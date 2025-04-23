@@ -42,6 +42,18 @@ class YPrint_TransformAjax {
         
         add_action('wp_ajax_yprint_transform_distribute', array($this, 'ajax_distribute'));
         add_action('wp_ajax_nopriv_yprint_transform_distribute', array($this, 'ajax_distribute'));
+        
+        add_action('wp_ajax_yprint_transform_duplicate', array($this, 'ajax_duplicate'));
+        add_action('wp_ajax_nopriv_yprint_transform_duplicate', array($this, 'ajax_duplicate'));
+        
+        add_action('wp_ajax_yprint_transform_delete', array($this, 'ajax_delete'));
+        add_action('wp_ajax_nopriv_yprint_transform_delete', array($this, 'ajax_delete'));
+        
+        add_action('wp_ajax_yprint_transform_lock', array($this, 'ajax_lock'));
+        add_action('wp_ajax_nopriv_yprint_transform_lock', array($this, 'ajax_lock'));
+        
+        add_action('wp_ajax_yprint_transform_unlock', array($this, 'ajax_unlock'));
+        add_action('wp_ajax_nopriv_yprint_transform_unlock', array($this, 'ajax_unlock'));
     }
     
     /**
@@ -360,4 +372,158 @@ class YPrint_TransformAjax {
         $direction = sanitize_text_field($_POST['direction']);
         
         if (empty($elements) || !is_array($elements) || count($elements) < 3) {
-            wp_send_json_error(__('Ungültige Elementliste. Mindestens 3 Elemente sind erforderlich.', 'yprint-designtool
+            wp_send_json_error(__('Ungültige Elementliste. Mindestens 3 Elemente sind erforderlich.', 'yprint-designtool'));
+            return;
+        }
+        
+        if (!in_array($direction, array('horizontal', 'vertical'))) {
+            wp_send_json_error(__('Ungültige Richtung.', 'yprint-designtool'));
+            return;
+        }
+        
+        // Transform-Klasse abrufen
+        $transform = YPrint_Transform::get_instance();
+        
+        // Elemente verteilen
+        $updated_elements = $transform->distribute($elements, $direction);
+        
+        // Erfolgreiche Antwort senden
+        wp_send_json_success(array(
+            'elements' => $updated_elements,
+            'message' => __('Elemente erfolgreich verteilt.', 'yprint-designtool')
+        ));
+    }
+    
+    /**
+     * AJAX-Handler für das Duplizieren eines Elements
+     */
+    public function ajax_duplicate() {
+        // Nonce-Überprüfung
+        check_ajax_referer('yprint-designtool-nonce', 'nonce');
+        
+        // Parameter überprüfen
+        if (empty($_POST['element'])) {
+            wp_send_json_error(__('Fehlende Parameter.', 'yprint-designtool'));
+            return;
+        }
+        
+        $element = json_decode(wp_unslash($_POST['element']), true);
+        
+        if (empty($element) || !isset($element['id'])) {
+            wp_send_json_error(__('Ungültiges Element.', 'yprint-designtool'));
+            return;
+        }
+        
+        // Dupliziertes Element erstellen
+        $duplicate = $element;
+        $duplicate['id'] = $element['id'] . '_copy_' . uniqid();
+        
+        // Position leicht versetzen, um Überlagerung zu vermeiden
+        $duplicate['left'] = $element['left'] + 20;
+        $duplicate['top'] = $element['top'] + 20;
+        
+        // Erfolgreiche Antwort senden
+        wp_send_json_success(array(
+            'element' => $duplicate,
+            'message' => __('Element erfolgreich dupliziert.', 'yprint-designtool')
+        ));
+    }
+    
+    /**
+     * AJAX-Handler für das Löschen von Elementen
+     */
+    public function ajax_delete() {
+        // Nonce-Überprüfung
+        check_ajax_referer('yprint-designtool-nonce', 'nonce');
+        
+        // Parameter überprüfen
+        if (empty($_POST['elements']) || empty($_POST['element_ids'])) {
+            wp_send_json_error(__('Fehlende Parameter.', 'yprint-designtool'));
+            return;
+        }
+        
+        $elements = json_decode(wp_unslash($_POST['elements']), true);
+        $element_ids = json_decode(wp_unslash($_POST['element_ids']), true);
+        
+        if (empty($elements) || !is_array($elements) || empty($element_ids) || !is_array($element_ids)) {
+            wp_send_json_error(__('Ungültige Parameter.', 'yprint-designtool'));
+            return;
+        }
+        
+        // Elemente filtern, um die zu löschenden Elemente zu entfernen
+        $updated_elements = array_filter($elements, function($element) use ($element_ids) {
+            return !in_array($element['id'], $element_ids);
+        });
+        
+        // Erfolgreiche Antwort senden
+        wp_send_json_success(array(
+            'elements' => array_values($updated_elements), // Array neu indizieren
+            'message' => _n(
+                'Element erfolgreich gelöscht.',
+                'Elemente erfolgreich gelöscht.',
+                count($element_ids),
+                'yprint-designtool'
+            )
+        ));
+    }
+    
+    /**
+     * AJAX-Handler für das Sperren von Elementen
+     */
+    public function ajax_lock() {
+        // Nonce-Überprüfung
+        check_ajax_referer('yprint-designtool-nonce', 'nonce');
+        
+        // Parameter überprüfen
+        if (empty($_POST['element'])) {
+            wp_send_json_error(__('Fehlende Parameter.', 'yprint-designtool'));
+            return;
+        }
+        
+        $element = json_decode(wp_unslash($_POST['element']), true);
+        
+        if (empty($element) || !isset($element['id'])) {
+            wp_send_json_error(__('Ungültiges Element.', 'yprint-designtool'));
+            return;
+        }
+        
+        // Element sperren
+        $element['locked'] = true;
+        
+        // Erfolgreiche Antwort senden
+        wp_send_json_success(array(
+            'element' => $element,
+            'message' => __('Element erfolgreich gesperrt.', 'yprint-designtool')
+        ));
+    }
+    
+    /**
+     * AJAX-Handler für das Entsperren von Elementen
+     */
+    public function ajax_unlock() {
+        // Nonce-Überprüfung
+        check_ajax_referer('yprint-designtool-nonce', 'nonce');
+        
+        // Parameter überprüfen
+        if (empty($_POST['element'])) {
+            wp_send_json_error(__('Fehlende Parameter.', 'yprint-designtool'));
+            return;
+        }
+        
+        $element = json_decode(wp_unslash($_POST['element']), true);
+        
+        if (empty($element) || !isset($element['id'])) {
+            wp_send_json_error(__('Ungültiges Element.', 'yprint-designtool'));
+            return;
+        }
+        
+        // Element entsperren
+        $element['locked'] = false;
+        
+        // Erfolgreiche Antwort senden
+        wp_send_json_success(array(
+            'element' => $element,
+            'message' => __('Element erfolgreich entsperrt.', 'yprint-designtool')
+        ));
+    }
+}
