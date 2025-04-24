@@ -111,6 +111,10 @@ final class YPrint_DesignTool {
         
         // Hook for third-party extensions
         do_action('yprint_designtool_init_modules', $this);
+
+        // SVG Enhancer initialisieren
+        $this->init_svg_enhancer();
+
     }
 
     /**
@@ -324,6 +328,9 @@ final class YPrint_DesignTool {
                 )
             );
         }
+
+        // SVG Enhancer Assets laden
+        $this->enqueue_svg_enhancer_assets();
     }
 
     /**
@@ -460,6 +467,97 @@ final class YPrint_DesignTool {
         // Include SVG preview template
         include YPRINT_DESIGNTOOL_PLUGIN_DIR . 'templates/svg-preview-demo.php';
     }
+
+    /**
+ * Integration der SVG-Enhancer-Funktionen in die Hauptplugin-Klasse
+ */
+
+// Folgende Funktionen zur YPrint_DesignTool-Klasse hinzufügen:
+
+/**
+ * Initialisiert den SVG Enhancer
+ */
+private function init_svg_enhancer() {
+    // Enhancer-Klasse laden
+    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-svg-enhancer.php';
+    
+    // SVG Enhancer-Instanz erstellen
+    $this->modules->svg_enhancer = YPrint_SVG_Enhancer::get_instance();
+}
+
+/**
+ * Registriert und lädt die SVG-Enhancer-Assets
+ */
+public function enqueue_svg_enhancer_assets() {
+    // Nur laden, wenn die SVG-Vorschau aktiv ist
+    global $post;
+    $load_assets = false;
+    
+    // Prüfen, ob wir auf einer Seite mit SVG-Vorschau sind
+    if (is_a($post, 'WP_Post') && (
+        has_shortcode($post->post_content, 'yprint_svg_preview') || 
+        has_shortcode($post->post_content, 'yprint_svg_display')
+    )) {
+        $load_assets = true;
+    }
+    
+    // Oder auf der SVG-Editor-Adminseite
+    if (isset($_GET['page']) && $_GET['page'] === 'yprint-designtool-svg-editor') {
+        $load_assets = true;
+    }
+    
+    if ($load_assets) {
+        // CSS laden
+        wp_enqueue_style(
+            'yprint-svg-enhancer',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/svg-enhancer.css',
+            array('yprint-svg-preview'),
+            YPRINT_DESIGNTOOL_VERSION
+        );
+        
+        // JS laden
+        wp_enqueue_script(
+            'yprint-svg-enhancer',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/svg-enhancer.js',
+            array('jquery', 'yprint-svg-preview'),
+            YPRINT_DESIGNTOOL_VERSION,
+            true
+        );
+        
+        // Localize script mit AJAX-URL und Nonce
+        wp_localize_script(
+            'yprint-svg-enhancer',
+            'yprintSVGEnhancer',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+                'i18n' => array(
+                    'lineThickness' => __('Linienstärke', 'yprint-designtool'),
+                    'detailLevel' => __('Detailgrad', 'yprint-designtool'),
+                    'enhanceLines' => __('Linien verstärken', 'yprint-designtool'),
+                    'simplifySVG' => __('SVG vereinfachen', 'yprint-designtool'),
+                    'resetSVG' => __('Zurücksetzen', 'yprint-designtool'),
+                    'noSVG' => __('Kein SVG gefunden.', 'yprint-designtool'),
+                    'processing' => __('Verarbeite...', 'yprint-designtool'),
+                    'success' => __('Erfolgreich!', 'yprint-designtool'),
+                    'error' => __('Fehler aufgetreten.', 'yprint-designtool')
+                )
+            )
+        );
+    }
+}
+
+// Die folgenden Zeilen müssen in der init_modules()-Methode hinzugefügt werden:
+/*
+// SVG Enhancer initialisieren
+$this->init_svg_enhancer();
+*/
+
+// Die folgenden Zeilen müssen in der enqueue_frontend_scripts()-Methode hinzugefügt werden:
+/*
+// SVG Enhancer Assets laden
+$this->enqueue_svg_enhancer_assets();
+*/
 }
 
 /**
