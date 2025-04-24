@@ -61,14 +61,23 @@ final class YPrint_DesignTool {
         // Load Vectorizer class
         require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-vectorizer.php';
         
+        // Load SVG Handler class
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-svg-handler.php';
+        
         // Load helper functions
         require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/helpers.php';
         
         // Load shortcodes
         require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/shortcodes.php';
         
+        // Load SVG shortcodes
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/svg-shortcodes';
+        
         // Load export functions
         require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/export.php';
+        
+        // Load SVG AJAX handlers
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/svg-ajax.php';
     }
 
     /**
@@ -93,6 +102,9 @@ final class YPrint_DesignTool {
     private function init_modules() {
         // Initialize Vectorizer
         $this->vectorizer = YPrint_Vectorizer::get_instance();
+        
+        // Initialize SVG Handler
+        $this->svg_handler = YPrint_SVG_Handler::get_instance();
         
         // Prepare a container for modules
         $this->modules = new stdClass();
@@ -123,6 +135,16 @@ final class YPrint_DesignTool {
             'manage_options',
             'yprint-designtool-vectorizer',
             array($this, 'vectorizer_page')
+        );
+        
+        // Add SVG Editor submenu page
+        add_submenu_page(
+            'yprint-designtool',
+            __('SVG Editor', 'yprint-designtool'),
+            __('SVG Editor', 'yprint-designtool'),
+            'manage_options',
+            'yprint-designtool-svg-editor',
+            array($this, 'svg_editor_page')
         );
     }
 
@@ -259,6 +281,49 @@ final class YPrint_DesignTool {
                 'pluginUrl' => YPRINT_DESIGNTOOL_PLUGIN_URL
             )
         );
+        
+        // Check if SVG preview shortcode is used
+        global $post;
+        if (is_a($post, 'WP_Post') && (
+            has_shortcode($post->post_content, 'yprint_svg_preview') || 
+            has_shortcode($post->post_content, 'yprint_svg_display')
+        )) {
+            // Enqueue SVG preview styles and scripts
+            wp_enqueue_style('dashicons');
+            wp_enqueue_style(
+                'yprint-svg-preview',
+                YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/svg-preview.css',
+                array(),
+                YPRINT_DESIGNTOOL_VERSION
+            );
+            
+            wp_enqueue_script(
+                'yprint-svg-preview',
+                YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/svg-preview.js',
+                array('jquery'),
+                YPRINT_DESIGNTOOL_VERSION,
+                true
+            );
+            
+            // Localize the script
+            wp_localize_script(
+                'yprint-svg-preview',
+                'yprintSVGPreview',
+                array(
+                    'ajaxUrl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+                    'isLoggedIn' => is_user_logged_in(),
+                    'texts' => array(
+                        'saveSuccess' => __('SVG erfolgreich gespeichert!', 'yprint-designtool'),
+                        'saveError' => __('Fehler beim Speichern.', 'yprint-designtool'),
+                        'downloadPreparing' => __('Download wird vorbereitet...', 'yprint-designtool'),
+                        'downloadReady' => __('SVG steht zum Download bereit!', 'yprint-designtool'),
+                        'downloadError' => __('Fehler beim Vorbereiten des Downloads.', 'yprint-designtool'),
+                        'noSVG' => __('Kein SVG vorhanden.', 'yprint-designtool')
+                    )
+                )
+            );
+        }
     }
 
     /**
@@ -277,8 +342,19 @@ final class YPrint_DesignTool {
             $is_active = true;
         }
         
-        // Check for the vectorizer test page
-        if (isset($_GET['page']) && $_GET['page'] === 'yprint-designtool-vectorizer') {
+        // Check for SVG-related shortcodes
+        if (is_a($post, 'WP_Post') && (
+            has_shortcode($post->post_content, 'yprint_svg_preview') || 
+            has_shortcode($post->post_content, 'yprint_svg_display')
+        )) {
+            $is_active = true;
+        }
+        
+        // Check for plugin admin pages
+        if (isset($_GET['page']) && (
+            $_GET['page'] === 'yprint-designtool-vectorizer' ||
+            $_GET['page'] === 'yprint-designtool-svg-editor'
+        )) {
             $is_active = true;
         }
         
@@ -336,6 +412,53 @@ final class YPrint_DesignTool {
     public function deactivate() {
         // Deactivation tasks
         flush_rewrite_rules();
+    }
+
+    /**
+     * SVG Editor page callback
+     */
+    public function svg_editor_page() {
+        // Enqueue required scripts for the SVG editor page
+        wp_enqueue_style(
+            'dashicons'
+        );
+        
+        wp_enqueue_style(
+            'yprint-svg-preview',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/svg-preview.css',
+            array(),
+            YPRINT_DESIGNTOOL_VERSION
+        );
+        
+        wp_enqueue_script(
+            'yprint-svg-preview',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/svg-preview.js',
+            array('jquery'),
+            YPRINT_DESIGNTOOL_VERSION,
+            true
+        );
+        
+        // Localize the script with basic data
+        wp_localize_script(
+            'yprint-svg-preview',
+            'yprintSVGPreview',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+                'isLoggedIn' => is_user_logged_in(),
+                'texts' => array(
+                    'saveSuccess' => __('SVG erfolgreich gespeichert!', 'yprint-designtool'),
+                    'saveError' => __('Fehler beim Speichern.', 'yprint-designtool'),
+                    'downloadPreparing' => __('Download wird vorbereitet...', 'yprint-designtool'),
+                    'downloadReady' => __('SVG steht zum Download bereit!', 'yprint-designtool'),
+                    'downloadError' => __('Fehler beim Vorbereiten des Downloads.', 'yprint-designtool'),
+                    'noSVG' => __('Kein SVG vorhanden.', 'yprint-designtool')
+                )
+            )
+        );
+        
+        // Include SVG preview template
+        include YPRINT_DESIGNTOOL_PLUGIN_DIR . 'templates/svg-preview-demo.php';
     }
 }
 
