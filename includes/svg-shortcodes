@@ -1,0 +1,206 @@
+<?php
+/**
+ * SVG Preview Shortcodes für YPrint DesignTool
+ *
+ * @package YPrint_DesignTool
+ * @subpackage Shortcodes
+ */
+
+// Exit if accessed directly
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Registriert die SVG-bezogenen Shortcodes
+ */
+function yprint_register_svg_shortcodes() {
+    add_shortcode('yprint_svg_preview', 'yprint_svg_preview_shortcode');
+}
+add_action('init', 'yprint_register_svg_shortcodes');
+
+/**
+ * Callback-Funktion für den SVG-Preview Shortcode
+ *
+ * @param array $atts Shortcode-Attribute
+ * @return string HTML-Ausgabe der SVG-Vorschau
+ */
+function yprint_svg_preview_shortcode($atts) {
+    // Standardattribute
+    $atts = shortcode_atts(array(
+        'width' => '100%',
+        'height' => '400px',
+        'svg' => '',
+        'svg_url' => '',
+        'background' => '#f5f5f5',
+        'controls' => 'true',
+        'toolbar' => 'false',
+        'id' => '',
+        'class' => ''
+    ), $atts, 'yprint_svg_preview');
+    
+    // Boolean-Werte konvertieren
+    $controls = filter_var($atts['controls'], FILTER_VALIDATE_BOOLEAN);
+    $toolbar = filter_var($atts['toolbar'], FILTER_VALIDATE_BOOLEAN);
+    
+    // Eindeutige ID für dieses SVG-Vorschau-Instanz
+    $instance_id = !empty($atts['id']) ? sanitize_html_class($atts['id']) : 'yprint-svg-preview-' . mt_rand(1000, 9999);
+    
+    // Zusätzliche Klassen
+    $classes = array('yprint-svg-preview');
+    if (!empty($atts['class'])) {
+        $classes[] = sanitize_html_class($atts['class']);
+    }
+    
+    // Assets laden
+    wp_enqueue_style('dashicons');
+    wp_enqueue_style('yprint-svg-preview', YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/svg-preview.css', array(), YPRINT_DESIGNTOOL_VERSION);
+    wp_enqueue_script('yprint-svg-preview', YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/svg-preview.js', array('jquery'), YPRINT_DESIGNTOOL_VERSION, true);
+    
+    // AJAX URL und Nonce für Frontend-Operationen
+    wp_localize_script('yprint-svg-preview', 'yprintSVGPreview', array(
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+        'isLoggedIn' => is_user_logged_in(),
+        'texts' => array(
+            'saveSuccess' => __('SVG erfolgreich gespeichert!', 'yprint-designtool'),
+            'saveError' => __('Fehler beim Speichern.', 'yprint-designtool'),
+            'downloadPreparing' => __('Download wird vorbereitet...', 'yprint-designtool'),
+            'downloadReady' => __('SVG steht zum Download bereit!', 'yprint-designtool'),
+            'downloadError' => __('Fehler beim Vorbereiten des Downloads.', 'yprint-designtool'),
+            'noSVG' => __('Kein SVG vorhanden.', 'yprint-designtool')
+        )
+    ));
+    
+    // SVG-Inhalt für die direkte Einbettung
+    $svg_content = '';
+    if (!empty($atts['svg'])) {
+        $svg_content = $atts['svg'];
+    }
+    
+    // Container-Stil
+    $container_style = sprintf(
+        'width: %s; height: %s; background-color: %s;',
+        esc_attr($atts['width']),
+        esc_attr($atts['height']),
+        esc_attr($atts['background'])
+    );
+    
+    // Ausgabe-Buffer starten
+    ob_start();
+    
+    ?>
+    <div id="<?php echo esc_attr($instance_id); ?>" 
+         class="<?php echo esc_attr(implode(' ', $classes)); ?>" 
+         style="<?php echo esc_attr($container_style); ?>"
+         data-controls="<?php echo esc_attr($controls ? 'true' : 'false'); ?>"
+         data-toolbar="<?php echo esc_attr($toolbar ? 'true' : 'false'); ?>"
+         data-svg="<?php echo esc_attr($svg_content); ?>"
+         <?php if (!empty($atts['svg_url'])) : ?>
+         data-svg-url="<?php echo esc_url($atts['svg_url']); ?>"
+         <?php endif; ?>>
+        
+        <?php if ($toolbar) : ?>
+        <div class="yprint-svg-toolbar">
+            <div class="yprint-svg-toolbar-group">
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="zoom-in" title="<?php esc_attr_e('Vergrößern', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-plus"></span>
+                </button>
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="zoom-out" title="<?php esc_attr_e('Verkleinern', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-minus"></span>
+                </button>
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="rotate" title="<?php esc_attr_e('Drehen', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-image-rotate"></span>
+                </button>
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="reset" title="<?php esc_attr_e('Zurücksetzen', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-image-rotate-left"></span>
+                </button>
+            </div>
+            <div class="yprint-svg-toolbar-group">
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="download" title="<?php esc_attr_e('Herunterladen', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-download"></span>
+                </button>
+                <?php if (is_user_logged_in()) : ?>
+                <button type="button" class="yprint-svg-toolbar-btn" data-action="save-to-media" title="<?php esc_attr_e('In Medienbibliothek speichern', 'yprint-designtool'); ?>">
+                    <span class="dashicons dashicons-admin-media"></span>
+                </button>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <div class="yprint-svg-container"></div>
+        <div class="yprint-svg-message"></div>
+    </div>
+    
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#<?php echo esc_js($instance_id); ?>').yprintSVGPreview({
+                width: '<?php echo esc_js($atts['width']); ?>',
+                height: '<?php echo esc_js($atts['height']); ?>',
+                background: '<?php echo esc_js($atts['background']); ?>',
+                controls: <?php echo $controls ? 'true' : 'false'; ?>,
+                isLoggedIn: <?php echo is_user_logged_in() ? 'true' : 'false'; ?>,
+                ajaxUrl: yprintSVGPreview.ajaxUrl,
+                nonce: yprintSVGPreview.nonce
+            });
+        });
+    </script>
+    <?php
+    
+    // Rückgabe des Ausgabe-Buffers
+    return ob_get_clean();
+}
+
+/**
+ * Shortcode für die Anzeige einer SVG-Datei aus der Medienbibliothek
+ * 
+ * @param array $atts Shortcode-Attribute
+ * @return string HTML-Ausgabe der SVG
+ */
+function yprint_svg_display_shortcode($atts) {
+    // Standardattribute
+    $atts = shortcode_atts(array(
+        'id' => 0,
+        'url' => '',
+        'width' => '100%',
+        'height' => 'auto',
+        'class' => ''
+    ), $atts, 'yprint_svg_display');
+    
+    // SVG URL ermitteln
+    $svg_url = '';
+    if (!empty($atts['id'])) {
+        $svg_url = wp_get_attachment_url(intval($atts['id']));
+    } elseif (!empty($atts['url'])) {
+        $svg_url = esc_url($atts['url']);
+    }
+    
+    if (empty($svg_url)) {
+        return '';
+    }
+    
+    // Zusätzliche Klassen
+    $classes = array('yprint-svg-display');
+    if (!empty($atts['class'])) {
+        $classes[] = sanitize_html_class($atts['class']);
+    }
+    
+    // Nur SVG-Dateien erlauben
+    $filetype = wp_check_filetype($svg_url);
+    if ($filetype['ext'] !== 'svg') {
+        return '<p class="yprint-error">' . __('Nur SVG-Dateien können angezeigt werden.', 'yprint-designtool') . '</p>';
+    }
+    
+    // Ausgabe
+    $output = sprintf(
+        '<div class="%1$s"><img src="%2$s" alt="" width="%3$s" height="%4$s" /></div>',
+        esc_attr(implode(' ', $classes)),
+        esc_url($svg_url),
+        esc_attr($atts['width']),
+        esc_attr($atts['height'])
+    );
+    
+    return $output;
+}
+add_shortcode('yprint_svg_display', 'yprint_svg_display_shortcode');

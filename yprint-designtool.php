@@ -346,5 +346,6 @@ function YPrint_DesignTool() {
     return YPrint_DesignTool::instance();
 }
 
+
 // Initialize the plugin
 YPrint_DesignTool();
