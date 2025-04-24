@@ -186,7 +186,7 @@ class YPrint_Vectorizer {
         $transient_key = 'yprint_vector_' . md5(basename($temp_file) . serialize($options));
         set_transient($transient_key, $result['content'], HOUR_IN_SECONDS);
         
-        // Return success response
+        // Return success response with debug info
         wp_send_json_success(array(
             'svg' => $result['content'],
             'file_url' => $result['file_url'],
@@ -566,7 +566,7 @@ class YPrint_Vectorizer {
         return file_put_contents($filename, $bmp) !== false;
     }
     
-    /**
+   /**
      * Vectorize an image using internal PHP method
      *
      * @param string $image_path Path to the image
@@ -623,6 +623,15 @@ class YPrint_Vectorizer {
             // Convert to BW and create simple path tracing
             $svg .= $this->generate_bw_svg_content($image, $options);
         }
+        
+        // Close SVG
+        $svg .= '</svg>';
+        
+        // Clean up
+        imagedestroy($image);
+        
+        return $svg;
+    
         
         // Close SVG
         $svg .= '</svg>';

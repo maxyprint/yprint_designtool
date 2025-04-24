@@ -154,6 +154,26 @@ final class YPrint_DesignTool {
      * Vectorizer page callback
      */
     public function vectorizer_page() {
+        // Enqueue required scripts for the vectorizer page
+        wp_enqueue_script(
+            'yprint-designtool-admin',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/admin.js',
+            array('jquery'),
+            YPRINT_DESIGNTOOL_VERSION,
+            true
+        );
+        
+        // Localize the script with basic data
+        wp_localize_script(
+            'yprint-designtool-admin',
+            'yprintDesignTool',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+                'pluginUrl' => YPRINT_DESIGNTOOL_PLUGIN_URL
+            )
+        );
+        
         // Include vectorizer test template
         include YPRINT_DESIGNTOOL_PLUGIN_DIR . 'templates/vectorizer-test.php';
     }
