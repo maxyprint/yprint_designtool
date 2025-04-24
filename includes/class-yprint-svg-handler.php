@@ -61,9 +61,6 @@ class YPrint_SVG_Handler {
         $this->init_hooks();
     }
     
-    /**
-     * Initialisiert Hooks
-     */
     private function init_hooks() {
         // AJAX-Aktionen registrieren
         add_action('wp_ajax_yprint_save_svg_to_media', array($this, 'ajax_save_svg_to_media'));
@@ -72,6 +69,9 @@ class YPrint_SVG_Handler {
         
         // Diese AJAX-Aktionen auch für nicht eingeloggte Benutzer verfügbar machen
         add_action('wp_ajax_nopriv_yprint_download_svg', array($this, 'ajax_download_svg'));
+        
+        // REST API-Endpunkte für SVG-Pfadoperationen registrieren
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
     }
     
     /**
@@ -776,5 +776,470 @@ class YPrint_SVG_Handler {
         }
         
         return (float) $value;
+    }
+
+    /**
+     * Registriert REST-API-Routen
+     */
+    public function register_rest_routes() {
+        register_rest_route('yprint-svg-path/v1', '/combine-paths', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_combine_paths'),
+            'permission_callback' => function () {
+                return current_user_can('edit_posts');
+            }
+        ));
+        
+        register_rest_route('yprint-svg-path/v1', '/break-apart', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_break_apart'),
+            'permission_callback' => function () {
+                return current_user_can('edit_posts');
+            }
+        ));
+        
+        register_rest_route('yprint-svg-path/v1', '/shape-to-path', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_shape_to_path'),
+            'permission_callback' => function () {
+                return current_user_can('edit_posts');
+            }
+        ));
+        
+        register_rest_route('yprint-svg-path/v1', '/reverse-path', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_reverse_path'),
+            'permission_callback' => function () {
+                return current_user_can('edit_posts');
+            }
+        ));
+        
+        register_rest_route('yprint-svg-path/v1', '/enhance-lines', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_enhance_lines'),
+            'permission_callback' => function () {
+                return current_user_can('edit_posts');
+            }
+        ));
+    }
+    
+    /**
+     * REST-API-Endpunkt zum Kombinieren von Pfaden
+     */
+    public function rest_combine_paths($request) {
+        $params = $request->get_params();
+        
+        if (!isset($params['paths']) || !is_array($params['paths'])) {
+            return new WP_Error('invalid_params', __('Ungültige Parameter', 'yprint-designtool'), array('status' => 400));
+        }
+        
+        $paths = $params['paths'];
+        $result = $this->combine_paths($paths);
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'combined_path' => $result
+        ));
+    }
+    
+    /**
+     * REST-API-Endpunkt zum Aufbrechen von Pfaden
+     */
+    public function rest_break_apart($request) {
+        $params = $request->get_params();
+        
+        if (!isset($params['path']) || empty($params['path'])) {
+            return new WP_Error('invalid_params', __('Ungültige Parameter', 'yprint-designtool'), array('status' => 400));
+        }
+        
+        $path = $params['path'];
+        $result = $this->break_apart_path($path);
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'paths' => $result
+        ));
+    }
+    
+    /**
+     * REST-API-Endpunkt zum Konvertieren von Formen in Pfade
+     */
+    public function rest_shape_to_path($request) {
+        $params = $request->get_params();
+        
+        if (!isset($params['shape']) || empty($params['shape'])) {
+            return new WP_Error('invalid_params', __('Ungültige Parameter', 'yprint-designtool'), array('status' => 400));
+        }
+        
+        $shape = $params['shape'];
+        $result = $this->shape_to_path($shape);
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'path' => $result
+        ));
+    }
+    
+    /**
+     * REST-API-Endpunkt zum Umkehren von Pfaden
+     */
+    public function rest_reverse_path($request) {
+        $params = $request->get_params();
+        
+        if (!isset($params['path']) || empty($params['path'])) {
+            return new WP_Error('invalid_params', __('Ungültige Parameter', 'yprint-designtool'), array('status' => 400));
+        }
+        
+        $path = $params['path'];
+        $result = $this->reverse_path($path);
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'reversed_path' => $result
+        ));
+    }
+    
+    /**
+     * REST-API-Endpunkt zum Verstärken von Linien
+     */
+    public function rest_enhance_lines($request) {
+        $params = $request->get_params();
+        
+        if (!isset($params['path']) || empty($params['path'])) {
+            return new WP_Error('invalid_params', __('Ungültige Parameter', 'yprint-designtool'), array('status' => 400));
+        }
+        
+        $path = $params['path'];
+        $thickness = isset($params['thickness']) ? floatval($params['thickness']) : 2.0;
+        
+        $result = $this->enhance_lines($path, $thickness);
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'enhanced_path' => $result
+        ));
+    }
+    
+    /**
+     * Kombiniert mehrere SVG-Pfade zu einem
+     *
+     * @param array $paths Array von SVG-Pfadstrings
+     * @return string Kombinierter Pfadstring
+     */
+    public function combine_paths($paths) {
+        if (empty($paths)) {
+            return '';
+        }
+        
+        // d-Attribute extrahieren und kombinieren
+        $combined_path = '';
+        foreach ($paths as $path) {
+            // d-Attribut mit Regex extrahieren
+            if (preg_match('/d="([^"]*)"/', $path, $matches)) {
+                $d_attr = $matches[1];
+                // Abschließenden Z-Befehl entfernen und Leerzeichen hinzufügen
+                $d_attr = rtrim($d_attr, 'Zz') . ' ';
+                $combined_path .= $d_attr;
+            }
+        }
+        
+        // Abschließendes Z hinzufügen, falls nötig
+        if (!empty($combined_path)) {
+            $combined_path .= 'Z';
+        }
+        
+        return $combined_path;
+    }
+    
+    /**
+     * Bricht einen SVG-Pfad in mehrere Pfade auf
+     *
+     * @param string $path SVG-Pfadstring
+     * @return array Array von Pfadstrings
+     */
+    public function break_apart_path($path) {
+        if (empty($path)) {
+            return array();
+        }
+        
+        // d-Attribut extrahieren
+        if (!preg_match('/d="([^"]*)"/', $path, $matches)) {
+            return array($path);
+        }
+        
+        $d_attr = $matches[1];
+        
+        // Den Pfad bei 'M'-Befehlen aufteilen (neue Teilpfade)
+        preg_match_all('/M[^M]*/', $d_attr, $subpaths);
+        
+        $result = array();
+        foreach ($subpaths[0] as $subpath) {
+            // Ein neues Pfadelement mit dem Teilpfad erstellen
+            $new_path = str_replace($matches[1], $subpath, $path);
+            $result[] = $new_path;
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Konvertiert Form-Elemente in Pfadelemente
+     *
+     * @param string $shape SVG-Formstring (rect, circle, etc.)
+     * @return string Pfadstring
+     */
+    public function shape_to_path($shape) {
+        // Formtyp extrahieren
+        if (preg_match('/<(rect|circle|ellipse|line|polygon|polyline)\s/', $shape, $matches)) {
+            $shape_type = $matches[1];
+            
+            switch ($shape_type) {
+                case 'rect':
+                    return $this->rect_to_path($shape);
+                case 'circle':
+                    return $this->circle_to_path($shape);
+                case 'ellipse':
+                    return $this->ellipse_to_path($shape);
+                case 'line':
+                    return $this->line_to_path($shape);
+                case 'polygon':
+                    return $this->polygon_to_path($shape);
+                case 'polyline':
+                    return $this->polyline_to_path($shape);
+                default:
+                    return $shape;
+            }
+        }
+        
+        return $shape;
+    }
+    
+    /**
+     * Methoden zur Umwandlung verschiedener Formen in Pfade
+     * (Aus der wordpress-svg-path-plugin.php übernommen)
+     */
+    private function rect_to_path($rect) {
+        // Attribute extrahieren
+        preg_match('/x="([^"]*)"/', $rect, $x_matches);
+        preg_match('/y="([^"]*)"/', $rect, $y_matches);
+        preg_match('/width="([^"]*)"/', $rect, $width_matches);
+        preg_match('/height="([^"]*)"/', $rect, $height_matches);
+        preg_match('/rx="([^"]*)"/', $rect, $rx_matches);
+        preg_match('/ry="([^"]*)"/', $rect, $ry_matches);
+        
+        $x = isset($x_matches[1]) ? floatval($x_matches[1]) : 0;
+        $y = isset($y_matches[1]) ? floatval($y_matches[1]) : 0;
+        $width = isset($width_matches[1]) ? floatval($width_matches[1]) : 0;
+        $height = isset($height_matches[1]) ? floatval($height_matches[1]) : 0;
+        $rx = isset($rx_matches[1]) ? floatval($rx_matches[1]) : 0;
+        $ry = isset($ry_matches[1]) ? floatval($ry_matches[1]) : $rx;
+        
+        // Wenn beide rx und ry 0 sind, zeichne ein einfaches Rechteck
+        if ($rx == 0 && $ry == 0) {
+            $path_d = sprintf("M %f,%f H %f V %f H %f Z", 
+                $x, $y, 
+                $x + $width, 
+                $y + $height, 
+                $x
+            );
+        } else {
+            // Stelle sicher, dass rx und ry nicht größer als die Hälfte der Breite und Höhe sind
+            $rx = min($rx, $width / 2);
+            $ry = min($ry, $height / 2);
+            
+            // Zeichne ein abgerundetes Rechteck
+            $path_d = sprintf("M %f,%f h %f a %f,%f 0 0 1 %f,%f v %f a %f,%f 0 0 1 %f,%f h %f a %f,%f 0 0 1 %f,%f v %f a %f,%f 0 0 1 %f,%f z",
+                $x + $rx, $y,
+                $width - 2 * $rx,
+                $rx, $ry, $rx, $ry,
+                $height - 2 * $ry,
+                $rx, $ry, -$rx, $ry,
+                -($width - 2 * $rx),
+                $rx, $ry, -$rx, -$ry,
+                -($height - 2 * $ry),
+                $rx, $ry, $rx, -$ry
+            );
+        }
+        
+        // Erstelle ein neues Pfadelement mit den Attributen des Rechtecks
+        $path = preg_replace('/<rect\s/', '<path ', $rect);
+        $path = preg_replace('/\sx="[^"]*"/', '', $path);
+        $path = preg_replace('/\sy="[^"]*"/', '', $path);
+        $path = preg_replace('/\swidth="[^"]*"/', '', $path);
+        $path = preg_replace('/\sheight="[^"]*"/', '', $path);
+        $path = preg_replace('/\srx="[^"]*"/', '', $path);
+        $path = preg_replace('/\sry="[^"]*"/', '', $path);
+        $path = str_replace('/>', ' d="' . $path_d . '" />', $path);
+        
+        return $path;
+    }
+    
+    // Weitere Methoden für andere Formen hier einfügen...
+    
+    /**
+     * Kehrt einen SVG-Pfad um
+     *
+     * @param string $path SVG-Pfadstring
+     * @return string Umgekehrter Pfadstring
+     */
+    public function reverse_path($path) {
+        if (empty($path)) {
+            return '';
+        }
+        
+        // d-Attribut extrahieren
+        if (!preg_match('/d="([^"]*)"/', $path, $matches)) {
+            return $path;
+        }
+        
+        $d_attr = $matches[1];
+        
+        // Den Pfad normalisieren
+        $d_attr = preg_replace('/([a-zA-Z])/', ' $1 ', $d_attr);
+        $d_attr = preg_replace('/\s+/', ' ', trim($d_attr));
+        
+        // In Befehle und Koordinaten aufteilen
+        $tokens = explode(' ', $d_attr);
+        $commands = array();
+        $current_command = '';
+        $current_points = array();
+        
+        foreach ($tokens as $token) {
+            if (preg_match('/^[a-zA-Z]$/', $token)) {
+                if (!empty($current_command)) {
+                    $commands[] = array(
+                        'command' => $current_command,
+                        'points' => $current_points
+                    );
+                }
+                $current_command = $token;
+                $current_points = array();
+            } else {
+                $current_points[] = $token;
+            }
+        }
+        
+        // Den letzten Befehl hinzufügen
+        if (!empty($current_command)) {
+            $commands[] = array(
+                'command' => $current_command,
+                'points' => $current_points
+            );
+        }
+        
+        // Die Befehle umkehren
+        $reversed_commands = array_reverse($commands);
+        
+        // Den neuen Pfad mit dem letzten Punkt des ursprünglichen Pfads beginnen
+        $last_command = end($commands);
+        $last_points = $last_command['points'];
+        $last_x = floatval($last_points[count($last_points) - 2]);
+        $last_y = floatval($last_points[count($last_points) - 1]);
+        
+        $reversed_path = "M " . $last_x . "," . $last_y;
+        
+        // Jeden Befehl verarbeiten
+        foreach ($reversed_commands as $i => $cmd) {
+            $command = $cmd['command'];
+            $points = $cmd['points'];
+            
+            // Verschiedene Befehle behandeln
+            switch (strtoupper($command)) {
+                case 'M':
+                    // Den ersten M-Befehl überspringen, da wir den Pfad bereits begonnen haben
+                    if ($i > 0) {
+                        $reversed_path .= " L " . $points[0] . "," . $points[1];
+                    }
+                    break;
+                case 'L':
+                    $reversed_path .= " L " . $points[0] . "," . $points[1];
+                    break;
+                case 'H':
+                    $reversed_path .= " H " . $points[0];
+                    break;
+                case 'V':
+                    $reversed_path .= " V " . $points[0];
+                    break;
+                case 'C':
+                    // Bezier-Kurve - Kontrollpunkte müssen umgekehrt werden
+                    $reversed_path .= " C " . $points[2] . "," . $points[3] . " " . 
+                                      $points[0] . "," . $points[1] . " " . 
+                                      $points[4] . "," . $points[5];
+                    break;
+                case 'S':
+                    // Glatte Bezier-Kurve - Kontrollpunkte müssen umgekehrt werden
+                    $reversed_path .= " S " . $points[0] . "," . $points[1] . " " . 
+                                      $points[2] . "," . $points[3];
+                    break;
+                case 'Q':
+                    // Quadratische Bezier-Kurve
+                    $reversed_path .= " Q " . $points[0] . "," . $points[1] . " " . 
+                                      $points[2] . "," . $points[3];
+                    break;
+                case 'T':
+                    // Glatte quadratische Bezier-Kurve
+                    $reversed_path .= " T " . $points[0] . "," . $points[1];
+                    break;
+                case 'A':
+                    // Bogen - die gleichen Parameter beibehalten
+                    $reversed_path .= " A " . implode(' ', $points);
+                    break;
+                case 'Z':
+                    // Pfad am Ende schließen
+                    if ($i === 0) {
+                        $reversed_path .= " Z";
+                    }
+                    break;
+            }
+        }
+        
+        // Die ursprünglichen Pfaddaten durch die umgekehrten ersetzen
+        $reversed = str_replace($matches[1], $reversed_path, $path);
+        
+        return $reversed;
+    }
+    
+    /**
+     * Verstärkt Linien in einem SVG-Pfad
+     *
+     * @param string $path SVG-Pfadstring
+     * @param float $thickness Dicke der Linien
+     * @return string Pfad mit verstärkten Linien
+     */
+    public function enhance_lines($path, $thickness = 2.0) {
+        if (empty($path)) {
+            return '';
+        }
+        
+        // d-Attribut extrahieren
+        if (!preg_match('/d="([^"]*)"/', $path, $matches)) {
+            return $path;
+        }
+        
+        // Pfadtag finden
+        if (preg_match('/<path\b[^>]*>/', $path, $tag_matches)) {
+            $path_tag = $tag_matches[0];
+            
+            // Prüfen, ob bereits stroke-width vorhanden ist
+            if (preg_match('/stroke-width="([^"]*)"/', $path, $sw_matches)) {
+                // Vorhandenes stroke-width ersetzen
+                $path = str_replace($sw_matches[0], 'stroke-width="' . $thickness . '"', $path);
+            } else {
+                // Neues stroke-width hinzufügen
+                $path = str_replace($path_tag, $path_tag . ' stroke-width="' . $thickness . '"', $path);
+            }
+            
+            // Sicherstellen, dass stroke Attribut vorhanden ist
+            if (!preg_match('/stroke="([^"]*)"/', $path)) {
+                $path = str_replace($path_tag, $path_tag . ' stroke="currentColor"', $path);
+            }
+            
+            // Sicherstellen, dass fill Attribut korrekt gesetzt ist
+            if (!preg_match('/fill="([^"]*)"/', $path)) {
+                $path = str_replace($path_tag, $path_tag . ' fill="none"', $path);
+            }
+        }
+        
+        return $path;
     }
 }

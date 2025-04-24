@@ -90,10 +90,66 @@ if (!defined('ABSPATH')) {
         </div>
         
         <div class="yprint-save-result" style="display: none;">
-            <h3><?php _e('Speichervorgang abgeschlossen', 'yprint-designtool'); ?></h3>
-            <div class="yprint-save-message"></div>
+        <h3><?php _e('Speichervorgang abgeschlossen', 'yprint-designtool'); ?></h3>
+        <div class="yprint-save-message"></div>
+    </div>
+    
+    <div class="yprint-demo-section">
+        <h2><?php _e('SVG-Pfadoperationen', 'yprint-designtool'); ?></h2>
+        
+        <div class="yprint-svg-path-operations">
+            <p><?php _e('Führe Operationen an SVG-Pfaden aus:', 'yprint-designtool'); ?></p>
+            
+            <div class="yprint-path-operations-buttons">
+                <button type="button" class="button yprint-svg-path-operation" data-operation="enhance-lines">
+                    <?php _e('Linien verstärken', 'yprint-designtool'); ?>
+                </button>
+                
+                <button type="button" class="button yprint-svg-path-operation" data-operation="combine">
+                    <?php _e('Pfade kombinieren', 'yprint-designtool'); ?>
+                </button>
+                
+                <button type="button" class="button yprint-svg-path-operation" data-operation="break-apart">
+                    <?php _e('Pfad aufbrechen', 'yprint-designtool'); ?>
+                </button>
+                
+                <button type="button" class="button yprint-svg-path-operation" data-operation="to-path">
+                    <?php _e('Form zu Pfad', 'yprint-designtool'); ?>
+                </button>
+                
+                <button type="button" class="button yprint-svg-path-operation" data-operation="reverse">
+                    <?php _e('Pfad umkehren', 'yprint-designtool'); ?>
+                </button>
+            </div>
+            
+            <div class="yprint-svg-path-result" style="display: none;">
+                <h3><?php _e('Operationsergebnis', 'yprint-designtool'); ?></h3>
+                <div class="yprint-svg-path-message"></div>
+            </div>
         </div>
     </div>
+</div>
+
+<style>
+.yprint-path-operations-buttons {
+    margin: 15px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.yprint-svg-path-operation {
+    min-width: 120px;
+}
+</style>
+
+<script type="text/javascript">
+// Globale Variable für die SVG-Pfad-Operationen
+var YPrintSVGPathData = {
+    restUrl: '<?php echo esc_js(rest_url('yprint-svg-path/v1/')); ?>',
+    nonce: '<?php echo esc_js(wp_create_nonce('wp_rest')); ?>'
+};
+</script>
 </div>
 
 <style>
