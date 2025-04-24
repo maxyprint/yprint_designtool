@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
  */
 function yprint_designtool_register_shortcodes() {
     add_shortcode('yprint_designtool', 'yprint_designtool_shortcode');
+    add_shortcode('yprint_vectorizer', 'yprint_vectorizer_shortcode');
 }
 add_action('init', 'yprint_designtool_register_shortcodes');
 
@@ -44,6 +45,10 @@ function yprint_designtool_shortcode($atts) {
         esc_attr($atts['width']), 
         esc_attr($atts['height'])
     );
+    
+    // Assets laden
+    wp_enqueue_style('yprint-designtool-frontend');
+    wp_enqueue_script('yprint-designtool-frontend');
     
     // Ausgabe-Buffer starten
     ob_start();
@@ -79,6 +84,68 @@ function yprint_designtool_shortcode($atts) {
             template: '<?php echo esc_js($atts['template']); ?>'
         };
     </script>
+    <?php
+    
+    // Rückgabe des Ausgabe-Buffers
+    return ob_get_clean();
+}
+
+/**
+ * Callback-Funktion für den Vektorisierungs-Shortcode
+ *
+ * @param array $atts Shortcode-Attribute
+ * @return string HTML-Ausgabe des Vektorisierungs-Tools
+ */
+function yprint_vectorizer_shortcode($atts) {
+    // Standardattribute
+    $atts = shortcode_atts(array(
+        'width' => '100%',
+        'height' => 'auto',
+        'detail' => 'medium',
+        'color' => 'mono',
+        'target' => ''
+    ), $atts, 'yprint_vectorizer');
+    
+    // Assets laden
+    wp_enqueue_style('yprint-vectorizer', YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/vectorizer.css');
+    wp_enqueue_script('yprint-vectorizer', YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/vectorizer.js', array('jquery'), null, true);
+    
+    // Einstellungen an das JavaScript übergeben
+    wp_localize_script('yprint-vectorizer', 'yprintVectorizerSettings', array(
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+        'maxUploadSize' => yprint_designtool_get_max_upload_size(),
+        'defaultDetail' => $atts['detail'],
+        'defaultColor' => $atts['color'],
+        'targetField' => $atts['target']
+    ));
+    
+    // Eindeutige ID für diese Vektorisierer-Instanz
+    $instance_id = 'yprint-vectorizer-' . uniqid();
+    
+    // Container-Stil
+    $container_style = sprintf(
+        'width: %s; height: %s;', 
+        esc_attr($atts['width']), 
+        esc_attr($atts['height'])
+    );
+    
+    // Ausgabe-Buffer starten
+    ob_start();
+    
+    ?>
+    <div id="<?php echo esc_attr($instance_id); ?>" 
+         class="yprint-vectorizer-container" 
+         style="<?php echo $container_style; ?>"
+         data-yprint-vectorizer
+         data-nonce="<?php echo wp_create_nonce('yprint-designtool-nonce'); ?>"
+         data-ajax-url="<?php echo admin_url('admin-ajax.php'); ?>"
+         data-max-upload-size="<?php echo yprint_designtool_get_max_upload_size(); ?>"
+         data-default-detail="<?php echo esc_attr($atts['detail']); ?>"
+         data-default-color="<?php echo esc_attr($atts['color']); ?>"
+         data-target-field="<?php echo esc_attr($atts['target']); ?>">
+        <!-- Container wird per JavaScript gefüllt -->
+    </div>
     <?php
     
     // Rückgabe des Ausgabe-Buffers

@@ -29,6 +29,11 @@ final class YPrint_DesignTool {
      * Singleton instance
      */
     private static $instance = null;
+    
+    /**
+     * Vectorizer instance
+     */
+    public $vectorizer = null;
 
     /**
      * Get singleton instance
@@ -49,19 +54,22 @@ final class YPrint_DesignTool {
         $this->init_modules();
     }
 
- /**
- * Include required files
- */
-private function includes() {
-    // Lade Hilfsfunktionen
-    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/helpers.php';
-    
-    // Lade Shortcodes
-    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/shortcodes.php';
-    
-    // Lade Export-Funktionen
-    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/export.php';
-}
+    /**
+     * Include required files
+     */
+    private function includes() {
+        // Load Vectorizer class
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-vectorizer.php';
+        
+        // Load helper functions
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/helpers.php';
+        
+        // Load shortcodes
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/shortcodes.php';
+        
+        // Load export functions
+        require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/export.php';
+    }
 
     /**
      * Initialize hooks
@@ -80,18 +88,18 @@ private function includes() {
     }
 
     /**
- * Initialize modules
- */
-private function init_modules() {
-    // Module werden später hinzugefügt, wenn sie implementiert sind
-    // Dies dient als Vorbereitung für zukünftige Module
-    
-    // Bereite einen Speicherort für Modulreferenzen vor
-    $this->modules = new stdClass();
-    
-    // Hook für Drittanbieter-Erweiterungen
-    do_action('yprint_designtool_init_modules', $this);
-}
+     * Initialize modules
+     */
+    private function init_modules() {
+        // Initialize Vectorizer
+        $this->vectorizer = YPrint_Vectorizer::get_instance();
+        
+        // Prepare a container for modules
+        $this->modules = new stdClass();
+        
+        // Hook for third-party extensions
+        do_action('yprint_designtool_init_modules', $this);
+    }
 
     /**
      * Register admin menu
@@ -106,19 +114,48 @@ private function init_modules() {
             'dashicons-art',
             30
         );
+        
+        // Add Vectorizer submenu page
+        add_submenu_page(
+            'yprint-designtool',
+            __('Bild Vektorisieren', 'yprint-designtool'),
+            __('Vektorisierer', 'yprint-designtool'),
+            'manage_options',
+            'yprint-designtool-vectorizer',
+            array($this, 'vectorizer_page')
+        );
     }
 
     /**
      * Admin page callback
      */
     public function admin_page() {
-        // Simple admin page for now
         ?>
         <div class="wrap">
             <h1><?php echo esc_html__('YPrint DesignTool', 'yprint-designtool'); ?></h1>
             <p><?php echo esc_html__('Willkommen beim YPrint DesignTool! Hier werden bald die Einstellungen und Features angezeigt.', 'yprint-designtool'); ?></p>
+            
+            <div class="card">
+                <h2><?php echo esc_html__('Verfügbare Tools', 'yprint-designtool'); ?></h2>
+                <ul>
+                    <li>
+                        <a href="<?php echo admin_url('admin.php?page=yprint-designtool-vectorizer'); ?>">
+                            <?php echo esc_html__('Bild Vektorisieren', 'yprint-designtool'); ?>
+                        </a> - 
+                        <?php echo esc_html__('Konvertiere Rasterbilder (JPEG, PNG) in Vektorgrafiken (SVG)', 'yprint-designtool'); ?>
+                    </li>
+                </ul>
+            </div>
         </div>
         <?php
+    }
+    
+    /**
+     * Vectorizer page callback
+     */
+    public function vectorizer_page() {
+        // Include vectorizer test template
+        include YPRINT_DESIGNTOOL_PLUGIN_DIR . 'templates/vectorizer-test.php';
     }
 
     /**
@@ -146,115 +183,138 @@ private function init_modules() {
             YPRINT_DESIGNTOOL_VERSION,
             true
         );
-    }
-
-    /**
- * Enqueue frontend scripts and styles
- */
-public function enqueue_frontend_scripts() {
-    // Nur laden, wenn das DesignTool aktiv ist (über Shortcode oder Template)
-    if (!$this->is_designtool_active()) {
-        return;
-    }
-    
-    // Grundlegende Styles für das DesignTool
-    wp_enqueue_style(
-        'yprint-designtool-frontend',
-        YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/frontend.css',
-        array(),
-        YPRINT_DESIGNTOOL_VERSION
-    );
-    
-    // Grundlegendes JavaScript für das DesignTool
-    wp_enqueue_script(
-        'yprint-designtool-frontend',
-        YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/frontend.js',
-        array('jquery'),
-        YPRINT_DESIGNTOOL_VERSION,
-        true
-    );
-    
-    // Lokalisiere das Script mit Basis-Daten
-    wp_localize_script(
-        'yprint-designtool-frontend',
-        'yprintDesignTool',
-        array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('yprint-designtool-nonce'),
-            'pluginUrl' => YPRINT_DESIGNTOOL_PLUGIN_URL
-        )
-    );
-}
-
-/**
- * Prüft, ob das DesignTool auf der aktuellen Seite aktiv ist
- * 
- * @return bool True wenn das DesignTool aktiv ist
- */
-private function is_designtool_active() {
-    global $post;
-    
-    // Standardmäßig nicht aktiv
-    $is_active = false;
-    
-    // Prüfe auf Shortcode [yprint_designtool]
-    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'yprint_designtool')) {
-        $is_active = true;
-    }
-    
-    // Erlaube Filterung durch andere Funktionen
-    return apply_filters('yprint_designtool_is_active', $is_active);
-}
-
-    /**
- * Plugin activation
- */
-public function activate() {
-    // Erstelle notwendige Verzeichnisse
-    $this->create_plugin_directories();
-    
-    // Aktualisiere Rewrite-Regeln
-    flush_rewrite_rules();
-}
-
-/**
- * Erstellt die notwendigen Verzeichnisse für das Plugin
- */
-private function create_plugin_directories() {
-    // Basisverzeichnis für Uploads
-    $upload_dir = wp_upload_dir();
-    $base_dir = $upload_dir['basedir'] . '/yprint-designtool';
-    
-    // Verzeichnisse erstellen
-    $directories = array(
-        $base_dir,
-        $base_dir . '/temp',
-        $base_dir . '/exports',
-        $base_dir . '/designs',
-        $base_dir . '/templates'
-    );
-    
-    foreach ($directories as $dir) {
-        if (!file_exists($dir)) {
-            wp_mkdir_p($dir);
+        
+        // Vectorizer CSS and JS (only on vectorizer page)
+        if (strpos($hook, 'yprint-designtool-vectorizer') !== false) {
+            wp_enqueue_style(
+                'yprint-vectorizer',
+                YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/vectorizer.css',
+                array(),
+                YPRINT_DESIGNTOOL_VERSION
+            );
+            
+            wp_enqueue_script(
+                'yprint-vectorizer',
+                YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/vectorizer.js',
+                array('jquery'),
+                YPRINT_DESIGNTOOL_VERSION,
+                true
+            );
         }
     }
-    
-    // .htaccess-Datei für temporäre Dateien erstellen
-    $htaccess_content = "# Verweigere direkten Zugriff auf Dateien
+
+    /**
+     * Enqueue frontend scripts and styles
+     */
+    public function enqueue_frontend_scripts() {
+        // Only load when the DesignTool is active
+        if (!$this->is_designtool_active()) {
+            return;
+        }
+        
+        // Basic styles for the DesignTool
+        wp_enqueue_style(
+            'yprint-designtool-frontend',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/frontend.css',
+            array(),
+            YPRINT_DESIGNTOOL_VERSION
+        );
+        
+        // Basic JavaScript for the DesignTool
+        wp_enqueue_script(
+            'yprint-designtool-frontend',
+            YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/frontend.js',
+            array('jquery'),
+            YPRINT_DESIGNTOOL_VERSION,
+            true
+        );
+        
+        // Localize the script with basic data
+        wp_localize_script(
+            'yprint-designtool-frontend',
+            'yprintDesignTool',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+                'pluginUrl' => YPRINT_DESIGNTOOL_PLUGIN_URL
+            )
+        );
+    }
+
+    /**
+     * Check if the DesignTool is active on the current page
+     * 
+     * @return bool True if the DesignTool is active
+     */
+    private function is_designtool_active() {
+        global $post;
+        
+        // Default to not active
+        $is_active = false;
+        
+        // Check for shortcode [yprint_designtool]
+        if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'yprint_designtool')) {
+            $is_active = true;
+        }
+        
+        // Check for the vectorizer test page
+        if (isset($_GET['page']) && $_GET['page'] === 'yprint-designtool-vectorizer') {
+            $is_active = true;
+        }
+        
+        // Allow filtering by other functions
+        return apply_filters('yprint_designtool_is_active', $is_active);
+    }
+
+    /**
+     * Plugin activation
+     */
+    public function activate() {
+        // Create necessary directories
+        $this->create_plugin_directories();
+        
+        // Update rewrite rules
+        flush_rewrite_rules();
+    }
+
+    /**
+     * Create necessary directories for the plugin
+     */
+    private function create_plugin_directories() {
+        // Base upload directory
+        $upload_dir = wp_upload_dir();
+        $base_dir = $upload_dir['basedir'] . '/yprint-designtool';
+        
+        // Create directories
+        $directories = array(
+            $base_dir,
+            $base_dir . '/temp',
+            $base_dir . '/exports',
+            $base_dir . '/designs',
+            $base_dir . '/templates'
+        );
+        
+        foreach ($directories as $dir) {
+            if (!file_exists($dir)) {
+                wp_mkdir_p($dir);
+            }
+        }
+        
+        // Create .htaccess file for temporary files
+        $htaccess_content = "# Deny direct access to files
 <FilesMatch \".*\">
     Order Allow,Deny
     Deny from all
 </FilesMatch>";
-    
-    file_put_contents($base_dir . '/temp/.htaccess', $htaccess_content);
-}
+        
+        file_put_contents($base_dir . '/temp/.htaccess', $htaccess_content);
+    }
 
     /**
      * Plugin deactivation
      */
     public function deactivate() {
-        // Deactivation tasks go here
+        // Deactivation tasks
         flush_rewrite_rules();
     }
 }
