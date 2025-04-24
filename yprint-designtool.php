@@ -49,15 +49,19 @@ final class YPrint_DesignTool {
         $this->init_modules();
     }
 
-    /**
-     * Include required files
-     */
-    private function includes() {
-        // Core files
-        // require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-vectorizer.php';
-        // require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-svg-handler.php';
-        // require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/class-yprint-exporter.php';
-    }
+ /**
+ * Include required files
+ */
+private function includes() {
+    // Lade Hilfsfunktionen
+    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/helpers.php';
+    
+    // Lade Shortcodes
+    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/shortcodes.php';
+    
+    // Lade Export-Funktionen
+    require_once YPRINT_DESIGNTOOL_PLUGIN_DIR . 'includes/export.php';
+}
 
     /**
      * Initialize hooks
@@ -76,14 +80,18 @@ final class YPrint_DesignTool {
     }
 
     /**
-     * Initialize modules
-     */
-    private function init_modules() {
-        // In future phases, we'll initialize modules here
-        // $this->vectorizer = new YPrint_Vectorizer();
-        // $this->svg_handler = new YPrint_SVG_Handler();
-        // $this->exporter = new YPrint_Exporter();
-    }
+ * Initialize modules
+ */
+private function init_modules() {
+    // Module werden später hinzugefügt, wenn sie implementiert sind
+    // Dies dient als Vorbereitung für zukünftige Module
+    
+    // Bereite einen Speicherort für Modulreferenzen vor
+    $this->modules = new stdClass();
+    
+    // Hook für Drittanbieter-Erweiterungen
+    do_action('yprint_designtool_init_modules', $this);
+}
 
     /**
      * Register admin menu
@@ -141,20 +149,106 @@ final class YPrint_DesignTool {
     }
 
     /**
-     * Enqueue frontend scripts and styles
-     */
-    public function enqueue_frontend_scripts() {
-        // We'll only enqueue these when needed
-        // This will be expanded in future phases
+ * Enqueue frontend scripts and styles
+ */
+public function enqueue_frontend_scripts() {
+    // Nur laden, wenn das DesignTool aktiv ist (über Shortcode oder Template)
+    if (!$this->is_designtool_active()) {
+        return;
     }
+    
+    // Grundlegende Styles für das DesignTool
+    wp_enqueue_style(
+        'yprint-designtool-frontend',
+        YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/css/frontend.css',
+        array(),
+        YPRINT_DESIGNTOOL_VERSION
+    );
+    
+    // Grundlegendes JavaScript für das DesignTool
+    wp_enqueue_script(
+        'yprint-designtool-frontend',
+        YPRINT_DESIGNTOOL_PLUGIN_URL . 'assets/js/frontend.js',
+        array('jquery'),
+        YPRINT_DESIGNTOOL_VERSION,
+        true
+    );
+    
+    // Lokalisiere das Script mit Basis-Daten
+    wp_localize_script(
+        'yprint-designtool-frontend',
+        'yprintDesignTool',
+        array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('yprint-designtool-nonce'),
+            'pluginUrl' => YPRINT_DESIGNTOOL_PLUGIN_URL
+        )
+    );
+}
+
+/**
+ * Prüft, ob das DesignTool auf der aktuellen Seite aktiv ist
+ * 
+ * @return bool True wenn das DesignTool aktiv ist
+ */
+private function is_designtool_active() {
+    global $post;
+    
+    // Standardmäßig nicht aktiv
+    $is_active = false;
+    
+    // Prüfe auf Shortcode [yprint_designtool]
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'yprint_designtool')) {
+        $is_active = true;
+    }
+    
+    // Erlaube Filterung durch andere Funktionen
+    return apply_filters('yprint_designtool_is_active', $is_active);
+}
 
     /**
-     * Plugin activation
-     */
-    public function activate() {
-        // Activation tasks go here
-        flush_rewrite_rules();
+ * Plugin activation
+ */
+public function activate() {
+    // Erstelle notwendige Verzeichnisse
+    $this->create_plugin_directories();
+    
+    // Aktualisiere Rewrite-Regeln
+    flush_rewrite_rules();
+}
+
+/**
+ * Erstellt die notwendigen Verzeichnisse für das Plugin
+ */
+private function create_plugin_directories() {
+    // Basisverzeichnis für Uploads
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'] . '/yprint-designtool';
+    
+    // Verzeichnisse erstellen
+    $directories = array(
+        $base_dir,
+        $base_dir . '/temp',
+        $base_dir . '/exports',
+        $base_dir . '/designs',
+        $base_dir . '/templates'
+    );
+    
+    foreach ($directories as $dir) {
+        if (!file_exists($dir)) {
+            wp_mkdir_p($dir);
+        }
     }
+    
+    // .htaccess-Datei für temporäre Dateien erstellen
+    $htaccess_content = "# Verweigere direkten Zugriff auf Dateien
+<FilesMatch \".*\">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>";
+    
+    file_put_contents($base_dir . '/temp/.htaccess', $htaccess_content);
+}
 
     /**
      * Plugin deactivation

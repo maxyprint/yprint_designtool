@@ -1,0 +1,226 @@
+/**
+ * YPrint DesignTool Frontend Styles
+ */
+
+ .yprint-designtool-container {
+    position: relative;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    min-height: 400px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/* Loading-Anzeige */
+.yprint-designtool-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    z-index: 10;
+}
+
+.yprint-designtool-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: yprint-spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes yprint-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Fehlermeldung */
+.yprint-designtool-error {
+    padding: 20px;
+    text-align: center;
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    margin: 20px;
+}
+
+/* Hauptinterface */
+.yprint-designtool-interface {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Werkzeugleiste */
+.yprint-designtool-toolbar {
+    display: flex;
+    background-color: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.yprint-designtool-tool-group {
+    display: flex;
+    margin-right: 15px;
+    padding-right: 15px;
+    border-right: 1px solid #eee;
+}
+
+.yprint-designtool-tool-group:last-child {
+    border-right: none;
+}
+
+.yprint-designtool-tool {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    margin-right: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #555;
+    background-color: transparent;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.yprint-designtool-tool:hover {
+    background-color: #f5f5f5;
+    border-color: #ddd;
+}
+
+.yprint-designtool-tool.active {
+    background-color: #e9f7fe;
+    border-color: #b3e5fc;
+    color: #0288d1;
+}
+
+/* Canvas-Bereich */
+.yprint-designtool-canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: #e9e9e9;
+    background-image: linear-gradient(45deg, #d0d0d0 25%, transparent 25%),
+                      linear-gradient(-45deg, #d0d0d0 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, #d0d0d0 75%),
+                      linear-gradient(-45deg, transparent 75%, #d0d0d0 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.yprint-designtool-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Element-Steuerung */
+.yprint-designtool-element {
+    position: absolute;
+    cursor: move;
+    user-select: none;
+}
+
+.yprint-designtool-element.selected {
+    outline: 2px solid #2196F3;
+}
+
+.yprint-designtool-element-control {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #fff;
+    border: 1px solid #2196F3;
+    border-radius: 50%;
+}
+
+.yprint-designtool-element-control.tl { top: -5px; left: -5px; cursor: nw-resize; }
+.yprint-designtool-element-control.tr { top: -5px; right: -5px; cursor: ne-resize; }
+.yprint-designtool-element-control.bl { bottom: -5px; left: -5px; cursor: sw-resize; }
+.yprint-designtool-element-control.br { bottom: -5px; right: -5px; cursor: se-resize; }
+
+/* Eigenschaften-Panel */
+.yprint-designtool-properties {
+    width: 260px;
+    background-color: #fff;
+    border-left: 1px solid #ddd;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.yprint-designtool-properties-section {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.yprint-designtool-properties-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.yprint-designtool-property {
+    margin-bottom: 10px;
+}
+
+.yprint-designtool-property label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: #555;
+}
+
+.yprint-designtool-property input[type="text"],
+.yprint-designtool-property input[type="number"],
+.yprint-designtool-property select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.yprint-designtool-property .color-picker {
+    display: flex;
+    align-items: center;
+}
+
+.yprint-designtool-property .color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .yprint-designtool-container {
+        min-height: 300px;
+    }
+    
+    .yprint-designtool-tool {
+        width: 32px;
+        height: 32px;
+    }
+}
