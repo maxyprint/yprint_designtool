@@ -237,67 +237,81 @@
             });
         },
         
-        /**
-         * Hilfsfunktionen für SVG-Manipulation
-         */
+        // Hilfsfunktionen für SVG-Manipulation
+        
+/**
+ * Gibt den aktuell ausgewählten SVG-Pfad zurück
+ */
+getSelectedSVGPath: function() {
+    // SVG-Vorschau finden, entweder original oder optimiert
+    var $svgContainer = $('#yprint-svg-preview-container, #yprint-svg-optimized-preview-container').filter(':visible');
+    
+    if (!$svgContainer.length) {
+        console.log('Keine sichtbare SVG-Vorschau gefunden');
+        return null;
+    }
+    
+    var $svgElement = $svgContainer.find('svg path').first();
+    
+    if ($svgElement.length === 0) {
+        console.log('Kein SVG-Pfad in der Vorschau gefunden');
+        return null;
+    }
+    
+    // Den kompletten SVG-Pfad zurückgeben
+    return '<path ' + this.getAllAttributes($svgElement[0]) + ' />';
+},
         
         /**
-         * Gibt den aktuell ausgewählten SVG-Pfad zurück
-         */
-        getSelectedSVGPath: function() {
-            // In der Praxis müsste hier die Logik implementiert werden,
-            // um den aktuell ausgewählten Pfad aus der SVG-Vorschau zu ermitteln
-            
-            // Für Demo-Zwecke verwenden wir hier die SVG-Vorschau
-            var $svgPreview = $('.yprint-svg-preview');
-            var $svgElement = $svgPreview.find('svg path').first();
-            
-            if ($svgElement.length === 0) {
-                return null;
-            }
-            
-            // Den kompletten SVG-Pfad zurückgeben
-            return '<path ' + this.getAllAttributes($svgElement[0]) + ' />';
-        },
+ * Gibt mehrere ausgewählte SVG-Pfade zurück
+ */
+getSelectedSVGPaths: function() {
+    // SVG-Vorschau finden, entweder original oder optimiert
+    var $svgContainer = $('#yprint-svg-preview-container, #yprint-svg-optimized-preview-container').filter(':visible');
+    
+    if (!$svgContainer.length) {
+        console.log('Keine sichtbare SVG-Vorschau gefunden');
+        return [];
+    }
+    
+    var $paths = $svgContainer.find('svg path');
+    var paths = [];
+    
+    if ($paths.length === 0) {
+        console.log('Keine SVG-Pfade in der Vorschau gefunden');
+        return [];
+    }
+    
+    $paths.each(function() {
+        paths.push('<path ' + YPrintSVGPath.getAllAttributes(this) + ' />');
+    });
+    
+    return paths;
+},
         
         /**
-         * Gibt mehrere ausgewählte SVG-Pfade zurück
-         */
-        getSelectedSVGPaths: function() {
-            // In der Praxis müsste hier die Logik implementiert werden,
-            // um die aktuell ausgewählten Pfade aus der SVG-Vorschau zu ermitteln
-            
-            // Für Demo-Zwecke verwenden wir hier alle Pfade aus der SVG-Vorschau
-            var $svgPreview = $('.yprint-svg-preview');
-            var $paths = $svgPreview.find('svg path');
-            var paths = [];
-            
-            $paths.each(function() {
-                paths.push('<path ' + YPrintSVGPath.getAllAttributes(this) + ' />');
-            });
-            
-            return paths;
-        },
-        
-        /**
-         * Gibt die aktuell ausgewählte SVG-Form zurück
-         */
-        getSelectedSVGShape: function() {
-            // In der Praxis müsste hier die Logik implementiert werden,
-            // um die aktuell ausgewählte Form aus der SVG-Vorschau zu ermitteln
-            
-            // Für Demo-Zwecke verwenden wir hier die erste Form aus der SVG-Vorschau
-            var $svgPreview = $('.yprint-svg-preview');
-            var $shape = $svgPreview.find('svg rect, svg circle, svg ellipse, svg line, svg polygon, svg polyline').first();
-            
-            if ($shape.length === 0) {
-                return null;
-            }
-            
-            // Die komplette SVG-Form zurückgeben
-            var tagName = $shape[0].tagName.toLowerCase();
-            return '<' + tagName + ' ' + this.getAllAttributes($shape[0]) + ' />';
-        },
+ * Gibt die aktuell ausgewählte SVG-Form zurück
+ */
+getSelectedSVGShape: function() {
+    // SVG-Vorschau finden, entweder original oder optimiert
+    var $svgContainer = $('#yprint-svg-preview-container, #yprint-svg-optimized-preview-container').filter(':visible');
+    
+    if (!$svgContainer.length) {
+        console.log('Keine sichtbare SVG-Vorschau gefunden');
+        return null;
+    }
+    
+    var $shape = $svgContainer.find('svg rect, svg circle, svg ellipse, svg line, svg polygon, svg polyline').first();
+    
+    if ($shape.length === 0) {
+        console.log('Keine SVG-Form in der Vorschau gefunden');
+        return null;
+    }
+    
+    // Die komplette SVG-Form zurückgeben
+    var tagName = $shape[0].tagName.toLowerCase();
+    return '<' + tagName + ' ' + this.getAllAttributes($shape[0]) + ' />';
+},
         
         /**
          * Gibt alle Attribute eines Elements als String zurück
@@ -314,35 +328,98 @@
         },
         
         /**
-         * Aktualisiert die SVG-Anzeige mit einem neuen Pfad
-         */
-        updateSVGDisplay: function(svgContent) {
-            // In der Praxis müsste hier die Logik implementiert werden,
-            // um die SVG-Vorschau mit dem neuen Pfad zu aktualisieren
-            
-            // Für Demo-Zwecke nur eine Meldung ausgeben
-            console.log('SVG-Anzeige aktualisiert mit:', svgContent);
-            alert('SVG-Pfad wurde erfolgreich aktualisiert.');
-            
-            // Hier könnte die SVG-Anzeige aktualisiert werden, z.B.:
-            // $('.yprint-svg-preview').html(svgContent);
-        },
+ * Aktualisiert die SVG-Anzeige mit einem neuen Pfad
+ */
+updateSVGDisplay: function(svgContent) {
+    // SVG-Vorschau finden, entweder original oder optimiert
+    var $svgContainer = $('#yprint-svg-preview-container, #yprint-svg-optimized-preview-container').filter(':visible');
+    
+    if (!$svgContainer.length) {
+        console.log('Keine sichtbare SVG-Vorschau gefunden');
+        alert('Keine SVG-Vorschau gefunden, in der der aktualisierte Pfad angezeigt werden könnte.');
+        return;
+    }
+    
+    // Aktuelle SVG-Instanz holen
+    var svgPreviewInstance = $svgContainer.data('yprintSVGPreview');
+    
+    if (!svgPreviewInstance) {
+        console.log('Keine SVG-Vorschau-Instanz gefunden');
+        alert('Fehler: SVG-Vorschau-Instanz nicht gefunden.');
+        return;
+    }
+    
+    // Aktualisiere die SVG in der Vorschau
+    svgPreviewInstance.loadSVG(svgContent);
+    
+    // Meldung anzeigen
+    console.log('SVG-Anzeige aktualisiert mit:', svgContent);
+    alert('SVG-Pfad wurde erfolgreich aktualisiert.');
+    
+    // Die SVG-Pfad-Nachricht anzeigen
+    $('.yprint-svg-path-result').show();
+    $('.yprint-svg-path-message').html('SVG-Pfad erfolgreich aktualisiert.');
+},
         
         /**
-         * Aktualisiert die SVG-Anzeige mit mehreren Pfaden
-         */
-        updateSVGDisplayWithMultiplePaths: function(paths) {
-            // In der Praxis müsste hier die Logik implementiert werden,
-            // um die SVG-Vorschau mit den neuen Pfaden zu aktualisieren
-            
-            // Für Demo-Zwecke nur eine Meldung ausgeben
-            console.log('SVG-Anzeige aktualisiert mit mehreren Pfaden:', paths);
-            alert('SVG-Pfad wurde erfolgreich in ' + paths.length + ' Teilpfade aufgebrochen.');
-            
-            // Hier könnte die SVG-Anzeige aktualisiert werden, z.B.:
-            // var svgContent = '<svg>...' + paths.join('') + '</svg>';
-            // $('.yprint-svg-preview').html(svgContent);
+ * Aktualisiert die SVG-Anzeige mit mehreren Pfaden
+ */
+updateSVGDisplayWithMultiplePaths: function(paths) {
+    // SVG-Vorschau finden, entweder original oder optimiert
+    var $svgContainer = $('#yprint-svg-preview-container, #yprint-svg-optimized-preview-container').filter(':visible');
+    
+    if (!$svgContainer.length) {
+        console.log('Keine sichtbare SVG-Vorschau gefunden');
+        alert('Keine SVG-Vorschau gefunden, in der die aktualisierten Pfade angezeigt werden könnten.');
+        return;
+    }
+    
+    // Aktuelle SVG-Instanz holen
+    var svgPreviewInstance = $svgContainer.data('yprintSVGPreview');
+    
+    if (!svgPreviewInstance) {
+        console.log('Keine SVG-Vorschau-Instanz gefunden');
+        alert('Fehler: SVG-Vorschau-Instanz nicht gefunden.');
+        return;
+    }
+    
+    // Bestehende SVG finden und die Pfade hinzufügen
+    var $svg = $svgContainer.find('svg').first();
+    
+    if ($svg.length === 0) {
+        console.log('Kein SVG-Element in der Vorschau gefunden');
+        alert('Fehler: Kein SVG-Element gefunden, in das die Pfade eingefügt werden könnten.');
+        return;
+    }
+    
+    // SVG-Attribute erhalten
+    var svgAttributes = '';
+    $.each($svg[0].attributes, function() {
+        if (this.specified && this.name !== 'xmlns') {
+            svgAttributes += ' ' + this.name + '="' + this.value + '"';
         }
+    });
+    
+    // Neuen SVG-Inhalt erstellen
+    var svgContent = '<svg xmlns="http://www.w3.org/2000/svg"' + svgAttributes + '>';
+    
+    // Alle Pfade hinzufügen
+    svgContent += paths.join('');
+    
+    // SVG schließen
+    svgContent += '</svg>';
+    
+    // Aktualisiere die SVG in der Vorschau
+    svgPreviewInstance.loadSVG(svgContent);
+    
+    // Meldung anzeigen
+    console.log('SVG-Anzeige aktualisiert mit mehreren Pfaden:', paths);
+    alert('SVG-Pfad wurde erfolgreich in ' + paths.length + ' Teilpfade aufgebrochen.');
+    
+    // Die SVG-Pfad-Nachricht anzeigen
+    $('.yprint-svg-path-result').show();
+    $('.yprint-svg-path-message').html('SVG-Pfad erfolgreich in ' + paths.length + ' Teilpfade aufgebrochen.');
+}
     };
     
     // Initialisierung beim Dokument-Ready
