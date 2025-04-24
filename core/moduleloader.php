@@ -30,13 +30,13 @@ class YPrint_ModuleLoader {
      */
     private static function load_core_modules() {
         // Vectorizer-Module
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/Vectorizer.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/vectorizer.php';
         
         // Document-Module (SVG-Handler)
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/document/SVGHandler.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/document/svghandler.php';
         
         // Export-Module
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/export/Exporter.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/export/exporter.php';
         
         // Shapes-Module - wird später implementiert
         // require_once YPRINT_DESIGNTOOL_PATH . 'core/shapes/ShapeFactory.php';
@@ -64,12 +64,12 @@ class YPrint_ModuleLoader {
      */
     private static function register_ajax_handlers() {
         // Vectorizer AJAX-Handler
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/VectorizerAjax.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/vectorizerajax.php';
         
         // SVG-Handler AJAX-Funktionen
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/document/SVGHandlerAjax.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/document/svghandlerajax.php';
         
         // Export AJAX-Handler
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/export/ExporterAjax.php';
+        require_once YPRINT_DESIGNTOOL_PATH . 'core/export/exporterajax.php';
     }
 }

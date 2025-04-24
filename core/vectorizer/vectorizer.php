@@ -282,14 +282,11 @@ class YPrint_Vectorizer {
             
             // Potrace-Befehl für diese Farbe erstellen
             $cmd = sprintf(
-                '%s %s -s -o %s %s',
-                escapeshellcmd($potrace_bin),
-                $this->build_potrace_options($options),
-                escapeshellarg($temp_svg),
-                escapeshellcmd($potrace_bin),
-                $this->build_potrace_options($options),
-                escapeshellarg($temp_svg),
-                escapeshellarg($temp_bmp)
+            '%s %s -s -o %s %s',
+            escapeshellcmd($potrace_bin),
+            $this->build_potrace_options($options),
+            escapeshellarg($temp_svg),
+            escapeshellarg($temp_bmp)
             );
             
             // Befehl ausführen

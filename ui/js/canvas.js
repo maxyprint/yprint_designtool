@@ -764,6 +764,7 @@ drawGrid: function(ctx) {
 /**
  * Elemente zeichnen
  */
+// Canvas-Element
 drawElements: function(ctx) {
     var self = this;
     
