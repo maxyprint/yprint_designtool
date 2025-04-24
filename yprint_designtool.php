@@ -35,6 +35,15 @@ class YPrint_DesignTool {
     public $vectorizer = null;
     public $svg_handler = null;
     public $exporter = null;
+    public $importer = null;
+    public $transform = null;
+    
+    // AJAX-Handler
+    private $vectorizer_ajax = null;
+    private $svg_handler_ajax = null;
+    private $exporter_ajax = null;
+    private $importer_ajax = null;
+    private $transform_ajax = null;
     
     // Konstruktor
     private function __construct() {
@@ -62,6 +71,45 @@ class YPrint_DesignTool {
         $this->vectorizer = YPrint_Vectorizer::get_instance();
         $this->svg_handler = YPrint_SVGHandler::get_instance();
         $this->exporter = YPrint_Exporter::get_instance();
+        
+        // Optional: Import-Modul initialisieren
+        if (class_exists('YPrint_Importer')) {
+            $this->importer = YPrint_Importer::get_instance();
+        }
+        
+        // Optional: Transform-Modul initialisieren
+        if (class_exists('YPrint_Transform')) {
+            $this->transform = YPrint_Transform::get_instance();
+        }
+        
+        // AJAX-Handler initialisieren
+        $this->init_ajax_handlers();
+    }
+    
+    // AJAX-Handler initialisieren
+    private function init_ajax_handlers() {
+        // Core AJAX-Handler
+        if (class_exists('YPrint_VectorizerAjax')) {
+            $this->vectorizer_ajax = new YPrint_VectorizerAjax();
+        }
+        
+        if (class_exists('YPrint_SVGHandlerAjax')) {
+            $this->svg_handler_ajax = new YPrint_SVGHandlerAjax();
+        }
+        
+        if (class_exists('YPrint_ExporterAjax')) {
+            $this->exporter_ajax = new YPrint_ExporterAjax();
+        }
+        
+        // Optional: Import AJAX-Handler
+        if (class_exists('YPrint_ImporterAjax')) {
+            $this->importer_ajax = new YPrint_ImporterAjax();
+        }
+        
+        // Optional: Transform AJAX-Handler
+        if (class_exists('YPrint_TransformAjax')) {
+            $this->transform_ajax = new YPrint_TransformAjax();
+        }
     }
 
     // Initialisierung der Hooks

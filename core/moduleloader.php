@@ -23,6 +23,12 @@ class YPrint_ModuleLoader {
         
         // AJAX-Handler registrieren
         self::register_ajax_handlers();
+        
+        // Import-Modul laden
+        self::load_import_module();
+        
+        // Transform-Modul laden
+        self::load_transform_module();
     }
     
     /**
@@ -60,16 +66,59 @@ class YPrint_ModuleLoader {
     }
     
     /**
+     * Import-Modul laden
+     */
+    private static function load_import_module() {
+        // Importer-Klasse
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/import/Importer.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/import/Importer.php';
+        }
+    }
+    
+    /**
+     * Transform-Modul laden
+     */
+    private static function load_transform_module() {
+        // Transform-Klasse
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/transform/Transform.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/transform/Transform.php';
+        }
+    }
+    
+    /**
      * AJAX-Handler registrieren
      */
     private static function register_ajax_handlers() {
         // Vectorizer AJAX-Handler
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/vectorizerajax.php';
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/vectorizerajax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/vectorizerajax.php';
+        } elseif (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/VectorizerAjax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/vectorizer/VectorizerAjax.php';
+        }
         
         // SVG-Handler AJAX-Funktionen
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/document/svghandlerajax.php';
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/document/svghandlerajax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/document/svghandlerajax.php';
+        } elseif (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/document/SVGHandlerAjax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/document/SVGHandlerAjax.php';
+        }
         
         // Export AJAX-Handler
-        require_once YPRINT_DESIGNTOOL_PATH . 'core/export/exporterajax.php';
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/export/exporterajax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/export/exporterajax.php';
+        } elseif (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/export/ExporterAjax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/export/ExporterAjax.php';
+        }
+    
+        
+        // Import AJAX-Handler
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/import/ImporterAjax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/import/ImporterAjax.php';
+        }
+        
+        // Transform AJAX-Handler
+        if (file_exists(YPRINT_DESIGNTOOL_PATH . 'core/transform/TransformAjax.php')) {
+            require_once YPRINT_DESIGNTOOL_PATH . 'core/transform/TransformAjax.php';
+        }
     }
 }
