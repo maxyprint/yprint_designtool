@@ -88,39 +88,50 @@ class YPrint_Vectorizer {
             return;
         }
         
-        // Check if an image was uploaded
-        if (empty($_FILES['image'])) {
-            wp_send_json_error(array('message' => 'No image uploaded'));
+        // Check for image source
+        if (!empty($_FILES['image'])) {
+            // Handle direct file upload
+            $file = $_FILES['image'];
+            
+            // Check for upload errors
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                wp_send_json_error(array(
+                    'message' => 'Upload error: ' . $this->get_upload_error_message($file['error'])
+                ));
+                return;
+            }
+            
+            // Check file type
+            $allowed_types = array('image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp');
+            if (!in_array($file['type'], $allowed_types)) {
+                wp_send_json_error(array('message' => 'Invalid file type. Please upload a JPEG, PNG, GIF, BMP, or WebP image.'));
+                return;
+            }
+            
+            // Create temporary file
+            $upload_dir = wp_upload_dir();
+            $temp_dir = $upload_dir['basedir'] . '/yprint-designtool/temp';
+            
+            if (!file_exists($temp_dir)) {
+                wp_mkdir_p($temp_dir);
+            }
+            
+            $temp_file = $temp_dir . '/' . sanitize_file_name($file['name']);
+            move_uploaded_file($file['tmp_name'], $temp_file);
+            
+        } elseif (isset($_POST['image_id']) && intval($_POST['image_id']) > 0) {
+            // Handle image from media library
+            $image_id = intval($_POST['image_id']);
+            $temp_file = get_attached_file($image_id);
+            
+            if (!$temp_file || !file_exists($temp_file)) {
+                wp_send_json_error(array('message' => 'Image file not found'));
+                return;
+            }
+        } else {
+            wp_send_json_error(array('message' => 'No image provided'));
             return;
         }
-        
-        $file = $_FILES['image'];
-        
-        // Check for upload errors
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            wp_send_json_error(array(
-                'message' => 'Upload error: ' . $this->get_upload_error_message($file['error'])
-            ));
-            return;
-        }
-        
-        // Check file type
-        $allowed_types = array('image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp');
-        if (!in_array($file['type'], $allowed_types)) {
-            wp_send_json_error(array('message' => 'Invalid file type. Please upload a JPEG, PNG, GIF, BMP, or WebP image.'));
-            return;
-        }
-        
-        // Create temporary file
-        $upload_dir = wp_upload_dir();
-        $temp_dir = $upload_dir['basedir'] . '/yprint-designtool/temp';
-        
-        if (!file_exists($temp_dir)) {
-            wp_mkdir_p($temp_dir);
-        }
-        
-        $temp_file = $temp_dir . '/' . sanitize_file_name($file['name']);
-        move_uploaded_file($file['tmp_name'], $temp_file);
         
         // Get vectorization options
         $options = array(
@@ -129,13 +140,41 @@ class YPrint_Vectorizer {
             'colors' => isset($_POST['colors']) ? intval($_POST['colors']) : 8,
             'invert' => isset($_POST['invert']) ? (bool) $_POST['invert'] : false,
             'remove_background' => isset($_POST['remove_background']) ? (bool) $_POST['remove_background'] : true,
+            'brightness_threshold' => isset($_POST['brightness']) ? (float) $_POST['brightness'] : 0.45,
+            'turdsize' => isset($_POST['turdsize']) ? intval($_POST['turdsize']) : 2,
+            'opticurve' => isset($_POST['opticurve']) ? (bool) $_POST['opticurve'] : true,
         );
+        
+        // Set detail level parameters
+        switch ($options['detail_level']) {
+            case 'low':
+                $options['alphamax'] = 2.0;
+                $options['optitolerance'] = 0.8;
+                break;
+            
+            case 'medium':
+                $options['alphamax'] = 1.0;
+                $options['optitolerance'] = 0.2;
+                break;
+            
+            case 'high':
+                $options['alphamax'] = 0.5;
+                $options['optitolerance'] = 0.1;
+                break;
+                
+            case 'ultra':
+                $options['alphamax'] = 0.2;
+                $options['optitolerance'] = 0.05;
+                break;
+        }
         
         // Process the image
         $result = $this->vectorize_image($temp_file, $options);
         
-        // Clean up temporary file
-        @unlink($temp_file);
+        // Clean up temporary file (only if it's an uploaded file, not from media library)
+        if (empty($_POST['image_id'])) {
+            @unlink($temp_file);
+        }
         
         // Check for errors
         if (is_wp_error($result)) {
@@ -143,10 +182,15 @@ class YPrint_Vectorizer {
             return;
         }
         
+        // Generate transient key for the result
+        $transient_key = 'yprint_vector_' . md5(basename($temp_file) . serialize($options));
+        set_transient($transient_key, $result['content'], HOUR_IN_SECONDS);
+        
         // Return success response
         wp_send_json_success(array(
             'svg' => $result['content'],
-            'file_url' => $result['file_url']
+            'file_url' => $result['file_url'],
+            'transient_key' => $transient_key
         ));
     }
     
@@ -167,31 +211,19 @@ class YPrint_Vectorizer {
         
         if (!file_exists($temp_dir)) {
             wp_mkdir_p($temp_dir);
+            // Create .htaccess to protect temp files
+            file_put_contents($temp_dir . '/.htaccess', 'deny from all');
         }
         
         $temp_base = $temp_dir . '/' . uniqid('vector_');
         $temp_bmp = $temp_base . '.bmp';
         $temp_svg = $temp_base . '.svg';
         
-        // Check which method to use for vectorization
-        $vectorization_method = $this->determine_vectorization_method();
-        
-        switch ($vectorization_method) {
-            case 'potrace':
-                $svg_content = $this->vectorize_with_potrace($image_path, $temp_bmp, $temp_svg, $options);
-                break;
-                
-            case 'internal':
-                $svg_content = $this->vectorize_internally($image_path, $options);
-                break;
-                
-            default:
-                return new WP_Error('no_vectorization_method', 'No suitable vectorization method available.');
-        }
+        // Always use internal vectorization for now
+        $svg_content = $this->vectorize_internally($image_path, $options);
         
         // Clean up temporary files
         @unlink($temp_bmp);
-        @unlink($temp_svg);
         
         // If we got a WP_Error, return it
         if (is_wp_error($svg_content)) {
@@ -200,7 +232,7 @@ class YPrint_Vectorizer {
         
         // Generate output file
         $file_info = pathinfo($image_path);
-        $result_filename = sanitize_file_name($file_info['filename'] . '.svg');
+        $result_filename = sanitize_file_name(uniqid() . '-' . $file_info['filename'] . '.svg');
         $result_dir = $upload_dir['basedir'] . '/yprint-designtool/exports';
         
         if (!file_exists($result_dir)) {
@@ -535,16 +567,13 @@ class YPrint_Vectorizer {
     }
     
     /**
-     * Vectorize an image using internal PHP method (fallback)
+     * Vectorize an image using internal PHP method
      *
      * @param string $image_path Path to the image
      * @param array $options Vectorization options
      * @return string|WP_Error SVG content or error
      */
     private function vectorize_internally($image_path, $options) {
-        // This is a simplified internal vectorization method
-        // It creates a very basic SVG tracing the image
-        
         // Load image
         $img_string = file_get_contents($image_path);
         if (!$img_string) {
@@ -559,15 +588,37 @@ class YPrint_Vectorizer {
         $width = imagesx($image);
         $height = imagesy($image);
         
+        // Check if image dimensions are reasonable
+        if ($width > 3000 || $height > 3000) {
+            // Resize image to more manageable dimensions
+            $ratio = $width / $height;
+            if ($width > $height) {
+                $new_width = 2000;
+                $new_height = 2000 / $ratio;
+            } else {
+                $new_height = 2000;
+                $new_width = 2000 * $ratio;
+            }
+            
+            $resized = imagecreatetruecolor($new_width, $new_height);
+            imagecopyresampled($resized, $image, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+            imagedestroy($image);
+            $image = $resized;
+            $width = $new_width;
+            $height = $new_height;
+        }
+        
         // Start SVG
         $svg = '<?xml version="1.0" standalone="no"?>' . "\n";
         $svg .= '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' . "\n";
         $svg .= '<svg width="' . $width . '" height="' . $height . '" viewBox="0 0 ' . $width . ' ' . $height . '" ';
         $svg .= 'xmlns="http://www.w3.org/2000/svg" version="1.1">' . "\n";
         
-        // If using color mode
+        // Process based on color mode
         if ($options['color_type'] === 'color') {
             $svg .= $this->generate_color_svg_content($image, $options);
+        } else if ($options['color_type'] === 'gray') {
+            $svg .= $this->generate_grayscale_svg_content($image, $options);
         } else {
             // Convert to BW and create simple path tracing
             $svg .= $this->generate_bw_svg_content($image, $options);
@@ -583,6 +634,103 @@ class YPrint_Vectorizer {
     }
     
     /**
+     * Generate grayscale SVG content
+     *
+     * @param resource $image GD image resource
+     * @param array $options Vectorization options
+     * @return string SVG content
+     */
+    private function generate_grayscale_svg_content($image, $options) {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $content = '';
+        
+        // Convert to grayscale
+        imagefilter($image, IMG_FILTER_GRAYSCALE);
+        
+        // Determine sampling based on detail level
+        $sample_factor = $this->get_sample_factor_for_detail($options['detail_level'], $width, $height);
+        
+        // Create gray levels (number based on options)
+        $gray_levels = min(max(intval($options['colors']), 3), 8);
+        $step = 255 / ($gray_levels - 1);
+        
+        // Create an SVG path for each gray level
+        for ($level = 0; $level < $gray_levels; $level++) {
+            $threshold = $level * $step;
+            $gray_value = 255 - $threshold;
+            
+            // Skip very light or very dark levels based on options
+            if ($options['remove_background'] && $gray_value > 230) {
+                continue;
+            }
+            
+            $hex_color = sprintf('#%02x%02x%02x', $gray_value, $gray_value, $gray_value);
+            $paths = [];
+            
+            for ($y = 0; $y < $height; $y += $sample_factor) {
+                for ($x = 0; $x < $width; $x += $sample_factor) {
+                    $rgb = imagecolorat($image, $x, $y);
+                    $r = ($rgb >> 16) & 0xFF;
+                    $g = ($rgb >> 8) & 0xFF;
+                    $b = $rgb & 0xFF;
+                    
+                    // Average for gray
+                    $avg = ($r + $g + $b) / 3;
+                    
+                    // Check if this pixel belongs to this gray level
+                    $lower_bound = $threshold - ($step/2);
+                    $upper_bound = $threshold + ($step/2);
+                    
+                    if ($avg >= $lower_bound && $avg <= $upper_bound) {
+                        $paths[] = "M{$x},{$y} h{$sample_factor}v{$sample_factor}h-{$sample_factor}z";
+                    }
+                }
+            }
+            
+            if (!empty($paths)) {
+                $content .= '<path d="' . implode(' ', $paths) . '" fill="' . $hex_color . '" />' . "\n";
+            }
+        }
+        
+        return $content;
+    }
+    
+    /**
+     * Get appropriate sampling factor based on detail level and image dimensions
+     *
+     * @param string $detail_level Detail level (low, medium, high, ultra)
+     * @param int $width Image width
+     * @param int $height Image height
+     * @return int Sampling factor
+     */
+    private function get_sample_factor_for_detail($detail_level, $width, $height) {
+        $size = max($width, $height);
+        
+        switch ($detail_level) {
+            case 'low':
+                if ($size > 1000) return 8;
+                if ($size > 500) return 6;
+                return 4;
+                
+            case 'medium':
+                if ($size > 1000) return 4;
+                if ($size > 500) return 3;
+                return 2;
+                
+            case 'high':
+                if ($size > 1000) return 2;
+                return 1;
+                
+            case 'ultra':
+                return 1;
+                
+            default:
+                return 3;
+        }
+    }
+    
+    /**
      * Generate SVG content for black and white mode
      *
      * @param resource $image GD image resource
@@ -593,16 +741,18 @@ class YPrint_Vectorizer {
         $width = imagesx($image);
         $height = imagesy($image);
         $threshold = (int)(255 * $options['brightness_threshold']);
-        $content = '';
         
         // Convert to grayscale
         imagefilter($image, IMG_FILTER_GRAYSCALE);
         
-        // Sample the image at reduced resolution for faster processing
-        $sample_factor = ($options['detail_level'] === 'low') ? 4 : (($options['detail_level'] === 'medium') ? 2 : 1);
+        // Apply additional contrast to make black/white separation clearer
+        imagefilter($image, IMG_FILTER_CONTRAST, -10);
+        
+        // Sample the image at reduced resolution based on detail level and image size
+        $sample_factor = $this->get_sample_factor_for_detail($options['detail_level'], $width, $height);
         
         // Create a path of rectangles for black pixels
-        $content .= '<path d="';
+        $paths = [];
         
         for ($y = 0; $y < $height; $y += $sample_factor) {
             for ($x = 0; $x < $width; $x += $sample_factor) {
@@ -614,14 +764,58 @@ class YPrint_Vectorizer {
                 // Simple grayscale check
                 $gray = (int)(($r + $g + $b) / 3);
                 
+                // Apply noise reduction (turdsize) - skip isolated pixels
+                if ($options['turdsize'] > 0) {
+                    $isolated = true;
+                    
+                    // Check surrounding pixels (if not at the edge)
+                    if ($x > 0 && $y > 0 && $x < ($width - $sample_factor) && $y < ($height - $sample_factor)) {
+                        for ($i = -1; $i <= 1; $i++) {
+                            for ($j = -1; $j <= 1; $j++) {
+                                if ($i === 0 && $j === 0) continue; // Skip self
+                                
+                                $nx = $x + ($i * $sample_factor);
+                                $ny = $y + ($j * $sample_factor);
+                                
+                                if ($nx >= 0 && $ny >= 0 && $nx < $width && $ny < $height) {
+                                    $neighbor_rgb = imagecolorat($image, $nx, $ny);
+                                    $neighbor_r = ($neighbor_rgb >> 16) & 0xFF;
+                                    $neighbor_g = ($neighbor_rgb >> 8) & 0xFF;
+                                    $neighbor_b = $neighbor_rgb & 0xFF;
+                                    $neighbor_gray = (int)(($neighbor_r + $neighbor_g + $neighbor_b) / 3);
+                                    
+                                    // If neighbor is similar, this pixel is not isolated
+                                    if (($neighbor_gray < $threshold && !$options['invert']) || 
+                                        ($neighbor_gray >= $threshold && $options['invert'])) {
+                                        $isolated = false;
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        $isolated = false; // Edge pixels are not considered isolated
+                    }
+                    
+                    // Skip if this is an isolated pixel/group (noise)
+                    if ($isolated && rand(1, 10) <= $options['turdsize']) {
+                        continue;
+                    }
+                }
+                
                 if (($gray < $threshold && !$options['invert']) || 
                     ($gray >= $threshold && $options['invert'])) {
-                    $content .= "M{$x},{$y} h{$sample_factor}v{$sample_factor}h-{$sample_factor}z ";
+                    $paths[] = "M{$x},{$y} h{$sample_factor}v{$sample_factor}h-{$sample_factor}z";
                 }
             }
         }
         
-        $content .= '" fill="black" />' . "\n";
+        if (empty($paths)) {
+            return ""; // No paths found
+        }
+        
+        // Group paths to optimize SVG size
+        $content = '<path d="' . implode(' ', $paths) . '" fill="black" />' . "\n";
         
         return $content;
     }
@@ -636,19 +830,24 @@ class YPrint_Vectorizer {
     private function generate_color_svg_content($image, $options) {
         $width = imagesx($image);
         $height = imagesy($image);
-        $content = '';
         
         // Reduce colors to make vectorization manageable
-        $num_colors = min(intval($options['colors']), 256);
+        $num_colors = min(intval($options['colors']), 64);
         
         // Create a temporary image with reduced colors
         $reduced = imagecreatetruecolor($width, $height);
         imagecopy($reduced, $image, 0, 0, 0, 0, $width, $height);
+        
+        // Apply some optional smoothing to improve results
+        if (!empty($options['smooth_colors'])) {
+            imagefilter($reduced, IMG_FILTER_SMOOTH, 4);
+        }
+        
+        // Reduce to palette
         imagetruecolortopalette($reduced, false, $num_colors);
         
-        // Sample factor based on detail level
-        $sample_factor = ($options['detail_level'] === 'low') ? 4 : 
-                         (($options['detail_level'] === 'medium') ? 2 : 1);
+        // Sample factor based on detail level and image size
+        $sample_factor = $this->get_sample_factor_for_detail($options['detail_level'], $width, $height);
         
         // Get color palette
         $colors = array();
@@ -656,12 +855,17 @@ class YPrint_Vectorizer {
             $colors[] = imagecolorsforindex($reduced, $i);
         }
         
-        // Sort colors from darkest to lightest
-        usort($colors, function($a, $b) {
-            $brightness_a = ($a['red'] + $a['green'] + $a['blue']) / 3;
-            $brightness_b = ($b['red'] + $b['green'] + $b['blue']) / 3;
-            return $brightness_a - $brightness_b;
-        });
+        // Sort colors - if stack_colors is enabled, we sort from darkest to lightest
+        // This creates a "stacking" effect where darker colors appear on top
+        if (!empty($options['stack_colors'])) {
+            usort($colors, function($a, $b) {
+                $brightness_a = ($a['red'] + $a['green'] + $a['blue']) / 3;
+                $brightness_b = ($b['red'] + $b['green'] + $b['blue']) / 3;
+                return $brightness_a - $brightness_b; // Dark to light
+            });
+        }
+        
+        $content = '';
         
         // Create separate path for each color
         foreach ($colors as $color) {
@@ -672,7 +876,9 @@ class YPrint_Vectorizer {
             }
             
             $hex_color = sprintf('#%02x%02x%02x', $color['red'], $color['green'], $color['blue']);
-            $content .= '<path d="';
+            
+            // Collect path segments for this color
+            $paths = [];
             
             // Find all pixels of this color
             for ($y = 0; $y < $height; $y += $sample_factor) {
@@ -684,12 +890,15 @@ class YPrint_Vectorizer {
                     if (abs($rgb_color['red'] - $color['red']) < 20 && 
                         abs($rgb_color['green'] - $color['green']) < 20 && 
                         abs($rgb_color['blue'] - $color['blue']) < 20) {
-                        $content .= "M{$x},{$y} h{$sample_factor}v{$sample_factor}h-{$sample_factor}z ";
+                        $paths[] = "M{$x},{$y} h{$sample_factor}v{$sample_factor}h-{$sample_factor}z";
                     }
                 }
             }
             
-            $content .= '" fill="' . $hex_color . '" />' . "\n";
+            // Only add path if there are segments (otherwise we get empty paths)
+            if (!empty($paths)) {
+                $content .= '<path d="' . implode(' ', $paths) . '" fill="' . $hex_color . '" />' . "\n";
+            }
         }
         
         // Clean up
