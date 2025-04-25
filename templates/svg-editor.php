@@ -492,8 +492,40 @@ setTimeout(function() {
     $('#yprint-svg-canvas-container').css('background', '');
 }, 200);
 
+// DEUTLICH verstärkte visuelle Rückmeldung für die Änderung
+$('#yprint-svg-canvas-container').append('<div class="svg-animation-overlay" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(33,150,243,0.2); z-index:100; pointer-events:none;"></div>');
+$('#yprint-svg-canvas-container svg').css({
+    'transition': 'all 0.5s ease',
+    'filter': 'drop-shadow(0 0 8px rgba(33,150,243,0.8))'
+});
+
+// Kurzer visueller Flash-Effekt
+$('#yprint-svg-canvas-container').css('background', 'rgba(255,255,255,0.9)');
+setTimeout(function() {
+    $('#yprint-svg-canvas-container').css('background', '');
+}, 200);
+
 // Update SVG mit Animation
 self.updateSVGDisplay(resultSVG);
+
+// Animation für alle Pfade
+$('#yprint-svg-canvas-container svg path').each(function(i) {
+    var delay = i * 5; // Gestaffelte Animation
+    setTimeout(() => {
+        $(this).addClass('svg-modified');
+    }, delay);
+    setTimeout(() => {
+        $(this).removeClass('svg-modified');
+    }, delay + 1000);
+});
+
+// Overlay entfernen
+setTimeout(function() {
+    $('#yprint-svg-canvas-container .svg-animation-overlay').fadeOut(500, function() {
+        $(this).remove();
+    });
+    $('#yprint-svg-canvas-container svg').css('filter', '');
+}, 1000);
 
 // Animation für alle Pfade
 $('#yprint-svg-canvas-container svg path').each(function(i) {
@@ -560,12 +592,11 @@ self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-
             return;
         }
         
-        // Bei Werten über 10% den Vorgang sicherer machen
-        var actualSmoothLevel = smoothLevel;
-        if (smoothLevel > 10) {
-            console.warn("Hoher Wert reduziert zu Testzwecken auf 10%");
-            actualSmoothLevel = 10; // Begrenze auf 10% für mehr Stabilität
-        }
+        // Keine Begrenzung mehr für höhere Glättungswerte
+var actualSmoothLevel = smoothLevel;
+if (smoothLevel > 10) {
+    console.info("Hoher Glättungswert wird angewendet: " + smoothLevel + "%");
+}
         
         $.ajax({
             url: yprintSVGEnhancer.ajaxUrl,

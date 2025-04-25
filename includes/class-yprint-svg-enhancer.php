@@ -651,13 +651,13 @@ private function smooth_path($path_element, $smooth_angles) {
     }
     
     // Direkten Glättungseffekt anwenden
-    // Für höhere Glättungswerte intensivere Änderungen vornehmen
-    $effective_smooth_angle = $smooth_angles;
-    if ($smooth_angles > 50) {
-        $effective_smooth_angle = $smooth_angles * 3;
-    } elseif ($smooth_angles > 20) {
-        $effective_smooth_angle = $smooth_angles * 2;
-    }
+// DEUTLICH verstärkte Effekte für alle Glättungswerte
+$effective_smooth_angle = $smooth_angles * 5; // 5x stärker als zuvor
+if ($smooth_angles > 50) {
+    $effective_smooth_angle = $smooth_angles * 10; // 10x stärker für hohe Werte
+} elseif ($smooth_angles > 20) {
+    $effective_smooth_angle = $smooth_angles * 7; // 7x stärker für mittlere Werte
+}
     
     // Pfad in Segmente aufteilen
     $segments = $this->parse_path_data($d);
