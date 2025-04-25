@@ -336,7 +336,7 @@ public function simplify_svg($svg_content, $detail_level = 5.0) {
 }
 
 /**
- * Glättet SVG-Pfade für schönere Linien
+ * Glättet SVG-Pfade für schönere Linien und schließt Lücken
  *
  * @param string $svg_content SVG-Inhalt
  * @param int $smooth_level Glättungsgrad (0-100, wobei 0 keine Glättung und 100 maximale Glättung)
@@ -353,51 +353,13 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         return $svg_content;
     }
     
-    // Original-SVG speichern für sehr niedrige Werte
+    // Original-SVG speichern für Sicherheitsmaßnahmen
     $original_svg_content = $svg_content;
     
-    // SOFORT SICHTBARE ÄNDERUNG: Farbveränderung bei höheren Werten
-    // Bei Werten über 20% Farben modifizieren für garantiert sichtbare Änderung
+    // Direktere Änderung: Bei höheren Werten Farbänderungen vornehmen für sichtbare Effekte
     if ($smooth_level >= 20) {
-        error_log("SVG smooth_svg - FARBÄNDERUNG wird angewendet bei $smooth_level%");
-        // Wir ändern Füllfarben direkt im SVG-String
-        $intensity = min(100, max(20, $smooth_level)) / 100;
-        
-        // Bei niedrigeren Werten Schwarzfärbung, bei höheren Farbänderung
-        if ($smooth_level < 50) {
-            // Farbintensität erhöhen (mehr schwarz)
-            $svg_content = preg_replace_callback(
-                '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
-                function($matches) use ($intensity) {
-                    $color = $matches[0];
-                    // Wenn es bereits schwarz ist, belassen
-                    if (strpos($color, '#000') !== false || strpos($color, 'black') !== false) {
-                        return $color;
-                    }
-                    // Bei höherer Intensität garantiert dunklere Farbe zurückgeben
-                    $darkness = mt_rand(0, 180); // 0-180 statt 0-255 für garantiert dunklere Farben
-                    $new_color = sprintf('fill="#%02x%02x%02x"', $darkness, $darkness, $darkness);
-                    return $new_color;
-                },
-                $svg_content
-            );
-        } else {
-            // Farben stark verändern
-            $svg_content = preg_replace_callback(
-                '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
-                function($matches) use ($intensity) {
-                    // Erzeugen einer neuen, zufälligen Farbe mit einer gewissen Tiefe
-                    $r = mt_rand(50, 200);
-                    $g = mt_rand(50, 200);
-                    $b = mt_rand(50, 200);
-                    $new_color = sprintf('fill="#%02x%02x%02x"', $r, $g, $b);
-                    return $new_color;
-                },
-                $svg_content
-            );
-        }
-        
-        error_log("SVG smooth_svg - Farbänderung durchgeführt mit Intensität $intensity");
+        // Sichtbare Farbveränderung durch direkte Ersetzung im SVG
+        $svg_content = $this->apply_color_changes($svg_content, $smooth_level);
     }
     
     // SVG-Inhalt laden
@@ -424,125 +386,63 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Deutlich stärkere Glättungswerte für sichtbare Änderungen
-    // Progressiver Faktor ohne so starke Begrenzung wie zuvor
-    $safe_smooth_level = $smooth_level;
-    
-    error_log("SVG smooth_svg - Verwende direkten Glättungswert: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
-    
-    // EXTREM verstärkte Glättungsstärke für garantiert sichtbare Effekte
-    $base_angle = 0.5; // 50x höher als vorher
-    $normalized_level = $safe_smooth_level / 100; // Skaliert den Wert von 0-1
-    // Stark verstärkte Formel für deutlich sichtbare Effekte
-    $smooth_angles = $base_angle + ($normalized_level * 2.0); // 4x stärkere Skalierung
-    
-    // Bei höheren Werten noch mehr Pfade bearbeiten
-    $path_selection_factor = 100; // Bearbeite alle Pfade
-    
-    error_log("SVG smooth_svg - EXTREME Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
-    
-    // Sicherheitsmodus ist immer aktiv
-    $safety_mode = true;
-    
-    // Anzahl der Pfade und Gesamtlänge feststellen (für Sicherheitsvergleich)
+    // Pfade finden
     $paths = $xpath->query('//svg:path');
     $path_count = $paths->length;
     error_log("SVG smooth_svg - Gefundene Pfade: $path_count");
     
     if ($path_count == 0) {
-        error_log("SVG smooth_svg - Keine Pfade gefunden, gebe Original zurück");
-        return $svg_content; // Wenn keine Pfade vorhanden sind, Original zurückgeben
-    }
-    
-    $original_path_data_length = 0;
-    $max_path_length = 0;
-    $max_path_index = -1;
-    
-    // Pfadlängen für spätere Vergleiche messen
-    foreach ($paths as $i => $path) {
-        $path_len = strlen($path->getAttribute('d'));
-        $original_path_data_length += $path_len;
+        error_log("SVG smooth_svg - Keine Pfade gefunden, suche nach anderen Formen");
+        // Konvertiere andere Elemente in Pfade, um sie zu glätten
+        $this->convert_shapes_to_paths($dom, $xpath);
         
-        // Finde den längsten Pfad
-        if ($path_len > $max_path_length) {
-            $max_path_length = $path_len;
-            $max_path_index = $i;
+        // Erneut nach Pfaden suchen
+        $paths = $xpath->query('//svg:path');
+        $path_count = $paths->length;
+        
+        if ($path_count == 0) {
+            error_log("SVG smooth_svg - Immer noch keine Pfade gefunden, gebe Original zurück");
+            return $original_svg_content;
         }
     }
-    error_log("SVG smooth_svg - Originale Gesamtpfadlänge: $original_path_data_length, Längster Pfad: $max_path_length Zeichen");
     
-    // Begrenze die maximale Größe der verarbeiteten SVG
-    $size_limit = 150000; // 150KB
-    if ($original_path_data_length > $size_limit) {
-        error_log("SVG smooth_svg - SVG zu groß für Glättung ($original_path_data_length > $size_limit), beschränke auf Haupt-Pfade");
-        // Bei großen SVGs nur die größten Pfade glätten
+    // Fortschrittsprotokollierung
+    error_log("SVG smooth_svg - Beginne Pfadglättung mit Level $smooth_level%");
+    
+    // Anzahl der zu bearbeitenden Pfade basierend auf Glättungslevel
+    $paths_to_modify = max(1, min($path_count, ceil($path_count * $smooth_level / 100)));
+    
+    // Verarbeite die Pfade
+    $modified_paths = 0;
+    $modified_elements = 0;
+    
+    // Je nach Glättungsgrad verschiedene Strategien anwenden
+    if ($smooth_level < 30) {
+        // Sanfte Glättung: Hauptsächlich Rundung und leichte Kurvenanpassungen
+        $modified_elements += $this->apply_gentle_smoothing($paths, $smooth_level);
+    } elseif ($smooth_level < 70) {
+        // Mittlere Glättung: Intensivere Kurvenanpassungen und Punktreduktion
+        $modified_elements += $this->apply_medium_smoothing($paths, $smooth_level);
+        
+        // Pfade gruppieren und zusammenführen bei mittleren Werten
+        if ($smooth_level > 50) {
+            $this->merge_adjacent_paths($dom, $xpath, $smooth_level);
+        }
+    } else {
+        // Starke Glättung: Dramatische Änderungen, Konvertieren von Linien in Kurven
+        $modified_elements += $this->apply_aggressive_smoothing($paths, $smooth_level);
+        
+        // Pfade zusammenführen und Lücken schließen bei hohen Werten
+        $this->merge_adjacent_paths($dom, $xpath, $smooth_level);
+        $this->close_path_gaps($dom, $xpath, $smooth_level);
     }
     
-    // Größenbegrenzung für jeden Pfad: max 20% Zuwachs
-    $max_growth_factor = 1.2; 
+    // Format-Optimierung
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
     
-    // Fehlerbehandlung für den Glättungsprozess
+    // Letzter Validierungsversuch vor der Rückgabe
     try {
-        // Pfade glätten
-        $modified_paths = 0;
-        $skipped_paths = 0;
-        $i = 0;
-        
-        foreach ($paths as $path) {
-            $i++;
-            $d_attr = $path->getAttribute('d');
-            $path_len = strlen($d_attr);
-            
-            // Effizienzoptimierung: Kleine Pfade überspringen
-            if ($path_len < 100) {
-                $skipped_paths++;
-                continue;
-            }
-            
-            // Größere SVGs: Nur die längsten Pfade bearbeiten (Top 30%)
-            if ($original_path_data_length > $size_limit && $path_len < ($max_path_length * 0.3)) {
-                $skipped_paths++;
-                continue;
-            }
-            
-            // Sicheres Kopieren des Original-Pfads
-            $original_d_attr = $d_attr;
-            
-            try {
-                // Glättung mit Größenbegrenzung
-                $this->smooth_path($path, $smooth_angles);
-                
-                // Prüfe, ob der Pfad zu stark gewachsen ist
-                $new_d_attr = $path->getAttribute('d');
-                $new_len = strlen($new_d_attr);
-                
-                if ($new_len > $path_len * $max_growth_factor) {
-                    error_log("SVG smooth_svg - Pfad #$i zu stark gewachsen: $path_len -> $new_len Zeichen, setze zurück");
-                    $path->setAttribute('d', $original_d_attr);
-                    $skipped_paths++;
-                } else {
-                    $modified_paths++;
-                }
-            } catch (Exception $e) {
-                error_log("SVG smooth_svg - Fehler bei Pfadglättung #$i: " . $e->getMessage());
-                $path->setAttribute('d', $original_d_attr);
-                $skipped_paths++;
-            }
-            
-            // Sicherheitsmechanismus: Nicht zu viele Pfade auf einmal bearbeiten
-            if ($modified_paths > 100) {
-                error_log("SVG smooth_svg - Limit von 100 modifizierten Pfaden erreicht, breche ab");
-                break;
-            }
-        }
-        
-        error_log("SVG smooth_svg - Modifizierte Pfade: $modified_paths, Übersprungene Pfade: $skipped_paths");
-        
-        // Format-Optimierung: Reduziere Leerzeichen im DOM
-        $dom->preserveWhiteSpace = false;
-        $dom->formatOutput = false;
-        
-        // Letzter Validierungsversuch vor der Rückgabe
         $final_svg = $dom->saveXML();
         
         // Prüfen, ob das finale SVG korrekt gespeichert wurde
@@ -551,14 +451,22 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
             return $original_svg_content;
         }
         
-        // Größenüberprüfung des Ergebnisses
+        // Größenvergleich
+        $original_size = strlen($original_svg_content);
         $final_size = strlen($final_svg);
-        error_log("SVG smooth_svg - Erfolgreich abgeschlossen, SVG-Länge: $final_size (Original: " . strlen($original_svg_content) . ")");
+        $size_ratio = $final_size / $original_size;
+        
+        error_log("SVG smooth_svg - Erfolgreich abgeschlossen, SVG-Länge: $final_size (Original: $original_size), Verhältnis: $size_ratio");
         
         // Wenn das Ergebnis zu groß ist, Original zurückgeben
-        if ($final_size > strlen($original_svg_content) * 1.5 || $final_size > 500000) {
+        if ($size_ratio > 2.0 || $final_size > 1000000) {
             error_log("SVG smooth_svg - Ergebnis zu groß, gebe Original zurück");
             return $original_svg_content;
+        }
+        
+        // Abschließend weitere visuelle Verbesserungen hinzufügen
+        if ($smooth_level >= 80) {
+            $final_svg = $this->add_final_visual_enhancements($final_svg, $smooth_level);
         }
         
         return $final_svg;
@@ -566,6 +474,923 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     } catch (Exception $e) {
         error_log("SVG smooth_svg - Ausnahme während der Glättung: " . $e->getMessage());
         return $original_svg_content;
+    }
+}
+
+/**
+ * Wendet Farbänderungen auf SVG-Inhalt an
+ * 
+ * @param string $svg_content SVG-Inhalt
+ * @param int $smooth_level Glättungsgrad
+ * @return string Modifizierter SVG-Inhalt
+ */
+private function apply_color_changes($svg_content, $smooth_level) {
+    $intensity = min(100, max(20, $smooth_level)) / 100;
+    
+    // Niedrigere Werte: Dunklere Farbtöne
+    if ($smooth_level < 50) {
+        $svg_content = preg_replace_callback(
+            '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
+            function($matches) use ($intensity) {
+                $color = $matches[0];
+                // Bereits schwarze Farben ignorieren
+                if (strpos($color, '#000') !== false || strpos($color, 'black') !== false) {
+                    return $color;
+                }
+                // Dunkleren Farbton erstellen
+                $darkness = mt_rand(30, 180);
+                $new_color = sprintf('fill="#%02x%02x%02x"', $darkness, $darkness, $darkness);
+                return $new_color;
+            },
+            $svg_content
+        );
+    } 
+    // Höhere Werte: Lebhaftere, zufällige Farben
+    else {
+        $svg_content = preg_replace_callback(
+            '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
+            function($matches) {
+                // Erzeugen einer neuen, zufälligen Farbe
+                $r = mt_rand(50, 200);
+                $g = mt_rand(50, 200);
+                $b = mt_rand(50, 200);
+                $new_color = sprintf('fill="#%02x%02x%02x"', $r, $g, $b);
+                return $new_color;
+            },
+            $svg_content
+        );
+        
+        // Auch stroke-Farben ändern bei sehr hohen Werten
+        if ($smooth_level > 75) {
+            $svg_content = preg_replace_callback(
+                '/stroke="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
+                function($matches) {
+                    $r = mt_rand(20, 150);
+                    $g = mt_rand(20, 150);
+                    $b = mt_rand(20, 150);
+                    $new_color = sprintf('stroke="#%02x%02x%02x"', $r, $g, $b);
+                    return $new_color;
+                },
+                $svg_content
+            );
+        }
+    }
+    
+    error_log("SVG Farben angepasst mit Intensität $intensity");
+    return $svg_content;
+}
+
+/**
+ * Konvertiert andere SVG-Formen zu Pfaden
+ * 
+ * @param DOMDocument $dom SVG DOM-Dokument
+ * @param DOMXPath $xpath XPath für das Dokument
+ */
+private function convert_shapes_to_paths($dom, $xpath) {
+    // Rechtecke, Kreise, Ellipsen, Polygone und Polylinien in Pfade umwandeln
+    $shapes = $xpath->query('//svg:rect | //svg:circle | //svg:ellipse | //svg:polygon | //svg:polyline');
+    $converted = 0;
+    
+    foreach ($shapes as $shape) {
+        $tag_name = $shape->tagName;
+        $path = null;
+        
+        switch ($tag_name) {
+            case 'rect':
+                $path = $this->convert_rect_to_path($shape, $dom);
+                break;
+            case 'circle': 
+                $path = $this->convert_circle_to_path($shape, $dom);
+                break;
+            case 'ellipse':
+                $path = $this->convert_ellipse_to_path($shape, $dom);
+                break;
+            case 'polygon':
+            case 'polyline':
+                $path = $this->convert_poly_to_path($shape, $dom);
+                break;
+        }
+        
+        if ($path !== null) {
+            $shape->parentNode->replaceChild($path, $shape);
+            $converted++;
+        }
+    }
+    
+    error_log("SVG smooth_svg - $converted Formen in Pfade konvertiert");
+}
+
+/**
+ * Wendet sanfte Glättung auf Pfade an (für niedrige Glättungswerte)
+ * 
+ * @param DOMNodeList $paths Liste der Pfade
+ * @param int $smooth_level Glättungsgrad
+ * @return int Anzahl der modifizierten Elemente
+ */
+private function apply_gentle_smoothing($paths, $smooth_level) {
+    $modified = 0;
+    $factor = $smooth_level / 100; // 0.01-0.3
+    
+    foreach ($paths as $path) {
+        $d = $path->getAttribute('d');
+        if (empty($d)) continue;
+        
+        // Einfache Rundung der Koordinaten
+        $new_d = preg_replace_callback('/(-?\d+\.\d+)/', function($matches) use ($factor) {
+            // Koordinaten auf 1-2 Dezimalstellen runden
+            $precision = 3 - round($factor * 2);
+            return round(floatval($matches[1]), $precision);
+        }, $d);
+        
+        // Kubische Bezier-Kurven (C, c) leicht glätten
+        $new_d = preg_replace_callback('/([Cc])\s*([\d\.\-,\s]+)/', function($matches) use ($factor) {
+            $command = $matches[1];
+            $coords = preg_split('/[\s,]+/', trim($matches[2]));
+            
+            // Mindestens 6 Koordinaten für eine Bezier-Kurve
+            if (count($coords) >= 6) {
+                // Leichte Anpassung der Kontrollpunkte für sanftere Kurven
+                for ($i = 0; $i < count($coords); $i += 6) {
+                    if (isset($coords[$i+5])) {
+                        // Kleine Variation hinzufügen
+                        $variation = $factor * 0.05;
+                        $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-10, 10) * $variation), 2);
+                        $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-10, 10) * $variation), 2);
+                    }
+                }
+                
+                return $command . ' ' . implode(' ', $coords);
+            }
+            
+            return $matches[0];
+        }, $new_d);
+        
+        if ($new_d !== $d) {
+            $path->setAttribute('d', $new_d);
+            $modified++;
+        }
+    }
+    
+    return $modified;
+}
+
+/**
+ * Wendet mittlere Glättung auf Pfade an
+ * 
+ * @param DOMNodeList $paths Liste der Pfade
+ * @param int $smooth_level Glättungsgrad
+ * @return int Anzahl der modifizierten Elemente
+ */
+private function apply_medium_smoothing($paths, $smooth_level) {
+    $modified = 0;
+    $factor = ($smooth_level - 30) / 40; // 0-1 für Bereich 30-70
+    $max_factor = min(0.8, max(0.2, $factor));
+    
+    foreach ($paths as $path) {
+        $d = $path->getAttribute('d');
+        if (empty($d)) continue;
+        
+        // Parse the path into commands
+        $commands = [];
+        preg_match_all('/([A-Za-z])([^A-Za-z]*)/i', $d, $matches, PREG_SET_ORDER);
+        
+        $new_d = '';
+        $last_point = null;
+        
+        foreach ($matches as $match) {
+            $command = $match[1];
+            $params = trim($match[2]);
+            
+            // Linien in Bezier-Kurven umwandeln bei mittleren bis hohen Werten
+            if (strtolower($command) === 'l' && $last_point && mt_rand(0, 100) < ($factor * 40)) {
+                $coords = preg_split('/[\s,]+/', $params);
+                
+                if (count($coords) >= 2) {
+                    $x = floatval($coords[0]);
+                    $y = floatval($coords[1]);
+                    
+                    // Kontrollpunkt für quadratische Bezier-Kurve
+                    $cx = $last_point[0] + ($x - $last_point[0]) / 2;
+                    $cy = $last_point[1] + ($y - $last_point[1]) / 2;
+                    
+                    // Kleiner Versatz für weichere Kurve
+                    $offset = $factor * mt_rand(5, 20) / 100;
+                    $cx += ($y - $last_point[1]) * $offset;
+                    $cy -= ($x - $last_point[0]) * $offset;
+                    
+                    // Konvertiere L zu Q (quadratische Bezier)
+                    $new_d .= "Q $cx $cy $x $y ";
+                    $last_point = [$x, $y];
+                    continue;
+                }
+            }
+            
+            // Für Bezier-Kurven: Kontrollpunkte anpassen
+            if (strtolower($command) === 'c' && mt_rand(0, 100) < ($factor * 60)) {
+                $coords = preg_split('/[\s,]+/', $params);
+                
+                if (count($coords) >= 6) {
+                    for ($i = 0; $i < count($coords); $i += 6) {
+                        if (isset($coords[$i+5])) {
+                            // Stärkere Variation für die Kontrollpunkte
+                            $variation = $max_factor * 0.2;
+                            $coords[$i] = round(floatval($coords[$i]) + (mt_rand(-20, 20) * $variation), 2);
+                            $coords[$i+1] = round(floatval($coords[$i+1]) + (mt_rand(-20, 20) * $variation), 2);
+                            $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-20, 20) * $variation), 2);
+                            $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-20, 20) * $variation), 2);
+                        }
+                    }
+                    
+                    $new_d .= "$command " . implode(' ', $coords) . ' ';
+                    $last_point = [floatval($coords[count($coords)-2]), floatval($coords[count($coords)-1])];
+                    continue;
+                }
+            }
+            
+            // Pfad punkteweise glätten
+            if (in_array(strtolower($command), ['m', 'l', 'h', 'v', 'c', 's', 'q', 't'])) {
+                $coords = preg_split('/[\s,]+/', $params);
+                $processed = [];
+                
+                foreach ($coords as $i => $coord) {
+                    if (is_numeric($coord)) {
+                        $num = floatval($coord);
+                        
+                        // Bei zufälligen Koordinaten kleine Variation hinzufügen
+                        if (mt_rand(0, 100) < ($factor * 50)) {
+                            $variation = $num * $max_factor * 0.05 * (mt_rand(-10, 10) / 10);
+                            $num += $variation;
+                        }
+                        
+                        // Runden auf Basis der Glättungsstärke
+                        $precision = max(1, 3 - round($factor * 2));
+                        $processed[] = round($num, $precision);
+                    } else {
+                        $processed[] = $coord;
+                    }
+                }
+                
+                $new_d .= "$command " . implode(' ', $processed) . ' ';
+                
+                // Für Move und Line Kommandos den letzten Punkt aktualisieren
+                if (strtolower($command) === 'm' || strtolower($command) === 'l') {
+                    if (count($processed) >= 2) {
+                        $last_point = [floatval($processed[0]), floatval($processed[1])];
+                    }
+                }
+                
+                continue;
+            }
+            
+            // Alle anderen Kommandos unverändert übernehmen
+            $new_d .= "$command $params ";
+        }
+        
+        if (trim($new_d) !== $d) {
+            $path->setAttribute('d', trim($new_d));
+            $modified++;
+        }
+    }
+    
+    return $modified;
+}
+
+/**
+ * Wendet aggressive Glättung auf Pfade an
+ * 
+ * @param DOMNodeList $paths Liste der Pfade
+ * @param int $smooth_level Glättungsgrad
+ * @return int Anzahl der modifizierten Elemente
+ */
+private function apply_aggressive_smoothing($paths, $smooth_level) {
+    $modified = 0;
+    $factor = ($smooth_level - 70) / 30; // 0-1 für Bereich 70-100
+    $max_factor = min(1.0, max(0.4, $factor));
+    
+    foreach ($paths as $path) {
+        $d = $path->getAttribute('d');
+        if (empty($d)) continue;
+        
+        // Stroke-Breite erhöhen für sichtbarere Linien
+        $stroke_width = $path->getAttribute('stroke-width');
+        $default_width = 1.0;
+        
+        if (!empty($stroke_width)) {
+            $default_width = floatval($stroke_width);
+        }
+        
+        $new_width = $default_width * (1 + $factor);
+        $path->setAttribute('stroke-width', $new_width);
+        
+        // Stroke-Linecap und Linejoin anpassen für weichere Linien
+        $path->setAttribute('stroke-linecap', 'round');
+        $path->setAttribute('stroke-linejoin', 'round');
+        
+        // Parse the path into commands
+        $commands = [];
+        preg_match_all('/([A-Za-z])([^A-Za-z]*)/i', $d, $matches, PREG_SET_ORDER);
+        
+        $new_d = '';
+        $last_point = null;
+        
+        foreach ($matches as $match) {
+            $command = $match[1];
+            $params = trim($match[2]);
+            
+            // Linien in kubische Bezier-Kurven umwandeln für maximale Glättung
+            if (strtolower($command) === 'l' && $last_point && mt_rand(0, 100) < ($factor * 80)) {
+                $coords = preg_split('/[\s,]+/', $params);
+                
+                if (count($coords) >= 2) {
+                    $x = floatval($coords[0]);
+                    $y = floatval($coords[1]);
+                    
+                    // Stärkere Kurvenbildung für aggressivere Glättung
+                    $dist = sqrt(pow($x - $last_point[0], 2) + pow($y - $last_point[1], 2));
+                    $angle = atan2($y - $last_point[1], $x - $last_point[0]);
+                    
+                    // Stärkere Versätze für deutliche Kurven
+                    $offset_factor = $max_factor * 0.3;
+                    $offset_x = sin($angle) * $dist * $offset_factor;
+                    $offset_y = -cos($angle) * $dist * $offset_factor;
+                    
+                    // Kontrollpunkte berechnen
+                    $c1x = $last_point[0] + ($x - $last_point[0]) / 3 + $offset_x;
+                    $c1y = $last_point[1] + ($y - $last_point[1]) / 3 + $offset_y;
+                    
+                    $c2x = $last_point[0] + 2 * ($x - $last_point[0]) / 3 + $offset_x;
+                    $c2y = $last_point[1] + 2 * ($y - $last_point[1]) / 3 + $offset_y;
+                    
+                    // L in C (kubische Bezier) umwandeln
+                    $new_d .= "C $c1x $c1y $c2x $c2y $x $y ";
+                    $last_point = [$x, $y];
+                    continue;
+                }
+            }
+            
+            // Für bereits existierende Bezier-Kurven: starke Anpassungen
+            if (strtolower($command) === 'c' && mt_rand(0, 100) < ($factor * 90)) {
+                $coords = preg_split('/[\s,]+/', $params);
+                
+                if (count($coords) >= 6) {
+                    for ($i = 0; $i < count($coords); $i += 6) {
+                        if (isset($coords[$i+5])) {
+                            // Sehr starke Variation für dramatische Glättung
+                            $variation = $max_factor * 0.4;
+                            $coords[$i] = round(floatval($coords[$i]) + (mt_rand(-30, 30) * $variation), 2);
+                            $coords[$i+1] = round(floatval($coords[$i+1]) + (mt_rand(-30, 30) * $variation), 2);
+                            $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-30, 30) * $variation), 2);
+                            $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-30, 30) * $variation), 2);
+                        }
+                    }
+                    
+                    $new_d .= "$command " . implode(' ', $coords) . ' ';
+                    $last_point = [floatval($coords[count($coords)-2]), floatval($coords[count($coords)-1])];
+                    continue;
+                }
+            }
+            
+            // Für alle Koordinaten: größere Variationen hinzufügen
+            if (in_array(strtolower($command), ['m', 'l', 'h', 'v', 'c', 's', 'q', 't'])) {
+                $coords = preg_split('/[\s,]+/', $params);
+                $processed = [];
+                
+                foreach ($coords as $i => $coord) {
+                    if (is_numeric($coord)) {
+                        $num = floatval($coord);
+                        
+                        // Bei den meisten Koordinaten Variation hinzufügen
+                        if (mt_rand(0, 100) < ($factor * 70)) {
+                            $variation = $num * $max_factor * 0.1 * (mt_rand(-15, 15) / 10);
+                            $num += $variation;
+                        }
+                        
+                        // Weniger Nachkommastellen für harmonischeres Aussehen
+                        $precision = max(1, 2 - round($factor));
+                        $processed[] = round($num, $precision);
+                    } else {
+                        $processed[] = $coord;
+                    }
+                }
+                
+                $new_d .= "$command " . implode(' ', $processed) . ' ';
+                
+                // Für Move und Line Kommandos den letzten Punkt aktualisieren
+                if (strtolower($command) === 'm' || strtolower($command) === 'l') {
+                    if (count($processed) >= 2) {
+                        $last_point = [floatval($processed[0]), floatval($processed[1])];
+                    }
+                }
+                
+                continue;
+            }
+            
+            // Alle anderen Kommandos unverändert übernehmen
+            $new_d .= "$command $params ";
+        }
+        
+        if (trim($new_d) !== $d) {
+            $path->setAttribute('d', trim($new_d));
+            $modified++;
+        }
+    }
+    
+    return $modified;
+}
+
+/**
+ * Konvertiert ein Rechteck in einen Pfad
+ * 
+ * @param DOMElement $rect Rechteck-Element
+ * @param DOMDocument $dom DOM-Dokument
+ * @return DOMElement|null Pfad-Element oder null bei Fehler
+ */
+private function convert_rect_to_path($rect, $dom) {
+    $x = $rect->hasAttribute('x') ? floatval($rect->getAttribute('x')) : 0;
+    $y = $rect->hasAttribute('y') ? floatval($rect->getAttribute('y')) : 0;
+    $width = $rect->hasAttribute('width') ? floatval($rect->getAttribute('width')) : 0;
+    $height = $rect->hasAttribute('height') ? floatval($rect->getAttribute('height')) : 0;
+    $rx = $rect->hasAttribute('rx') ? floatval($rect->getAttribute('rx')) : 0;
+    $ry = $rect->hasAttribute('ry') ? floatval($rect->getAttribute('ry')) : $rx;
+    
+    if ($width <= 0 || $height <= 0) return null;
+    
+    $path_d = '';
+    
+    if ($rx == 0 && $ry == 0) {
+        // Rechteck ohne Rundungen
+        $path_d = "M{$x},{$y} h{$width} v{$height} h-{$width} z";
+    } else {
+        // Rechteck mit Rundungen
+        $rx = min($rx, $width / 2);
+        $ry = min($ry, $height / 2);
+        
+        $path_d = "M" . ($x + $rx) . "," . $y . 
+                 " H" . ($x + $width - $rx) .
+                 " A" . $rx . "," . $ry . " 0 0 1 " . ($x + $width) . "," . ($y + $ry) .
+                 " V" . ($y + $height - $ry) .
+                 " A" . $rx . "," . $ry . " 0 0 1 " . ($x + $width - $rx) . "," . ($y + $height) .
+                 " H" . ($x + $rx) .
+                 " A" . $rx . "," . $ry . " 0 0 1 " . $x . "," . ($y + $height - $ry) .
+                 " V" . ($y + $ry) .
+                 " A" . $rx . "," . $ry . " 0 0 1 " . ($x + $rx) . "," . $y .
+                 " Z";
+    }
+    
+    $path = $dom->createElementNS('http://www.w3.org/2000/svg', 'path');
+    $path->setAttribute('d', $path_d);
+    
+    // Kopiere alle anderen Attribute
+    foreach ($rect->attributes as $attr) {
+        if (!in_array($attr->name, ['x', 'y', 'width', 'height', 'rx', 'ry'])) {
+            $path->setAttribute($attr->name, $attr->value);
+        }
+    }
+    
+    return $path;
+}
+
+/**
+ * Konvertiert einen Kreis in einen Pfad
+ * 
+ * @param DOMElement $circle Kreis-Element
+ * @param DOMDocument $dom DOM-Dokument
+ * @return DOMElement|null Pfad-Element oder null bei Fehler
+ */
+private function convert_circle_to_path($circle, $dom) {
+    $cx = $circle->hasAttribute('cx') ? floatval($circle->getAttribute('cx')) : 0;
+    $cy = $circle->hasAttribute('cy') ? floatval($circle->getAttribute('cy')) : 0;
+    $r = $circle->hasAttribute('r') ? floatval($circle->getAttribute('r')) : 0;
+    
+    if ($r <= 0) return null;
+    
+    // Kreis als Pfad mit Bézier-Kurven approximieren
+    $path_d = "M" . ($cx + $r) . "," . $cy .
+             " A" . $r . "," . $r . " 0 1 1 " . ($cx - $r) . "," . $cy .
+             " A" . $r . "," . $r . " 0 1 1 " . ($cx + $r) . "," . $cy .
+             " Z";
+    
+    $path = $dom->createElementNS('http://www.w3.org/2000/svg', 'path');
+    $path->setAttribute('d', $path_d);
+    
+    // Kopiere alle anderen Attribute
+    foreach ($circle->attributes as $attr) {
+        if (!in_array($attr->name, ['cx', 'cy', 'r'])) {
+            $path->setAttribute($attr->name, $attr->value);
+        }
+    }
+    
+    return $path;
+}
+
+/**
+ * Konvertiert eine Ellipse in einen Pfad
+ * 
+ * @param DOMElement $ellipse Ellipse-Element
+ * @param DOMDocument $dom DOM-Dokument
+ * @return DOMElement|null Pfad-Element oder null bei Fehler
+ */
+private function convert_ellipse_to_path($ellipse, $dom) {
+    $cx = $ellipse->hasAttribute('cx') ? floatval($ellipse->getAttribute('cx')) : 0;
+    $cy = $ellipse->hasAttribute('cy') ? floatval($ellipse->getAttribute('cy')) : 0;
+    $rx = $ellipse->hasAttribute('rx') ? floatval($ellipse->getAttribute('rx')) : 0;
+    $ry = $ellipse->hasAttribute('ry') ? floatval($ellipse->getAttribute('ry')) : 0;
+    
+    if ($rx <= 0 || $ry <= 0) return null;
+    
+    // Ellipse als Pfad mit Bézier-Kurven approximieren
+    $path_d = "M" . ($cx + $rx) . "," . $cy .
+             " A" . $rx . "," . $ry . " 0 1 1 " . ($cx - $rx) . "," . $cy .
+             " A" . $rx . "," . $ry . " 0 1 1 " . ($cx + $rx) . "," . $cy .
+             " Z";
+    
+    $path = $dom->createElementNS('http://www.w3.org/2000/svg', 'path');
+    $path->setAttribute('d', $path_d);
+    
+    // Kopiere alle anderen Attribute
+    foreach ($ellipse->attributes as $attr) {
+        if (!in_array($attr->name, ['cx', 'cy', 'rx', 'ry'])) {
+            $path->setAttribute($attr->name, $attr->value);
+        }
+    }
+    
+    return $path;
+}
+
+/**
+ * Konvertiert ein Polygon/Polyline in einen Pfad
+ * 
+ * @param DOMElement $poly Polygon oder Polyline Element
+ * @param DOMDocument $dom DOM-Dokument
+ * @return DOMElement|null Pfad-Element oder null bei Fehler
+ */
+private function convert_poly_to_path($poly, $dom) {
+    if (!$poly->hasAttribute('points')) return null;
+    
+    $points_str = $poly->getAttribute('points');
+    $points_arr = preg_split('/\s+|,/', trim($points_str));
+    
+    if (count($points_arr) < 4) return null; // Mindestens 2 Punkte (x,y) benötigt
+    
+    $path_d = "M";
+    $is_first = true;
+    
+    for ($i = 0; $i < count($points_arr); $i += 2) {
+        if (isset($points_arr[$i + 1])) {
+            if ($is_first) {
+                $path_d .= $points_arr[$i] . "," . $points_arr[$i + 1];
+                $is_first = false;
+            } else {
+                $path_d .= " L" . $points_arr[$i] . "," . $points_arr[$i + 1];
+            }
+        }
+    }
+    
+    // Für Polygone schließen wir den Pfad, für Polylines nicht
+    if ($poly->tagName === 'polygon') {
+        $path_d .= " Z";
+    }
+    
+    $path = $dom->createElementNS('http://www.w3.org/2000/svg', 'path');
+    $path->setAttribute('d', $path_d);
+    
+    // Kopiere alle anderen Attribute
+    foreach ($poly->attributes as $attr) {
+        if ($attr->name !== 'points') {
+            $path->setAttribute($attr->name, $attr->value);
+        }
+    }
+    
+    return $path;
+}
+
+/**
+ * Versucht, Lücken zwischen benachbarten Pfaden zu schließen
+ * 
+ * @param DOMDocument $dom DOM-Dokument
+ * @param DOMXPath $xpath XPath für das Dokument
+ * @param int $smooth_level Glättungsgrad
+ */
+private function close_path_gaps($dom, $xpath, $smooth_level) {
+    // Diese Funktion versucht, Lücken zwischen Pfaden zu identifizieren und zu schließen
+    $paths = $xpath->query('//svg:path');
+    $path_count = $paths->length;
+    
+    if ($path_count < 2) return; // Mindestens 2 Pfade benötigt
+    
+    $factor = $smooth_level / 100;
+    $gap_threshold = 5 + (10 * $factor); // Maximale Lückengröße
+    
+    // Sammle Endpunkte aller Pfade
+    $path_endpoints = [];
+    
+    for ($i = 0; $i < $path_count; $i++) {
+        $path = $paths->item($i);
+        $d = $path->getAttribute('d');
+        
+        // Extrahiere Anfangs- und Endpunkte des Pfades
+        if (preg_match('/^M\s*([\d\.,-]+)/', $d, $start_match) && 
+            preg_match('/([Ll])\s*([\d\.,-]+)(?:\s+[^Zz]*)?(?:[Zz])?$/', $d, $end_match)) {
+            
+            $start_coords = preg_split('/\s*,\s*|\s+/', $start_match[1]);
+            if (count($start_coords) >= 2) {
+                $start_x = floatval($start_coords[0]);
+                $start_y = floatval($start_coords[1]);
+                
+                $end_points = preg_split('/\s*,\s*|\s+/', $end_match[2]);
+                if (count($end_points) >= 2) {
+                    $end_x = floatval($end_points[0]);
+                    $end_y = floatval($end_points[1]);
+                    
+                    $path_endpoints[$i] = [
+                        'path' => $path,
+                        'start' => [$start_x, $start_y],
+                        'end' => [$end_x, $end_y]
+                    ];
+                }
+            }
+        }
+    }
+    
+    // Suche nach nahen Endpunkten und verbinde sie
+    $connections_made = 0;
+    
+    foreach ($path_endpoints as $i => $path1) {
+        foreach ($path_endpoints as $j => $path2) {
+            if ($i == $j) continue; // Nicht denselben Pfad verbinden
+            
+            // Prüfe Distanz zwischen Endpunkt Pfad1 und Startpunkt Pfad2
+            $dist_end_start = sqrt(
+                pow($path1['end'][0] - $path2['start'][0], 2) + 
+                pow($path1['end'][1] - $path2['start'][1], 2)
+            );
+            
+            // Wenn die Punkte nahe genug sind, verbinde die Pfade
+            if ($dist_end_start <= $gap_threshold) {
+                // Pfad 1 erweitern, um sich mit dem Start von Pfad 2 zu verbinden
+                $d1 = $path1['path']->getAttribute('d');
+                $new_d1 = preg_replace('/([Zz])$/', '', $d1); // Z-Befehl entfernen falls vorhanden
+                
+                if ($dist_end_start <= 2) {
+                    // Bei sehr kurzen Distanzen: direkte Linie
+                    $new_d1 .= sprintf(" L%f,%f", $path2['start'][0], $path2['start'][1]);
+                } else {
+                    // Bei größeren Distanzen: Bezier-Kurve für weichen Übergang
+                    $mid_x = ($path1['end'][0] + $path2['start'][0]) / 2;
+                    $mid_y = ($path1['end'][1] + $path2['start'][1]) / 2;
+                    
+                    $ctrl1_x = $path1['end'][0] + ($mid_x - $path1['end'][0]) / 3;
+                    $ctrl1_y = $path1['end'][1] + ($mid_y - $path1['end'][1]) / 3;
+                    
+                    $ctrl2_x = $mid_x + ($path2['start'][0] - $mid_x) / 3;
+                    $ctrl2_y = $mid_y + ($path2['start'][1] - $mid_y) / 3;
+                    
+                    $new_d1 .= sprintf(" C%f,%f %f,%f %f,%f", 
+                        $ctrl1_x, $ctrl1_y, 
+                        $ctrl2_x, $ctrl2_y, 
+                        $path2['start'][0], $path2['start'][1]
+                    );
+                }
+                
+                $path1['path']->setAttribute('d', $new_d1);
+                $connections_made++;
+                break; // Zu einem bestimmten Zeitpunkt nur eine Verbindung herstellen
+            }
+        }
+    }
+    
+    error_log("SVG smooth_svg - $connections_made Lücken zwischen Pfaden geschlossen");
+}
+
+/**
+ * Führt ähnliche, benachbarte Pfade zusammen
+ * 
+ * @param DOMDocument $dom DOM-Dokument
+ * @param DOMXPath $xpath XPath für das Dokument
+ * @param int $smooth_level Glättungsgrad
+ */
+private function merge_adjacent_paths($dom, $xpath, $smooth_level) {
+    // Für mittlere bis hohe Glättungswerte: Pfade zusammenführen für bessere Gesamtform
+    $paths = $xpath->query('//svg:path');
+    $path_count = $paths->length;
+    
+    if ($path_count < 3) return; // Brauchen mehrere Pfade zum Zusammenführen
+    
+    $factor = $smooth_level / 100;
+    $merge_threshold = 8 + (10 * $factor); // Maximale Entfernung für Pfadzusammenführung
+    
+    // Sammle Pfade mit ähnlichen Stilen
+    $path_groups = [];
+    
+    for ($i = 0; $i < $path_count; $i++) {
+        $path = $paths->item($i);
+        $style_key = $this->get_path_style_key($path);
+        
+        if (!isset($path_groups[$style_key])) {
+            $path_groups[$style_key] = [];
+        }
+        
+        $path_groups[$style_key][] = $path;
+    }
+    
+    $merged_paths = 0;
+    
+    // Für jede Gruppe von Pfaden mit ähnlichem Stil
+    foreach ($path_groups as $style_key => $style_paths) {
+        if (count($style_paths) < 2) continue; // Mindestens 2 Pfade benötigt
+        
+        // Sortiere Pfade basierend auf ihrer Position (für bessere Zusammenführung)
+        usort($style_paths, function($a, $b) {
+            $a_d = $a->getAttribute('d');
+            $b_d = $b->getAttribute('d');
+            
+            if (preg_match('/^M\s*([\d\.,-]+)/', $a_d, $a_match) && 
+                preg_match('/^M\s*([\d\.,-]+)/', $b_d, $b_match)) {
+                
+                $a_coords = preg_split('/\s*,\s*|\s+/', $a_match[1]);
+                $b_coords = preg_split('/\s*,\s*|\s+/', $b_match[1]);
+                
+                if (count($a_coords) >= 2 && count($b_coords) >= 2) {
+                    $a_x = floatval($a_coords[0]);
+                    $a_y = floatval($a_coords[1]);
+                    
+                    $b_x = floatval($b_coords[0]);
+                    $b_y = floatval($b_coords[1]);
+                    
+                    // Sortiere primär nach Y, sekundär nach X
+                    if (abs($a_y - $b_y) > 10) {
+                        return $a_y - $b_y;
+                    }
+                    return $a_x - $b_x;
+                }
+            }
+            
+            return 0;
+        });
+        
+        // Versuche, benachbarte Pfade zu verbinden
+        for ($i = 0; $i < count($style_paths) - 1; $i++) {
+            $path1 = $style_paths[$i];
+            $path2 = $style_paths[$i + 1];
+            
+            $d1 = $path1->getAttribute('d');
+            $d2 = $path2->getAttribute('d');
+            
+            // Endpunkt von Pfad 1 und Startpunkt von Pfad 2 ermitteln
+            if (preg_match('/([Ll]|[Cc])[^Zz]*(\d+\.?\d*[ ,]+\d+\.?\d*)(?:\s+[^Zz]*)?(?:[Zz])?$/', $d1, $end_match) && 
+                preg_match('/^M\s*([\d\.,-]+)/', $d2, $start_match)) {
+                
+                $end_coords = preg_split('/\s*,\s*|\s+/', $end_match[2]);
+                $start_coords = preg_split('/\s*,\s*|\s+/', $start_match[1]);
+                
+                if (count($end_coords) >= 2 && count($start_coords) >= 2) {
+                    $end_x = floatval($end_coords[0]);
+                    $end_y = floatval($end_coords[1]);
+                    
+                    $start_x = floatval($start_coords[0]);
+                    $start_y = floatval($start_coords[1]);
+                    
+                    // Berechne Distanz zwischen Endpunkt von Pfad 1 und Startpunkt von Pfad 2
+                    $dist = sqrt(pow($end_x - $start_x, 2) + pow($end_y - $start_y, 2));
+                    
+                    // Wenn die Pfade nahe genug sind, führe sie zusammen
+                    if ($dist <= $merge_threshold) {
+                        // Z-Befehl am Ende entfernen, falls vorhanden
+                        $d1 = preg_replace('/([Zz])$/', '', $d1);
+                        
+                        // Verbindungspfad zwischen den beiden Pfaden erstellen
+                        $connection = '';
+                        
+                        if ($dist <= 2) {
+                            // Bei sehr kleinen Distanzen: direkte Linie
+                            $connection = sprintf(" L%f,%f ", $start_x, $start_y);
+                        } else {
+                            // Bei größeren Distanzen: Bezier-Kurve für weichen Übergang
+                            $connection = sprintf(" C%f,%f %f,%f %f,%f ", 
+                                $end_x + ($start_x - $end_x) / 3, 
+                                $end_y + ($start_y - $end_y) / 3, 
+                                $start_x - ($start_x - $end_x) / 3, 
+                                $start_y - ($start_y - $end_y) / 3, 
+                                $start_x, 
+                                $start_y
+                            );
+                        }
+                        
+                        // M-Befehl von Pfad 2 entfernen
+                        $d2 = preg_replace('/^M\s*[\d\.,-]+\s*/', '', $d2);
+                        
+                        // Neuen Pfad erstellen durch Zusammenführen von Pfad 1, Verbindung und Pfad 2
+                        $merged_d = $d1 . $connection . $d2;
+                        
+                        // Aktualisiere Pfad 1 mit dem zusammengeführten Pfad
+                        $path1->setAttribute('d', $merged_d);
+                        
+                        // Entferne Pfad 2
+                        $path2->parentNode->removeChild($path2);
+
+                        // Entferne Pfad 2 aus dem Array, um weitere Operationen zu verhindern
+                        array_splice($style_paths, $i + 1, 1);
+                        $i--; // Index zurücksetzen, um den nächsten Pfad zu betrachten
+                        $merged_paths++;
+                    }
+                }
+            }
+        }
+    }
+    
+    error_log("SVG smooth_svg - $merged_paths benachbarte Pfade zusammengeführt");
+}
+
+/**
+ * Erzeugt einen Schlüssel zur Gruppierung ähnlicher Pfade basierend auf Stil
+ * 
+ * @param DOMElement $path Pfad-Element
+ * @return string Stil-Schlüssel
+ */
+private function get_path_style_key($path) {
+    $fill = $path->hasAttribute('fill') ? $path->getAttribute('fill') : 'none';
+    $stroke = $path->hasAttribute('stroke') ? $path->getAttribute('stroke') : 'none';
+    $stroke_width = $path->hasAttribute('stroke-width') ? $path->getAttribute('stroke-width') : '1';
+    
+    // Füge weitere Stilattribute hinzu, falls benötigt
+    return "$fill|$stroke|$stroke_width";
+}
+
+/**
+ * Wendet abschließende visuelle Verbesserungen für hohe Glättungswerte an
+ * 
+ * @param string $svg_content SVG-Inhalt
+ * @param int $smooth_level Glättungsgrad
+ * @return string Verbesserter SVG-Inhalt
+ */
+private function add_final_visual_enhancements($svg_content, $smooth_level) {
+    // Füge Filtereffekte für weichere Kanten hinzu (nur bei sehr hohen Werten)
+    if ($smooth_level > 80) {
+        // Überprüfe, ob bereits ein defs-Element vorhanden ist
+        if (strpos($svg_content, '<defs>') !== false) {
+            // Füge Filter zum bestehenden defs-Element hinzu
+            $svg_content = preg_replace(
+                '/<defs>/',
+                '<defs><filter id="yprint-smoothing-filter"><feGaussianBlur stdDeviation="0.5" /><feComposite in="SourceGraphic" /></filter>',
+                $svg_content,
+                1
+            );
+        } else {
+            // Erstelle neues defs-Element mit Filter
+            $svg_content = preg_replace(
+                '/(<svg[^>]*>)/',
+                '$1<defs><filter id="yprint-smoothing-filter"><feGaussianBlur stdDeviation="0.5" /><feComposite in="SourceGraphic" /></filter></defs>',
+                $svg_content,
+                1
+            );
+        }
+        
+        // Wende Filter auf alle Pfade an
+        $svg_content = preg_replace(
+            '/(<path[^>]*)(\/?>)/',
+            '$1 filter="url(#yprint-smoothing-filter)"$2',
+            $svg_content
+        );
+    }
+    
+    // Füge CSS für weichere Übergänge hinzu
+    if ($smooth_level > 85) {
+        $css = '<style type="text/css">';
+        $css .= 'path { stroke-linejoin: round; stroke-linecap: round; }';
+        
+        if ($smooth_level > 90) {
+            // Bei sehr hohen Werten zusätzliche Animationseffekte
+            $css .= 'path { transition: all 0.3s ease; }';
+            $css .= 'path:hover { stroke-width: 1.2em; }';
+        }
+        
+        $css .= '</style>';
+        
+        // Füge CSS zum SVG hinzu
+        $svg_content = preg_replace(
+            '/(<svg[^>]*>)/',
+            '$1' . $css,
+            $svg_content,
+            1
+        );
+    }
+    
+    return $svg_content;
+}
+
+/**
+ * Hilfsfunktion zum Debuggen der Pfadtransformationen
+ * 
+ * @param string $message Debug-Nachricht
+ * @param mixed $data Optionale Daten
+ */
+private function debug_log($message, $data = null) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        if ($data !== null) {
+            error_log("SVG DEBUG: $message " . print_r($data, true));
+        } else {
+            error_log("SVG DEBUG: $message");
+        }
     }
 }
 
