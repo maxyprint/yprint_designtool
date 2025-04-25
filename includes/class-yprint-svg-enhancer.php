@@ -252,8 +252,9 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Glättungsstärke berechnen (0-100 zu Grad-Wert)
-    $smooth_angles = 360 * ($smooth_level / 100);
+    // Glättungsstärke berechnen (0-100 zu Grad-Wert, aber mit viel geringerem Einfluss)
+    // Max 45 Grad bei 100% Glättung, dadurch wird die Glättung sanfter
+    $smooth_angles = 45 * ($smooth_level / 100);
     
     // Pfade finden und glätten
     $paths = $xpath->query('//svg:path');
@@ -292,7 +293,7 @@ private function smooth_path($path_element, $smooth_angles) {
  * Erstellt einen geglätteten Pfad aus Segmenten
  *
  * @param array $segments Pfadsegmente
- * @param float $smooth_angles Winkelmaximum für Glättung (0-360)
+ * @param float $smooth_angles Winkelmaximum für Glättung (0-45)
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
@@ -337,26 +338,33 @@ private function create_smoothed_path($segments, $smooth_angles) {
                         $angle_diff = 360 - $angle_diff;
                     }
                     
-                    // Wenn der Winkelunterschied kleiner als der Grenzwert ist, glätten
-                    if ($angle_diff <= $smooth_angles) {
+                    // Winkelglättung - graduell anwenden basierend auf Winkelunterschied
+                    // Je größer der Unterschied, desto weniger stark glätten
+                    $smoothing_factor = max(0, 1 - ($angle_diff / 90)); // Sanftere Glättung
+                    $smoothing_factor *= ($smooth_angles / 45); // Skalieren nach Benutzereinstellung
+                    
+                    if ($smoothing_factor > 0) {
                         // Berechne die Distanz für die Kontrolle
                         $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
                         $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
                         
-                        // Anpassen des zweiten Kontrollpunkts
-                        $new_angle = $angle1 + M_PI; // Umgekehrter Winkel
-                        $control2_x = $end_x + cos($new_angle) * $dist2;
-                        $control2_y = $end_y + sin($new_angle) * $dist2;
+                        // Interpoliere zwischen originalen und geglätteten Winkeln
+                        $new_angle = $angle1 + M_PI; // Umgekehrter Winkel für perfekte Glättung
+                        $interp_angle = $angle2 * (1 - $smoothing_factor) + ($new_angle) * $smoothing_factor;
+                        
+                        // Neue Kontrollpunkte berechnen, nur teilweise anpassen
+                        $new_control2_x = $end_x + cos($interp_angle) * $dist2;
+                        $new_control2_y = $end_y + sin($interp_angle) * $dist2;
                         
                         // Aktualisiere die Punkte
-                        $points[2] = $control2_x;
-                        $points[3] = $control2_y;
+                        $points[2] = $new_control2_x;
+                        $points[3] = $new_control2_y;
                     }
                 }
                 
                 // Aktualisiere für das nächste Segment
                 $last_point = [$end_x, $end_y];
-                $last_control = [$control2_x, $control2_y];
+                $last_control = [$points[2], $points[3]]; // Verwende die möglicherweise aktualisierten Werte
             }
         } else if ($command === 'M' || $command === 'm') {
             // Bei Move-To-Befehl den letzten Punkt aktualisieren
