@@ -407,6 +407,10 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         return;
     }
     
+    // Kopie des ursprünglichen SVGs für Sicherheitsmaßnahmen
+    var safeOriginalSVG = originalSVG;
+    var displayedSVG = currentSVG;
+    
     // Zeige den Regler an und deaktiviere andere Buttons
     $('#smoothing-control').fadeIn();
     
@@ -420,7 +424,7 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         
         if (smoothLevel === 0) {
             // Bei 0% zeigen wir das Original an
-            self.updateSVGDisplay(originalSVG);
+            self.updateSVGDisplay(safeOriginalSVG);
             return;
         }
         
@@ -430,7 +434,15 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         }
         
         // Kopie des SVG für Debug-Zwecke (nur Anfang)
-        console.log("SVG Anfang (Debug): " + originalSVG.substring(0, 200) + "...");
+        console.log("SVG Anfang (Debug): " + safeOriginalSVG.substring(0, 200) + "...");
+        console.log("SVG Länge: " + safeOriginalSVG.length);
+        
+        // Bei Werten über 10% den Vorgang sicherer machen
+        var actualSmoothLevel = smoothLevel;
+        if (smoothLevel > 10) {
+            console.warn("Hoher Wert reduziert zu Testzwecken auf 10%");
+            actualSmoothLevel = 10; // Begrenze auf 10% für mehr Stabilität
+        }
         
         $.ajax({
             url: yprintSVGEnhancer.ajaxUrl,
@@ -438,21 +450,54 @@ $('#yprint-smooth-svg-btn').on('click', function() {
             data: {
                 action: 'yprint_smooth_svg',
                 nonce: yprintSVGEnhancer.nonce,
-                svg_content: originalSVG,
-                smooth_level: smoothLevel
+                svg_content: safeOriginalSVG,
+                smooth_level: actualSmoothLevel
             },
             success: function(response) {
                 console.log("AJAX Antwort erhalten - Erfolg: " + (response.success ? "Ja" : "Nein"));
                 
                 if (response.success && response.data.svg_content) {
-                    console.log("SVG Ergebnis (Debug): " + response.data.svg_content.substring(0, 200) + "...");
-                    // Nur Vorschau, noch nicht speichern
-                    self.updateSVGDisplay(response.data.svg_content);
+                    var resultSVG = response.data.svg_content;
+                    
+                    // Prüfe ob das resultierende SVG valide ist (Basis-Check)
+                    var isValidSVG = resultSVG.indexOf('<svg') >= 0 && resultSVG.indexOf('</svg>') > 0;
+                    console.log("SVG Validität: " + (isValidSVG ? "OK" : "UNGÜLTIG!"));
+                    console.log("SVG Ergebnis-Länge: " + resultSVG.length);
+                    console.log("SVG Ergebnis (Anfang): " + resultSVG.substring(0, 200) + "...");
+                    console.log("SVG Ergebnis (Ende): " + resultSVG.substring(resultSVG.length - 100) + "...");
+                    
+                    if (isValidSVG) {
+                        try {
+                            // Teste, ob das SVG geparst werden kann
+                            var parser = new DOMParser();
+                            var svgDoc = parser.parseFromString(resultSVG, "image/svg+xml");
+                            var parserError = svgDoc.querySelector("parsererror");
+                            
+                            if (parserError) {
+                                console.error("SVG Parser-Fehler:", parserError.textContent);
+                                // Bei Fehler Original anzeigen
+                                self.updateSVGDisplay(displayedSVG);
+                                return;
+                            }
+                            
+                            // Nur Vorschau, noch nicht speichern
+                            displayedSVG = resultSVG; // Aktualisiere die zuletzt angezeigte Version
+                            self.updateSVGDisplay(resultSVG);
+                            console.log("SVG Display aktualisiert");
+                        } catch (e) {
+                            console.error("Fehler beim SVG-Parsen:", e);
+                            self.updateSVGDisplay(displayedSVG);
+                        }
+                    } else {
+                        console.error("SVG ist ungültig!");
+                        self.updateSVGDisplay(displayedSVG);
+                    }
                 } else {
                     console.error("Fehler in AJAX-Antwort", response);
                     if (response.data && response.data.message) {
                         console.error("Fehlermeldung: " + response.data.message);
                     }
+                    self.updateSVGDisplay(displayedSVG);
                 }
             },
             error: function(xhr, status, error) {
@@ -466,6 +511,8 @@ $('#yprint-smooth-svg-btn').on('click', function() {
                 } catch(e) {
                     console.error("Konnte Antwort nicht als JSON parsen");
                 }
+                // Bei Fehler Original anzeigen
+                self.updateSVGDisplay(displayedSVG);
             }
         });
     });
@@ -477,8 +524,16 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         
         if (smoothLevel === 0) {
             // Bei 0% setzen wir auf das Original zurück
-            currentSVG = originalSVG;
+            currentSVG = safeOriginalSVG;
+            self.updateSVGDisplay(currentSVG);
             return;
+        }
+        
+        // Bei Werten über 10% den Vorgang sicherer machen
+        var actualSmoothLevel = smoothLevel;
+        if (smoothLevel > 10) {
+            console.warn("Hoher Wert reduziert zu Testzwecken auf 10%");
+            actualSmoothLevel = 10; // Begrenze auf 10% für mehr Stabilität
         }
         
         $.ajax({
@@ -487,20 +542,52 @@ $('#yprint-smooth-svg-btn').on('click', function() {
             data: {
                 action: 'yprint_smooth_svg',
                 nonce: yprintSVGEnhancer.nonce,
-                svg_content: originalSVG,
-                smooth_level: smoothLevel
+                svg_content: safeOriginalSVG,
+                smooth_level: actualSmoothLevel
             },
             beforeSend: function() {
                 self.showMessage('<?php echo esc_js(__('Verschönere SVG...', 'yprint-designtool')); ?>');
-                console.log("Starte SVG-Glättung mit Level " + smoothLevel + "%");
+                console.log("Starte SVG-Glättung mit Level " + actualSmoothLevel + "%");
             },
             success: function(response) {
                 console.log("Glättung abgeschlossen - Erfolg: " + (response.success ? "Ja" : "Nein"));
                 
                 if (response.success && response.data.svg_content) {
-                    self.addToHistory(currentSVG);
-                    currentSVG = response.data.svg_content;
-                    self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
+                    var resultSVG = response.data.svg_content;
+                    
+                    // Prüfe ob das resultierende SVG valide ist (Basis-Check)
+                    var isValidSVG = resultSVG.indexOf('<svg') >= 0 && resultSVG.indexOf('</svg>') > 0;
+                    console.log("SVG Validität: " + (isValidSVG ? "OK" : "UNGÜLTIG!"));
+                    console.log("SVG Ergebnis-Länge: " + resultSVG.length);
+                    
+                    if (isValidSVG) {
+                        try {
+                            // Teste, ob das SVG geparst werden kann
+                            var parser = new DOMParser();
+                            var svgDoc = parser.parseFromString(resultSVG, "image/svg+xml");
+                            var parserError = svgDoc.querySelector("parsererror");
+                            
+                            if (parserError) {
+                                console.error("SVG Parser-Fehler:", parserError.textContent);
+                                self.showMessage('<?php echo esc_js(__('Fehler beim Parsen des SVG. Versuche einen niedrigeren Wert.', 'yprint-designtool')); ?>');
+                                self.updateSVGDisplay(currentSVG);
+                                return;
+                            }
+                            
+                            self.addToHistory(currentSVG);
+                            currentSVG = resultSVG;
+                            self.updateSVGDisplay(currentSVG);
+                            self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
+                        } catch (e) {
+                            console.error("Fehler beim SVG-Parsen:", e);
+                            self.showMessage('<?php echo esc_js(__('Fehler beim Parsen des SVG. Versuche einen niedrigeren Wert.', 'yprint-designtool')); ?>');
+                            self.updateSVGDisplay(currentSVG);
+                        }
+                    } else {
+                        console.error("SVG ist ungültig!");
+                        self.showMessage('<?php echo esc_js(__('Das erzeugte SVG ist ungültig. Versuche einen niedrigeren Wert.', 'yprint-designtool')); ?>');
+                        self.updateSVGDisplay(currentSVG);
+                    }
                 } else {
                     console.error("Fehler im Erfolgsfall", response);
                     var errorMsg = response.data && response.data.message ? response.data.message : '<?php echo esc_js(__('Fehler beim Verschönern der SVG.', 'yprint-designtool')); ?>';
@@ -690,29 +777,65 @@ $('#yprint-reset-svg-btn').on('click', function() {
     reader.readAsText(file);
 },
         
-        updateSVGDisplay: function(svgContent) {
-            // Remove placeholder
-            this.$canvasContainer.find('.yprint-svg-upload-placeholder').hide();
-            
-            // Remove previous SVG if exists
-            this.$canvasContainer.find('svg').remove();
-            
-            // Add new SVG
-            this.$canvasContainer.append(svgContent);
-            
-            // Adjust SVG size to fit canvas
-            var $svg = this.$canvasContainer.find('svg');
-            $svg.css({
-                'max-width': '100%',
-                'max-height': '100%',
-                'width': 'auto',
-'height': 'auto',
-                'position': 'absolute',
-                'top': '50%',
-                'left': '50%',
-                'transform': 'translate(-50%, -50%)'
-            });
-        },
+updateSVGDisplay: function(svgContent) {
+    // Validiere das SVG-Inhaltsformat
+    var validSVG = true;
+    
+    console.log("updateSVGDisplay aufgerufen mit Inhalt der Länge: " + (svgContent ? svgContent.length : 0));
+    
+    // Basische Überprüfung des SVG-Inhalts
+    if (!svgContent || typeof svgContent !== 'string' || svgContent.trim() === '') {
+        console.error("SVG-Inhalt ist leer oder kein String");
+        validSVG = false;
+    } else if (svgContent.indexOf('<svg') === -1 || svgContent.indexOf('</svg>') === -1) {
+        console.error("SVG-Inhalt hat keine SVG-Tags");
+        validSVG = false;
+    }
+    
+    // Remove placeholder
+    this.$canvasContainer.find('.yprint-svg-upload-placeholder').hide();
+    
+    // Remove previous SVG if exists
+    this.$canvasContainer.find('svg').remove();
+    
+    // Prüfe ob wir ein gültiges SVG haben
+    if (!validSVG) {
+        console.error("Ungültiges SVG!");
+        // Füge Fehlermeldung hinzu
+        this.$canvasContainer.append('<div class="svg-error-message">Fehler: Ungültiges SVG-Format.</div>');
+        return;
+    }
+    
+    try {
+        // Add new SVG with error handling
+        this.$canvasContainer.append(svgContent);
+        
+        // Adjust SVG size to fit canvas
+        var $svg = this.$canvasContainer.find('svg');
+        
+        if ($svg.length === 0) {
+            console.error("SVG konnte nicht in DOM eingefügt werden!");
+            this.$canvasContainer.append('<div class="svg-error-message">Fehler: SVG konnte nicht angezeigt werden.</div>');
+            return;
+        }
+        
+        console.log("SVG erfolgreich in DOM eingefügt. Abmessungen:", $svg.width(), "x", $svg.height());
+        
+        $svg.css({
+            'max-width': '100%',
+            'max-height': '100%',
+            'width': 'auto',
+            'height': 'auto',
+            'position': 'absolute',
+            'top': '50%',
+            'left': '50%',
+            'transform': 'translate(-50%, -50%)'
+        });
+    } catch (e) {
+        console.error("Fehler beim Anzeigen des SVGs:", e);
+        this.$canvasContainer.append('<div class="svg-error-message">Fehler: ' + e.message + '</div>');
+    }
+},
         
         handleToolbarAction: function(action) {
             var $svg = this.$canvasContainer.find('svg');
