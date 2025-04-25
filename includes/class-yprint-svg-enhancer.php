@@ -998,50 +998,110 @@ private function create_smoothed_path($segments, $smooth_angles) {
     }
     
     /**
-     * Parst SVG-Pfaddaten in Segmente
-     *
-     * @param string $d Pfad-Daten
-     * @return array Segmente des Pfades
-     */
-    private function parse_path_data($d) {
-        // Einfaches Parsing der Pfaddaten
-        $segments = [];
-        $current_command = '';
-        $current_points = [];
-        
-        // Entferne überflüssige Leerzeichen und normalisiere Befehle
-        $d = preg_replace('/([a-zA-Z])/', ' $1 ', $d);
-        $d = preg_replace('/\s+/', ' ', trim($d));
-        
-        $tokens = explode(' ', $d);
-        
-        foreach ($tokens as $token) {
-            if (preg_match('/^[a-zA-Z]$/', $token)) {
-                // Neuer Befehl gefunden
-                if (!empty($current_command)) {
+ * Parst SVG-Pfaddaten in Segmente mit korrekter Validierung
+ *
+ * @param string $d Pfad-Daten
+ * @return array Segmente des Pfades
+ */
+private function parse_path_data($d) {
+    // Einfaches Parsing der Pfaddaten
+    $segments = [];
+    $current_command = '';
+    $current_points = [];
+    
+    // Entferne überflüssige Leerzeichen und normalisiere Befehle
+    $d = preg_replace('/([a-zA-Z])/', ' $1 ', $d);
+    $d = preg_replace('/\s+/', ' ', trim($d));
+    $d = preg_replace('/(\d)-/', '$1 -', $d); // Trenne negative Zahlen
+    
+    $tokens = explode(' ', $d);
+    
+    foreach ($tokens as $token) {
+        if (preg_match('/^[a-zA-Z]$/', $token)) {
+            // Neuer Befehl gefunden
+            if (!empty($current_command)) {
+                // Validiere Mindestanzahl von Koordinaten für jeden Befehl
+                $valid = $this->validate_command_points($current_command, $current_points);
+                if ($valid) {
                     $segments[] = [
                         'command' => $current_command,
                         'points' => $current_points
                     ];
+                } else {
+                    // Bei ungültigen Befehlen Fehlerbehandlung
+                    error_log("SVG parse error: Ungültiger Befehl $current_command mit " . count($current_points) . " Punkten");
+                    // Füge einen sicheren Ersatz ein, falls nötig
+                    if ($current_command == 'M' && empty($current_points)) {
+                        $current_points = [0, 0]; // Sicherer Standardwert für M
+                        $segments[] = [
+                            'command' => $current_command,
+                            'points' => $current_points
+                        ];
+                    }
                 }
-                $current_command = $token;
-                $current_points = [];
-            } elseif (!empty($token)) {
-                // Koordinate gefunden
-                $current_points[] = floatval($token);
             }
+            $current_command = $token;
+            $current_points = [];
+        } elseif (!empty($token) && is_numeric($token)) {
+            // Koordinate gefunden
+            $current_points[] = floatval($token);
         }
-        
-        // Letztes Segment hinzufügen
-        if (!empty($current_command)) {
+    }
+    
+    // Letztes Segment hinzufügen, wenn es gültig ist
+    if (!empty($current_command)) {
+        $valid = $this->validate_command_points($current_command, $current_points);
+        if ($valid) {
             $segments[] = [
                 'command' => $current_command,
                 'points' => $current_points
             ];
+        } else {
+            error_log("SVG parse error: Letzter Befehl $current_command ungültig mit " . count($current_points) . " Punkten");
         }
-        
-        return $segments;
     }
+    
+    return $segments;
+}
+
+/**
+ * Validiert die richtige Anzahl von Punkten für jeden SVG-Pfadbefehl
+ *
+ * @param string $command Der Befehl (M, L, C, etc.)
+ * @param array $points Die Punkte für den Befehl
+ * @return bool True wenn gültig, sonst False
+ */
+private function validate_command_points($command, $points) {
+    $count = count($points);
+    
+    switch (strtoupper($command)) {
+        case 'M': // moveto
+        case 'L': // lineto
+        case 'T': // smooth quadratic curveto
+            return $count >= 2 && $count % 2 == 0;
+            
+        case 'H': // horizontal lineto
+        case 'V': // vertical lineto
+            return $count >= 1;
+            
+        case 'C': // curveto
+            return $count >= 6 && $count % 6 == 0;
+            
+        case 'S': // smooth curveto
+        case 'Q': // quadratic curveto
+            return $count >= 4 && $count % 4 == 0;
+            
+        case 'A': // elliptical arc
+            return $count >= 7 && $count % 7 == 0;
+            
+        case 'Z': // closepath
+        case 'z':
+            return true; // Benötigt keine Punkte
+            
+        default:
+            return false; // Unbekannter Befehl
+    }
+}
     
     /**
      * Erstellt einen vereinfachten Pfad aus Segmenten
