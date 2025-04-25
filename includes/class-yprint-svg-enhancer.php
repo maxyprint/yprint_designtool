@@ -380,15 +380,27 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Striktere Begrenzung der Glättungswerte für alle Ebenen:
-    // 1) Wir begrenzen alle Werte über 3% auf maximal 3%
-    $safe_smooth_level = min($smooth_level, 3);
-    error_log("SVG smooth_svg - Glättungswert begrenzt: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
+    // Progressive Begrenzung der Glättungswerte:
+// Wir erlauben höhere Werte, reduzieren aber die Steigerungsrate
+if ($smooth_level <= 3) {
+    // Für Werte bis 3% keine Änderung
+    $safe_smooth_level = $smooth_level;
+} elseif ($smooth_level <= 30) {
+    // Zwischen 3% und 30% moderate Steigerung
+    $safe_smooth_level = 3 + (($smooth_level - 3) * 0.3);
+} else {
+    // Über 30% langsame Steigerung
+    $safe_smooth_level = 11.1 + (($smooth_level - 30) * 0.1);
+}
+error_log("SVG smooth_svg - Glättungswert progressiv angepasst: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
     
-    // Verbesserte Glättungsstärke mit mikro-präziser Kontrolle
-    $base_angle = 0.01; // Sehr klein für mikroskopische Änderungen
-    $normalized_level = $safe_smooth_level / 10; // Maximal 0.3 für 3%
-    $smooth_angles = $base_angle * pow(10, $normalized_level * 1.2); // Reduziertes exponentielles Wachstum
+    // Dynamische Glättungsstärke mit verbesserten Effekten
+$base_angle = 0.01; // Basis für mikroskopische Änderungen
+$normalized_level = $safe_smooth_level / 10; // Skaliert den Wert
+// Erweiterte exponentielle Formel für sichtbarere Effekte
+$smooth_angles = $base_angle * pow(10, $normalized_level * 1.5); 
+// Bei höheren Werten zusätzliche Pfade einbeziehen
+$path_selection_factor = min(100, max(5, $safe_smooth_level * 3)); // 5-100% der Pfade bearbeiten
     
     error_log("SVG smooth_svg - Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
     

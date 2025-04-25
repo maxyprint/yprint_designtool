@@ -437,12 +437,11 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         console.log("SVG Anfang (Debug): " + safeOriginalSVG.substring(0, 200) + "...");
         console.log("SVG Länge: " + safeOriginalSVG.length);
         
-        // Bei Werten über 10% den Vorgang sicherer machen
-        var actualSmoothLevel = smoothLevel;
-        if (smoothLevel > 10) {
-            console.warn("Hoher Wert reduziert zu Testzwecken auf 10%");
-            actualSmoothLevel = 10; // Begrenze auf 10% für mehr Stabilität
-        }
+        // Bei höheren Werten Benutzer informieren, aber Wert nicht mehr reduzieren
+var actualSmoothLevel = smoothLevel;
+if (smoothLevel > 10) {
+    console.info("Höherer Glättungswert: " + smoothLevel + "% wird angewendet");
+}
         
         $.ajax({
             url: yprintSVGEnhancer.ajaxUrl,
