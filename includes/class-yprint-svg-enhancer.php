@@ -687,19 +687,26 @@ private function minimal_smooth_path($segments) {
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
-    // Verbesserte Berechnung des smooth_factor mit garantierter Mindestanpassung
-    // Auch bei kleinsten Werten wird eine minimale Anpassung garantiert
+    // Verstärkte Berechnung des smooth_factor für sichtbarere Effekte
+    // Die Glättungsstärke wird exponentiell erhöht, um sichtbare Änderungen zu erzielen
     if ($smooth_angles < 0.05) {
         // Für extrem kleine Winkel (< 0.05°) immer noch minimale Veränderung garantieren
-        $smooth_factor = 0.000005; // Garantierte Mikroanpassung
+        $smooth_factor = 0.0001; // Erhöhte Mikroanpassung
     } else if ($smooth_angles < 1) {
-        $smooth_factor = 0.00001 + ($smooth_angles * 0.00001); // Extrem kleine, aber progressive Anpassung
+        $smooth_factor = 0.0005 + ($smooth_angles * 0.0005); // Stärkere Anpassung
     } else if ($smooth_angles < 5) {
-        $smooth_factor = 0.0001 + (($smooth_angles - 1) * 0.0001); // Sehr kleine, progressive Anpassung
+        $smooth_factor = 0.001 + (($smooth_angles - 1) * 0.001); // Deutlichere Anpassung
+    } else if ($smooth_angles < 20) {
+        // Mittlere Glättungsstärke mit wahrnehmbarem Effekt
+        $smooth_factor = 0.01 + (($smooth_angles - 5) * 0.002);
+    } else if ($smooth_angles < 50) {
+        // Stärkere Glättung
+        $smooth_factor = 0.04 + (($smooth_angles - 20) * 0.001);
     } else {
-        // Standard-Berechnung für größere Winkel
-        // Verbesserte Progression für mittlere Winkel
-        $smooth_factor = min(0.05, 0.001 + ($smooth_angles / 500));
+        // Maximale Glättungsstärke für hohe Werte (50-100%)
+        $smooth_factor = 0.07 + (($smooth_angles - 50) * 0.002);
+        // Begrenze auf 0.2 für Stabilität
+        $smooth_factor = min(0.2, $smooth_factor);
     }
     
     // Pfad mit geglätteten Kurven erstellen
@@ -761,9 +768,10 @@ private function create_smoothed_path($segments, $smooth_angles) {
                     $adaptive_factor = max($dynamic_factor, $smooth_factor * 0.1);
                 }
                 
-                // Bei sehr sanften Kurven (< 10°) noch feiner anpassen, aber garantiere Anpassung
+                // Bei sehr sanften Kurven (< 10°) angepasste Stärke, aber garantiere sichtbare Anpassung
                 if ($angle_diff < 10) {
-                    $adaptive_factor = max($adaptive_factor * 0.5, $smooth_factor * 0.05);
+                    // Verstärkter Faktor für sanfte Kurven
+                    $adaptive_factor = max($adaptive_factor * 0.7, $smooth_factor * 0.2);
                 }
                 
                 if ($do_smoothing) { // Immer Smoothing durchführen, auch bei kleinsten Winkeln
@@ -775,8 +783,8 @@ private function create_smoothed_path($segments, $smooth_angles) {
                     $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
                     $current_angle = atan2($control2_y - $end_y, $control2_x - $end_x);
                     
-                    // Garantiere immer eine minimale Anpassung
-                    $blend_factor = max($adaptive_factor, 0.000001);
+                    // Verstärkter Blend-Faktor für sichtbare Änderungen
+                    $blend_factor = max($adaptive_factor, 0.001); // Erhöhter Mindestwert für Sichtbarkeit
                     $new_angle = $current_angle * (1 - $blend_factor) + $ideal_angle * $blend_factor;
                     
                     // Neue Kontrollpunktkoordinaten
@@ -787,8 +795,16 @@ private function create_smoothed_path($segments, $smooth_angles) {
                     $change_distance = sqrt(pow($new_control2_x - $control2_x, 2) + 
                                          pow($new_control2_y - $control2_y, 2));
                     
-                    // Sichere Änderungsbegrenzung - verhindert große Sprünge, erlaubt aber immer eine Mindestanpassung
-                    $safe_max_change = max($dist2 * 0.05, 0.01); // Mindestens 0.01 Einheiten Änderung zulassen
+                    // Erhöhte sichere Änderungsbegrenzung für sichtbarere Effekte
+                    // Erlaubt größere Änderungen, besonders bei hohen Glättungswerten
+                    $smooth_percentage = $smooth_angles / 100; // Prozentsatz 0-1 basierend auf Glättungswert
+                    $base_change_factor = 0.1 + ($smooth_percentage * 0.3); // 10-40% Änderung basierend auf Glättungsstärke
+                    $safe_max_change = max($dist2 * $base_change_factor, 0.5); // Mindestens 0.5 Einheiten Änderung zulassen
+                    
+                    // Bei hohen Glättungswerten größere Änderungen erlauben
+                    if ($smooth_angles > 50) {
+                        $safe_max_change = max($safe_max_change, $dist2 * 0.5); // Bis zu 50% Änderung bei hoher Glättung
+                    }
                     
                     if ($change_distance <= $safe_max_change) {
                         // Punkte aktualisieren
@@ -797,8 +813,14 @@ private function create_smoothed_path($segments, $smooth_angles) {
                         $point_modified = true;
                         $modified_segments++;
                     } else {
-                        // Falls die Änderung zu groß wäre, führe eine kleinere Anpassung durch
+                        // Falls die Änderung zu groß wäre, führe eine proportionale Anpassung durch
+                        // Bei hohen Glättungswerten trotzdem deutliche Änderungen erlauben
                         $scale_factor = $safe_max_change / $change_distance;
+                        // Bei hohen Glättungswerten stärkere Anpassungen erlauben
+                        if ($smooth_angles > 70) {
+                            $scale_factor = max($scale_factor, 0.7); // Mindestens 70% der Änderung anwenden bei hoher Glättung
+                        }
+                        
                         $adjusted_x = $control2_x + ($new_control2_x - $control2_x) * $scale_factor;
                         $adjusted_y = $control2_y + ($new_control2_y - $control2_y) * $scale_factor;
                         
