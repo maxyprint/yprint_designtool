@@ -240,7 +240,7 @@
     color: white;
 }
 
-/* Animation for path operations */
+/* Animation für path operations */
 @keyframes path-operation {
     0% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -249,4 +249,15 @@
 
 .yprint-path-animating {
     animation: path-operation 0.5s ease;
+}
+
+/* Animation für SVG-Modifikationen */
+@keyframes svg-modified-animation {
+    0% { stroke: inherit; stroke-width: inherit; }
+    50% { stroke: #2196F3; stroke-width: 1.5; }
+    100% { stroke: inherit; stroke-width: inherit; }
+}
+
+.svg-modified {
+    animation: svg-modified-animation 0.7s ease;
 }
