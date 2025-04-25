@@ -771,7 +771,7 @@ private function create_smoothed_path($segments, $smooth_angles) {
 }
     
     /**
-     * Wendet die Linienverstärkung auf ein SVG-Element an
+     * Wendet die Linienverstärkung auf ein SVG-Element an!
      *
      * @param DOMElement $element SVG-Element
      * @param float $thickness Liniendicke
