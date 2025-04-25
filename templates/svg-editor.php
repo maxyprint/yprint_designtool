@@ -320,17 +320,17 @@ jQuery(document).ready(function($) {
             });
             
             // File Upload Handler
-            this.$fileInput.on('change', function(e) {
-                var file = e.target.files[0];
-                if (!file) return;
-                
-                if (file.type !== 'image/svg+xml' && !file.name.endsWith('.svg')) {
-                    self.showMessage('<?php echo esc_js(__('Bitte wähle eine SVG-Datei aus.', 'yprint-designtool')); ?>');
-                    return;
-                }
-                
-                self.loadSVGFile(file);
-            });
+this.$fileInput.on('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.type !== 'image/svg+xml' && !file.name.endsWith('.svg')) {
+        self.showMessage('<?php echo esc_js(__('Bitte wähle eine SVG-Datei aus.', 'yprint-designtool')); ?>');
+        return;
+    }
+    
+    self.loadSVGFile(file);
+});
             
             // Drag & Drop Support
             var $uploadArea = $('.yprint-upload-area');
@@ -606,35 +606,35 @@ $('#yprint-reset-svg-btn').on('click', function() {
         },
         
         loadSVGFile: function(file) {
-            var self = this;
-            var reader = new FileReader();
-            
-            reader.onload = function(e) {
-                originalSVG = e.target.result;
-                currentSVG = originalSVG;
-                
-                // Reset history
-                svgHistory = [];
-                historyIndex = -1;
-                
-                // Update display
-                self.updateSVGDisplay(currentSVG);
-                
-                // Enable buttons
-                $('.yprint-svg-toolbar-btn').prop('disabled', false);
-                $('.yprint-svg-path-operation').prop('disabled', false);
-                $('#yprint-enhance-svg-btn').prop('disabled', false);
-                $('#yprint-simplify-svg-btn').prop('disabled', false);
-                $('#yprint-cleanup-svg-btn').prop('disabled', false);
-                $('#yprint-reset-svg-btn').prop('disabled', false);
-                $('#yprint-svg-download-btn').prop('disabled', false);
-                $('#yprint-svg-save-media-btn').prop('disabled', false);
-                
-                self.showMessage('<?php echo esc_js(__('SVG erfolgreich geladen!', 'yprint-designtool')); ?>');
-            };
-            
-            reader.readAsText(file);
-        },
+    var self = this;
+    var reader = new FileReader();
+    
+    reader.onload = function(e) {
+        originalSVG = e.target.result;
+        currentSVG = originalSVG;
+        
+        // Reset history
+        svgHistory = [];
+        historyIndex = -1;
+        
+        // Update display
+        self.updateSVGDisplay(currentSVG);
+        
+        // Enable buttons
+        $('.yprint-svg-toolbar-btn').prop('disabled', false);
+        $('.yprint-svg-path-operation').prop('disabled', false);
+        $('#yprint-enhance-svg-btn').prop('disabled', false);
+        $('#yprint-smooth-svg-btn').prop('disabled', false);
+        $('#yprint-simplify-svg-btn').prop('disabled', false);
+        $('#yprint-reset-svg-btn').prop('disabled', false);
+        $('#yprint-svg-download-btn').prop('disabled', false);
+        $('#yprint-svg-save-media-btn').prop('disabled', false);
+        
+        self.showMessage('<?php echo esc_js(__('SVG erfolgreich geladen!', 'yprint-designtool')); ?>');
+    };
+    
+    reader.readAsText(file);
+},
         
         updateSVGDisplay: function(svgContent) {
             // Remove placeholder
