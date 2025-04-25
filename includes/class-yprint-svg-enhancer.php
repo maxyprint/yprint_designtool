@@ -111,6 +111,10 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
+    // DEBUG: SVG-Rohdaten in error_log schreiben (gekürzt)
+    $debug_svg = substr($svg_content, 0, 200) . '...'; // Nur ersten 200 Zeichen
+    error_log("SVG Smooth Debug - Input Level: {$smooth_level}%, SVG Start: {$debug_svg}");
+    
     // Bei sehr niedrigen Werten (1-2%) zusätzlichen Sicherheitsmodus aktivieren
     $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
     
@@ -123,8 +127,13 @@ public function ajax_smooth_svg() {
         
         // Fehlererkennung
         if ($smoothed_svg === false) {
+            error_log("SVG Smooth Debug - Glättung schlug fehl und gab false zurück");
             throw new Exception(__('Fehler beim Glätten der SVG-Pfade.', 'yprint-designtool'));
         }
+        
+        // DEBUG: Ausgabe des geglätteten SVGs (gekürzt)
+        $debug_result = substr($smoothed_svg, 0, 200) . '...';
+        error_log("SVG Smooth Debug - Nach Glättung: {$debug_result}");
         
         // Sicherheitscheck: Bei niedrigen Werten (1-2%) prüfen, ob das Ergebnis zu stark abweicht
         if ($safety_mode) {
@@ -134,6 +143,7 @@ public function ajax_smooth_svg() {
             
             // Wenn die Größenänderung mehr als 10% beträgt, ist das verdächtig
             $size_change_percent = abs(($smoothed_length - $original_length) / $original_length) * 100;
+            error_log("SVG Smooth Debug - Sicherheitscheck: Original Länge: {$original_length}, Geglättet Länge: {$smoothed_length}, Änderung: {$size_change_percent}%");
             
             if ($size_change_percent > 10 || $smoothed_length < 100) {
                 // Bei verdächtigen Änderungen das Original mit minimaler Anpassung zurückgeben
@@ -145,14 +155,60 @@ public function ajax_smooth_svg() {
             }
         }
         
+        // Erweiterte Validitätsprüfung
+        if (!$this->is_valid_svg($smoothed_svg)) {
+            error_log("SVG Smooth Debug - FEHLER: Geglättetes SVG ist ungültig. Gebe Original zurück.");
+            $smoothed_svg = $original_svg;
+        }
+        
         // Erfolg zurückmelden
         wp_send_json_success(array(
             'svg_content' => $smoothed_svg
         ));
         
     } catch (Exception $e) {
+        error_log("SVG Smooth Debug - Exception: " . $e->getMessage());
         wp_send_json_error(array('message' => $e->getMessage()));
     }
+}
+
+/**
+ * Überprüft, ob ein SVG-String gültig ist
+ *
+ * @param string $svg_content SVG-Inhalt als String
+ * @return bool True wenn gültig, sonst False
+ */
+private function is_valid_svg($svg_content) {
+    if (empty($svg_content)) {
+        error_log("SVG Validation - Leerer SVG-Inhalt");
+        return false;
+    }
+    
+    // Einfache Prüfung auf SVG-Tag
+    if (!preg_match('/<svg[^>]*>.*<\/svg>/s', $svg_content)) {
+        error_log("SVG Validation - Kein komplettes SVG-Tag gefunden");
+        return false;
+    }
+    
+    // Versuche, das SVG zu parsen
+    libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    $result = @$dom->loadXML($svg_content);
+    $errors = libxml_get_errors();
+    libxml_clear_errors();
+    
+    if (!$result) {
+        if (!empty($errors)) {
+            foreach ($errors as $error) {
+                error_log("SVG Validation - XML-Fehler: " . $error->message);
+            }
+        } else {
+            error_log("SVG Validation - Unbekannter Parsing-Fehler");
+        }
+        return false;
+    }
+    
+    return true;
 }
     
     /**
@@ -255,6 +311,7 @@ public function simplify_svg($svg_content, $detail_level = 5.0) {
  */
 public function smooth_svg($svg_content, $smooth_level = 0) {
     if (empty($svg_content)) {
+        error_log("SVG smooth_svg - Leerer SVG-Inhalt");
         return false;
     }
     
@@ -275,11 +332,16 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     libxml_use_internal_errors(true);
     $success = $dom->loadXML($svg_content);
     $errors = libxml_get_errors();
-    libxml_clear_errors();
     
     if (!$success || !empty($errors)) {
+        error_log("SVG smooth_svg - Fehler beim Laden des Original-SVGs:");
+        foreach ($errors as $error) {
+            error_log("SVG XML Error: " . $error->message . " (Zeile: " . $error->line . ")");
+        }
+        libxml_clear_errors();
         return false;
     }
+    libxml_clear_errors();
     
     // XPath für die Suche nach Pfaden
     $xpath = new DOMXPath($dom);
@@ -294,79 +356,151 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         $smooth_angles = $base_angle * pow(10, $normalized_level * 1.5); // Exponentielles Wachstum
     } else {
         // Reguläre Glättung für 11-100%
+        // Bei Werten über 10% limitieren wir den maximalen Winkel stärker
         $base_angle = 0.15;
-        $max_angle = 25;
+        $max_angle = 15; // Reduziert von 25 auf 15 für mehr Stabilität
         $normalized_level = ($smooth_level - 10) / 90; // 0.0 bis 1.0 für 10-100%
         $smooth_angles = $base_angle + ($max_angle - $base_angle) * ($normalized_level * $normalized_level);
     }
     
+    error_log("SVG smooth_svg - Glättungsstärke berechnet: Level=$smooth_level, Winkel=$smooth_angles");
+    
     // Sicherheitsmodus für sehr niedrige Werte (1-3%) - komplexe Veränderungen begrenzen
     $safety_mode = ($smooth_level >= 1 && $smooth_level <= 3);
+    
+    // NEUER SICHERHEITSMODUS FÜR HÖHERE WERTE (> 10%) 
+    $high_safety_mode = ($smooth_level > 10);
     
     // Anzahl der Pfade und Gesamtlänge feststellen (für Sicherheitsvergleich)
     $paths = $xpath->query('//svg:path');
     $path_count = $paths->length;
+    error_log("SVG smooth_svg - Gefundene Pfade: $path_count");
+    
+    if ($path_count == 0) {
+        error_log("SVG smooth_svg - Keine Pfade gefunden, gebe Original zurück");
+        return $svg_content; // Wenn keine Pfade vorhanden sind, Original zurückgeben
+    }
+    
     $original_path_data_length = 0;
     
     // Pfadlängen für spätere Vergleiche messen
-    if ($safety_mode) {
+    if ($safety_mode || $high_safety_mode) {
         foreach ($paths as $path) {
             $original_path_data_length += strlen($path->getAttribute('d'));
         }
+        error_log("SVG smooth_svg - Originale Gesamtpfadlänge: $original_path_data_length");
     }
     
-    // Pfade glätten
-    $modified_paths = 0;
-    foreach ($paths as $path) {
-        if ($smooth_level <= 3) {
-            // Bei 1-3% nur die größten Pfade glätten, kleine unverändert lassen
-            $d_attr = $path->getAttribute('d');
-            if (strlen($d_attr) < 100) {
-                continue; // Kleine Pfade überspringen
+    // Fehlerbehandlung für den Glättungsprozess
+    try {
+        // Pfade glätten
+        $modified_paths = 0;
+        foreach ($paths as $path) {
+            // Bei höheren Werten (>10%) zusätzliche Sicherheitsmaßnahmen
+            if ($high_safety_mode) {
+                $d_attr = $path->getAttribute('d');
+                // Debug-Info: Pfadlänge
+                error_log("SVG smooth_svg - Pfad Länge: " . strlen($d_attr));
+                
+                // Bei hohen Glättungswerten kleine Pfade überspringen, um Stabilitätsprobleme zu vermeiden
+                if (strlen($d_attr) < 100) {
+                    continue;
+                }
+                
+                try {
+                    // Jeden Pfad einzeln verarbeiten, um Fehler zu isolieren
+                    $this->smooth_path($path, $smooth_angles);
+                    $modified_paths++;
+                } catch (Exception $e) {
+                    error_log("SVG smooth_svg - Fehler bei Pfadglättung: " . $e->getMessage());
+                    // Bei Fehler den Originalpfad wiederherstellen
+                    $path->setAttribute('d', $d_attr);
+                }
+            } 
+            // Bei niedrigen Werten (1-3%) nur die größten Pfade glätten
+            else if ($smooth_level <= 3) {
+                $d_attr = $path->getAttribute('d');
+                if (strlen($d_attr) < 100) {
+                    continue; // Kleine Pfade überspringen
+                }
+                
+                $this->smooth_path($path, $smooth_angles);
+                $modified_paths++;
+            }
+            // Standard-Glättung für Werte zwischen 4-10%
+            else {
+                $this->smooth_path($path, $smooth_angles);
+                $modified_paths++;
             }
         }
         
-        $this->smooth_path($path, $smooth_angles);
-        $modified_paths++;
-    }
-    
-    // Sicherheitsvergleich - bei sehr niedrigen Werten prüfen, ob das Ergebnis noch valid ist
-    if ($safety_mode) {
-        $modified_path_data_length = 0;
-        $paths = $xpath->query('//svg:path');
+        error_log("SVG smooth_svg - Modifizierte Pfade: $modified_paths");
         
-        foreach ($paths as $path) {
-            $modified_path_data_length += strlen($path->getAttribute('d'));
-        }
-        
-        // Wenn zu viele Daten verloren gingen oder Pfade verschwunden sind, Original verwenden
-        if ($paths->length < $path_count * 0.9 || 
-            $modified_path_data_length < $original_path_data_length * 0.8) {
-            
-            error_log("SVG smooth safety triggered: paths reduced from {$path_count} to {$paths->length} or data reduced too much");
-            
-            // Extrem leichte Glättung anwenden (kaum sichtbar, aber ein kleiner Unterschied)
-            $dom = new DOMDocument();
-            $dom->preserveWhiteSpace = false;
-            $dom->formatOutput = true;
-            $dom->loadXML($original_svg_content);
-            
-            $xpath = new DOMXPath($dom);
-            $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
-            
-            // Nur winzige ästhetische Änderungen, die garantiert nicht zum Verlust führen
+        // Sicherheitsvergleich für alle Werte außer den niedrigsten
+        if ($safety_mode || $high_safety_mode) {
+            $modified_path_data_length = 0;
             $paths = $xpath->query('//svg:path');
+            $new_path_count = $paths->length;
+            
             foreach ($paths as $path) {
-                $d_attr = $path->getAttribute('d');
-                if (strlen($d_attr) > 500) { // Nur große Pfade minimal glätten
-                    $this->minimal_path_enhancement($path, $smooth_level);
+                $modified_path_data_length += strlen($path->getAttribute('d'));
+            }
+            
+            error_log("SVG smooth_svg - Nach Glättung: Pfade=$new_path_count (vorher $path_count), Länge=$modified_path_data_length (vorher $original_path_data_length)");
+            
+            // Wenn zu viele Daten verloren gingen oder Pfade verschwunden sind, Original verwenden
+            if ($new_path_count < $path_count * 0.95 || 
+                $modified_path_data_length < $original_path_data_length * 0.8) {
+                
+                error_log("SVG smooth safety triggered: paths reduced from {$path_count} to {$new_path_count} or data reduced too much");
+                
+                // Extrem leichte Glättung anwenden (kaum sichtbar, aber ein kleiner Unterschied)
+                $dom = new DOMDocument();
+                $dom->preserveWhiteSpace = false;
+                $dom->formatOutput = true;
+                
+                // Fehlerbehandlung für das Neu-Laden
+                libxml_use_internal_errors(true);
+                $load_success = $dom->loadXML($original_svg_content);
+                $load_errors = libxml_get_errors();
+                libxml_clear_errors();
+                
+                if (!$load_success) {
+                    error_log("SVG smooth_svg - Fehler beim Neuladen des Originals, gebe unverändert zurück");
+                    return $original_svg_content;
+                }
+                
+                $xpath = new DOMXPath($dom);
+                $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
+                
+                // Nur winzige ästhetische Änderungen, die garantiert nicht zum Verlust führen
+                $paths = $xpath->query('//svg:path');
+                foreach ($paths as $path) {
+                    $d_attr = $path->getAttribute('d');
+                    if (strlen($d_attr) > 500) { // Nur große Pfade minimal glätten
+                        $this->minimal_path_enhancement($path, $smooth_level);
+                    }
                 }
             }
         }
+        
+        // Letzter Validierungsversuch vor der Rückgabe
+        $final_svg = $dom->saveXML();
+        
+        // Prüfen, ob das finale SVG korrekt gespeichert wurde
+        if (empty($final_svg)) {
+            error_log("SVG smooth_svg - Leeres Ergebnis nach saveXML, gebe Original zurück");
+            return $original_svg_content;
+        }
+        
+        error_log("SVG smooth_svg - Erfolgreich abgeschlossen, SVG-Länge: " . strlen($final_svg));
+        
+        return $final_svg;
+        
+    } catch (Exception $e) {
+        error_log("SVG smooth_svg - Ausnahme während der Glättung: " . $e->getMessage());
+        return $original_svg_content;
     }
-    
-    // SVG-Dokument zurückgeben
-    return $dom->saveXML();
 }
 
 /**
