@@ -437,10 +437,10 @@ $('#yprint-smooth-svg-btn').on('click', function() {
         console.log("SVG Anfang (Debug): " + safeOriginalSVG.substring(0, 200) + "...");
         console.log("SVG Länge: " + safeOriginalSVG.length);
         
-        // Bei höheren Werten Benutzer informieren, aber Wert nicht mehr reduzieren
+        // Keine Begrenzung mehr für höhere Glättungswerte
 var actualSmoothLevel = smoothLevel;
 if (smoothLevel > 10) {
-    console.info("Höherer Glättungswert: " + smoothLevel + "% wird angewendet");
+    console.info("Hoher Glättungswert wird angewendet: " + smoothLevel + "%");
 }
         
         $.ajax({

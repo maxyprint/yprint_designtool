@@ -646,117 +646,152 @@ private function smooth_path($path_element, $smooth_angles) {
 }
 
 /**
- * Fügt subtile Variationen zu einem Pfad hinzu, um Änderungen sichtbarer zu machen
+ * Fügt deutlich sichtbare Variationen zu einem Pfad hinzu, basierend auf der Glättungsstärke
  * 
  * @param string $path_data Der SVG-Pfaddaten-String
  * @param float $strength Stärke der Variation (0-100)
  * @return string Veränderter Pfad
  */
 private function add_subtle_variations($path_data, $strength) {
-    // Normalisiere die Stärke auf 0.001-0.1
-    $variation_strength = min(0.1, max(0.001, $strength / 1000));
+    // Deutlich verstärkte Variation (0.01-0.3) - 10-30x stärker als zuvor
+    $variation_strength = min(0.3, max(0.01, $strength / 330));
+    
+    // Debug-Info
+    error_log("Angewendete Variationsstärke: " . $variation_strength . " bei Glättungslevel " . $strength);
     
     // Teile den Pfad in Segmente (bei Befehlen und Koordinaten)
     preg_match_all('/([A-Za-z])|(-?\d+(?:\.\d+)?)/', $path_data, $matches);
     
     $modified_path = '';
-    foreach ($matches[0] as $token) {
-        // Wenn es sich um eine Zahl handelt, füge leichte Variation hinzu
+    $change_counter = 0;
+    
+    foreach ($matches[0] as $i => $token) {
+        // Wenn es sich um eine Zahl handelt, füge stärkere Variation hinzu
         if (is_numeric($token)) {
             $num = floatval($token);
+            $abs_num = abs($num);
             
-            // Stärke der Variation proportional zum Wert und Glättungslevel
-            $variation = $num * $variation_strength * (mt_rand(-10, 10) / 10);
+            // Variationslogik verbessern - stärkere und häufigere Anpassungen
+            // Bei stärkerem Glättungslevel mehr Punkte verändern
+            $chance_to_modify = min(90, max(10, $strength)); // 10%-90% je nach Glättungsstärke
             
-            // Bei größeren Werten stärkere Variationen
-            if (abs($num) > 100) {
-                $variation *= 2;
-            }
-            
-            // Besondere Behandlung für sehr kleine Werte
-            if (abs($num) < 0.1) {
-                $modified_path .= $token;
-            } else {
+            if (mt_rand(1, 100) <= $chance_to_modify) {
+                // Stärke der Variation proportional zum Wert und Glättungslevel
+                $variation_factor = $variation_strength;
+                
+                // Bei größeren Werten stärkere Variationen
+                if ($abs_num > 100) {
+                    $variation_factor *= 3;
+                } elseif ($abs_num > 10) {
+                    $variation_factor *= 2;
+                } elseif ($abs_num < 1) {
+                    // Für sehr kleine Werte immer noch leichte Änderung garantieren
+                    $variation_factor = max($variation_factor, 0.05);
+                }
+                
+                // Variation mit Zufallsrichtung
+                $variation = $abs_num * $variation_factor * (mt_rand(-10, 10) / 10);
+                
+                // Garantiere Mindeständerung bei höheren Glättungswerten
+                if ($strength > 30 && abs($variation) < 0.5) {
+                    $dir = ($variation >= 0) ? 1 : -1;
+                    $variation = 0.5 * $dir;
+                }
+                
                 $modified_num = $num + $variation;
-                $modified_path .= round($modified_num, 3);
+                $modified_path .= round($modified_num, 2) . ' '; // Weniger Dezimalstellen für bessere Sichtbarkeit
+                $change_counter++;
+            } else {
+                $modified_path .= $token . ' ';
             }
         } else {
-            $modified_path .= $token;
-        }
-        
-        // Füge Leerzeichen um Befehle ein
-        if (preg_match('/[A-Za-z]/', $token)) {
-            $modified_path .= ' ';
-        } else {
-            $modified_path .= ' ';
+            $modified_path .= $token . ' ';
         }
     }
+    
+    error_log("SVG-Variationen: $change_counter Koordinaten von " . count($matches[0]) . " wurden angepasst");
     
     return trim($modified_path);
 }
 
 /**
- * Erzwingt sichtbare Änderungen am Pfad bei hohen Glättungswerten
+ * Erzwingt deutlich sichtbare Änderungen am Pfad bei allen Glättungswerten
  * 
  * @param string $path_data Original-Pfaddaten
  * @param float $strength Stärke der Änderung (0-100)
  * @return string Modifizierter Pfad
  */
 private function force_visible_changes($path_data, $strength) {
-    // Bei sehr hohen Werten mehr Punkte modifizieren
-    $modify_percentage = min(90, max(5, $strength));
-    $modify_factor = $strength / 100;
+    // Drastisch erhöhte Werte für sichtbare Änderungen
+    $modify_percentage = min(95, max(20, $strength));
+    $modify_factor = $strength / 30; // 3.3x stärker als zuvor
+    
+    // Debug-Info
+    error_log("SVG force_visible_changes: Level=$strength%, Faktor=$modify_factor, Änderungsrate=$modify_percentage%");
     
     // Segmente identifizieren
     preg_match_all('/([A-Za-z])|([-+]?\d*\.?\d+)/', $path_data, $matches);
     
     $modified_path = '';
-    $index = 0;
-    $in_number = false;
+    $changed_count = 0;
+    $total_numbers = 0;
     
     foreach ($matches[0] as $token) {
         // Verändere nur numerische Werte
         if (is_numeric($token)) {
-            // Größere Werte stärker modifizieren
+            $total_numbers++;
             $num = floatval($token);
             $abs_num = abs($num);
             
-            // Bei großen Zahlen stärkere Modifikation
-            if ($abs_num > 100 && mt_rand(1, 100) <= $modify_percentage) {
-                $factor = $modify_factor * (mt_rand(5, 15) / 10);
-                $direction = mt_rand(0, 1) ? 1 : -1;
-                $change = $abs_num * $factor * $direction;
-                $new_value = $num + $change;
-                $modified_path .= round($new_value, 2) . ' ';
-            } 
-            // Bei mittleren Zahlen moderate Modifikation
-            else if ($abs_num > 10 && mt_rand(1, 100) <= $modify_percentage) {
-                $factor = $modify_factor * (mt_rand(3, 12) / 10);
-                $direction = mt_rand(0, 1) ? 1 : -1;
-                $change = $abs_num * $factor * $direction;
-                $new_value = $num + $change;
-                $modified_path .= round($new_value, 2) . ' ';
+            // Zufallswürfel für Änderungsentscheidung
+            $should_modify = mt_rand(1, 100) <= $modify_percentage;
+            
+            // Für hohe Glättungswerte gewisse Änderungen erzwingen
+            if ($strength > 50 && $total_numbers % 5 == 0) {
+                $should_modify = true;
             }
-            // Bei kleinen Zahlen leichte Modifikation
-            else if ($abs_num > 1) {
-                $factor = $modify_factor * (mt_rand(2, 8) / 100);
+            
+            if ($should_modify) {
+                // Wert des Faktors basierend auf Zahlengröße und Glättungsniveau
+                // Deutlich verstärkte Werte für bessere Sichtbarkeit
+                if ($abs_num > 100) {
+                    $factor = $modify_factor * mt_rand(10, 30) / 10;
+                } elseif ($abs_num > 10) {
+                    $factor = $modify_factor * mt_rand(8, 25) / 10;
+                } elseif ($abs_num > 1) {
+                    $factor = $modify_factor * mt_rand(5, 20) / 10;
+                } else {
+                    // Für sehr kleine Zahlen einen absoluten Wert hinzufügen statt Prozentänderung
+                    $factor = 0;
+                    $absolute_change = mt_rand(5, 20) / 10; // 0.5 bis 2.0 addieren
+                }
+                
+                // Zufällige Richtung der Änderung
                 $direction = mt_rand(0, 1) ? 1 : -1;
-                $change = $abs_num * $factor * $direction;
-                $new_value = $num + $change;
-                $modified_path .= round($new_value, 3) . ' ';
-            }
-            // Sehr kleine Zahlen unverändert lassen
-            else {
+                
+                // Berechne neue Werte
+                if ($abs_num <= 1) {
+                    // Für sehr kleine Zahlen absolute Änderung
+                    $new_value = $num + ($absolute_change * $direction);
+                } else {
+                    // Prozentuale Änderung mit Mindestbetrag
+                    $change = max($abs_num * $factor, 1) * $direction;
+                    $new_value = $num + $change;
+                }
+                
+                // Auf max. 2 Dezimalstellen runden für bessere Sichtbarkeit
+                $modified_path .= round($new_value, 2) . ' ';
+                $changed_count++;
+            } else {
                 $modified_path .= $token . ' ';
             }
-        } 
-        // Befehle unverändert beibehalten
-        else {
+        } else {
             $modified_path .= $token . ' ';
         }
-        
-        $index++;
     }
+    
+    error_log("SVG Änderungen erzwungen: $changed_count von $total_numbers Koordinaten geändert (" . 
+              round(($changed_count/$total_numbers)*100) . "%)");
     
     return trim($modified_path);
 }
