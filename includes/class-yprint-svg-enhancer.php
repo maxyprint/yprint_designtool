@@ -822,27 +822,41 @@ private function minimal_smooth_path($segments) {
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
-    // Verstärkte Berechnung des smooth_factor für sichtbarere Effekte
-    // Die Glättungsstärke wird exponentiell erhöht, um sichtbare Änderungen zu erzielen
+    // Drastisch verstärkte Berechnung des smooth_factor für deutlich sichtbarere Effekte
+    // Exponentielle Steigerung für wahrnehmbare Änderungen auch bei komplexen SVGs
+    
+    // Debug-Info für die Anpassung des Faktors
+    $original_angle = $smooth_angles;
+    
     if ($smooth_angles < 0.05) {
-        // Für extrem kleine Winkel (< 0.05°) immer noch minimale Veränderung garantieren
-        $smooth_factor = 0.0001; // Erhöhte Mikroanpassung
+        // Für extrem kleine Winkel (< 0.05°) trotzdem minimale Veränderung garantieren
+        $smooth_factor = 0.001; // 10x mehr als vorher
     } else if ($smooth_angles < 1) {
-        $smooth_factor = 0.0005 + ($smooth_angles * 0.0005); // Stärkere Anpassung
+        $smooth_factor = 0.002 + ($smooth_angles * 0.002); // 4x stärker
     } else if ($smooth_angles < 5) {
-        $smooth_factor = 0.001 + (($smooth_angles - 1) * 0.001); // Deutlichere Anpassung
+        $smooth_factor = 0.004 + (($smooth_angles - 1) * 0.004); // 4x stärker
     } else if ($smooth_angles < 20) {
-        // Mittlere Glättungsstärke mit wahrnehmbarem Effekt
-        $smooth_factor = 0.01 + (($smooth_angles - 5) * 0.002);
+        // Mittlere Glättungsstärke mit deutlich wahrnehmbarem Effekt
+        $smooth_factor = 0.02 + (($smooth_angles - 5) * 0.006); // 3x stärker
     } else if ($smooth_angles < 50) {
-        // Stärkere Glättung
-        $smooth_factor = 0.04 + (($smooth_angles - 20) * 0.001);
+        // Starke Glättung
+        $smooth_factor = 0.12 + (($smooth_angles - 20) * 0.004); // 3x stärker
+    } else if ($smooth_angles < 75) {
+        // Sehr starke Glättung
+        $smooth_factor = 0.24 + (($smooth_angles - 50) * 0.008);
     } else {
-        // Maximale Glättungsstärke für hohe Werte (50-100%)
-        $smooth_factor = 0.07 + (($smooth_angles - 50) * 0.002);
-        // Begrenze auf 0.2 für Stabilität
-        $smooth_factor = min(0.2, $smooth_factor);
+        // Extreme Glättung für Werte über 75%
+        $smooth_factor = 0.44 + (($smooth_angles - 75) * 0.016); 
+        // Höheres Maximum für sichtbare Effekte
+        $smooth_factor = min(0.8, $smooth_factor);
     }
+    
+    // Zusätzliche Verstärkung bei sehr hohen Glättungswerten
+    if ($smooth_angles > 90) {
+        $smooth_factor *= 1.5; // 50% mehr Effekt
+    }
+    
+    error_log("Glättungsfaktor berechnet: Winkel $original_angle° -> Faktor $smooth_factor");
     
     // Pfad mit geglätteten Kurven erstellen
     $smoothed = '';
