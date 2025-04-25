@@ -380,19 +380,23 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Progressive Begrenzung der Glättungswerte:
-// Wir erlauben höhere Werte, reduzieren aber die Steigerungsrate
-if ($smooth_level <= 3) {
-    // Für Werte bis 3% keine Änderung
+    // Deutlich stärkere Glättungswerte für sichtbare Änderungen
+    // Progressiver Faktor ohne so starke Begrenzung wie zuvor
     $safe_smooth_level = $smooth_level;
-} elseif ($smooth_level <= 30) {
-    // Zwischen 3% und 30% moderate Steigerung
-    $safe_smooth_level = 3 + (($smooth_level - 3) * 0.3);
-} else {
-    // Über 30% langsame Steigerung
-    $safe_smooth_level = 11.1 + (($smooth_level - 30) * 0.1);
-}
-error_log("SVG smooth_svg - Glättungswert progressiv angepasst: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
+    
+    error_log("SVG smooth_svg - Verwende direkten Glättungswert: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
+    
+    // Direkte, intensivere Glättungsstärke für sichtbare Effekte
+    // Deutlich verstärkte Basis für sichtbare Änderungen
+    $base_angle = 0.1; // 10x höher als vorher
+    $normalized_level = $safe_smooth_level / 100; // Skaliert den Wert von 0-1
+    // Stark vereinfachte, direkte Formel für deutlich sichtbare Effekte
+    $smooth_angles = $base_angle + ($normalized_level * 0.5); // Linearere Skalierung für vorhersehbarere Effekte
+    
+    // Bei höheren Werten noch mehr Pfade bearbeiten
+    $path_selection_factor = 100; // Bearbeite alle Pfade
+    
+    error_log("SVG smooth_svg - Verstärkte Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
     
     // Dynamische Glättungsstärke mit verbesserten Effekten
 $base_angle = 0.01; // Basis für mikroskopische Änderungen
@@ -653,8 +657,8 @@ private function smooth_path($path_element, $smooth_angles) {
  * @return string Veränderter Pfad
  */
 private function add_subtle_variations($path_data, $strength) {
-    // Deutlich verstärkte Variation (0.01-0.3) - 10-30x stärker als zuvor
-    $variation_strength = min(0.3, max(0.01, $strength / 330));
+    // DRASTISCH verstärkte Variation für sichtbare Veränderungen
+    $variation_strength = min(0.8, max(0.05, $strength / 100));
     
     // Debug-Info
     error_log("Angewendete Variationsstärke: " . $variation_strength . " bei Glättungslevel " . $strength);
@@ -671,35 +675,37 @@ private function add_subtle_variations($path_data, $strength) {
             $num = floatval($token);
             $abs_num = abs($num);
             
-            // Variationslogik verbessern - stärkere und häufigere Anpassungen
-            // Bei stärkerem Glättungslevel mehr Punkte verändern
-            $chance_to_modify = min(90, max(10, $strength)); // 10%-90% je nach Glättungsstärke
+            // Viel höhere Änderungswahrscheinlichkeit
+            // Min 30% bis 100% je nach Glättungsstärke
+            $chance_to_modify = min(100, max(30, $strength)); 
             
             if (mt_rand(1, 100) <= $chance_to_modify) {
-                // Stärke der Variation proportional zum Wert und Glättungslevel
+                // Verstärkte Variation für sichtbare Effekte
                 $variation_factor = $variation_strength;
                 
-                // Bei größeren Werten stärkere Variationen
+                // Bei größeren Werten noch stärkere Variationen
                 if ($abs_num > 100) {
-                    $variation_factor *= 3;
+                    $variation_factor *= 5; // Erhöht von 3 auf 5
                 } elseif ($abs_num > 10) {
-                    $variation_factor *= 2;
+                    $variation_factor *= 3; // Erhöht von 2 auf 3
                 } elseif ($abs_num < 1) {
-                    // Für sehr kleine Werte immer noch leichte Änderung garantieren
-                    $variation_factor = max($variation_factor, 0.05);
+                    // Für sehr kleine Werte garantiere eine klare Änderung
+                    $variation_factor = max($variation_factor, 0.2); // Erhöht von 0.05 auf 0.2
                 }
                 
-                // Variation mit Zufallsrichtung
-                $variation = $abs_num * $variation_factor * (mt_rand(-10, 10) / 10);
+                // Stärkere Variation mit breiterer Zufallsverteilung
+                $variation = $abs_num * $variation_factor * (mt_rand(-15, 15) / 10); // Verstärkt von ±10 auf ±15
                 
-                // Garantiere Mindeständerung bei höheren Glättungswerten
-                if ($strength > 30 && abs($variation) < 0.5) {
+                // Garantiere deutliche Mindeständerung für alle Werte
+                $min_change = 0.8 + ($strength / 100); // 0.8 bis 1.8 je nach Glättungsniveau
+                if (abs($variation) < $min_change) {
                     $dir = ($variation >= 0) ? 1 : -1;
-                    $variation = 0.5 * $dir;
+                    $variation = $min_change * $dir;
                 }
                 
                 $modified_num = $num + $variation;
-                $modified_path .= round($modified_num, 2) . ' '; // Weniger Dezimalstellen für bessere Sichtbarkeit
+                // Weniger Rundung für bessere Sichtbarkeit der Änderungen
+                $modified_path .= round($modified_num, 1) . ' '; 
                 $change_counter++;
             } else {
                 $modified_path .= $token . ' ';

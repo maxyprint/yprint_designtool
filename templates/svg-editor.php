@@ -479,10 +479,15 @@ if (smoothLevel > 10) {
                                 return;
                             }
                             
-                            // Nur Vorschau, noch nicht speichern
-                            displayedSVG = resultSVG; // Aktualisiere die zuletzt angezeigte Version
-                            self.updateSVGDisplay(resultSVG);
-                            console.log("SVG Display aktualisiert");
+                            // Visuelle Rückmeldung für die Änderung anzeigen
+$('#yprint-svg-canvas-container svg path').css('transition', 'all 0.3s ease');
+self.updateSVGDisplay(resultSVG);
+// Kurz hervorheben, dass eine Änderung stattgefunden hat
+$('#yprint-svg-canvas-container svg path').addClass('svg-modified');
+setTimeout(function() {
+    $('#yprint-svg-canvas-container svg path').removeClass('svg-modified');
+}, 500);
+self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
                         } catch (e) {
                             console.error("Fehler beim SVG-Parsen:", e);
                             self.updateSVGDisplay(displayedSVG);
