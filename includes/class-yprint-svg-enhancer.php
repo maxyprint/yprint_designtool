@@ -95,7 +95,7 @@ private function init_hooks() {
         ));
     }
     
-    /**
+/**
  * AJAX-Handler zum Glätten von SVG-Pfaden
  */
 public function ajax_smooth_svg() {
@@ -111,18 +111,48 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
-    // SVG glätten
-    $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
+    // Bei sehr niedrigen Werten (1-2%) zusätzlichen Sicherheitsmodus aktivieren
+    $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
     
-    if ($smoothed_svg === false) {
-        wp_send_json_error(array('message' => __('Fehler beim Glätten der SVG-Pfade.', 'yprint-designtool')));
-        return;
+    try {
+        // Zuerst speichern wir immer das Original für den Sicherheitsvergleich
+        $original_svg = $svg_content;
+        
+        // SVG glätten
+        $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
+        
+        // Fehlererkennung
+        if ($smoothed_svg === false) {
+            throw new Exception(__('Fehler beim Glätten der SVG-Pfade.', 'yprint-designtool'));
+        }
+        
+        // Sicherheitscheck: Bei niedrigen Werten (1-2%) prüfen, ob das Ergebnis zu stark abweicht
+        if ($safety_mode) {
+            // Einfache Prüfung auf drastische Änderungen
+            $original_length = strlen($original_svg);
+            $smoothed_length = strlen($smoothed_svg);
+            
+            // Wenn die Größenänderung mehr als 10% beträgt, ist das verdächtig
+            $size_change_percent = abs(($smoothed_length - $original_length) / $original_length) * 100;
+            
+            if ($size_change_percent > 10 || $smoothed_length < 100) {
+                // Bei verdächtigen Änderungen das Original mit minimaler Anpassung zurückgeben
+                error_log("SVG smooth safety triggered: size change {$size_change_percent}% is too drastic for level {$smooth_level}%");
+                
+                // Bei sehr niedrigen Levels (1-2%) lieber ein fast unverändertes Original zurückgeben
+                // als ein potentiell fehlerhaftes Ergebnis
+                $smoothed_svg = $original_svg;
+            }
+        }
+        
+        // Erfolg zurückmelden
+        wp_send_json_success(array(
+            'svg_content' => $smoothed_svg
+        ));
+        
+    } catch (Exception $e) {
+        wp_send_json_error(array('message' => $e->getMessage()));
     }
-    
-    // Erfolg zurückmelden
-    wp_send_json_success(array(
-        'svg_content' => $smoothed_svg
-    ));
 }
     
     /**
@@ -252,9 +282,21 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Glättungsstärke berechnen (0-100 zu Grad-Wert, aber mit viel geringerem Einfluss)
-    // Max 45 Grad bei 100% Glättung, dadurch wird die Glättung sanfter
-    $smooth_angles = 45 * ($smooth_level / 100);
+    // Glättungsstärke berechnen - sanftere Progression
+    // Bei 1% nur 0,15 Grad, bei 100% maximal 25 Grad
+    // Verwende eine nichtlineare Kurve für bessere Kontrolle bei niedrigen Werten
+    $base_angle = 0.15; // Minimaler Winkel bei 1%
+    $max_angle = 25;    // Maximaler Winkel bei 100%
+    
+    // Nichtlineare Progression (quadratisch), sanfter für kleine Werte
+    $normalized_level = $smooth_level / 100;
+    $smooth_angles = $base_angle + ($max_angle - $base_angle) * ($normalized_level * $normalized_level);
+    
+    // Zusätzliche Sicherheitsschicht bei sehr niedrigen Werten (1-5%)
+    if ($smooth_level <= 5) {
+        // Extrem sanfte Anpassung für 1-5% Bereich
+        $smooth_angles = $base_angle * ($smooth_level / 5);
+    }
     
     // Pfade finden und glätten
     $paths = $xpath->query('//svg:path');
@@ -291,15 +333,24 @@ private function smooth_path($path_element, $smooth_angles) {
 
 /**
  * Erstellt einen geglätteten Pfad aus Segmenten
- *
+ * 
  * @param array $segments Pfadsegmente
  * @param float $smooth_angles Winkelmaximum für Glättung (0-360)
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
-    // Bei niedrigen Winkelwerten sehr geringe Glättung anwenden
-    // Bei 45° (Maximalwert laut Funktion) wird smooth_factor auf max. 0.125 begrenzt
-    $smooth_factor = min(0.125, $smooth_angles / 360);
+    // Bessere Kontrolle über den smooth_factor
+    // Extrem niedrige Werte bei kleinen Winkeln
+    // Bei winzigen Winkeln (< 1°) verwenden wir einen mikroskopischen smooth_factor
+    if ($smooth_angles < 1) {
+        $smooth_factor = $smooth_angles / 1000; // Extrem kleine Anpassung
+    } else if ($smooth_angles < 5) {
+        $smooth_factor = $smooth_angles / 500;  // Sehr kleine Anpassung
+    } else {
+        // Standard-Berechnung für größere Winkel
+        // Bei max 25° (aus smooth_svg) wird smooth_factor auf max. 0.05 begrenzt (statt 0.125)
+        $smooth_factor = min(0.05, $smooth_angles / 500);
+    }
     
     error_log("create_smoothed_path: Starting with smooth_factor: " . $smooth_factor);
     
@@ -308,12 +359,16 @@ private function create_smoothed_path($segments, $smooth_angles) {
     $last_point = null;
     $last_control = null;
     
+    // Array zur Erhaltung der ursprünglichen Punkte bei Mikroänderungen
+    $preserved_points = [];
+    $original_segment_count = count($segments);
+    
     foreach ($segments as $i => $segment) {
         $command = $segment['command'];
         $points = $segment['points'];
         
-        // Kopie der Punkte erstellen, um Originalpunkte nicht zu verlieren
-        $original_points = $points;
+        // Originalpunkte immer speichern (Sicherheitsmaßnahme)
+        $preserved_points[$i] = $points;
         
         // Befehl und erste Punkte immer beibehalten
         $smoothed .= ' ' . $command . ' ';
@@ -328,74 +383,63 @@ private function create_smoothed_path($segments, $smooth_angles) {
             $end_x = $points[4];
             $end_y = $points[5];
             
-            // Für sehr kleine Glättungswerte (1-5%) nur Mikroanpassungen vornehmen
-            if ($smooth_angles < 5) {
-                // Verkleinere den smooth_factor noch weiter für minimale Änderungen
-                $smooth_factor = $smooth_factor * ($smooth_angles / 5);
-                error_log("create_smoothed_path: Very small smoothing. Reduced smooth_factor to: " . $smooth_factor);
-            }
-            
             // Nur bei vorhandenem letzten Punkt fortsetzen
             if ($last_point && $last_control) {
-                error_log("create_smoothed_path: Processing curve with last point: " . json_encode($last_point));
-                
-                // Berechne den Winkel zwischen dem letzten Punkt und dem ersten Kontrollpunkt
+                // Berechne Winkel und Distanzen mit Vorsichtsmaßnahmen
                 $angle1 = atan2($control1_y - $last_point[1], $control1_x - $last_point[0]);
-                // Berechne den Winkel zwischen dem Endpunkt und dem zweiten Kontrollpunkt
                 $angle2 = atan2($end_y - $control2_y, $end_x - $control2_x);
                 
-                // Konvertiere in Grad für bessere Lesbarkeit in Logs
                 $angle1_deg = rad2deg($angle1);
                 $angle2_deg = rad2deg($angle2);
                 
-                // Berechne den Winkelunterschied
+                // Winkelunterschied berechnen
                 $angle_diff = abs($angle2_deg - $angle1_deg);
                 if ($angle_diff > 180) {
                     $angle_diff = 360 - $angle_diff;
                 }
                 
-                // Log der Winkelberechnung
-                error_log("create_smoothed_path: Angles - angle1: {$angle1_deg}°, angle2: {$angle2_deg}°, diff: {$angle_diff}°");
+                // Nur winzige Anpassungen erlauben
+                $do_smoothing = false;
+                $adaptive_factor = $smooth_factor;
                 
-                // Distanzen für die Kontrolle berechnen
-                $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
-                $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
+                // Progressiv anpassen basierend auf Winkelunterschied
+                if ($angle_diff < 90) {
+                    // Kleinere Anpassungen bei kleinen Winkeln
+                    $adaptive_factor = $smooth_factor * ($angle_diff / 90);
+                    $do_smoothing = true;
+                } else if ($angle_diff <= $smooth_angles) {
+                    // Standardanpassung innerhalb des angegebenen Bereichs
+                    $do_smoothing = true;
+                }
                 
-                error_log("create_smoothed_path: Control point distances - dist1: {$dist1}, dist2: {$dist2}");
-                
-                // Nur anpassen, wenn die Glättung wirklich benötigt wird und der Winkel in unserem Bereich liegt
-                if ($angle_diff <= $smooth_angles && $smooth_factor > 0.001) { // Minimale Schwelle für Aktivierung
-                    // Berechne den idealen Winkel für den zweiten Kontrollpunkt
-                    $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
+                if ($do_smoothing && $adaptive_factor > 0.00001) { // Mindestens ein wenig Anpassung
+                    // Distanzen für Kontrollpunkte berechnen
+                    $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
+                    $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
                     
-                    // Aktueller Winkel des zweiten Kontrollpunkts
+                    // Idealen Winkel berechnen
+                    $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
                     $current_angle = atan2($control2_y - $end_y, $control2_x - $end_x);
                     
-                    // Extrem sanfte Mischung zwischen aktuellem und idealem Winkel
-                    $new_angle = $current_angle * (1 - $smooth_factor) + $ideal_angle * $smooth_factor;
+                    // Sehr sanfte Anpassung für niedrige Glättungswerte
+                    $blend_factor = min(0.01, $adaptive_factor); // Maximal 1% Anpassung pro Durchlauf
+                    $new_angle = $current_angle * (1 - $blend_factor) + $ideal_angle * $blend_factor;
                     
-                    error_log("create_smoothed_path: Angle calculation - current: " . rad2deg($current_angle) . 
-                            "°, ideal: " . rad2deg($ideal_angle) . "°, new: " . rad2deg($new_angle) . "°");
-                    
-                    // Neue Kontrollpunktkoordinaten berechnen
+                    // Neue Kontrollpunktkoordinaten
                     $new_control2_x = $end_x + cos($new_angle) * $dist2;
                     $new_control2_y = $end_y + sin($new_angle) * $dist2;
                     
-                    // Berechne die Distanz zwischen den alten und neuen Punkten
+                    // Berechne Änderungsdistanz mit sicherer Begrenzung
                     $change_distance = sqrt(pow($new_control2_x - $control2_x, 2) + 
                                          pow($new_control2_y - $control2_y, 2));
                     
-                    error_log("create_smoothed_path: Potential change - distance: {$change_distance}, max allowed: " . ($dist2 * $smooth_factor));
+                    // Sanfte Änderungsbegrenzung - verhindert große Sprünge
+                    $max_change = min($dist2 * 0.01, 0.5); // Maximal 1% der Distanz oder 0.5 Einheiten
                     
-                    // Nur ändern, wenn die Änderung minimal ist
-                    $max_change = $dist2 * $smooth_factor;
                     if ($change_distance <= $max_change) {
-                        error_log("create_smoothed_path: Applying change to control points");
                         // Punkte aktualisieren
                         $points[2] = $new_control2_x;
                         $points[3] = $new_control2_y;
-                    } else {
-                        error_log("create_smoothed_path: Change too large, keeping original points");
                     }
                 }
             }
@@ -429,7 +473,24 @@ private function create_smoothed_path($segments, $smooth_angles) {
     }
     
     $result = trim($smoothed);
-    error_log("create_smoothed_path: Final path length: " . strlen($result));
+    
+    // Sicherheitsprüfung: Wenn Ergebnis leer oder deutlich kürzer als Original,
+    // stelle sicher, dass wir einen gültigen Pfad zurückgeben
+    if (empty($result) || strlen($result) < 10) {
+        // Originalstruktur wiederherstellen, aber mit minimaler Veränderung
+        $result = '';
+        foreach ($segments as $i => $segment) {
+            $command = $segment['command'];
+            $points = $preserved_points[$i]; // Verwende die gespeicherten Originalpunkte
+            
+            $result .= ' ' . $command . ' ';
+            foreach ($points as $point) {
+                $result .= $point . ' ';
+            }
+        }
+        $result = trim($result);
+    }
+    
     return $result;
 }
     
