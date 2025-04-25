@@ -111,16 +111,26 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
-    // DEBUG: SVG-Rohdaten in error_log schreiben (gekürzt)
-    $debug_svg = substr($svg_content, 0, 200) . '...'; // Nur ersten 200 Zeichen
-    error_log("SVG Smooth Debug - Input Level: {$smooth_level}%, SVG Start: {$debug_svg}");
+    // Direkte Debug-Ausgabe im Browser-Debug-Log
+    error_log("SVG Smooth Debug - Input Level: {$smooth_level}%");
     
     // Bei sehr niedrigen Werten (1-2%) zusätzlichen Sicherheitsmodus aktivieren
     $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
     
     try {
+        // Bei hohen Werten (>10%) zusätzliche Debug-Info
+        if ($smooth_level > 10) {
+            error_log("HOHER SMOOTHING-WERT: $smooth_level% - Besondere Vorsicht");
+        }
+        
         // Zuerst speichern wir immer das Original für den Sicherheitsvergleich
         $original_svg = $svg_content;
+        
+        // SVG-Validitätsprüfung VOR dem Glätten
+        if (!$this->is_valid_svg($original_svg)) {
+            wp_send_json_error(array('message' => 'Eingangs-SVG ist ungültig. Bitte lade ein gültiges SVG hoch.'));
+            return;
+        }
         
         // SVG glätten
         $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
@@ -128,12 +138,8 @@ public function ajax_smooth_svg() {
         // Fehlererkennung
         if ($smoothed_svg === false) {
             error_log("SVG Smooth Debug - Glättung schlug fehl und gab false zurück");
-            throw new Exception(__('Fehler beim Glätten der SVG-Pfade.', 'yprint-designtool'));
+            throw new Exception(__('Fehler beim Glätten der SVG-Pfade: Rückgabewert ist false', 'yprint-designtool'));
         }
-        
-        // DEBUG: Ausgabe des geglätteten SVGs (gekürzt)
-        $debug_result = substr($smoothed_svg, 0, 200) . '...';
-        error_log("SVG Smooth Debug - Nach Glättung: {$debug_result}");
         
         // Sicherheitscheck: Bei niedrigen Werten (1-2%) prüfen, ob das Ergebnis zu stark abweicht
         if ($safety_mode) {
@@ -158,17 +164,44 @@ public function ajax_smooth_svg() {
         // Erweiterte Validitätsprüfung
         if (!$this->is_valid_svg($smoothed_svg)) {
             error_log("SVG Smooth Debug - FEHLER: Geglättetes SVG ist ungültig. Gebe Original zurück.");
-            $smoothed_svg = $original_svg;
+            
+            // In diesem Fall senden wir eine Fehlermeldung zurück mit mehr Details
+            libxml_use_internal_errors(true);
+            $dom = new DOMDocument();
+            $result = @$dom->loadXML($smoothed_svg);
+            $errors = libxml_get_errors();
+            libxml_clear_errors();
+            
+            $error_details = "XML Parse-Fehler: ";
+            foreach ($errors as $error) {
+                $error_details .= $error->message . " (Zeile: " . $error->line . ") ";
+            }
+            
+            wp_send_json_error(array(
+                'message' => __('Geglättetes SVG ist ungültig.', 'yprint-designtool') . ' ' . $error_details,
+                'debug' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . ", Result length: " . strlen($smoothed_svg)
+            ));
+            return;
         }
         
         // Erfolg zurückmelden
         wp_send_json_success(array(
-            'svg_content' => $smoothed_svg
+            'svg_content' => $smoothed_svg,
+            'debug_info' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . ", Result length: " . strlen($smoothed_svg)
         ));
         
     } catch (Exception $e) {
         error_log("SVG Smooth Debug - Exception: " . $e->getMessage());
-        wp_send_json_error(array('message' => $e->getMessage()));
+        
+        // Ausführlichere Fehlermeldung zurücksenden
+        $trace = $e->getTraceAsString();
+        error_log("Stack Trace: " . $trace);
+        
+        wp_send_json_error(array(
+            'message' => "Fehler: " . $e->getMessage(),
+            'trace' => substr($trace, 0, 500), // Begrenzte Länge für die Antwort
+            'debug' => "Smoothing Level: $smooth_level"
+        ));
     }
 }
 

@@ -401,83 +401,137 @@ this.$fileInput.on('change', function(e) {
             });
             
             // SVG verschönern button
-        $('#yprint-smooth-svg-btn').on('click', function() {
-            if (!currentSVG) {
-                self.showMessage('<?php echo esc_js(__('Keine SVG zum Verschönern gefunden.', 'yprint-designtool')); ?>');
-                return;
+$('#yprint-smooth-svg-btn').on('click', function() {
+    if (!currentSVG) {
+        self.showMessage('<?php echo esc_js(__('Keine SVG zum Verschönern gefunden.', 'yprint-designtool')); ?>');
+        return;
+    }
+    
+    // Zeige den Regler an und deaktiviere andere Buttons
+    $('#smoothing-control').fadeIn();
+    
+    // Wenn der Slider aktualisiert wird, aktualisieren wir das SVG in Echtzeit
+    $('#yprint-smooth-level').off('input').on('input', function() {
+        var smoothLevel = parseInt($(this).val());
+        $('.smooth-value').text(smoothLevel);
+        
+        // Debug-Info in Konsole
+        console.log("Slider-Wert geändert: " + smoothLevel + "%");
+        
+        if (smoothLevel === 0) {
+            // Bei 0% zeigen wir das Original an
+            self.updateSVGDisplay(originalSVG);
+            return;
+        }
+        
+        // Für höhere Werte (über 3%) eine Warnung anzeigen
+        if (smoothLevel > 3) {
+            console.warn("Hoher Glättungswert: " + smoothLevel + "% - Könnte zu Problemen führen");
+        }
+        
+        // Kopie des SVG für Debug-Zwecke (nur Anfang)
+        console.log("SVG Anfang (Debug): " + originalSVG.substring(0, 200) + "...");
+        
+        $.ajax({
+            url: yprintSVGEnhancer.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'yprint_smooth_svg',
+                nonce: yprintSVGEnhancer.nonce,
+                svg_content: originalSVG,
+                smooth_level: smoothLevel
+            },
+            success: function(response) {
+                console.log("AJAX Antwort erhalten - Erfolg: " + (response.success ? "Ja" : "Nein"));
+                
+                if (response.success && response.data.svg_content) {
+                    console.log("SVG Ergebnis (Debug): " + response.data.svg_content.substring(0, 200) + "...");
+                    // Nur Vorschau, noch nicht speichern
+                    self.updateSVGDisplay(response.data.svg_content);
+                } else {
+                    console.error("Fehler in AJAX-Antwort", response);
+                    if (response.data && response.data.message) {
+                        console.error("Fehlermeldung: " + response.data.message);
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX Fehler: " + error);
+                console.error("Status: " + status);
+                console.error("Response Text: " + xhr.responseText);
+                
+                try {
+                    var jsonResponse = JSON.parse(xhr.responseText);
+                    console.error("Parsed error response:", jsonResponse);
+                } catch(e) {
+                    console.error("Konnte Antwort nicht als JSON parsen");
+                }
             }
-            
-            // Zeige den Regler an und deaktiviere andere Buttons
-            $('#smoothing-control').fadeIn();
-            
-            // Wenn der Slider aktualisiert wird, aktualisieren wir das SVG in Echtzeit
-            $('#yprint-smooth-level').off('input').on('input', function() {
-                var smoothLevel = parseInt($(this).val());
-                $('.smooth-value').text(smoothLevel);
-                
-                if (smoothLevel === 0) {
-                    // Bei 0% zeigen wir das Original an
-                    self.updateSVGDisplay(originalSVG);
-                    return;
-                }
-                
-                $.ajax({
-                    url: yprintSVGEnhancer.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'yprint_smooth_svg',
-                        nonce: yprintSVGEnhancer.nonce,
-                        svg_content: originalSVG,
-                        smooth_level: smoothLevel
-                    },
-                    success: function(response) {
-                        if (response.success && response.data.svg_content) {
-                            // Nur Vorschau, noch nicht speichern
-                            self.updateSVGDisplay(response.data.svg_content);
-                        }
-                    }
-                });
-            });
-            
-            // Wenn der Benutzer die Maus loslässt, speichern wir die Änderung
-            $('#yprint-smooth-level').off('change').on('change', function() {
-                var smoothLevel = parseInt($(this).val());
-                
-                if (smoothLevel === 0) {
-                    // Bei 0% setzen wir auf das Original zurück
-                    currentSVG = originalSVG;
-                    return;
-                }
-                
-                $.ajax({
-                    url: yprintSVGEnhancer.ajaxUrl,
-                    type: 'POST',
-                    data: {
-                        action: 'yprint_smooth_svg',
-                        nonce: yprintSVGEnhancer.nonce,
-                        svg_content: originalSVG,
-                        smooth_level: smoothLevel
-                    },
-                    beforeSend: function() {
-                        self.showMessage('<?php echo esc_js(__('Verschönere SVG...', 'yprint-designtool')); ?>');
-                    },
-                    success: function(response) {
-                        if (response.success && response.data.svg_content) {
-                            self.addToHistory(currentSVG);
-                            currentSVG = response.data.svg_content;
-                            self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
-                        } else {
-                            self.showMessage(response.data.message || '<?php echo esc_js(__('Fehler beim Verschönern der SVG.', 'yprint-designtool')); ?>');
-                            self.updateSVGDisplay(currentSVG);
-                        }
-                    },
-                    error: function() {
-                        self.showMessage('<?php echo esc_js(__('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', 'yprint-designtool')); ?>');
-                        self.updateSVGDisplay(currentSVG);
-                    }
-                });
-            });
         });
+    });
+    
+    // Wenn der Benutzer die Maus loslässt, speichern wir die Änderung
+    $('#yprint-smooth-level').off('change').on('change', function() {
+        var smoothLevel = parseInt($(this).val());
+        console.log("Slider Änderung bestätigt: " + smoothLevel + "%");
+        
+        if (smoothLevel === 0) {
+            // Bei 0% setzen wir auf das Original zurück
+            currentSVG = originalSVG;
+            return;
+        }
+        
+        $.ajax({
+            url: yprintSVGEnhancer.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'yprint_smooth_svg',
+                nonce: yprintSVGEnhancer.nonce,
+                svg_content: originalSVG,
+                smooth_level: smoothLevel
+            },
+            beforeSend: function() {
+                self.showMessage('<?php echo esc_js(__('Verschönere SVG...', 'yprint-designtool')); ?>');
+                console.log("Starte SVG-Glättung mit Level " + smoothLevel + "%");
+            },
+            success: function(response) {
+                console.log("Glättung abgeschlossen - Erfolg: " + (response.success ? "Ja" : "Nein"));
+                
+                if (response.success && response.data.svg_content) {
+                    self.addToHistory(currentSVG);
+                    currentSVG = response.data.svg_content;
+                    self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
+                } else {
+                    console.error("Fehler im Erfolgsfall", response);
+                    var errorMsg = response.data && response.data.message ? response.data.message : '<?php echo esc_js(__('Fehler beim Verschönern der SVG.', 'yprint-designtool')); ?>';
+                    self.showMessage(errorMsg);
+                    self.updateSVGDisplay(currentSVG);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX Fehler bei Glättung: " + error);
+                console.error("Status: " + status);
+                console.error("Response Text: " + xhr.responseText);
+                
+                try {
+                    var errorDetails = JSON.parse(xhr.responseText);
+                    console.error("Detaillierter Fehler:", errorDetails);
+                    
+                    if (errorDetails && errorDetails.data && errorDetails.data.message) {
+                        self.showMessage(errorDetails.data.message);
+                    } else {
+                        self.showMessage('<?php echo esc_js(__('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', 'yprint-designtool')); ?>');
+                    }
+                } catch(e) {
+                    console.error("Konnte Fehlerantwort nicht parsen:", e);
+                    self.showMessage('<?php echo esc_js(__('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', 'yprint-designtool')); ?>');
+                }
+                
+                self.updateSVGDisplay(currentSVG);
+            }
+        });
+    });
+});
             
             // Reset SVG button
             $('#yprint-reset-svg-btn').on('click', function() {
