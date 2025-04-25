@@ -282,30 +282,97 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Glättungsstärke berechnen - sanftere Progression
-    // Bei 1% nur 0,15 Grad, bei 100% maximal 25 Grad
-    // Verwende eine nichtlineare Kurve für bessere Kontrolle bei niedrigen Werten
-    $base_angle = 0.15; // Minimaler Winkel bei 1%
+    // Verbesserte Glättungsstärke-Berechnung mit exponentieller Progression für feinere Kontrolle
+    // Exponentielle Skala bietet eine viel feinere Kontrolle im unteren Bereich
+    $base_angle = 0.05; // Startwinkel (noch kleiner als zuvor)
     $max_angle = 25;    // Maximaler Winkel bei 100%
     
-    // Nichtlineare Progression (quadratisch), sanfter für kleine Werte
+    // Nicht-lineare Progression für bessere niedrigwertige Kontrolle 
+    // Verwende eine Kubikwurzel-Funktion für mehr Präzision bei niedrigen Werten
     $normalized_level = $smooth_level / 100;
-    $smooth_angles = $base_angle + ($max_angle - $base_angle) * ($normalized_level * $normalized_level);
+    $smooth_angles = $base_angle + ($max_angle - $base_angle) * pow($normalized_level, 1/3);
     
-    // Zusätzliche Sicherheitsschicht bei sehr niedrigen Werten (1-5%)
+    // Spezielles Handling für sehr niedrige Werte (1-5%)
     if ($smooth_level <= 5) {
-        // Extrem sanfte Anpassung für 1-5% Bereich
-        $smooth_angles = $base_angle * ($smooth_level / 5);
+        // Mikro-Anpassungen für 1-5% Bereich
+        // Linear skaliert von 0.01° bis 0.05° (extreme Feinabstimmung)
+        $smooth_angles = 0.01 + 0.01 * ($smooth_level - 1);
     }
     
     // Pfade finden und glätten
     $paths = $xpath->query('//svg:path');
+    
+    // Wenn keine Pfade gefunden wurden, versuche es mit Polylines und Polygonen
+    if ($paths->length === 0) {
+        $paths = $xpath->query('//svg:polyline | //svg:polygon');
+        
+        // Konvertiere polylines/polygone zu Pfaden wenn nötig
+        if ($paths->length > 0) {
+            foreach ($paths as $shape) {
+                $this->convert_shape_to_path($shape, $dom);
+            }
+            
+            // Nach der Konvertierung erneut nach Pfaden suchen
+            $paths = $xpath->query('//svg:path');
+        }
+    }
+    
     foreach ($paths as $path) {
         $this->smooth_path($path, $smooth_angles);
     }
     
     // SVG-Dokument zurückgeben
     return $dom->saveXML();
+}
+
+/**
+ * Konvertiert ein Polygon oder Polyline zu einem Pfad
+ *
+ * @param DOMElement $shape Polygon oder Polyline Element
+ * @param DOMDocument $dom Das DOM-Dokument
+ */
+private function convert_shape_to_path($shape, $dom) {
+    $tag_name = $shape->tagName;
+    $points = $shape->getAttribute('points');
+    
+    if (empty($points)) {
+        return;
+    }
+    
+    // Punkte-String in ein Array von Punkten umwandeln
+    $points_array = preg_split('/\s+/', trim($points));
+    
+    // Path-Daten erstellen
+    $d = '';
+    foreach ($points_array as $i => $point) {
+        $xy = explode(',', $point);
+        if (count($xy) != 2) continue;
+        
+        if ($i === 0) {
+            $d .= "M{$xy[0]},{$xy[1]}";
+        } else {
+            $d .= " L{$xy[0]},{$xy[1]}";
+        }
+    }
+    
+    // Für Polygone den Pfad schließen
+    if ($tag_name === 'polygon') {
+        $d .= ' Z';
+    }
+    
+    // Neuen Pfad erstellen
+    $path = $dom->createElementNS('http://www.w3.org/2000/svg', 'path');
+    $path->setAttribute('d', $d);
+    
+    // Andere Attribute vom Original übernehmen
+    foreach ($shape->attributes as $attr) {
+        if ($attr->name !== 'points') {
+            $path->setAttribute($attr->name, $attr->value);
+        }
+    }
+    
+    // Original durch Pfad ersetzen
+    $shape->parentNode->replaceChild($path, $shape);
 }
 
 /**
@@ -339,29 +406,30 @@ private function smooth_path($path_element, $smooth_angles) {
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
-    // Bessere Kontrolle über den smooth_factor
-    // Extrem niedrige Werte bei kleinen Winkeln
-    // Bei winzigen Winkeln (< 1°) verwenden wir einen mikroskopischen smooth_factor
-    if ($smooth_angles < 1) {
-        $smooth_factor = $smooth_angles / 1000; // Extrem kleine Anpassung
+    // Verbesserte Berechnung des smooth_factor mit garantierter Mindestanpassung
+    // Auch bei kleinsten Werten wird eine minimale Anpassung garantiert
+    if ($smooth_angles < 0.05) {
+        // Für extrem kleine Winkel (< 0.05°) immer noch minimale Veränderung garantieren
+        $smooth_factor = 0.000005; // Garantierte Mikroanpassung
+    } else if ($smooth_angles < 1) {
+        $smooth_factor = 0.00001 + ($smooth_angles * 0.00001); // Extrem kleine, aber progressive Anpassung
     } else if ($smooth_angles < 5) {
-        $smooth_factor = $smooth_angles / 500;  // Sehr kleine Anpassung
+        $smooth_factor = 0.0001 + (($smooth_angles - 1) * 0.0001); // Sehr kleine, progressive Anpassung
     } else {
         // Standard-Berechnung für größere Winkel
-        // Bei max 25° (aus smooth_svg) wird smooth_factor auf max. 0.05 begrenzt (statt 0.125)
-        $smooth_factor = min(0.05, $smooth_angles / 500);
+        // Verbesserte Progression für mittlere Winkel
+        $smooth_factor = min(0.05, 0.001 + ($smooth_angles / 500));
     }
-    
-    error_log("create_smoothed_path: Starting with smooth_factor: " . $smooth_factor);
     
     // Pfad mit geglätteten Kurven erstellen
     $smoothed = '';
     $last_point = null;
     $last_control = null;
     
-    // Array zur Erhaltung der ursprünglichen Punkte bei Mikroänderungen
+    // Array zur Erhaltung der ursprünglichen Punkte und Zählung der Anpassungen
     $preserved_points = [];
     $original_segment_count = count($segments);
+    $modified_segments = 0;
     
     foreach ($segments as $i => $segment) {
         $command = $segment['command'];
@@ -373,7 +441,9 @@ private function create_smoothed_path($segments, $smooth_angles) {
         // Befehl und erste Punkte immer beibehalten
         $smoothed .= ' ' . $command . ' ';
         
-        // Für Kurvenbefehle (C, c, S, s) optionale Glättung anwenden
+        // Für Kurvenbefehle (C, c, S, s) oder Linienbefehle (L, l) Glättung anwenden
+        $point_modified = false;
+        
         if (in_array(strtolower($command), ['c', 's']) && count($points) >= 6 && $i > 0) {
             // Kontrollpunkte extrahieren
             $control1_x = $points[0];
@@ -398,48 +468,63 @@ private function create_smoothed_path($segments, $smooth_angles) {
                     $angle_diff = 360 - $angle_diff;
                 }
                 
-                // Nur winzige Anpassungen erlauben
-                $do_smoothing = false;
+                // Anpassungen auch für sehr kleine Winkel erlauben
+                $do_smoothing = true;
                 $adaptive_factor = $smooth_factor;
                 
                 // Progressiv anpassen basierend auf Winkelunterschied
                 if ($angle_diff < 90) {
-                    // Kleinere Anpassungen bei kleinen Winkeln
-                    $adaptive_factor = $smooth_factor * ($angle_diff / 90);
-                    $do_smoothing = true;
-                } else if ($angle_diff <= $smooth_angles) {
-                    // Standardanpassung innerhalb des angegebenen Bereichs
-                    $do_smoothing = true;
+                    // Kleinere Anpassungen bei kleinen Winkeln, aber nie unter Minimumwert
+                    $dynamic_factor = $smooth_factor * ($angle_diff / 90);
+                    // Garantiere mindestens 10% der berechneten Anpassung
+                    $adaptive_factor = max($dynamic_factor, $smooth_factor * 0.1);
                 }
                 
-                if ($do_smoothing && $adaptive_factor > 0.00001) { // Mindestens ein wenig Anpassung
+                // Bei sehr sanften Kurven (< 10°) noch feiner anpassen, aber garantiere Anpassung
+                if ($angle_diff < 10) {
+                    $adaptive_factor = max($adaptive_factor * 0.5, $smooth_factor * 0.05);
+                }
+                
+                if ($do_smoothing) { // Immer Smoothing durchführen, auch bei kleinsten Winkeln
                     // Distanzen für Kontrollpunkte berechnen
                     $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
                     $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
                     
-                    // Idealen Winkel berechnen
+                    // Idealen Winkel berechnen mit Berücksichtigung der Kurvenrichtung
                     $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
                     $current_angle = atan2($control2_y - $end_y, $control2_x - $end_x);
                     
-                    // Sehr sanfte Anpassung für niedrige Glättungswerte
-                    $blend_factor = min(0.01, $adaptive_factor); // Maximal 1% Anpassung pro Durchlauf
+                    // Garantiere immer eine minimale Anpassung
+                    $blend_factor = max($adaptive_factor, 0.000001);
                     $new_angle = $current_angle * (1 - $blend_factor) + $ideal_angle * $blend_factor;
                     
                     // Neue Kontrollpunktkoordinaten
                     $new_control2_x = $end_x + cos($new_angle) * $dist2;
                     $new_control2_y = $end_y + sin($new_angle) * $dist2;
                     
-                    // Berechne Änderungsdistanz mit sicherer Begrenzung
+                    // Berechne Änderungsdistanz
                     $change_distance = sqrt(pow($new_control2_x - $control2_x, 2) + 
                                          pow($new_control2_y - $control2_y, 2));
                     
-                    // Sanfte Änderungsbegrenzung - verhindert große Sprünge
-                    $max_change = min($dist2 * 0.01, 0.5); // Maximal 1% der Distanz oder 0.5 Einheiten
+                    // Sichere Änderungsbegrenzung - verhindert große Sprünge, erlaubt aber immer eine Mindestanpassung
+                    $safe_max_change = max($dist2 * 0.05, 0.01); // Mindestens 0.01 Einheiten Änderung zulassen
                     
-                    if ($change_distance <= $max_change) {
+                    if ($change_distance <= $safe_max_change) {
                         // Punkte aktualisieren
                         $points[2] = $new_control2_x;
                         $points[3] = $new_control2_y;
+                        $point_modified = true;
+                        $modified_segments++;
+                    } else {
+                        // Falls die Änderung zu groß wäre, führe eine kleinere Anpassung durch
+                        $scale_factor = $safe_max_change / $change_distance;
+                        $adjusted_x = $control2_x + ($new_control2_x - $control2_x) * $scale_factor;
+                        $adjusted_y = $control2_y + ($new_control2_y - $control2_y) * $scale_factor;
+                        
+                        $points[2] = $adjusted_x;
+                        $points[3] = $adjusted_y;
+                        $point_modified = true;
+                        $modified_segments++;
                     }
                 }
             }
@@ -448,14 +533,50 @@ private function create_smoothed_path($segments, $smooth_angles) {
             $last_point = [$end_x, $end_y];
             $last_control = [$points[2], $points[3]];
             
+        } else if (in_array(strtolower($command), ['l']) && count($points) >= 2 && $i > 0 && $last_point) {
+            // Für Linien - konvertiere in sanfte Kurven bei niedrigen Glättungswerten
+            // Nur anwenden wenn smooth_angles sehr klein ist (< 5°) - subtile Glättung
+            if ($smooth_angles < 5 && $smooth_angles > 0.05) {
+                $end_x = $points[0];
+                $end_y = $points[1];
+                
+                // Distanz zwischen Punkten
+                $dist = sqrt(pow($end_x - $last_point[0], 2) + pow($end_y - $last_point[1], 2));
+                
+                // Winkel der Linie berechnen
+                $line_angle = atan2($end_y - $last_point[1], $end_x - $last_point[0]);
+                
+                // Bei niedrigen Glättungswerten nur minimale Krümmung erzeugen
+                // Progressive Krümmungsstärke basierend auf smooth_angles
+                $curve_strength = $dist * 0.1 * ($smooth_angles / 5);
+                
+                // Berechne Kontrollpunkte für eine sanfte Kurve
+                $control_x = $last_point[0] + cos($line_angle) * $dist * 0.5 + 
+                             cos($line_angle + M_PI/2) * $curve_strength;
+                $control_y = $last_point[1] + sin($line_angle) * $dist * 0.5 + 
+                             sin($line_angle + M_PI/2) * $curve_strength;
+                
+                // Ersetze die Linie durch eine sanfte Kurve
+                // Konvertiere zu quadratischer Bezier-Kurve (Q)
+                $smoothed = substr($smoothed, 0, strrpos($smoothed, $command)) . ' Q ' . 
+                           $control_x . ' ' . $control_y . ' ' . $end_x . ' ' . $end_y;
+                
+                $last_point = [$end_x, $end_y];
+                $last_control = [$control_x, $control_y];
+                $point_modified = true;
+                $modified_segments++;
+                
+                // Überspringe das reguläre Hinzufügen von Punkten
+                continue;
+            } else {
+                // Normal fortfahren, für Linien-Befehl den letzten Punkt aktualisieren
+                if (count($points) >= 2) {
+                    $last_point = [$points[0], $points[1]];
+                    $last_control = null;
+                }
+            }
         } else if ($command === 'M' || $command === 'm') {
             // Bei Move-To-Befehl den letzten Punkt aktualisieren
-            if (count($points) >= 2) {
-                $last_point = [$points[0], $points[1]];
-                $last_control = null;
-            }
-        } else if ($command === 'L' || $command === 'l') {
-            // Bei Line-To-Befehl den letzten Punkt aktualisieren
             if (count($points) >= 2) {
                 $last_point = [$points[0], $points[1]];
                 $last_control = null;
@@ -474,21 +595,49 @@ private function create_smoothed_path($segments, $smooth_angles) {
     
     $result = trim($smoothed);
     
-    // Sicherheitsprüfung: Wenn Ergebnis leer oder deutlich kürzer als Original,
-    // stelle sicher, dass wir einen gültigen Pfad zurückgeben
-    if (empty($result) || strlen($result) < 10) {
-        // Originalstruktur wiederherstellen, aber mit minimaler Veränderung
-        $result = '';
-        foreach ($segments as $i => $segment) {
-            $command = $segment['command'];
-            $points = $preserved_points[$i]; // Verwende die gespeicherten Originalpunkte
+    // Sicherheitsprüfung: Wenn keine Änderungen oder Ergebnis invalide,
+    // stelle sicher, dass wir einen gültigen Pfad zurückgeben mit minimaler Änderung
+    if (empty($result) || strlen($result) < 10 || $modified_segments === 0) {
+        // Bei niedrigsten Glättungswerten (<1%) garantiere mindestens eine kleine Änderung
+        if ($smooth_angles < 1 && $smooth_angles > 0) {
+            $result = '';
+            $change_applied = false;
             
-            $result .= ' ' . $command . ' ';
-            foreach ($points as $point) {
-                $result .= $point . ' ';
+            foreach ($segments as $i => $segment) {
+                $command = $segment['command'];
+                $points = $preserved_points[$i]; // Verwende die gespeicherten Originalpunkte
+                
+                // Wähle ein einzelnes Segment für eine minimale Änderung aus
+                if (!$change_applied && $i > 0 && in_array(strtolower($command), ['c', 's', 'l']) && count($points) >= 2) {
+                    // Minimalste Änderung: Verschiebe einen einzigen Punkt um 0.001 Einheiten
+                    $idx = (in_array(strtolower($command), ['c', 's'])) ? 2 : 0; // Index des zu ändernden Punkts
+                    if (isset($points[$idx])) {
+                        $points[$idx] = $points[$idx] + 0.001;
+                        $change_applied = true;
+                    }
+                }
+                
+                $result .= ' ' . $command . ' ';
+                foreach ($points as $point) {
+                    $result .= $point . ' ';
+                }
             }
+            
+            $result = trim($result);
+        } else {
+            // Originalstruktur wiederherstellen
+            $result = '';
+            foreach ($segments as $i => $segment) {
+                $command = $segment['command'];
+                $points = $preserved_points[$i]; // Verwende die gespeicherten Originalpunkte
+                
+                $result .= ' ' . $command . ' ';
+                foreach ($points as $point) {
+                    $result .= $point . ' ';
+                }
+            }
+            $result = trim($result);
         }
-        $result = trim($result);
     }
     
     return $result;
