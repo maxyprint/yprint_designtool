@@ -795,8 +795,8 @@ updateSVGDisplay: function(svgContent) {
     // Remove placeholder
     this.$canvasContainer.find('.yprint-svg-upload-placeholder').hide();
     
-    // Remove previous SVG if exists
-    this.$canvasContainer.find('svg').remove();
+    // Remove previous SVG and error messages if they exist
+    this.$canvasContainer.find('svg, .svg-error-message').remove();
     
     // Prüfe ob wir ein gültiges SVG haben
     if (!validSVG) {
@@ -807,8 +807,12 @@ updateSVGDisplay: function(svgContent) {
     }
     
     try {
+        // Create a container for the SVG to ensure proper handling
+        var $svgContainer = $('<div class="svg-wrapper"></div>');
+        this.$canvasContainer.append($svgContainer);
+        
         // Add new SVG with error handling
-        this.$canvasContainer.append(svgContent);
+        $svgContainer.html(svgContent);
         
         // Adjust SVG size to fit canvas
         var $svg = this.$canvasContainer.find('svg');
@@ -820,19 +824,40 @@ updateSVGDisplay: function(svgContent) {
         }
         
         console.log("SVG erfolgreich in DOM eingefügt. Abmessungen:", $svg.width(), "x", $svg.height());
+        console.log("SVG viewBox:", $svg.attr('viewBox'));
+        
+        // Ensure the SVG has dimensions
+        var svgWidth = $svg.attr('width') || '100%';
+        var svgHeight = $svg.attr('height') || '100%';
+        
+        // Ensure necessary attributes for proper rendering
+        $svg.attr({
+            'width': svgWidth,
+            'height': svgHeight,
+            'preserveAspectRatio': 'xMidYMid meet'
+        });
         
         $svg.css({
             'max-width': '100%',
             'max-height': '100%',
             'width': 'auto',
             'height': 'auto',
+            'display': 'block', // Ensure it's a block element
             'position': 'absolute',
             'top': '50%',
             'left': '50%',
-            'transform': 'translate(-50%, -50%)'
+            'transform': 'translate(-50%, -50%)',
+            'visibility': 'visible', // Explicitly make it visible
+            'opacity': '1'
         });
+        
+        // Add debug info in canvas for visibility issues
+        var debugInfo = "SVG Sichtbarkeitsinfo - Breite: " + $svg.width() + "px, Höhe: " + $svg.height() + "px";
+        this.$canvasContainer.append('<div class="debug-info" style="position:absolute; bottom:5px; left:5px; font-size:10px; color:#999;">' + debugInfo + '</div>');
+        
     } catch (e) {
         console.error("Fehler beim Anzeigen des SVGs:", e);
+        console.error("SVG Inhalt (gekürzt):", svgContent.substring(0, 100) + "...");
         this.$canvasContainer.append('<div class="svg-error-message">Fehler: ' + e.message + '</div>');
     }
 },
