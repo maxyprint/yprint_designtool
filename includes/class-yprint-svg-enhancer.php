@@ -297,8 +297,11 @@ private function smooth_path($path_element, $smooth_angles) {
  * @return string Geglätteter Pfad
  */
 private function create_smoothed_path($segments, $smooth_angles) {
-    // Bei sehr niedrigen Glättungswinkeln nur minimale Glättung anwenden
-    $smooth_factor = min(1.0, $smooth_angles / 360);
+    // Bei niedrigen Winkelwerten sehr geringe Glättung anwenden
+    // Bei 45° (Maximalwert laut Funktion) wird smooth_factor auf max. 0.125 begrenzt
+    $smooth_factor = min(0.125, $smooth_angles / 360);
+    
+    error_log("create_smoothed_path: Starting with smooth_factor: " . $smooth_factor);
     
     // Pfad mit geglätteten Kurven erstellen
     $smoothed = '';
@@ -309,10 +312,13 @@ private function create_smoothed_path($segments, $smooth_angles) {
         $command = $segment['command'];
         $points = $segment['points'];
         
+        // Kopie der Punkte erstellen, um Originalpunkte nicht zu verlieren
+        $original_points = $points;
+        
         // Befehl und erste Punkte immer beibehalten
         $smoothed .= ' ' . $command . ' ';
         
-        // Für Kurvenbefehle (C, c, S, s) Glättung anwenden
+        // Für Kurvenbefehle (C, c, S, s) optionale Glättung anwenden
         if (in_array(strtolower($command), ['c', 's']) && count($points) >= 6 && $i > 0) {
             // Kontrollpunkte extrahieren
             $control1_x = $points[0];
@@ -322,73 +328,94 @@ private function create_smoothed_path($segments, $smooth_angles) {
             $end_x = $points[4];
             $end_y = $points[5];
             
-            // Letzten Punkt aus vorherigem Segment bekommen
-            if ($last_point) {
-                // Winkel zwischen Kontrollpunkten und Endpunkten berechnen
-                if ($last_point && $last_control) {
-                    // Berechne den Winkel zwischen dem letzten Punkt und dem ersten Kontrollpunkt
-                    $angle1 = atan2($control1_y - $last_point[1], $control1_x - $last_point[0]);
-                    // Berechne den Winkel zwischen dem Endpunkt und dem zweiten Kontrollpunkt
-                    $angle2 = atan2($end_y - $control2_y, $end_x - $control2_x);
-                    
-                    // Konvertiere in Grad
-                    $angle1_deg = rad2deg($angle1);
-                    $angle2_deg = rad2deg($angle2);
-                    
-                    // Berechne den Winkelunterschied
-                    $angle_diff = abs($angle2_deg - $angle1_deg);
-                    if ($angle_diff > 180) {
-                        $angle_diff = 360 - $angle_diff;
-                    }
-                    
-                    // Berechne die Distanz für die Kontrolle
-                    $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
-                    $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
-                    
-                    // Bei kleinen Glättungswerten nur minimal anpassen
-                    if ($angle_diff <= $smooth_angles) {
-                        // Berechne den gewünschten Winkel für den zweiten Kontrollpunkt
-                        $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
-                        
-                        // Aktueller Winkel des zweiten Kontrollpunkts
-                        $current_angle = atan2($control2_y - $end_y, $control2_x - $end_x);
-                        
-                        // Gewichtete Mischung zwischen aktuellem und idealem Winkel basierend auf smooth_factor
-                        $new_angle = $current_angle * (1 - $smooth_factor) + $ideal_angle * $smooth_factor;
-                        
-                        // Neue Kontrollpunktkoordinaten berechnen
-                        $new_control2_x = $end_x + cos($new_angle) * $dist2;
-                        $new_control2_y = $end_y + sin($new_angle) * $dist2;
-                        
-                        // Aktualisiere die Punkte nur, wenn die Änderung signifikant ist
-                        // und smooth_factor ausreichend groß ist
-                        if ($smooth_factor > 0.05) {
-                            // Berechne die Distanz zwischen den alten und neuen Punkten
-                            $change_distance = sqrt(pow($new_control2_x - $control2_x, 2) + 
-                                                   pow($new_control2_y - $control2_y, 2));
-                            
-                            // Nur ändern, wenn die Änderung relativ zur Kurve nicht zu groß ist
-                            $max_change = $dist2 * $smooth_factor;
-                            if ($change_distance <= $max_change) {
-                                $points[2] = $new_control2_x;
-                                $points[3] = $new_control2_y;
-                            }
-                        }
-                    }
+            // Für sehr kleine Glättungswerte (1-5%) nur Mikroanpassungen vornehmen
+            if ($smooth_angles < 5) {
+                // Verkleinere den smooth_factor noch weiter für minimale Änderungen
+                $smooth_factor = $smooth_factor * ($smooth_angles / 5);
+                error_log("create_smoothed_path: Very small smoothing. Reduced smooth_factor to: " . $smooth_factor);
+            }
+            
+            // Nur bei vorhandenem letzten Punkt fortsetzen
+            if ($last_point && $last_control) {
+                error_log("create_smoothed_path: Processing curve with last point: " . json_encode($last_point));
+                
+                // Berechne den Winkel zwischen dem letzten Punkt und dem ersten Kontrollpunkt
+                $angle1 = atan2($control1_y - $last_point[1], $control1_x - $last_point[0]);
+                // Berechne den Winkel zwischen dem Endpunkt und dem zweiten Kontrollpunkt
+                $angle2 = atan2($end_y - $control2_y, $end_x - $control2_x);
+                
+                // Konvertiere in Grad für bessere Lesbarkeit in Logs
+                $angle1_deg = rad2deg($angle1);
+                $angle2_deg = rad2deg($angle2);
+                
+                // Berechne den Winkelunterschied
+                $angle_diff = abs($angle2_deg - $angle1_deg);
+                if ($angle_diff > 180) {
+                    $angle_diff = 360 - $angle_diff;
                 }
                 
-                // Aktualisiere für das nächste Segment
-                $last_point = [$end_x, $end_y];
-                $last_control = [$points[2], $points[3]]; // Verwende die möglicherweise aktualisierten Kontrollpunkte
+                // Log der Winkelberechnung
+                error_log("create_smoothed_path: Angles - angle1: {$angle1_deg}°, angle2: {$angle2_deg}°, diff: {$angle_diff}°");
+                
+                // Distanzen für die Kontrolle berechnen
+                $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
+                $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
+                
+                error_log("create_smoothed_path: Control point distances - dist1: {$dist1}, dist2: {$dist2}");
+                
+                // Nur anpassen, wenn die Glättung wirklich benötigt wird und der Winkel in unserem Bereich liegt
+                if ($angle_diff <= $smooth_angles && $smooth_factor > 0.001) { // Minimale Schwelle für Aktivierung
+                    // Berechne den idealen Winkel für den zweiten Kontrollpunkt
+                    $ideal_angle = $angle1 + M_PI; // Umgekehrter Winkel
+                    
+                    // Aktueller Winkel des zweiten Kontrollpunkts
+                    $current_angle = atan2($control2_y - $end_y, $control2_x - $end_x);
+                    
+                    // Extrem sanfte Mischung zwischen aktuellem und idealem Winkel
+                    $new_angle = $current_angle * (1 - $smooth_factor) + $ideal_angle * $smooth_factor;
+                    
+                    error_log("create_smoothed_path: Angle calculation - current: " . rad2deg($current_angle) . 
+                            "°, ideal: " . rad2deg($ideal_angle) . "°, new: " . rad2deg($new_angle) . "°");
+                    
+                    // Neue Kontrollpunktkoordinaten berechnen
+                    $new_control2_x = $end_x + cos($new_angle) * $dist2;
+                    $new_control2_y = $end_y + sin($new_angle) * $dist2;
+                    
+                    // Berechne die Distanz zwischen den alten und neuen Punkten
+                    $change_distance = sqrt(pow($new_control2_x - $control2_x, 2) + 
+                                         pow($new_control2_y - $control2_y, 2));
+                    
+                    error_log("create_smoothed_path: Potential change - distance: {$change_distance}, max allowed: " . ($dist2 * $smooth_factor));
+                    
+                    // Nur ändern, wenn die Änderung minimal ist
+                    $max_change = $dist2 * $smooth_factor;
+                    if ($change_distance <= $max_change) {
+                        error_log("create_smoothed_path: Applying change to control points");
+                        // Punkte aktualisieren
+                        $points[2] = $new_control2_x;
+                        $points[3] = $new_control2_y;
+                    } else {
+                        error_log("create_smoothed_path: Change too large, keeping original points");
+                    }
+                }
             }
+            
+            // Aktualisiere für das nächste Segment
+            $last_point = [$end_x, $end_y];
+            $last_control = [$points[2], $points[3]];
+            
         } else if ($command === 'M' || $command === 'm') {
             // Bei Move-To-Befehl den letzten Punkt aktualisieren
-            $last_point = [$points[0], $points[1]];
-            $last_control = null;
+            if (count($points) >= 2) {
+                $last_point = [$points[0], $points[1]];
+                $last_control = null;
+            }
         } else if ($command === 'L' || $command === 'l') {
             // Bei Line-To-Befehl den letzten Punkt aktualisieren
-            $last_point = [$points[0], $points[1]];
-            $last_control = null;
+            if (count($points) >= 2) {
+                $last_point = [$points[0], $points[1]];
+                $last_control = null;
+            }
         } else if ($command === 'Z' || $command === 'z') {
             // Bei Close-Path den letzten Punkt zurücksetzen
             $last_point = null;
@@ -401,7 +428,9 @@ private function create_smoothed_path($segments, $smooth_angles) {
         }
     }
     
-    return trim($smoothed);
+    $result = trim($smoothed);
+    error_log("create_smoothed_path: Final path length: " . strlen($result));
+    return $result;
 }
     
     /**
