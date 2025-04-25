@@ -263,6 +263,9 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         return $svg_content;
     }
     
+    // Original-SVG speichern für sehr niedrige Werte
+    $original_svg_content = $svg_content;
+    
     // SVG-Inhalt laden
     $dom = new DOMDocument();
     $dom->preserveWhiteSpace = false;
@@ -282,43 +285,84 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
     
-    // Verbesserte Glättungsstärke-Berechnung mit exponentieller Progression für feinere Kontrolle
-    // Exponentielle Skala bietet eine viel feinere Kontrolle im unteren Bereich
-    $base_angle = 0.05; // Startwinkel (noch kleiner als zuvor)
-    $max_angle = 25;    // Maximaler Winkel bei 100%
-    
-    // Nicht-lineare Progression für bessere niedrigwertige Kontrolle 
-    // Verwende eine Kubikwurzel-Funktion für mehr Präzision bei niedrigen Werten
-    $normalized_level = $smooth_level / 100;
-    $smooth_angles = $base_angle + ($max_angle - $base_angle) * pow($normalized_level, 1/3);
-    
-    // Spezielles Handling für sehr niedrige Werte (1-5%)
-    if ($smooth_level <= 5) {
-        // Mikro-Anpassungen für 1-5% Bereich
-        // Linear skaliert von 0.01° bis 0.05° (extreme Feinabstimmung)
-        $smooth_angles = 0.01 + 0.01 * ($smooth_level - 1);
+    // Verbesserte Glättungsstärke mit mikro-präziser Kontrolle für 1-10%
+    if ($smooth_level <= 10) {
+        // Mikro-Glättung für 1-10%
+        // Exponentiell ansteigend, aber extrem sanft im unteren Bereich
+        $base_angle = 0.01; // Noch kleiner für mikroskopische Änderungen bei 1%
+        $normalized_level = $smooth_level / 10; // 0.1 bis 1.0 für 1-10%
+        $smooth_angles = $base_angle * pow(10, $normalized_level * 1.5); // Exponentielles Wachstum
+    } else {
+        // Reguläre Glättung für 11-100%
+        $base_angle = 0.15;
+        $max_angle = 25;
+        $normalized_level = ($smooth_level - 10) / 90; // 0.0 bis 1.0 für 10-100%
+        $smooth_angles = $base_angle + ($max_angle - $base_angle) * ($normalized_level * $normalized_level);
     }
     
-    // Pfade finden und glätten
-    $paths = $xpath->query('//svg:path');
+    // Sicherheitsmodus für sehr niedrige Werte (1-3%) - komplexe Veränderungen begrenzen
+    $safety_mode = ($smooth_level >= 1 && $smooth_level <= 3);
     
-    // Wenn keine Pfade gefunden wurden, versuche es mit Polylines und Polygonen
-    if ($paths->length === 0) {
-        $paths = $xpath->query('//svg:polyline | //svg:polygon');
-        
-        // Konvertiere polylines/polygone zu Pfaden wenn nötig
-        if ($paths->length > 0) {
-            foreach ($paths as $shape) {
-                $this->convert_shape_to_path($shape, $dom);
-            }
-            
-            // Nach der Konvertierung erneut nach Pfaden suchen
-            $paths = $xpath->query('//svg:path');
+    // Anzahl der Pfade und Gesamtlänge feststellen (für Sicherheitsvergleich)
+    $paths = $xpath->query('//svg:path');
+    $path_count = $paths->length;
+    $original_path_data_length = 0;
+    
+    // Pfadlängen für spätere Vergleiche messen
+    if ($safety_mode) {
+        foreach ($paths as $path) {
+            $original_path_data_length += strlen($path->getAttribute('d'));
         }
     }
     
+    // Pfade glätten
+    $modified_paths = 0;
     foreach ($paths as $path) {
+        if ($smooth_level <= 3) {
+            // Bei 1-3% nur die größten Pfade glätten, kleine unverändert lassen
+            $d_attr = $path->getAttribute('d');
+            if (strlen($d_attr) < 100) {
+                continue; // Kleine Pfade überspringen
+            }
+        }
+        
         $this->smooth_path($path, $smooth_angles);
+        $modified_paths++;
+    }
+    
+    // Sicherheitsvergleich - bei sehr niedrigen Werten prüfen, ob das Ergebnis noch valid ist
+    if ($safety_mode) {
+        $modified_path_data_length = 0;
+        $paths = $xpath->query('//svg:path');
+        
+        foreach ($paths as $path) {
+            $modified_path_data_length += strlen($path->getAttribute('d'));
+        }
+        
+        // Wenn zu viele Daten verloren gingen oder Pfade verschwunden sind, Original verwenden
+        if ($paths->length < $path_count * 0.9 || 
+            $modified_path_data_length < $original_path_data_length * 0.8) {
+            
+            error_log("SVG smooth safety triggered: paths reduced from {$path_count} to {$paths->length} or data reduced too much");
+            
+            // Extrem leichte Glättung anwenden (kaum sichtbar, aber ein kleiner Unterschied)
+            $dom = new DOMDocument();
+            $dom->preserveWhiteSpace = false;
+            $dom->formatOutput = true;
+            $dom->loadXML($original_svg_content);
+            
+            $xpath = new DOMXPath($dom);
+            $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
+            
+            // Nur winzige ästhetische Änderungen, die garantiert nicht zum Verlust führen
+            $paths = $xpath->query('//svg:path');
+            foreach ($paths as $path) {
+                $d_attr = $path->getAttribute('d');
+                if (strlen($d_attr) > 500) { // Nur große Pfade minimal glätten
+                    $this->minimal_path_enhancement($path, $smooth_level);
+                }
+            }
+        }
     }
     
     // SVG-Dokument zurückgeben
@@ -388,14 +432,88 @@ private function smooth_path($path_element, $smooth_angles) {
         return;
     }
     
+    // Original-Pfad speichern
+    $original_d = $d;
+    
     // Pfad in Segmente aufteilen
     $segments = $this->parse_path_data($d);
     
     // Geglätteten Pfad erstellen
     $smoothed_d = $this->create_smoothed_path($segments, $smooth_angles);
     
+    // Prüfen, ob der geglättete Pfad deutlich kürzer ist (Sicherheitsmaßnahme)
+    if (strlen($smoothed_d) < strlen($original_d) * 0.8) {
+        // Bei drastischer Reduzierung der Pfadlänge, sanftere Glättung anwenden
+        $segments = $this->parse_path_data($original_d);
+        $smoothed_d = $this->create_smoothed_path($segments, $smooth_angles * 0.5);
+        
+        // Wenn immer noch zu kurz, Original beibehalten mit minimaler Verbesserung
+        if (strlen($smoothed_d) < strlen($original_d) * 0.9) {
+            $segments = $this->parse_path_data($original_d);
+            $smoothed_d = $this->minimal_smooth_path($segments);
+        }
+    }
+    
+    // Stellen Sie sicher, dass der Pfad wenigstens eine Mindestlänge hat
+    if (empty($smoothed_d) || strlen($smoothed_d) < 5) {
+        $smoothed_d = $original_d;
+    }
+    
     // Neuen Pfad setzen
     $path_element->setAttribute('d', $smoothed_d);
+}
+
+/**
+ * Wendet eine minimale ästhetische Verbesserung auf einen Pfad an
+ * (für sehr niedrige Glättungswerte 1-3%)
+ *
+ * @param DOMElement $path_element Pfad-Element
+ * @param int $smooth_level Glättungsgrad (1-100)
+ * @return void
+ */
+private function minimal_path_enhancement($path_element, $smooth_level) {
+    // d-Attribut des Pfades abrufen
+    $d = $path_element->getAttribute('d');
+    if (empty($d)) {
+        return;
+    }
+    
+    // Segmente parsen
+    $segments = $this->parse_path_data($d);
+    
+    // Minimal geglätteten Pfad erstellen
+    $enhanced_d = $this->minimal_smooth_path($segments);
+    
+    // Neuen Pfad setzen
+    $path_element->setAttribute('d', $enhanced_d);
+}
+
+/**
+ * Erzeugt einen minimal geglätteten Pfad für niedrige Glättungswerte
+ * 
+ * @param array $segments Pfadsegmente
+ * @return string Minimal geglätteter Pfad
+ */
+private function minimal_smooth_path($segments) {
+    // Runde einfach die Koordinaten auf 2 Dezimalstellen
+    $enhanced = '';
+    
+    foreach ($segments as $segment) {
+        $command = $segment['command'];
+        $points = $segment['points'];
+        
+        // Befehl hinzufügen
+        $enhanced .= ' ' . $command . ' ';
+        
+        // Punkte mit leichter Rundung hinzufügen
+        foreach ($points as $point) {
+            // Einfache Rundung auf 2 Dezimalstellen
+            $rounded = round($point * 100) / 100;
+            $enhanced .= $rounded . ' ';
+        }
+    }
+    
+    return trim($enhanced);
 }
 
 /**
@@ -625,17 +743,26 @@ private function create_smoothed_path($segments, $smooth_angles) {
             
             $result = trim($result);
         } else {
-            // Originalstruktur wiederherstellen
+            // Bei höheren Glättungswerten, versuche minimale Rundung
             $result = '';
             foreach ($segments as $i => $segment) {
                 $command = $segment['command'];
                 $points = $preserved_points[$i]; // Verwende die gespeicherten Originalpunkte
+                
+                // Beim Parsen können Rundungsfehler auftreten, daher immer eine minimale Änderung vornehmen
+                if (count($points) >= 2) {
+                    for ($j = 0; $j < count($points); $j++) {
+                        // Eine minimale Änderung durch Rundung
+                        $points[$j] = round($points[$j] * 100) / 100;
+                    }
+                }
                 
                 $result .= ' ' . $command . ' ';
                 foreach ($points as $point) {
                     $result .= $point . ' ';
                 }
             }
+            
             $result = trim($result);
         }
     }
