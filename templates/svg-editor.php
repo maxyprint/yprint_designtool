@@ -40,9 +40,9 @@ if (!defined('ABSPATH')) {
                         <input type="range" id="yprint-line-thickness" min="0.5" max="5" step="0.1" value="1">
                     </div>
                     
-                    <div class="yprint-enhancer-control">
-                        <label for="yprint-detail-level"><?php _e('Detailgrad', 'yprint-designtool'); ?>: <span class="detail-value">5</span></label>
-                        <input type="range" id="yprint-detail-level" min="0" max="10" step="0.5" value="5">
+                    <div class="yprint-enhancer-control" id="smoothing-control" style="display: none;">
+                        <label for="yprint-smooth-level"><?php _e('Glättungsstärke', 'yprint-designtool'); ?>: <span class="smooth-value">0</span>%</label>
+                        <input type="range" id="yprint-smooth-level" min="0" max="100" step="1" value="0">
                     </div>
                     
                     <div class="yprint-enhancer-actions">
@@ -50,44 +50,12 @@ if (!defined('ABSPATH')) {
                             <?php _e('Linien verstärken', 'yprint-designtool'); ?>
                         </button>
                         
-                        <button type="button" id="yprint-simplify-svg-btn" class="yprint-enhancer-btn" disabled>
-                            <?php _e('SVG vereinfachen', 'yprint-designtool'); ?>
-                        </button>
-                        
-                        <button type="button" id="yprint-cleanup-svg-btn" class="yprint-enhancer-btn" disabled>
-                            <?php _e('SVG säubern', 'yprint-designtool'); ?>
+                        <button type="button" id="yprint-smooth-svg-btn" class="yprint-enhancer-btn" disabled>
+                            <?php _e('SVG verschönern', 'yprint-designtool'); ?>
                         </button>
                         
                         <button type="button" id="yprint-reset-svg-btn" class="yprint-enhancer-btn" disabled>
                             <?php _e('Zurücksetzen', 'yprint-designtool'); ?>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="yprint-svg-editor-section">
-                <h2><?php _e('SVG-Pfadoperationen', 'yprint-designtool'); ?></h2>
-                
-                <div class="yprint-svg-path-operations">
-                    <div class="yprint-path-operations-buttons">
-                        <button type="button" class="button yprint-svg-path-operation" data-operation="enhance-lines" disabled>
-                            <?php _e('Linien verstärken', 'yprint-designtool'); ?>
-                        </button>
-                        
-                        <button type="button" class="button yprint-svg-path-operation" data-operation="combine" disabled>
-                            <?php _e('Pfade kombinieren', 'yprint-designtool'); ?>
-                        </button>
-                        
-                        <button type="button" class="button yprint-svg-path-operation" data-operation="break-apart" disabled>
-                            <?php _e('Pfad aufbrechen', 'yprint-designtool'); ?>
-                        </button>
-                        
-                        <button type="button" class="button yprint-svg-path-operation" data-operation="to-path" disabled>
-                            <?php _e('Form zu Pfad', 'yprint-designtool'); ?>
-                        </button>
-                        
-                        <button type="button" class="button yprint-svg-path-operation" data-operation="reverse" disabled>
-                            <?php _e('Pfad umkehren', 'yprint-designtool'); ?>
                         </button>
                     </div>
                 </div>
@@ -432,51 +400,52 @@ jQuery(document).ready(function($) {
                 });
             });
             
-            // Simplify SVG button
-            $('#yprint-simplify-svg-btn').on('click', function() {
-                if (!currentSVG) {
-                    self.showMessage('<?php echo esc_js(__('Keine SVG zum Vereinfachen gefunden.', 'yprint-designtool')); ?>');
+            // SVG verschönern button
+        $('#yprint-smooth-svg-btn').on('click', function() {
+            if (!currentSVG) {
+                self.showMessage('<?php echo esc_js(__('Keine SVG zum Verschönern gefunden.', 'yprint-designtool')); ?>');
+                return;
+            }
+            
+            // Zeige den Regler an und deaktiviere andere Buttons
+            $('#smoothing-control').fadeIn();
+            
+            // Wenn der Slider aktualisiert wird, aktualisieren wir das SVG in Echtzeit
+            $('#yprint-smooth-level').off('input').on('input', function() {
+                var smoothLevel = parseInt($(this).val());
+                $('.smooth-value').text(smoothLevel);
+                
+                if (smoothLevel === 0) {
+                    // Bei 0% zeigen wir das Original an
+                    self.updateSVGDisplay(originalSVG);
                     return;
                 }
-                
-                var detailLevel = parseFloat($('#yprint-detail-level').val());
                 
                 $.ajax({
                     url: yprintSVGEnhancer.ajaxUrl,
                     type: 'POST',
                     data: {
-                        action: 'yprint_simplify_svg',
+                        action: 'yprint_smooth_svg',
                         nonce: yprintSVGEnhancer.nonce,
-                        svg_content: currentSVG,
-                        detail_level: detailLevel
-                    },
-                    beforeSend: function() {
-                        self.showMessage('<?php echo esc_js(__('Vereinfache SVG...', 'yprint-designtool')); ?>');
-                        $('#yprint-simplify-svg-btn').prop('disabled', true);
+                        svg_content: originalSVG,
+                        smooth_level: smoothLevel
                     },
                     success: function(response) {
-                        $('#yprint-simplify-svg-btn').prop('disabled', false);
-                        
                         if (response.success && response.data.svg_content) {
-                            self.addToHistory(currentSVG);
-                            currentSVG = response.data.svg_content;
-                            self.updateSVGDisplay(currentSVG);
-                            self.showMessage('<?php echo esc_js(__('SVG erfolgreich vereinfacht!', 'yprint-designtool')); ?>');
-                        } else {
-                            self.showMessage(response.data.message || '<?php echo esc_js(__('Fehler beim Vereinfachen der SVG.', 'yprint-designtool')); ?>');
+                            // Nur Vorschau, noch nicht speichern
+                            self.updateSVGDisplay(response.data.svg_content);
                         }
-                    },
-                    error: function() {
-                        $('#yprint-simplify-svg-btn').prop('disabled', false);
-                        self.showMessage('<?php echo esc_js(__('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', 'yprint-designtool')); ?>');
                     }
                 });
             });
             
-            // Clean up SVG button
-            $('#yprint-cleanup-svg-btn').on('click', function() {
-                if (!currentSVG) {
-                    self.showMessage('<?php echo esc_js(__('Keine SVG zum Säubern gefunden.', 'yprint-designtool')); ?>');
+            // Wenn der Benutzer die Maus loslässt, speichern wir die Änderung
+            $('#yprint-smooth-level').off('change').on('change', function() {
+                var smoothLevel = parseInt($(this).val());
+                
+                if (smoothLevel === 0) {
+                    // Bei 0% setzen wir auf das Original zurück
+                    currentSVG = originalSVG;
                     return;
                 }
                 
@@ -484,32 +453,31 @@ jQuery(document).ready(function($) {
                     url: yprintSVGEnhancer.ajaxUrl,
                     type: 'POST',
                     data: {
-                        action: 'yprint_cleanup_svg',
+                        action: 'yprint_smooth_svg',
                         nonce: yprintSVGEnhancer.nonce,
-                        svg_content: currentSVG
+                        svg_content: originalSVG,
+                        smooth_level: smoothLevel
                     },
                     beforeSend: function() {
-                        self.showMessage('<?php echo esc_js(__('Säubere SVG...', 'yprint-designtool')); ?>');
-                        $('#yprint-cleanup-svg-btn').prop('disabled', true);
+                        self.showMessage('<?php echo esc_js(__('Verschönere SVG...', 'yprint-designtool')); ?>');
                     },
                     success: function(response) {
-                        $('#yprint-cleanup-svg-btn').prop('disabled', false);
-                        
                         if (response.success && response.data.svg_content) {
                             self.addToHistory(currentSVG);
                             currentSVG = response.data.svg_content;
-                            self.updateSVGDisplay(currentSVG);
-                            self.showMessage('<?php echo esc_js(__('SVG erfolgreich gesäubert!', 'yprint-designtool')); ?>');
+                            self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-designtool')); ?>');
                         } else {
-                            self.showMessage(response.data.message || '<?php echo esc_js(__('Fehler beim Säubern der SVG.', 'yprint-designtool')); ?>');
+                            self.showMessage(response.data.message || '<?php echo esc_js(__('Fehler beim Verschönern der SVG.', 'yprint-designtool')); ?>');
+                            self.updateSVGDisplay(currentSVG);
                         }
                     },
                     error: function() {
-                        $('#yprint-cleanup-svg-btn').prop('disabled', false);
                         self.showMessage('<?php echo esc_js(__('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', 'yprint-designtool')); ?>');
+                        self.updateSVGDisplay(currentSVG);
                     }
                 });
             });
+        });
             
             // Reset SVG button
             $('#yprint-reset-svg-btn').on('click', function() {
@@ -614,13 +582,13 @@ jQuery(document).ready(function($) {
                 self.handleToolbarAction(action);
             });
             
-            // Path operation buttons
-            $('.yprint-svg-path-operation').on('click', function() {
-                if ($(this).prop('disabled')) return;
-                
-                var operation = $(this).data('operation');
-                self.handlePathOperation(operation);
-            });
+            // Reset SVG bei Klick auf Zurücksetzen
+$('#yprint-reset-svg-btn').on('click', function() {
+    // Den Glättungsregler zurücksetzen und ausblenden
+    $('#yprint-smooth-level').val(0);
+    $('.smooth-value').text('0');
+    $('#smoothing-control').fadeOut();
+});
             
             // Range input changes
             $('#yprint-line-thickness').on('input', function() {

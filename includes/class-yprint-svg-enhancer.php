@@ -54,16 +54,16 @@ class YPrint_SVG_Enhancer {
     }
     
     /**
-     * Initialisiert Hooks
-     */
-    private function init_hooks() {
-        // AJAX-Hooks für SVG-Verbesserungen
-        add_action('wp_ajax_yprint_enhance_svg_lines', array($this, 'ajax_enhance_svg_lines'));
-        add_action('wp_ajax_nopriv_yprint_enhance_svg_lines', array($this, 'ajax_enhance_svg_lines'));
-        
-        add_action('wp_ajax_yprint_simplify_svg', array($this, 'ajax_simplify_svg'));
-        add_action('wp_ajax_nopriv_yprint_simplify_svg', array($this, 'ajax_simplify_svg'));
-    }
+ * Initialisiert Hooks
+ */
+private function init_hooks() {
+    // AJAX-Hooks für SVG-Verbesserungen
+    add_action('wp_ajax_yprint_enhance_svg_lines', array($this, 'ajax_enhance_svg_lines'));
+    add_action('wp_ajax_nopriv_yprint_enhance_svg_lines', array($this, 'ajax_enhance_svg_lines'));
+    
+    add_action('wp_ajax_yprint_smooth_svg', array($this, 'ajax_smooth_svg'));
+    add_action('wp_ajax_nopriv_yprint_smooth_svg', array($this, 'ajax_smooth_svg'));
+}
     
     /**
      * AJAX-Handler zum Verstärken von SVG-Linien
@@ -96,34 +96,34 @@ class YPrint_SVG_Enhancer {
     }
     
     /**
-     * AJAX-Handler zum Vereinfachen von SVG-Pfaden (Detailregler)
-     */
-    public function ajax_simplify_svg() {
-        // Sicherheitscheck
-        check_ajax_referer('yprint-designtool-nonce', 'nonce');
-        
-        // SVG-Daten prüfen
-        if (empty($_POST['svg_content'])) {
-            wp_send_json_error(array('message' => __('Kein SVG-Inhalt gefunden.', 'yprint-designtool')));
-            return;
-        }
-        
-        $svg_content = stripslashes($_POST['svg_content']);
-        $detail_level = isset($_POST['detail_level']) ? floatval($_POST['detail_level']) : 5.0;
-        
-        // SVG vereinfachen
-        $simplified_svg = $this->simplify_svg($svg_content, $detail_level);
-        
-        if ($simplified_svg === false) {
-            wp_send_json_error(array('message' => __('Fehler beim Vereinfachen der SVG-Pfade.', 'yprint-designtool')));
-            return;
-        }
-        
-        // Erfolg zurückmelden
-        wp_send_json_success(array(
-            'svg_content' => $simplified_svg
-        ));
+ * AJAX-Handler zum Glätten von SVG-Pfaden
+ */
+public function ajax_smooth_svg() {
+    // Sicherheitscheck
+    check_ajax_referer('yprint-designtool-nonce', 'nonce');
+    
+    // SVG-Daten prüfen
+    if (empty($_POST['svg_content'])) {
+        wp_send_json_error(array('message' => __('Kein SVG-Inhalt gefunden.', 'yprint-designtool')));
+        return;
     }
+    
+    $svg_content = stripslashes($_POST['svg_content']);
+    $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
+    
+    // SVG glätten
+    $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
+    
+    if ($smoothed_svg === false) {
+        wp_send_json_error(array('message' => __('Fehler beim Glätten der SVG-Pfade.', 'yprint-designtool')));
+        return;
+    }
+    
+    // Erfolg zurückmelden
+    wp_send_json_success(array(
+        'svg_content' => $smoothed_svg
+    ));
+}
     
     /**
      * Verstärkt Linien in einem SVG-Dokument
@@ -173,48 +173,213 @@ class YPrint_SVG_Enhancer {
     }
     
     /**
-     * Vereinfacht SVG-Pfade durch Reduzierung von Punkten und Details
-     *
-     * @param string $svg_content SVG-Inhalt
-     * @param float $detail_level Detailstufe (0-10, wobei 0 wenig Details und 10 viele Details sind)
-     * @return string|bool Vereinfachtes SVG oder false bei Fehler
-     */
-    public function simplify_svg($svg_content, $detail_level = 5.0) {
-        if (empty($svg_content)) {
-            return false;
-        }
-        
-        // SVG-Inhalt laden
-        $dom = new DOMDocument();
-        $dom->preserveWhiteSpace = false;
-        $dom->formatOutput = true;
-        
-        // Fehlerbehandlung aktivieren
-        libxml_use_internal_errors(true);
-        $success = $dom->loadXML($svg_content);
-        $errors = libxml_get_errors();
-        libxml_clear_errors();
-        
-        if (!$success || !empty($errors)) {
-            return false;
-        }
-        
-        // XPath für die Suche nach Pfaden
-        $xpath = new DOMXPath($dom);
-        $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
-        
-        // Threshold für die Vereinfachung berechnen (umgekehrter Wert: höher = weniger Details)
-        $threshold = 0.1 + ((10 - min(10, max(0, $detail_level))) * 0.5);
-        
-        // Pfade finden und vereinfachen
-        $paths = $xpath->query('//svg:path');
-        foreach ($paths as $path) {
-            $this->simplify_path($path, $threshold);
-        }
-        
-        // SVG-Dokument zurückgeben
-        return $dom->saveXML();
+ * Vereinfacht SVG-Pfade durch Reduzierung von Punkten und Details
+ *
+ * @param string $svg_content SVG-Inhalt
+ * @param float $detail_level Detailstufe (0-10, wobei 0 wenig Details und 10 viele Details sind)
+ * @return string|bool Vereinfachtes SVG oder false bei Fehler
+ */
+public function simplify_svg($svg_content, $detail_level = 5.0) {
+    if (empty($svg_content)) {
+        return false;
     }
+    
+    // SVG-Inhalt laden
+    $dom = new DOMDocument();
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    
+    // Fehlerbehandlung aktivieren
+    libxml_use_internal_errors(true);
+    $success = $dom->loadXML($svg_content);
+    $errors = libxml_get_errors();
+    libxml_clear_errors();
+    
+    if (!$success || !empty($errors)) {
+        return false;
+    }
+    
+    // XPath für die Suche nach Pfaden
+    $xpath = new DOMXPath($dom);
+    $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
+    
+    // Threshold für die Vereinfachung berechnen (umgekehrter Wert: höher = weniger Details)
+    $threshold = 0.1 + ((10 - min(10, max(0, $detail_level))) * 0.5);
+    
+    // Pfade finden und vereinfachen
+    $paths = $xpath->query('//svg:path');
+    foreach ($paths as $path) {
+        $this->simplify_path($path, $threshold);
+    }
+    
+    // SVG-Dokument zurückgeben
+    return $dom->saveXML();
+}
+
+/**
+ * Glättet SVG-Pfade für schönere Linien
+ *
+ * @param string $svg_content SVG-Inhalt
+ * @param int $smooth_level Glättungsgrad (0-100, wobei 0 keine Glättung und 100 maximale Glättung)
+ * @return string|bool Geglättetes SVG oder false bei Fehler
+ */
+public function smooth_svg($svg_content, $smooth_level = 0) {
+    if (empty($svg_content)) {
+        return false;
+    }
+    
+    // Keine Glättung, Original zurückgeben
+    if ($smooth_level <= 0) {
+        return $svg_content;
+    }
+    
+    // SVG-Inhalt laden
+    $dom = new DOMDocument();
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    
+    // Fehlerbehandlung aktivieren
+    libxml_use_internal_errors(true);
+    $success = $dom->loadXML($svg_content);
+    $errors = libxml_get_errors();
+    libxml_clear_errors();
+    
+    if (!$success || !empty($errors)) {
+        return false;
+    }
+    
+    // XPath für die Suche nach Pfaden
+    $xpath = new DOMXPath($dom);
+    $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
+    
+    // Glättungsstärke berechnen (0-100 zu Grad-Wert)
+    $smooth_angles = 360 * ($smooth_level / 100);
+    
+    // Pfade finden und glätten
+    $paths = $xpath->query('//svg:path');
+    foreach ($paths as $path) {
+        $this->smooth_path($path, $smooth_angles);
+    }
+    
+    // SVG-Dokument zurückgeben
+    return $dom->saveXML();
+}
+
+/**
+ * Glättet einen SVG-Pfad
+ *
+ * @param DOMElement $path_element Pfad-Element
+ * @param float $smooth_angles Winkelmaximum für Glättung
+ */
+private function smooth_path($path_element, $smooth_angles) {
+    // d-Attribut des Pfades abrufen
+    $d = $path_element->getAttribute('d');
+    if (empty($d)) {
+        return;
+    }
+    
+    // Pfad in Segmente aufteilen
+    $segments = $this->parse_path_data($d);
+    
+    // Geglätteten Pfad erstellen
+    $smoothed_d = $this->create_smoothed_path($segments, $smooth_angles);
+    
+    // Neuen Pfad setzen
+    $path_element->setAttribute('d', $smoothed_d);
+}
+
+/**
+ * Erstellt einen geglätteten Pfad aus Segmenten
+ *
+ * @param array $segments Pfadsegmente
+ * @param float $smooth_angles Winkelmaximum für Glättung (0-360)
+ * @return string Geglätteter Pfad
+ */
+private function create_smoothed_path($segments, $smooth_angles) {
+    // Pfad mit geglätteten Kurven erstellen
+    $smoothed = '';
+    $last_point = null;
+    $last_control = null;
+    
+    foreach ($segments as $i => $segment) {
+        $command = $segment['command'];
+        $points = $segment['points'];
+        
+        // Befehl und erste Punkte immer beibehalten
+        $smoothed .= ' ' . $command . ' ';
+        
+        // Für Kurvenbefehle (C, c, S, s) Glättung anwenden
+        if (in_array(strtolower($command), ['c', 's']) && count($points) >= 6 && $i > 0) {
+            // Kontrollpunkte extrahieren
+            $control1_x = $points[0];
+            $control1_y = $points[1];
+            $control2_x = $points[2];
+            $control2_y = $points[3];
+            $end_x = $points[4];
+            $end_y = $points[5];
+            
+            // Letzten Punkt aus vorherigem Segment bekommen
+            if ($last_point) {
+                // Winkel zwischen Kontrollpunkten und Endpunkten berechnen
+                if ($last_point && $last_control) {
+                    // Berechne den Winkel zwischen dem letzten Punkt und dem ersten Kontrollpunkt
+                    $angle1 = atan2($control1_y - $last_point[1], $control1_x - $last_point[0]);
+                    // Berechne den Winkel zwischen dem Endpunkt und dem zweiten Kontrollpunkt
+                    $angle2 = atan2($end_y - $control2_y, $end_x - $control2_x);
+                    
+                    // Konvertiere in Grad
+                    $angle1_deg = rad2deg($angle1);
+                    $angle2_deg = rad2deg($angle2);
+                    
+                    // Berechne den Winkelunterschied
+                    $angle_diff = abs($angle2_deg - $angle1_deg);
+                    if ($angle_diff > 180) {
+                        $angle_diff = 360 - $angle_diff;
+                    }
+                    
+                    // Wenn der Winkelunterschied kleiner als der Grenzwert ist, glätten
+                    if ($angle_diff <= $smooth_angles) {
+                        // Berechne die Distanz für die Kontrolle
+                        $dist1 = sqrt(pow($control1_x - $last_point[0], 2) + pow($control1_y - $last_point[1], 2));
+                        $dist2 = sqrt(pow($control2_x - $end_x, 2) + pow($control2_y - $end_y, 2));
+                        
+                        // Anpassen des zweiten Kontrollpunkts
+                        $new_angle = $angle1 + M_PI; // Umgekehrter Winkel
+                        $control2_x = $end_x + cos($new_angle) * $dist2;
+                        $control2_y = $end_y + sin($new_angle) * $dist2;
+                        
+                        // Aktualisiere die Punkte
+                        $points[2] = $control2_x;
+                        $points[3] = $control2_y;
+                    }
+                }
+                
+                // Aktualisiere für das nächste Segment
+                $last_point = [$end_x, $end_y];
+                $last_control = [$control2_x, $control2_y];
+            }
+        } else if ($command === 'M' || $command === 'm') {
+            // Bei Move-To-Befehl den letzten Punkt aktualisieren
+            $last_point = [$points[0], $points[1]];
+            $last_control = null;
+        } else if ($command === 'L' || $command === 'l') {
+            // Bei Line-To-Befehl den letzten Punkt aktualisieren
+            $last_point = [$points[0], $points[1]];
+            $last_control = null;
+        } else if ($command === 'Z' || $command === 'z') {
+            // Bei Close-Path den letzten Punkt zurücksetzen
+            $last_point = null;
+            $last_control = null;
+        }
+        
+        // Punkte zum Pfad hinzufügen
+        foreach ($points as $point) {
+            $smoothed .= $point . ' ';
+        }
+    }
+    
+    return trim($smoothed);
+}
     
     /**
      * Wendet die Linienverstärkung auf ein SVG-Element an

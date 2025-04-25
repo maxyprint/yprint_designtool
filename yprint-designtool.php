@@ -152,29 +152,35 @@ final class YPrint_DesignTool {
         );
     }
 
-    /**
-     * Admin page callback
-     */
-    public function admin_page() {
-        ?>
-        <div class="wrap">
-            <h1><?php echo esc_html__('YPrint DesignTool', 'yprint-designtool'); ?></h1>
-            <p><?php echo esc_html__('Willkommen beim YPrint DesignTool! Hier werden bald die Einstellungen und Features angezeigt.', 'yprint-designtool'); ?></p>
-            
-            <div class="card">
-                <h2><?php echo esc_html__('Verfügbare Tools', 'yprint-designtool'); ?></h2>
-                <ul>
-                    <li>
-                        <a href="<?php echo admin_url('admin.php?page=yprint-designtool-vectorizer'); ?>">
-                            <?php echo esc_html__('Bild Vektorisieren', 'yprint-designtool'); ?>
-                        </a> - 
-                        <?php echo esc_html__('Konvertiere Rasterbilder (JPEG, PNG) in Vektorgrafiken (SVG)', 'yprint-designtool'); ?>
-                    </li>
-                </ul>
-            </div>
+   /**
+ * Admin page callback
+ */
+public function admin_page() {
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html__('YPrint DesignTool', 'yprint-designtool'); ?></h1>
+        <p><?php echo esc_html__('Willkommen beim YPrint DesignTool! Hier werden bald die Einstellungen und Features angezeigt.', 'yprint-designtool'); ?></p>
+        
+        <div class="card">
+            <h2><?php echo esc_html__('Verfügbare Tools', 'yprint-designtool'); ?></h2>
+            <ul>
+                <li>
+                    <a href="<?php echo admin_url('admin.php?page=yprint-designtool-vectorizer'); ?>">
+                        <?php echo esc_html__('Bild Vektorisieren', 'yprint-designtool'); ?>
+                    </a> - 
+                    <?php echo esc_html__('Konvertiere Rasterbilder (JPEG, PNG) in Vektorgrafiken (SVG)', 'yprint-designtool'); ?>
+                </li>
+                <li>
+                    <a href="<?php echo admin_url('admin.php?page=yprint-designtool-svg-editor'); ?>">
+                        <?php echo esc_html__('SVG Editor', 'yprint-designtool'); ?>
+                    </a> - 
+                    <?php echo esc_html__('Bearbeite und optimiere SVG-Dateien für deine Designs', 'yprint-designtool'); ?>
+                </li>
+            </ul>
         </div>
-        <?php
-    }
+    </div>
+    <?php
+}
     
     /**
      * Vectorizer page callback
