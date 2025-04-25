@@ -251,13 +251,16 @@
     animation: path-operation 0.5s ease;
 }
 
-/* Animation für SVG-Modifikationen */
+/* Animation für SVG-Modifikationen - DEUTLICH verstärkt */
 @keyframes svg-modified-animation {
-    0% { stroke: inherit; stroke-width: inherit; }
-    50% { stroke: #2196F3; stroke-width: 1.5; }
-    100% { stroke: inherit; stroke-width: inherit; }
+    0% { stroke: inherit; stroke-width: inherit; fill: inherit; }
+    20% { stroke: #ff3d00; stroke-width: 3; fill: rgba(255, 61, 0, 0.3); }
+    40% { stroke: #2196F3; stroke-width: 2; fill: rgba(33, 150, 243, 0.3); }
+    60% { stroke: #4caf50; stroke-width: 2.5; fill: rgba(76, 175, 80, 0.3); }
+    80% { stroke: #ff3d00; stroke-width: 1.5; fill: rgba(255, 61, 0, 0.2); }
+    100% { stroke: inherit; stroke-width: inherit; fill: inherit; }
 }
 
 .svg-modified {
-    animation: svg-modified-animation 0.7s ease;
+    animation: svg-modified-animation 1.5s ease;
 }

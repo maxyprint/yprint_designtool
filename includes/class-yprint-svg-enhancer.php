@@ -356,6 +356,50 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     // Original-SVG speichern für sehr niedrige Werte
     $original_svg_content = $svg_content;
     
+    // SOFORT SICHTBARE ÄNDERUNG: Farbveränderung bei höheren Werten
+    // Bei Werten über 20% Farben modifizieren für garantiert sichtbare Änderung
+    if ($smooth_level >= 20) {
+        error_log("SVG smooth_svg - FARBÄNDERUNG wird angewendet bei $smooth_level%");
+        // Wir ändern Füllfarben direkt im SVG-String
+        $intensity = min(100, max(20, $smooth_level)) / 100;
+        
+        // Bei niedrigeren Werten Schwarzfärbung, bei höheren Farbänderung
+        if ($smooth_level < 50) {
+            // Farbintensität erhöhen (mehr schwarz)
+            $svg_content = preg_replace_callback(
+                '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
+                function($matches) use ($intensity) {
+                    $color = $matches[0];
+                    // Wenn es bereits schwarz ist, belassen
+                    if (strpos($color, '#000') !== false || strpos($color, 'black') !== false) {
+                        return $color;
+                    }
+                    // Bei höherer Intensität garantiert dunklere Farbe zurückgeben
+                    $darkness = mt_rand(0, 180); // 0-180 statt 0-255 für garantiert dunklere Farben
+                    $new_color = sprintf('fill="#%02x%02x%02x"', $darkness, $darkness, $darkness);
+                    return $new_color;
+                },
+                $svg_content
+            );
+        } else {
+            // Farben stark verändern
+            $svg_content = preg_replace_callback(
+                '/fill="(?:#[0-9a-f]{6}|#[0-9a-f]{3}|rgba?\([^)]+\)|[a-z]+)"/',
+                function($matches) use ($intensity) {
+                    // Erzeugen einer neuen, zufälligen Farbe mit einer gewissen Tiefe
+                    $r = mt_rand(50, 200);
+                    $g = mt_rand(50, 200);
+                    $b = mt_rand(50, 200);
+                    $new_color = sprintf('fill="#%02x%02x%02x"', $r, $g, $b);
+                    return $new_color;
+                },
+                $svg_content
+            );
+        }
+        
+        error_log("SVG smooth_svg - Farbänderung durchgeführt mit Intensität $intensity");
+    }
+    
     // SVG-Inhalt laden
     $dom = new DOMDocument();
     $dom->preserveWhiteSpace = false;
@@ -386,27 +430,16 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
     
     error_log("SVG smooth_svg - Verwende direkten Glättungswert: Original=$smooth_level%, Verwendet=$safe_smooth_level%");
     
-    // Direkte, intensivere Glättungsstärke für sichtbare Effekte
-    // Deutlich verstärkte Basis für sichtbare Änderungen
-    $base_angle = 0.1; // 10x höher als vorher
+    // EXTREM verstärkte Glättungsstärke für garantiert sichtbare Effekte
+    $base_angle = 0.5; // 50x höher als vorher
     $normalized_level = $safe_smooth_level / 100; // Skaliert den Wert von 0-1
-    // Stark vereinfachte, direkte Formel für deutlich sichtbare Effekte
-    $smooth_angles = $base_angle + ($normalized_level * 0.5); // Linearere Skalierung für vorhersehbarere Effekte
+    // Stark verstärkte Formel für deutlich sichtbare Effekte
+    $smooth_angles = $base_angle + ($normalized_level * 2.0); // 4x stärkere Skalierung
     
     // Bei höheren Werten noch mehr Pfade bearbeiten
     $path_selection_factor = 100; // Bearbeite alle Pfade
     
-    error_log("SVG smooth_svg - Verstärkte Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
-    
-    // Dynamische Glättungsstärke mit verbesserten Effekten
-$base_angle = 0.01; // Basis für mikroskopische Änderungen
-$normalized_level = $safe_smooth_level / 10; // Skaliert den Wert
-// Erweiterte exponentielle Formel für sichtbarere Effekte
-$smooth_angles = $base_angle * pow(10, $normalized_level * 1.5); 
-// Bei höheren Werten zusätzliche Pfade einbeziehen
-$path_selection_factor = min(100, max(5, $safe_smooth_level * 3)); // 5-100% der Pfade bearbeiten
-    
-    error_log("SVG smooth_svg - Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
+    error_log("SVG smooth_svg - EXTREME Glättungsstärke berechnet: OrigLevel=$smooth_level%, SafeLevel=$safe_smooth_level%, Winkel=$smooth_angles");
     
     // Sicherheitsmodus ist immer aktiv
     $safety_mode = true;
@@ -657,17 +690,21 @@ private function smooth_path($path_element, $smooth_angles) {
  * @return string Veränderter Pfad
  */
 private function add_subtle_variations($path_data, $strength) {
-    // DRASTISCH verstärkte Variation für sichtbare Veränderungen
-    $variation_strength = min(0.8, max(0.05, $strength / 100));
+    // EXTREM verstärkte Variation für garantiert sichtbare Veränderungen
+    $variation_strength = min(3.0, max(0.2, $strength / 25)); // Deutlich höhere Basis-Stärke
     
     // Debug-Info
-    error_log("Angewendete Variationsstärke: " . $variation_strength . " bei Glättungslevel " . $strength);
+    error_log("EXTREME Variationsstärke angewendet: " . $variation_strength . " bei Glättungslevel " . $strength);
     
     // Teile den Pfad in Segmente (bei Befehlen und Koordinaten)
     preg_match_all('/([A-Za-z])|(-?\d+(?:\.\d+)?)/', $path_data, $matches);
     
     $modified_path = '';
     $change_counter = 0;
+    $total_matches = count($matches[0]);
+    
+    // Garantierte Mindestanzahl von Änderungen basierend auf Stärke berechnen
+    $min_changes_needed = ceil($total_matches * min(0.5, max(0.05, $strength / 100)));
     
     foreach ($matches[0] as $i => $token) {
         // Wenn es sich um eine Zahl handelt, füge stärkere Variation hinzu
@@ -675,37 +712,45 @@ private function add_subtle_variations($path_data, $strength) {
             $num = floatval($token);
             $abs_num = abs($num);
             
-            // Viel höhere Änderungswahrscheinlichkeit
-            // Min 30% bis 100% je nach Glättungsstärke
-            $chance_to_modify = min(100, max(30, $strength)); 
+            // Garantiert hohe Änderungswahrscheinlichkeit
+            // Minimum 50% bis 100% je nach Glättungsstärke - deutlich erhöht
+            $chance_to_modify = min(100, max(50, $strength)); 
+            
+            // Gegen Ende erzwingen wir Änderungen, wenn wir unter der Mindestanzahl liegen
+            $remaining_tokens = $total_matches - $i;
+            $remaining_needed = $min_changes_needed - $change_counter;
+            
+            if ($remaining_tokens <= $remaining_needed) {
+                $chance_to_modify = 100; // Erzwingen!
+            }
             
             if (mt_rand(1, 100) <= $chance_to_modify) {
-                // Verstärkte Variation für sichtbare Effekte
+                // EXTREME Variation für garantiert sichtbare Effekte
                 $variation_factor = $variation_strength;
                 
-                // Bei größeren Werten noch stärkere Variationen
+                // Bei größeren Werten noch VIEL stärkere Variationen
                 if ($abs_num > 100) {
-                    $variation_factor *= 5; // Erhöht von 3 auf 5
+                    $variation_factor *= 10; // Massiv erhöht
                 } elseif ($abs_num > 10) {
-                    $variation_factor *= 3; // Erhöht von 2 auf 3
+                    $variation_factor *= 6;  // Massiv erhöht
                 } elseif ($abs_num < 1) {
                     // Für sehr kleine Werte garantiere eine klare Änderung
-                    $variation_factor = max($variation_factor, 0.2); // Erhöht von 0.05 auf 0.2
+                    $variation_factor = max($variation_factor, 1.0); // Massiv erhöht
                 }
                 
-                // Stärkere Variation mit breiterer Zufallsverteilung
-                $variation = $abs_num * $variation_factor * (mt_rand(-15, 15) / 10); // Verstärkt von ±10 auf ±15
+                // Extreme Variation mit noch breiterer Zufallsverteilung
+                $variation = $abs_num * $variation_factor * (mt_rand(-20, 20) / 10); // Weiter verstärkt
                 
-                // Garantiere deutliche Mindeständerung für alle Werte
-                $min_change = 0.8 + ($strength / 100); // 0.8 bis 1.8 je nach Glättungsniveau
-                if (abs($variation) < $min_change) {
+                // Garantiere DEUTLICHE Mindeständerung für alle Werte
+                $min_change = 2.0 + ($strength / 50); // 2.0 bis 4.0 je nach Glättungsniveau - massiv erhöht
+                if (abs($variation) < $min_change && $abs_num > 0.1) {
                     $dir = ($variation >= 0) ? 1 : -1;
                     $variation = $min_change * $dir;
                 }
                 
                 $modified_num = $num + $variation;
-                // Weniger Rundung für bessere Sichtbarkeit der Änderungen
-                $modified_path .= round($modified_num, 1) . ' '; 
+                // Keine Rundung für maximale Sichtbarkeit der Änderungen
+                $modified_path .= $modified_num . ' '; 
                 $change_counter++;
             } else {
                 $modified_path .= $token . ' ';
@@ -715,7 +760,8 @@ private function add_subtle_variations($path_data, $strength) {
         }
     }
     
-    error_log("SVG-Variationen: $change_counter Koordinaten von " . count($matches[0]) . " wurden angepasst");
+    error_log("SVG-Variationen EXTREM: $change_counter Koordinaten von $total_matches wurden angepasst (" . 
+              round(($change_counter/$total_matches)*100) . "%)");
     
     return trim($modified_path);
 }
