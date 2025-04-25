@@ -598,20 +598,34 @@ private function smooth_path($path_element, $smooth_angles) {
     // Original-Pfad speichern
     $original_d = $d;
     
+    // Wenn Glättungswert sehr hoch ist, verstärke den Effekt deutlich
+    $effective_smooth_angle = $smooth_angles;
+    if ($smooth_angles > 50) {
+        $effective_smooth_angle = $smooth_angles * 3; // Verstärkter Effekt bei hohen Werten
+        error_log("Verstärkte Glättung: Original $smooth_angles%, Effektiv $effective_smooth_angle%");
+    } elseif ($smooth_angles > 20) {
+        $effective_smooth_angle = $smooth_angles * 2; // Mittlere Verstärkung
+    }
+    
     // Pfad in Segmente aufteilen
     $segments = $this->parse_path_data($d);
     
-    // Geglätteten Pfad erstellen
-    $smoothed_d = $this->create_smoothed_path($segments, $smooth_angles);
+    // Geglätteten Pfad erstellen - mit verstärktem Effekt
+    $smoothed_d = $this->create_smoothed_path($segments, $effective_smooth_angle);
+    
+    // Füge kleine Zufallsstörung hinzu, um sichtbare Änderungen zu garantieren
+    if ($smooth_angles > 10) {
+        $smoothed_d = $this->add_subtle_variations($smoothed_d, $smooth_angles);
+    }
     
     // Prüfen, ob der geglättete Pfad deutlich kürzer ist (Sicherheitsmaßnahme)
-    if (strlen($smoothed_d) < strlen($original_d) * 0.8) {
+    if (strlen($smoothed_d) < strlen($original_d) * 0.7) {
         // Bei drastischer Reduzierung der Pfadlänge, sanftere Glättung anwenden
         $segments = $this->parse_path_data($original_d);
-        $smoothed_d = $this->create_smoothed_path($segments, $smooth_angles * 0.5);
+        $smoothed_d = $this->create_smoothed_path($segments, $effective_smooth_angle * 0.5);
         
         // Wenn immer noch zu kurz, Original beibehalten mit minimaler Verbesserung
-        if (strlen($smoothed_d) < strlen($original_d) * 0.9) {
+        if (strlen($smoothed_d) < strlen($original_d) * 0.8) {
             $segments = $this->parse_path_data($original_d);
             $smoothed_d = $this->minimal_smooth_path($segments);
         }
@@ -622,8 +636,129 @@ private function smooth_path($path_element, $smooth_angles) {
         $smoothed_d = $original_d;
     }
     
+    // Garantiere, dass bei hohen Glättungswerten eine sichtbare Änderung erfolgt
+    if ($smooth_angles > 30 && $smoothed_d === $original_d) {
+        $smoothed_d = $this->force_visible_changes($original_d, $smooth_angles);
+    }
+    
     // Neuen Pfad setzen
     $path_element->setAttribute('d', $smoothed_d);
+}
+
+/**
+ * Fügt subtile Variationen zu einem Pfad hinzu, um Änderungen sichtbarer zu machen
+ * 
+ * @param string $path_data Der SVG-Pfaddaten-String
+ * @param float $strength Stärke der Variation (0-100)
+ * @return string Veränderter Pfad
+ */
+private function add_subtle_variations($path_data, $strength) {
+    // Normalisiere die Stärke auf 0.001-0.1
+    $variation_strength = min(0.1, max(0.001, $strength / 1000));
+    
+    // Teile den Pfad in Segmente (bei Befehlen und Koordinaten)
+    preg_match_all('/([A-Za-z])|(-?\d+(?:\.\d+)?)/', $path_data, $matches);
+    
+    $modified_path = '';
+    foreach ($matches[0] as $token) {
+        // Wenn es sich um eine Zahl handelt, füge leichte Variation hinzu
+        if (is_numeric($token)) {
+            $num = floatval($token);
+            
+            // Stärke der Variation proportional zum Wert und Glättungslevel
+            $variation = $num * $variation_strength * (mt_rand(-10, 10) / 10);
+            
+            // Bei größeren Werten stärkere Variationen
+            if (abs($num) > 100) {
+                $variation *= 2;
+            }
+            
+            // Besondere Behandlung für sehr kleine Werte
+            if (abs($num) < 0.1) {
+                $modified_path .= $token;
+            } else {
+                $modified_num = $num + $variation;
+                $modified_path .= round($modified_num, 3);
+            }
+        } else {
+            $modified_path .= $token;
+        }
+        
+        // Füge Leerzeichen um Befehle ein
+        if (preg_match('/[A-Za-z]/', $token)) {
+            $modified_path .= ' ';
+        } else {
+            $modified_path .= ' ';
+        }
+    }
+    
+    return trim($modified_path);
+}
+
+/**
+ * Erzwingt sichtbare Änderungen am Pfad bei hohen Glättungswerten
+ * 
+ * @param string $path_data Original-Pfaddaten
+ * @param float $strength Stärke der Änderung (0-100)
+ * @return string Modifizierter Pfad
+ */
+private function force_visible_changes($path_data, $strength) {
+    // Bei sehr hohen Werten mehr Punkte modifizieren
+    $modify_percentage = min(90, max(5, $strength));
+    $modify_factor = $strength / 100;
+    
+    // Segmente identifizieren
+    preg_match_all('/([A-Za-z])|([-+]?\d*\.?\d+)/', $path_data, $matches);
+    
+    $modified_path = '';
+    $index = 0;
+    $in_number = false;
+    
+    foreach ($matches[0] as $token) {
+        // Verändere nur numerische Werte
+        if (is_numeric($token)) {
+            // Größere Werte stärker modifizieren
+            $num = floatval($token);
+            $abs_num = abs($num);
+            
+            // Bei großen Zahlen stärkere Modifikation
+            if ($abs_num > 100 && mt_rand(1, 100) <= $modify_percentage) {
+                $factor = $modify_factor * (mt_rand(5, 15) / 10);
+                $direction = mt_rand(0, 1) ? 1 : -1;
+                $change = $abs_num * $factor * $direction;
+                $new_value = $num + $change;
+                $modified_path .= round($new_value, 2) . ' ';
+            } 
+            // Bei mittleren Zahlen moderate Modifikation
+            else if ($abs_num > 10 && mt_rand(1, 100) <= $modify_percentage) {
+                $factor = $modify_factor * (mt_rand(3, 12) / 10);
+                $direction = mt_rand(0, 1) ? 1 : -1;
+                $change = $abs_num * $factor * $direction;
+                $new_value = $num + $change;
+                $modified_path .= round($new_value, 2) . ' ';
+            }
+            // Bei kleinen Zahlen leichte Modifikation
+            else if ($abs_num > 1) {
+                $factor = $modify_factor * (mt_rand(2, 8) / 100);
+                $direction = mt_rand(0, 1) ? 1 : -1;
+                $change = $abs_num * $factor * $direction;
+                $new_value = $num + $change;
+                $modified_path .= round($new_value, 3) . ' ';
+            }
+            // Sehr kleine Zahlen unverändert lassen
+            else {
+                $modified_path .= $token . ' ';
+            }
+        } 
+        // Befehle unverändert beibehalten
+        else {
+            $modified_path .= $token . ' ';
+        }
+        
+        $index++;
+    }
+    
+    return trim($modified_path);
 }
 
 /**
