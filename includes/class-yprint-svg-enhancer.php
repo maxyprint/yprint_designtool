@@ -102,10 +102,8 @@ public function ajax_smooth_svg() {
     // Sicherheitscheck
     check_ajax_referer('yprint-designtool-nonce', 'nonce');
     
-    // --- NEUE LOGS HIER EINFÜGEN ---
     error_log("[YPrint DEBUG] [AJAX] ajax_smooth_svg aufgerufen.");
     error_log("[YPrint DEBUG] [AJAX] Empfangene POST-Daten: " . print_r($_POST, true));
-    // --- ENDE NEUE LOGS ---
     
     // SVG-Daten prüfen
     if (empty($_POST['svg_content'])) {
@@ -116,10 +114,7 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
-    // --- NEUE LOGS HIER EINFÜGEN ---
-    error_log("[YPrint DEBUG] [AJAX] Aufruf von smooth_svg steht bevor.");
-    error_log("[YPrint DEBUG] [AJAX] Übergabe an smooth_svg - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
-    // --- ENDE NEUE LOGS ---
+    error_log("[YPrint DEBUG] [AJAX] Übergabe an apply_svg_smoothing - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
     
     // Log den empfangenen Level direkt am Eingang der Funktion
     error_log("[YPrint DEBUG] ===== BEGINN SVG GLÄTTUNG =====");
@@ -137,7 +132,6 @@ public function ajax_smooth_svg() {
     
     try {
         // Wert konsistent halten - KEINE zusätzliche Verarbeitung des Levels
-        // Der ursprüngliche Wert wird exakt so an die smooth_svg-Funktion weitergegeben
         $requested_level = $smooth_level;
         error_log("[YPrint DEBUG] Verarbeite mit EXAKTEM Glättungswert: $requested_level%");
         
@@ -164,7 +158,7 @@ public function ajax_smooth_svg() {
         
         // SVG glätten mit Zeiterfassung - EXAKTEN Wert weitergeben
         $start_time = microtime(true);
-        $smoothed_svg = $this->smooth_svg($svg_content, $requested_level);
+        $smoothed_svg = $this->apply_svg_smoothing($svg_content, $requested_level);
         $end_time = microtime(true);
         $processing_time = round(($end_time - $start_time) * 1000, 2); // in Millisekunden
         
@@ -458,39 +452,38 @@ public function simplify_svg($svg_content, $detail_level = 5.0) {
  * @param int $smooth_level Glättungsgrad (0-100, wobei 0 keine Glättung und 100 maximale Glättung)
  * @return string|bool Geglättetes SVG oder false bei Fehler
  */
-public function smooth_svg($svg_content, $smooth_level = 0) {
-    // --- NEUE LOGS HIER EINFÜGEN ---
-    error_log("[YPrint DEBUG] [smooth_svg] Funktion gestartet.");
-    error_log("[YPrint DEBUG] [smooth_svg] Empfangener Parameter - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
-    // --- ENDE NEUE LOGS ---
+public function apply_svg_smoothing($svg_content, $smooth_level = 0) {
+    // Logs zur Nachverfolgung
+    error_log("[YPrint DEBUG] [apply_svg_smoothing] Funktion gestartet.");
+    error_log("[YPrint DEBUG] [apply_svg_smoothing] Empfangener Parameter - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
     
     if (empty($svg_content)) {
-        error_log("[YPrint Backend][smooth_svg] Leerer SVG-Inhalt");
+        error_log("[YPrint Backend][apply_svg_smoothing] Leerer SVG-Inhalt");
         return false;
     }
     
     // Keine Glättung, Original zurückgeben
     if ($smooth_level <= 0) {
-        error_log("[YPrint Backend][smooth_svg] Level 0%, gebe Original zurück");
+        error_log("[YPrint Backend][apply_svg_smoothing] Level 0%, gebe Original zurück");
         return $svg_content;
     }
     
     // Original-SVG speichern für Sicherheitsmaßnahmen
     $original_svg_content = $svg_content;
     
-    error_log("[YPrint Backend][smooth_svg] Start der Verarbeitung mit Level $smooth_level%, Original-Länge: " . strlen($original_svg_content));
+    error_log("[YPrint Backend][apply_svg_smoothing] Start der Verarbeitung mit Level $smooth_level%, Original-Länge: " . strlen($original_svg_content));
     
     try {
         // Direktere Änderung: Bei höheren Werten Farbänderungen vornehmen für sichtbare Effekte
         if ($smooth_level >= 20) {
-            error_log("[YPrint Backend][smooth_svg] Wende Farbänderungen an (Level >= 20%)");
+            error_log("[YPrint Backend][apply_svg_smoothing] Wende Farbänderungen an (Level >= 20%)");
             // Sichtbare Farbveränderung durch direkte Ersetzung im SVG
             $svg_content = $this->apply_color_changes($svg_content, $smooth_level);
         }
         
         // Versuch, eine einfache Änderung am SVG vorzunehmen, um zu prüfen, ob die Funktion grundsätzlich arbeitet
         if ($smooth_level > 0) {
-            error_log("[YPrint Backend][smooth_svg] Teste einfache Modifikation");
+            error_log("[YPrint Backend][apply_svg_smoothing] Teste einfache Modifikation");
             
             // Probiere eine sehr einfache Änderung (einfaches String-Replace für sichtbare Änderung)
             // Dies ist nur zu Debug-Zwecken und sollte später entfernt werden
@@ -501,7 +494,7 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
             if (strpos($svg_content, '<svg') !== false && $smooth_level >= 5) {
                 $style_attribute = " style=\"filter: drop-shadow(0px 0px {$smooth_level}px rgba(0,0,0,0.3));\"";
                 $svg_content = preg_replace('/<svg([^>]*)>/', '<svg$1' . $style_attribute . '>', $svg_content, 1);
-                error_log("[YPrint Backend][smooth_svg] Style-Attribut hinzugefügt");
+                error_log("[YPrint Backend][apply_svg_smoothing] Style-Attribut hinzugefügt");
             }
         }
         
@@ -512,17 +505,17 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         
         // Fehlerbehandlung aktivieren
         libxml_use_internal_errors(true);
-        error_log("[YPrint Backend][smooth_svg] Lade SVG in DOM");
+        error_log("[YPrint Backend][apply_svg_smoothing] Lade SVG in DOM");
         $success = $dom->loadXML($svg_content);
         $errors = libxml_get_errors();
         
         if (!$success || !empty($errors)) {
-            error_log("[YPrint Backend][smooth_svg] Fehler beim Laden des SVGs:");
+            error_log("[YPrint Backend][apply_svg_smoothing] Fehler beim Laden des SVGs:");
             foreach ($errors as $error) {
-                error_log("[YPrint Backend][smooth_svg] XML Error: " . $error->message . " (Zeile: " . $error->line . ")");
+                error_log("[YPrint Backend][apply_svg_smoothing] XML Error: " . $error->message . " (Zeile: " . $error->line . ")");
             }
             libxml_clear_errors();
-            error_log("[YPrint Backend][smooth_svg] DOM-Laden fehlgeschlagen, versuche direkte String-Manipulation");
+            error_log("[YPrint Backend][apply_svg_smoothing] DOM-Laden fehlgeschlagen, versuche direkte String-Manipulation");
             
             // Vereinfachte Alternative bei DOM-Fehlern: Einfache Text-Ersetzung
             return $svg_content;
@@ -536,10 +529,10 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         // Pfade finden
         $paths = $xpath->query('//svg:path');
         $path_count = $paths->length;
-        error_log("[YPrint Backend][smooth_svg] Gefundene Pfade: $path_count");
+        error_log("[YPrint Backend][apply_svg_smoothing] Gefundene Pfade: $path_count");
         
         if ($path_count == 0) {
-            error_log("[YPrint Backend][smooth_svg] Keine Pfade gefunden, suche nach anderen Formen");
+            error_log("[YPrint Backend][apply_svg_smoothing] Keine Pfade gefunden, suche nach anderen Formen");
             // Konvertiere andere Elemente in Pfade, um sie zu glätten
             $this->convert_shapes_to_paths($dom, $xpath);
             
@@ -548,7 +541,7 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
             $path_count = $paths->length;
             
             if ($path_count == 0) {
-                error_log("[YPrint Backend][smooth_svg] Immer noch keine Pfade gefunden");
+                error_log("[YPrint Backend][apply_svg_smoothing] Immer noch keine Pfade gefunden");
                 // Selbst wenn keine Pfade gefunden wurden, gebe die SVG mit den einfachen Änderungen zurück
                 return $svg_content;
             }
@@ -559,7 +552,7 @@ foreach ($paths as $index => $path) {
     if ($index < 3) { // Nur die ersten 3 Pfade loggen, um das Log nicht zu überfluten
         $d_attr = $path->getAttribute('d');
         $d_preview = substr($d_attr, 0, 50) . (strlen($d_attr) > 50 ? '...' : '');
-        error_log("[YPrint Backend][smooth_svg] Pfad #$index: $d_preview");
+        error_log("[YPrint Backend][apply_svg_smoothing] Pfad #$index: $d_preview");
         
         // Diese Pfad-ID merken für Debug-Zwecke
         $path->setAttribute('data-debug-id', "path-$index");
@@ -567,40 +560,40 @@ foreach ($paths as $index => $path) {
 }
         
         // Fortschrittsprotokollierung
-        error_log("[YPrint Backend][smooth_svg] Beginne Pfadglättung mit Level $smooth_level%");
+        error_log("[YPrint Backend][apply_svg_smoothing] Beginne Pfadglättung mit Level $smooth_level%");
         
         // Verarbeite die Pfade
         $modified_elements = 0;
         
         // Je nach Glättungsgrad verschiedene Strategien anwenden
         if ($smooth_level < 30) {
-            error_log("[YPrint Backend][smooth_svg] Wende sanfte Glättung an (Level < 30%)");
+            error_log("[YPrint Backend][apply_svg_smoothing] Wende sanfte Glättung an (Level < 30%)");
             // Sanfte Glättung: Hauptsächlich Rundung und leichte Kurvenanpassungen
             $modified_elements += $this->apply_gentle_smoothing($paths, $smooth_level);
         } elseif ($smooth_level < 70) {
-            error_log("[YPrint Backend][smooth_svg] Wende mittlere Glättung an (Level < 70%)");
+            error_log("[YPrint Backend][apply_svg_smoothing] Wende mittlere Glättung an (Level < 70%)");
             // Mittlere Glättung: Intensivere Kurvenanpassungen und Punktreduktion
             $modified_elements += $this->apply_medium_smoothing($paths, $smooth_level);
             
             // Pfade gruppieren und zusammenführen bei mittleren Werten
             if ($smooth_level > 50) {
-                error_log("[YPrint Backend][smooth_svg] Versuche benachbarte Pfade zu verbinden (Level > 50%)");
+                error_log("[YPrint Backend][apply_svg_smoothing] Versuche benachbarte Pfade zu verbinden (Level > 50%)");
                 $this->merge_adjacent_paths($dom, $xpath, $smooth_level);
             }
         } else {
-            error_log("[YPrint Backend][smooth_svg] Wende aggressive Glättung an (Level >= 70%)");
+            error_log("[YPrint Backend][apply_svg_smoothing] Wende aggressive Glättung an (Level >= 70%)");
             // Starke Glättung: Dramatische Änderungen, Konvertieren von Linien in Kurven
             $modified_elements += $this->apply_aggressive_smoothing($paths, $smooth_level);
             
             // Pfade zusammenführen und Lücken schließen bei hohen Werten
-            error_log("[YPrint Backend][smooth_svg] Versuche benachbarte Pfade zu verbinden");
+            error_log("[YPrint Backend][apply_svg_smoothing] Versuche benachbarte Pfade zu verbinden");
             $this->merge_adjacent_paths($dom, $xpath, $smooth_level);
             
-            error_log("[YPrint Backend][smooth_svg] Versuche Lücken zu schließen");
+            error_log("[YPrint Backend][apply_svg_smoothing] Versuche Lücken zu schließen");
             $this->close_path_gaps($dom, $xpath, $smooth_level);
         }
         
-        error_log("[YPrint Backend][smooth_svg] Modifizierte Elemente: $modified_elements");
+        error_log("[YPrint Backend][apply_svg_smoothing] Modifizierte Elemente: $modified_elements");
         
         // Format-Optimierung
         $dom->preserveWhiteSpace = false;
@@ -611,7 +604,7 @@ foreach ($paths as $index => $path) {
         
         // Prüfen, ob das finale SVG korrekt gespeichert wurde
         if (empty($final_svg)) {
-            error_log("[YPrint Backend][smooth_svg] Leeres Ergebnis nach saveXML, gebe modifizierte String-Version zurück");
+            error_log("[YPrint Backend][apply_svg_smoothing] Leeres Ergebnis nach saveXML, gebe modifizierte String-Version zurück");
             return $svg_content; // Gebe die einfach modifizierte Version zurück
         }
         
@@ -620,26 +613,26 @@ foreach ($paths as $index => $path) {
         $final_size = strlen($final_svg);
         $size_ratio = $final_size / $original_size;
         
-        error_log("[YPrint Backend][smooth_svg] Erfolgreich abgeschlossen, SVG-Länge: $final_size (Original: $original_size), Verhältnis: $size_ratio");
+        error_log("[YPrint Backend][apply_svg_smoothing] Erfolgreich abgeschlossen, SVG-Länge: $final_size (Original: $original_size), Verhältnis: $size_ratio");
         
         // Wenn das Ergebnis zu groß ist, gebe die einfach modifizierte Version zurück
         if ($size_ratio > 2.0 || $final_size > 1000000) {
-            error_log("[YPrint Backend][smooth_svg] Ergebnis zu groß, gebe modifizierte String-Version zurück");
+            error_log("[YPrint Backend][apply_svg_smoothing] Ergebnis zu groß, gebe modifizierte String-Version zurück");
             return $svg_content;
         }
         
         // Abschließend weitere visuelle Verbesserungen hinzufügen
         if ($smooth_level >= 80) {
-            error_log("[YPrint Backend][smooth_svg] Füge finale visuelle Verbesserungen hinzu (Level >= 80%)");
+            error_log("[YPrint Backend][apply_svg_smoothing] Füge finale visuelle Verbesserungen hinzu (Level >= 80%)");
             $final_svg = $this->add_final_visual_enhancements($final_svg, $smooth_level);
         }
         
-        error_log("[YPrint Backend][smooth_svg] Verarbeitung erfolgreich abgeschlossen");
+        error_log("[YPrint Backend][apply_svg_smoothing] Verarbeitung erfolgreich abgeschlossen");
         return $final_svg;
         
     } catch (Exception $e) {
-        error_log("[YPrint Backend][smooth_svg] Ausnahme während der Glättung: " . $e->getMessage());
-        error_log("[YPrint Backend][smooth_svg] Stack Trace: " . $e->getTraceAsString());
+        error_log("[YPrint Backend][apply_svg_smoothing] Ausnahme während der Glättung: " . $e->getMessage());
+        error_log("[YPrint Backend][apply_svg_smoothing] Stack Trace: " . $e->getTraceAsString());
         // Bei Ausnahmen geben wir die einfach modifizierte Version zurück
         return $svg_content;
     }
