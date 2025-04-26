@@ -102,6 +102,11 @@ public function ajax_smooth_svg() {
     // Sicherheitscheck
     check_ajax_referer('yprint-designtool-nonce', 'nonce');
     
+    // --- NEUE LOGS HIER EINFÜGEN ---
+    error_log("[YPrint DEBUG] [AJAX] ajax_smooth_svg aufgerufen.");
+    error_log("[YPrint DEBUG] [AJAX] Empfangene POST-Daten: " . print_r($_POST, true));
+    // --- ENDE NEUE LOGS ---
+    
     // SVG-Daten prüfen
     if (empty($_POST['svg_content'])) {
         wp_send_json_error(array('message' => __('Kein SVG-Inhalt gefunden.', 'yprint-designtool')));
@@ -110,6 +115,11 @@ public function ajax_smooth_svg() {
     
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
+    
+    // --- NEUE LOGS HIER EINFÜGEN ---
+    error_log("[YPrint DEBUG] [AJAX] Aufruf von smooth_svg steht bevor.");
+    error_log("[YPrint DEBUG] [AJAX] Übergabe an smooth_svg - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
+    // --- ENDE NEUE LOGS ---
     
     // Log den empfangenen Level direkt am Eingang der Funktion
     error_log("[YPrint DEBUG] ===== BEGINN SVG GLÄTTUNG =====");
@@ -449,6 +459,11 @@ public function simplify_svg($svg_content, $detail_level = 5.0) {
  * @return string|bool Geglättetes SVG oder false bei Fehler
  */
 public function smooth_svg($svg_content, $smooth_level = 0) {
+    // --- NEUE LOGS HIER EINFÜGEN ---
+    error_log("[YPrint DEBUG] [smooth_svg] Funktion gestartet.");
+    error_log("[YPrint DEBUG] [smooth_svg] Empfangener Parameter - Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
+    // --- ENDE NEUE LOGS ---
+    
     if (empty($svg_content)) {
         error_log("[YPrint Backend][smooth_svg] Leerer SVG-Inhalt");
         return false;
