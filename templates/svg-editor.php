@@ -601,7 +601,7 @@ self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-
         });
     });
     
-    // SVG-Glättung optimiert: Nur bei explizitem Klick auf den "Anwenden"-Button
+// SVG-Glättung optimiert: Nur bei explizitem Klick auf den "Anwenden"-Button
 // Kein automatisches Triggern mehr durch Slider-Änderungen
 var lastRequestedLevel = -1;
 
@@ -636,6 +636,13 @@ $('#yprint-apply-smooth-btn').off().on('click', function() {
         return;
     }
     
+    // Stelle sicher, dass wir das originale SVG verwenden
+    var svgToProcess = safeOriginalSVG || currentSVG;
+    if (!svgToProcess) {
+        self.showMessage('<?php echo esc_js(__('Keine SVG-Daten zum Glätten vorhanden.', 'yprint-designtool')); ?>');
+        return;
+    }
+    
     // Exakter Wert wird ohne Modifikationen direkt an das Backend gesendet
     $.ajax({
         url: yprintSVGEnhancer.ajaxUrl,
@@ -643,7 +650,7 @@ $('#yprint-apply-smooth-btn').off().on('click', function() {
         data: {
             action: 'yprint_smooth_svg',
             nonce: yprintSVGEnhancer.nonce,
-            svg_content: safeOriginalSVG,
+            svg_content: svgToProcess,
             smooth_level: smoothLevel // Exakter Wert aus dem Slider
         },
         beforeSend: function() {
