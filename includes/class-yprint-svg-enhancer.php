@@ -925,9 +925,21 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
     $factor = ($smooth_level - 70) / 30; // 0-1 für Bereich 70-100
     $max_factor = min(1.0, max(0.4, $factor));
     
-    foreach ($paths as $path) {
+    error_log("[YPrint Debug] === START apply_aggressive_smoothing ===");
+    error_log("[YPrint Debug] Pfade für aggressive Glättung: " . $paths->length . ", Level: $smooth_level%, Faktor: $max_factor");
+    
+    $paths_checked = 0;
+    $paths_with_l_commands = 0;
+    $paths_with_c_commands = 0;
+    $commands_modified = 0;
+    
+    foreach ($paths as $index => $path) {
+        $paths_checked++;
         $d = $path->getAttribute('d');
-        if (empty($d)) continue;
+        if (empty($d)) {
+            error_log("[YPrint Debug] Pfad #$index: leeres d-Attribut, überspringe");
+            continue;
+        }
         
         // Stroke-Breite erhöhen für sichtbarere Linien
         $stroke_width = $path->getAttribute('stroke-width');
@@ -944,16 +956,33 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
         $path->setAttribute('stroke-linecap', 'round');
         $path->setAttribute('stroke-linejoin', 'round');
         
+        error_log("[YPrint Debug] Pfad #$index verarbeiten: d-Attribut Länge " . strlen($d) . " Zeichen");
+        
         // Parse the path into commands
         $commands = [];
         preg_match_all('/([A-Za-z])([^A-Za-z]*)/i', $d, $matches, PREG_SET_ORDER);
+        error_log("[YPrint Debug] Pfad #$index: " . count($matches) . " Kommandos gefunden");
         
         $new_d = '';
         $last_point = null;
+        $command_index = 0;
+        $l_commands_found = 0;
+        $c_commands_found = 0;
+        $path_commands_modified = 0;
         
         foreach ($matches as $match) {
             $command = $match[1];
             $params = trim($match[2]);
+            $command_index++;
+            
+            if (strtolower($command) === 'l') {
+                $l_commands_found++;
+            }
+            if (strtolower($command) === 'c') {
+                $c_commands_found++;
+            }
+            
+            $original_cmd_data = $command . ' ' . $params;
             
             // Linien in kubische Bezier-Kurven umwandeln für maximale Glättung
             if (strtolower($command) === 'l' && $last_point && mt_rand(0, 100) < ($factor * 80)) {
@@ -980,8 +1009,13 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
                     $c2y = $last_point[1] + 2 * ($y - $last_point[1]) / 3 + $offset_y;
                     
                     // L in C (kubische Bezier) umwandeln
-                    $new_d .= "C $c1x $c1y $c2x $c2y $x $y ";
+                    $bezier_cmd = "C $c1x $c1y $c2x $c2y $x $y ";
+                    $new_d .= $bezier_cmd;
                     $last_point = [$x, $y];
+                    
+                    error_log("[YPrint Debug] Pfad #$index, Kommando #$command_index: L->C Umwandlung. Vorher: '$original_cmd_data', Nachher: '$bezier_cmd'");
+                    $path_commands_modified++;
+                    $commands_modified++;
                     continue;
                 }
             }
@@ -991,6 +1025,8 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
                 $coords = preg_split('/[\s,]+/', $params);
                 
                 if (count($coords) >= 6) {
+                    $original_coords = $coords;
+                    
                     for ($i = 0; $i < count($coords); $i += 6) {
                         if (isset($coords[$i+5])) {
                             // Sehr starke Variation für dramatische Glättung
@@ -1002,8 +1038,18 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
                         }
                     }
                     
-                    $new_d .= "$command " . implode(' ', $coords) . ' ';
+                    $modified_c_cmd = "$command " . implode(' ', $coords) . ' ';
+                    $new_d .= $modified_c_cmd;
                     $last_point = [floatval($coords[count($coords)-2]), floatval($coords[count($coords)-1])];
+                    
+                    $are_coords_changed = implode(' ', $original_coords) !== implode(' ', $coords);
+                    if ($are_coords_changed) {
+                        error_log("[YPrint Debug] Pfad #$index, Kommando #$command_index: C-Kurve modifiziert");
+                        $path_commands_modified++;
+                        $commands_modified++;
+                    } else {
+                        error_log("[YPrint Debug] Pfad #$index, Kommando #$command_index: C-Kurve NICHT modifiziert trotz Versuch");
+                    }
                     continue;
                 }
             }
@@ -1011,16 +1057,22 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
             // Für alle Koordinaten: größere Variationen hinzufügen
             if (in_array(strtolower($command), ['m', 'l', 'h', 'v', 'c', 's', 'q', 't'])) {
                 $coords = preg_split('/[\s,]+/', $params);
+                $original_coords = $coords;
                 $processed = [];
+                $coords_changed = false;
                 
                 foreach ($coords as $i => $coord) {
                     if (is_numeric($coord)) {
                         $num = floatval($coord);
+                        $original_num = $num;
                         
                         // Bei den meisten Koordinaten Variation hinzufügen
                         if (mt_rand(0, 100) < ($factor * 70)) {
                             $variation = $num * $max_factor * 0.1 * (mt_rand(-15, 15) / 10);
                             $num += $variation;
+                            if ($original_num !== $num) {
+                                $coords_changed = true;
+                            }
                         }
                         
                         // Weniger Nachkommastellen für harmonischeres Aussehen
@@ -1031,13 +1083,20 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
                     }
                 }
                 
-                $new_d .= "$command " . implode(' ', $processed) . ' ';
+                $processed_cmd = "$command " . implode(' ', $processed) . ' ';
+                $new_d .= $processed_cmd;
                 
                 // Für Move und Line Kommandos den letzten Punkt aktualisieren
                 if (strtolower($command) === 'm' || strtolower($command) === 'l') {
                     if (count($processed) >= 2) {
                         $last_point = [floatval($processed[0]), floatval($processed[1])];
                     }
+                }
+                
+                if ($coords_changed) {
+                    error_log("[YPrint Debug] Pfad #$index, Kommando #$command_index: $command-Koordinaten modifiziert");
+                    $path_commands_modified++;
+                    $commands_modified++;
                 }
                 
                 continue;
@@ -1047,11 +1106,51 @@ private function apply_aggressive_smoothing($paths, $smooth_level) {
             $new_d .= "$command $params ";
         }
         
-        if (trim($new_d) !== $d) {
+        if ($l_commands_found > 0) {
+            $paths_with_l_commands++;
+        }
+        if ($c_commands_found > 0) {
+            $paths_with_c_commands++;
+        }
+        
+        $d_changed = trim($new_d) !== $d;
+        
+        if ($d_changed) {
+            error_log("[YPrint Debug] Pfad #$index: d-Attribut geändert! $path_commands_modified Kommandos modifiziert");
             $path->setAttribute('d', trim($new_d));
+            $path->setAttribute('data-smoothed', 'true');
+            $path->setAttribute('data-smooth-level', $smooth_level);
             $modified++;
+        } else {
+            error_log("[YPrint Debug] Pfad #$index: KEINE ÄNDERUNG im d-Attribut trotz $path_commands_modified modifizierter Kommandos!");
+            
+            if ($path_commands_modified > 0) {
+                // Notfall-Debugging: Genauere Analyse warum keine Änderung
+                error_log("[YPrint Debug] Original d: " . substr($d, 0, 50) . "...");
+                error_log("[YPrint Debug] Neues d: " . substr(trim($new_d), 0, 50) . "...");
+                
+                // Erzwinge minimale Änderung für Sichtbarkeit
+                if (preg_match('/([0-9]\.[0-9]+)/', $d, $matches, PREG_OFFSET_CAPTURE)) {
+                    $number = $matches[0][0];
+                    $position = $matches[0][1];
+                    $modified_d = substr($d, 0, $position) . (floatval($number) + 0.01) . substr($d, $position + strlen($number));
+                    
+                    error_log("[YPrint Debug] Pfad #$index: Erzwinge minimale Änderung von $number zu " . (floatval($number) + 0.01));
+                    $path->setAttribute('d', $modified_d);
+                    $path->setAttribute('data-smoothed', 'true');
+                    $path->setAttribute('data-smooth-level', $smooth_level);
+                    $path->setAttribute('data-forced-change', 'true');
+                    $modified++;
+                }
+            }
         }
     }
+    
+    error_log("[YPrint Debug] Aggressive Glättung: $paths_checked Pfade geprüft, $modified Pfade modifiziert");
+    error_log("[YPrint Debug] L-Kommandos in $paths_with_l_commands Pfaden gefunden");
+    error_log("[YPrint Debug] C-Kommandos in $paths_with_c_commands Pfaden gefunden");
+    error_log("[YPrint Debug] Insgesamt $commands_modified Kommandos modifiziert");
+    error_log("[YPrint Debug] === ENDE apply_aggressive_smoothing ===");
     
     return $modified;
 }
