@@ -684,6 +684,21 @@ $('#yprint-apply-smooth-btn').off().on('click', function() {
                             return;
                         }
                         
+                        // Visuelles Feedback für erfolgreiche Glättung
+                        $('#yprint-svg-canvas-container').append('<div class="svg-animation-overlay" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(33,150,243,0.2); z-index:100; pointer-events:none;"></div>');
+                        $('#yprint-svg-canvas-container svg').css({
+                            'transition': 'all 0.5s ease',
+                            'filter': 'drop-shadow(0 0 8px rgba(33,150,243,0.8))'
+                        });
+                        
+                        // Animation für alle Pfade
+                        setTimeout(function() {
+                            $('#yprint-svg-canvas-container .svg-animation-overlay').fadeOut(500, function() {
+                                $(this).remove();
+                            });
+                            $('#yprint-svg-canvas-container svg').css('filter', '');
+                        }, 1000);
+                        
                         self.addToHistory(currentSVG);
                         currentSVG = resultSVG;
                         self.updateSVGDisplay(currentSVG);

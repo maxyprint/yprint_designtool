@@ -117,13 +117,13 @@ public function ajax_smooth_svg() {
     error_log("[YPrint DEBUG] [AJAX] Starte SVG-Glättung mit Level: " . $smooth_level . ", SVG-Länge: " . strlen($svg_content));
     
     try {
-        // Prozess in separater Methode ausführen
-        $result = $this->process_svg_smoothing($svg_content, $smooth_level);
+        // Direkt die Glättungslogik aufrufen
+        $smoothed_svg = $this->_apply_smoothing_logic($svg_content, $smooth_level);
         
         // Erfolg zurückmelden
         wp_send_json_success(array(
-            'svg_content' => $result['svg_content'],
-            'debug_info' => $result['debug_info']
+            'svg_content' => $smoothed_svg,
+            'debug_info' => "Smoothing Level: $smooth_level, Applied successfully"
         ));
         
     } catch (Exception $e) {
@@ -143,14 +143,14 @@ public function ajax_smooth_svg() {
 }
 
 /**
- * Verarbeitet die SVG-Glättung mit allen Sicherheitsmaßnahmen
+ * Wendet die SVG-Glättungslogik an
  * 
  * @param string $svg_content Der SVG-Inhalt
  * @param int $smooth_level Glättungslevel (0-100)
- * @return array Array mit dem geglätteten SVG und Debug-Informationen
+ * @return string Geglättetes SVG oder Original bei Fehlern
  * @throws Exception Bei Fehlern im Glättungsprozess
  */
-private function process_svg_smoothing($svg_content, $smooth_level) {
+private function _apply_smoothing_logic($svg_content, $smooth_level) {
     // Log den empfangenen Level direkt am Eingang der Funktion
     error_log("[YPrint DEBUG] ===== BEGINN SVG GLÄTTUNG =====");
     error_log("[YPrint DEBUG] EINGANGSWERT: smooth_level=$smooth_level");
@@ -269,10 +269,7 @@ private function process_svg_smoothing($svg_content, $smooth_level) {
     error_log("[YPrint DEBUG] Änderungen vorgenommen: " . ($had_changes ? "Ja" : "Nein"));
     error_log("[YPrint DEBUG] ===== ENDE SVG GLÄTTUNG =====");
     
-    return array(
-        'svg_content' => $smoothed_svg,
-        'debug_info' => "Smoothing Level: $requested_level, Modified paths: $modified_paths_count, Processing time: $processing_time ms"
-    );
+    return $smoothed_svg; // Direkt das SVG zurückgeben statt eines Arrays
 }
 
 /**
