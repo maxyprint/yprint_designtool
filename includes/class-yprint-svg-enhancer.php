@@ -111,9 +111,15 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
-    // Erweitertes Backend-Logging für detaillierte Analyse
-    error_log("[YPrint Backend] SVG Glättung empfangen - Level: {$smooth_level}%, SVG-Länge: " . strlen($svg_content));
-    error_log("[YPrint Backend] SVG Anfang: " . substr($svg_content, 0, 500));
+    // Ausführliches Backend-Logging für detaillierte Analyse
+    error_log("[YPrint DEBUG] ===== BEGINN SVG GLÄTTUNG =====");
+    error_log("[YPrint DEBUG] Empfangen - Level: {$smooth_level}%, SVG-Länge: " . strlen($svg_content));
+    error_log("[YPrint DEBUG] Request-ID: " . uniqid() . " - Zeitstempel: " . date("Y-m-d H:i:s"));
+    
+    // SVG-Struktur analysieren und loggen
+    $has_svg_tag = (strpos($svg_content, '<svg') !== false && strpos($svg_content, '</svg>') !== false);
+    $path_count = substr_count($svg_content, '<path');
+    error_log("[YPrint DEBUG] SVG Struktur: Hat SVG-Tags: " . ($has_svg_tag ? "Ja" : "Nein") . ", Anzahl Pfade: " . $path_count);
     
     // Bei sehr niedrigen Werten (1-2%) zusätzlichen Sicherheitsmodus aktivieren
     $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
@@ -121,7 +127,7 @@ public function ajax_smooth_svg() {
     try {
         // Bei hohen Werten (>10%) zusätzliche Debug-Info
         if ($smooth_level > 10) {
-            error_log("[YPrint Backend] HOHER SMOOTHING-WERT: $smooth_level% - Besondere Vorsicht");
+            error_log("[YPrint DEBUG] HOHER SMOOTHING-WERT: $smooth_level% - Besondere Vorsicht aktiviert");
         }
         
         // Zuerst speichern wir immer das Original für den Sicherheitsvergleich
@@ -129,51 +135,66 @@ public function ajax_smooth_svg() {
         
         // SVG-Validitätsprüfung VOR dem Glätten
         if (!$this->is_valid_svg($original_svg)) {
-            error_log("[YPrint Backend] Eingangs-SVG ist ungültig");
+            error_log("[YPrint DEBUG] FEHLER: Eingangs-SVG ist ungültig");
             wp_send_json_error(array('message' => 'Eingangs-SVG ist ungültig. Bitte lade ein gültiges SVG hoch.'));
             return;
         }
         
-        // Log vor der Verarbeitung
-        error_log("[YPrint Backend] Starte smooth_svg() Methode mit Level $smooth_level%");
+        error_log("[YPrint DEBUG] SVG validiert - Starte Glättungsprozess mit Level $smooth_level%");
         
-        // SVG glätten
+        // Genaue Parameter für den Glättungsalgorithmus loggen
+        $factor = $smooth_level / 100; // Umwandlung von Prozent in Dezimalwert (0-1)
+        $settings = array(
+            'smooth_factor' => $factor,
+            'intensity' => $smooth_level,
+            'safety_mode' => $safety_mode
+        );
+        error_log("[YPrint DEBUG] Glättungsparameter: " . json_encode($settings));
+        
+        // SVG glätten mit Zeiterfassung
+        $start_time = microtime(true);
         $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
+        $end_time = microtime(true);
+        $processing_time = round(($end_time - $start_time) * 1000, 2); // in Millisekunden
         
-        // Log nach der Verarbeitung
-        error_log("[YPrint Backend] smooth_svg() Methode beendet, Ergebnis: " . ($smoothed_svg === false ? "FALSE" : "Erfolgreich (Länge: " . strlen($smoothed_svg) . ")"));
+        error_log("[YPrint DEBUG] Glättung abgeschlossen in $processing_time ms, Ergebnis: " . 
+                 ($smoothed_svg === false ? "FEHLGESCHLAGEN" : "Erfolgreich (Länge: " . strlen($smoothed_svg) . ")"));
         
         // Fehlererkennung
         if ($smoothed_svg === false) {
-            error_log("[YPrint Backend] Glättung schlug fehl und gab false zurück");
+            error_log("[YPrint DEBUG] KRITISCH: Glättung schlug fehl und gab false zurück");
             throw new Exception(__('Fehler beim Glätten der SVG-Pfade: Rückgabewert ist false', 'yprint-designtool'));
         }
         
         // Sicherheitscheck: Bei niedrigen Werten (1-2%) prüfen, ob das Ergebnis zu stark abweicht
         if ($safety_mode) {
-            // Einfache Prüfung auf drastische Änderungen
+            // Detaillierte Prüfung auf drastische Änderungen
             $original_length = strlen($original_svg);
             $smoothed_length = strlen($smoothed_svg);
             
-            // Wenn die Größenänderung mehr als 10% beträgt, ist das verdächtig
+            // Verschiedene Metriken zur Bestimmung der Änderungsstärke
             $size_change_percent = abs(($smoothed_length - $original_length) / $original_length) * 100;
-            error_log("[YPrint Backend] Sicherheitscheck: Original Länge: {$original_length}, Geglättet Länge: {$smoothed_length}, Änderung: {$size_change_percent}%");
+            $similarity = similar_text($original_svg, $smoothed_svg, $percent_similar);
+            $percent_different = 100 - $percent_similar;
             
-            if ($size_change_percent > 10 || $smoothed_length < 100) {
-                // Bei verdächtigen Änderungen das Original mit minimaler Anpassung zurückgeben
-                error_log("[YPrint Backend] Safety triggered: Änderung {$size_change_percent}% ist zu drastisch für Level {$smooth_level}%, verwende Original");
+            error_log("[YPrint DEBUG] Sicherheitsanalyse - Original: {$original_length} bytes, Geglättet: {$smoothed_length} bytes");
+            error_log("[YPrint DEBUG] Änderung: {$size_change_percent}%, Ähnlichkeit: {$percent_similar}%");
+            
+            // Wenn die Größenänderung zu drastisch ist oder die Ähnlichkeit zu gering
+            if ($size_change_percent > 10 || $percent_different > 20 || $smoothed_length < 100) {
+                error_log("[YPrint DEBUG] SICHERHEITSMECHANISMUS AKTIVIERT: Änderung zu drastisch für Level {$smooth_level}%");
+                error_log("[YPrint DEBUG] Verwende Original mit minimalen Anpassungen");
                 
                 // Bei sehr niedrigen Levels (1-2%) lieber ein fast unverändertes Original zurückgeben
-                // als ein potentiell fehlerhaftes Ergebnis
                 $smoothed_svg = $original_svg;
             }
         }
         
-        // Erweiterte Validitätsprüfung
+        // Validierung des Ergebnisses
         if (!$this->is_valid_svg($smoothed_svg)) {
-            error_log("[YPrint Backend] FEHLER: Geglättetes SVG ist ungültig. Gebe Original zurück.");
+            error_log("[YPrint DEBUG] KRITISCH: Geglättetes SVG ist ungültig");
             
-            // In diesem Fall senden wir eine Fehlermeldung zurück mit mehr Details
+            // Detaillierte XML-Fehleranalyse
             libxml_use_internal_errors(true);
             $dom = new DOMDocument();
             $result = @$dom->loadXML($smoothed_svg);
@@ -183,38 +204,77 @@ public function ajax_smooth_svg() {
             $error_details = "XML Parse-Fehler: ";
             foreach ($errors as $error) {
                 $error_details .= $error->message . " (Zeile: " . $error->line . ") ";
-                error_log("[YPrint Backend] XML-Fehler: " . $error->message . " (Zeile: " . $error->line . ")");
+                error_log("[YPrint DEBUG] XML-Fehler: " . $error->message . " (Zeile: " . $error->line . ")");
             }
+            
+            // Tag-Vergleich zwischen Original und Ergebnis für zusätzliche Diagnostik
+            $original_tags = $this->count_svg_tags($original_svg);
+            $result_tags = $this->count_svg_tags($smoothed_svg);
+            error_log("[YPrint DEBUG] Tag-Vergleich - Original: " . json_encode($original_tags) . 
+                     ", Ergebnis: " . json_encode($result_tags));
             
             wp_send_json_error(array(
                 'message' => __('Geglättetes SVG ist ungültig.', 'yprint-designtool') . ' ' . $error_details,
-                'debug' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . ", Result length: " . strlen($smoothed_svg)
+                'debug' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . 
+                          ", Result length: " . strlen($smoothed_svg)
             ));
             return;
         }
         
-        // Log vor dem Zurücksenden
-        error_log("[YPrint Backend] Sende erfolgreiches Ergebnis zurück, SVG-Anfang: " . substr($smoothed_svg, 0, 200));
+        // Erfolgsanalyse
+        $path_count_after = substr_count($smoothed_svg, '<path');
+        $had_changes = ($original_svg !== $smoothed_svg);
+        
+        error_log("[YPrint DEBUG] Analyse des Ergebnisses - Pfade vorher: $path_count, nachher: $path_count_after");
+        error_log("[YPrint DEBUG] Änderungen vorgenommen: " . ($had_changes ? "Ja" : "Nein"));
+        error_log("[YPrint DEBUG] ===== ENDE SVG GLÄTTUNG =====");
         
         // Erfolg zurückmelden
         wp_send_json_success(array(
             'svg_content' => $smoothed_svg,
-            'debug_info' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . ", Result length: " . strlen($smoothed_svg)
+            'debug_info' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . 
+                           ", Result length: " . strlen($smoothed_svg) . ", Processing time: $processing_time ms"
         ));
         
     } catch (Exception $e) {
-        error_log("[YPrint Backend] Exception: " . $e->getMessage());
+        error_log("[YPrint DEBUG] EXCEPTION: " . $e->getMessage());
         
-        // Ausführlichere Fehlermeldung zurücksenden
+        // Ausführliche Fehlermeldung mit Stack-Trace
         $trace = $e->getTraceAsString();
-        error_log("[YPrint Backend] Stack Trace: " . $trace);
+        error_log("[YPrint DEBUG] Stack Trace: " . $trace);
+        error_log("[YPrint DEBUG] ===== ENDE SVG GLÄTTUNG MIT FEHLER =====");
         
         wp_send_json_error(array(
             'message' => "Fehler: " . $e->getMessage(),
-            'trace' => substr($trace, 0, 500), // Begrenzte Länge für die Antwort
+            'trace' => substr($trace, 0, 500),
             'debug' => "Smoothing Level: $smooth_level"
         ));
     }
+}
+
+/**
+ * Zählt die Anzahl verschiedener Tags in einem SVG-String
+ * Hilfsmethode für erweiterte Debugging-Informationen
+ * 
+ * @param string $svg_content SVG-Inhalt
+ * @return array Assoziatives Array mit Tag-Namen und Anzahl
+ */
+private function count_svg_tags($svg_content) {
+    $tags = array();
+    $common_tags = array('svg', 'path', 'g', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'defs');
+    
+    foreach ($common_tags as $tag) {
+        $open_count = substr_count($svg_content, '<' . $tag);
+        $close_count = substr_count($svg_content, '</' . $tag);
+        
+        $tags[$tag] = array(
+            'open' => $open_count,
+            'close' => $close_count,
+            'balanced' => ($open_count === $close_count)
+        );
+    }
+    
+    return $tags;
 }
 
 /**
