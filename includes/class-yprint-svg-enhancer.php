@@ -774,7 +774,7 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
         }
         
         if ($new_d !== $d) {
-            // Erzwinge immer einen sichtbaren Unterschied im SVG
+            // Erzwinge immer einen sichtbaren Unterschied im SVG!
             $path->setAttribute('d', $new_d);
             $path->setAttribute('data-smoothed', 'true');
             $path->setAttribute('data-smooth-level', $smooth_level);
