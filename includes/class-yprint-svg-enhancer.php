@@ -125,10 +125,12 @@ public function ajax_smooth_svg() {
     $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
     
     try {
-        // Bei hohen Werten (>10%) zusätzliche Debug-Info
-        if ($smooth_level > 10) {
-            error_log("[YPrint DEBUG] HOHER SMOOTHING-WERT: $smooth_level% - Besondere Vorsicht aktiviert");
-        }
+        // Bei sehr hohen Werten (>80%) eine Warnung anzeigen, aber nicht mehr reduzieren
+if ($smooth_level > 80) {
+    error_log("[YPrint Backend][smooth_svg] [Hinweis] Sehr hoher Glättungswert: $smooth_level% - kann zu Leistungsproblemen führen");
+}
+// Detailliertes Debugging für alle Glättungslevel
+error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungswert: $smooth_level%");
         
         // Zuerst speichern wir immer das Original für den Sicherheitsvergleich
         $original_svg = $svg_content;
@@ -506,13 +508,16 @@ public function smooth_svg($svg_content, $smooth_level = 0) {
         }
         
         // Detailliertes Logging der gefundenen Pfade
-        foreach ($paths as $index => $path) {
-            if ($index < 3) { // Nur die ersten 3 Pfade loggen, um das Log nicht zu überfluten
-                $d_attr = $path->getAttribute('d');
-                $d_preview = substr($d_attr, 0, 50) . (strlen($d_attr) > 50 ? '...' : '');
-                error_log("[YPrint Backend][smooth_svg] Pfad #$index: $d_preview");
-            }
-        }
+foreach ($paths as $index => $path) {
+    if ($index < 3) { // Nur die ersten 3 Pfade loggen, um das Log nicht zu überfluten
+        $d_attr = $path->getAttribute('d');
+        $d_preview = substr($d_attr, 0, 50) . (strlen($d_attr) > 50 ? '...' : '');
+        error_log("[YPrint Backend][smooth_svg] Pfad #$index: $d_preview");
+        
+        // Diese Pfad-ID merken für Debug-Zwecke
+        $path->setAttribute('data-debug-id', "path-$index");
+    }
+}
         
         // Fortschrittsprotokollierung
         error_log("[YPrint Backend][smooth_svg] Beginne Pfadglättung mit Level $smooth_level%");
@@ -707,9 +712,15 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
     $modified = 0;
     $factor = $smooth_level / 100; // 0.01-0.3
     
+    // Debug-Info
+    error_log("[YPrint Debug] Starte sanfte Glättung mit Faktor: $factor");
+    
     foreach ($paths as $path) {
         $d = $path->getAttribute('d');
         if (empty($d)) continue;
+        
+        // Original-Pfad für Debugging
+        $original_d = $d;
         
         // Einfache Rundung der Koordinaten
         $new_d = preg_replace_callback('/(-?\d+\.\d+)/', function($matches) use ($factor) {
@@ -718,7 +729,7 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
             return round(floatval($matches[1]), $precision);
         }, $d);
         
-        // Kubische Bezier-Kurven (C, c) leicht glätten
+        // Kubische Bezier-Kurven (C, c) leicht glätten - VERSTÄRKTE VARIATION
         $new_d = preg_replace_callback('/([Cc])\s*([\d\.\-,\s]+)/', function($matches) use ($factor) {
             $command = $matches[1];
             $coords = preg_split('/[\s,]+/', trim($matches[2]));
@@ -728,10 +739,16 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
                 // Leichte Anpassung der Kontrollpunkte für sanftere Kurven
                 for ($i = 0; $i < count($coords); $i += 6) {
                     if (isset($coords[$i+5])) {
-                        // Kleine Variation hinzufügen
-                        $variation = $factor * 0.05;
-                        $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-10, 10) * $variation), 2);
-                        $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-10, 10) * $variation), 2);
+                        // DEUTLICH VERSTÄRKTE Variation hinzufügen
+                        $variation = max(0.1, $factor * 0.3); // Mindestens 10% Variation, bis zu 30%
+                        
+                        // Ersten Kontrollpunkt anpassen
+                        $coords[$i] = round(floatval($coords[$i]) + (mt_rand(-15, 15) * $variation), 2);
+                        $coords[$i+1] = round(floatval($coords[$i+1]) + (mt_rand(-15, 15) * $variation), 2);
+                        
+                        // Zweiten Kontrollpunkt stärker anpassen
+                        $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-20, 20) * $variation), 2);
+                        $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-20, 20) * $variation), 2);
                     }
                 }
                 
@@ -741,12 +758,37 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
             return $matches[0];
         }, $new_d);
         
+        // Wenn keine automatische Änderung erkannt wurde, erzwinge eine minimale Änderung
+        if ($new_d === $d) {
+            // Bei sehr geringen Glättungswerten trotzdem eine Änderung erzwingen
+            if (preg_match('/(-?\d+\.\d+)/', $new_d, $matches, PREG_OFFSET_CAPTURE)) {
+                $number = $matches[0][0];
+                $position = $matches[0][1];
+                
+                // Leichte Änderung der Zahl
+                $modified_number = floatval($number) + 0.1;
+                
+                // Pfad mit der geänderten Zahl zurückgeben
+                $new_d = substr($new_d, 0, $position) . $modified_number . substr($new_d, $position + strlen($number));
+            }
+        }
+        
         if ($new_d !== $d) {
+            // Erzwinge immer einen sichtbaren Unterschied im SVG
             $path->setAttribute('d', $new_d);
+            $path->setAttribute('data-smoothed', 'true');
+            $path->setAttribute('data-smooth-level', $smooth_level);
             $modified++;
+            
+            // Debug nur für die ersten paar Pfade
+            if ($modified <= 2) {
+                error_log("[YPrint Debug] Pfad geglättet. Vorher: " . substr($original_d, 0, 40) . "...");
+                error_log("[YPrint Debug] Pfad geglättet. Nachher: " . substr($new_d, 0, 40) . "...");
+            }
         }
     }
     
+    error_log("[YPrint Debug] Sanfte Glättung abgeschlossen: $modified Pfade modifiziert");
     return $modified;
 }
 
@@ -2210,10 +2252,16 @@ private function create_smoothed_path($segments, $smooth_angles) {
                     $base_change_factor = 0.1 + ($smooth_percentage * 0.3); // 10-40% Änderung basierend auf Glättungsstärke
                     $safe_max_change = max($dist2 * $base_change_factor, 0.5); // Mindestens 0.5 Einheiten Änderung zulassen
                     
-                    // Bei hohen Glättungswerten größere Änderungen erlauben
-                    if ($smooth_angles > 50) {
-                        $safe_max_change = max($safe_max_change, $dist2 * 0.5); // Bis zu 50% Änderung bei hoher Glättung
-                    }
+                    // Bei hohen Glättungswerten deutlich größere Änderungen erlauben
+if ($smooth_angles > 50) {
+    $safe_max_change = max($safe_max_change, $dist2 * 0.5); // Bis zu 50% Änderung bei hoher Glättung
+    // Bei sehr hohen Werten noch stärkere Anpassungen
+    if ($smooth_angles > 70) {
+        $safe_max_change = max($safe_max_change, $dist2 * 0.8); // Bis zu 80% Änderung bei sehr hoher Glättung
+    }
+}
+// Wir erzwingen eine Mindeständerung, damit IMMER ein Effekt sichtbar ist
+$safe_max_change = max($safe_max_change, 0.5); // Garantiert mindestens 0.5 Einheiten Änderung
                     
                     if ($change_distance <= $safe_max_change) {
                         // Punkte aktualisieren

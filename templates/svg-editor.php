@@ -486,6 +486,14 @@ $('#yprint-svg-canvas-container svg').css({
     'filter': 'drop-shadow(0 0 8px rgba(33,150,243,0.8))'
 });
 
+// Debug-Informationen direkt im SVG-Container anzeigen 
+$('#yprint-svg-canvas-container').append(
+    '<div class="debug-info" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px; border-radius:3px; font-size:12px; z-index:101;">' + 
+    'Glättungslevel: ' + smoothLevel + '% | ' +
+    'Pfade modifiziert: <span class="modifiedCount">...</span>' +
+    '</div>'
+);
+
 // Kurzer visueller Flash-Effekt
 $('#yprint-svg-canvas-container').css('background', 'rgba(255,255,255,0.9)');
 setTimeout(function() {
@@ -508,16 +516,29 @@ setTimeout(function() {
 // Update SVG mit Animation
 self.updateSVGDisplay(resultSVG);
 
-// Animation für alle Pfade
+// Animation für alle Pfade und Zählen der tatsächlich modifizierten Pfade
+var modifiedPathCount = 0;
 $('#yprint-svg-canvas-container svg path').each(function(i) {
-    var delay = i * 5; // Gestaffelte Animation
-    setTimeout(() => {
-        $(this).addClass('svg-modified');
-    }, delay);
-    setTimeout(() => {
-        $(this).removeClass('svg-modified');
-    }, delay + 1000);
+    // Prüfen, ob der Pfad tatsächlich geglättet wurde
+    if ($(this).attr('data-smoothed') === 'true') {
+        modifiedPathCount++;
+        
+        // Stärkere Animation für geglättete Pfade
+        var delay = i * 5; // Gestaffelte Animation
+        setTimeout(() => {
+            $(this).addClass('svg-modified');
+            $(this).css('stroke-width', parseFloat($(this).css('stroke-width') || 1) * 1.5);
+        }, delay);
+        setTimeout(() => {
+            $(this).removeClass('svg-modified');
+            $(this).css('stroke-width', ''); // Zurücksetzen auf Original
+        }, delay + 1500);
+    }
 });
+
+// Zeige an, wie viele Pfade modifiziert wurden
+$('.modifiedCount').text(modifiedPathCount);
+console.log('SVG-Glättung: ' + modifiedPathCount + ' Pfade wurden modifiziert');
 
 // Overlay entfernen
 setTimeout(function() {
