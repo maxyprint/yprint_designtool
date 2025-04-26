@@ -111,8 +111,9 @@ public function ajax_smooth_svg() {
     $svg_content = stripslashes($_POST['svg_content']);
     $smooth_level = isset($_POST['smooth_level']) ? intval($_POST['smooth_level']) : 0;
     
-    // Ausführliches Backend-Logging für detaillierte Analyse
+    // Log den empfangenen Level direkt am Eingang der Funktion
     error_log("[YPrint DEBUG] ===== BEGINN SVG GLÄTTUNG =====");
+    error_log("[YPrint DEBUG] EINGANGSWERT: smooth_level=$smooth_level");
     error_log("[YPrint DEBUG] Empfangen - Level: {$smooth_level}%, SVG-Länge: " . strlen($svg_content));
     error_log("[YPrint DEBUG] Request-ID: " . uniqid() . " - Zeitstempel: " . date("Y-m-d H:i:s"));
     
@@ -125,12 +126,10 @@ public function ajax_smooth_svg() {
     $safety_mode = ($smooth_level > 0 && $smooth_level <= 2);
     
     try {
-        // Bei sehr hohen Werten (>80%) eine Warnung anzeigen, aber nicht mehr reduzieren
-if ($smooth_level > 80) {
-    error_log("[YPrint Backend][smooth_svg] [Hinweis] Sehr hoher Glättungswert: $smooth_level% - kann zu Leistungsproblemen führen");
-}
-// Detailliertes Debugging für alle Glättungslevel
-error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungswert: $smooth_level%");
+        // Wert konsistent halten - KEINE zusätzliche Verarbeitung des Levels
+        // Der ursprüngliche Wert wird exakt so an die smooth_svg-Funktion weitergegeben
+        $requested_level = $smooth_level;
+        error_log("[YPrint DEBUG] Verarbeite mit EXAKTEM Glättungswert: $requested_level%");
         
         // Zuerst speichern wir immer das Original für den Sicherheitsvergleich
         $original_svg = $svg_content;
@@ -142,20 +141,20 @@ error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungs
             return;
         }
         
-        error_log("[YPrint DEBUG] SVG validiert - Starte Glättungsprozess mit Level $smooth_level%");
+        error_log("[YPrint DEBUG] SVG validiert - Starte Glättungsprozess mit Level $requested_level%");
         
         // Genaue Parameter für den Glättungsalgorithmus loggen
-        $factor = $smooth_level / 100; // Umwandlung von Prozent in Dezimalwert (0-1)
+        $factor = $requested_level / 100; // Umwandlung von Prozent in Dezimalwert (0-1)
         $settings = array(
             'smooth_factor' => $factor,
-            'intensity' => $smooth_level,
+            'intensity' => $requested_level,
             'safety_mode' => $safety_mode
         );
         error_log("[YPrint DEBUG] Glättungsparameter: " . json_encode($settings));
         
-        // SVG glätten mit Zeiterfassung
+        // SVG glätten mit Zeiterfassung - EXAKTEN Wert weitergeben
         $start_time = microtime(true);
-        $smoothed_svg = $this->smooth_svg($svg_content, $smooth_level);
+        $smoothed_svg = $this->smooth_svg($svg_content, $requested_level);
         $end_time = microtime(true);
         $processing_time = round(($end_time - $start_time) * 1000, 2); // in Millisekunden
         
@@ -184,13 +183,20 @@ error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungs
             
             // Wenn die Größenänderung zu drastisch ist oder die Ähnlichkeit zu gering
             if ($size_change_percent > 10 || $percent_different > 20 || $smoothed_length < 100) {
-                error_log("[YPrint DEBUG] SICHERHEITSMECHANISMUS AKTIVIERT: Änderung zu drastisch für Level {$smooth_level}%");
+                error_log("[YPrint DEBUG] SICHERHEITSMECHANISMUS AKTIVIERT: Änderung zu drastisch für Level {$requested_level}%");
                 error_log("[YPrint DEBUG] Verwende Original mit minimalen Anpassungen");
                 
                 // Bei sehr niedrigen Levels (1-2%) lieber ein fast unverändertes Original zurückgeben
-                $smoothed_svg = $original_svg;
+                $smoothed_svg = $this->force_minimal_svg_change($original_svg, $requested_level);
             }
         }
+        
+        // Füge kommentierte Pfad-Anzahl und den tatsächlich angewendeten Level hinzu
+        $modified_paths_count = $this->count_modified_paths($smoothed_svg);
+        error_log("[YPrint DEBUG] Anzahl modifizierter Pfade im Ergebnis: $modified_paths_count");
+        
+        // Füge den Kommentar mit dem EXAKTEN angeforderten Level hinzu
+        $smoothed_svg = str_replace('</svg>', "<!-- YPrint SVG Enhancer processed with level: $requested_level%, modified paths: $modified_paths_count -->\n</svg>", $smoothed_svg);
         
         // Validierung des Ergebnisses
         if (!$this->is_valid_svg($smoothed_svg)) {
@@ -217,7 +223,7 @@ error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungs
             
             wp_send_json_error(array(
                 'message' => __('Geglättetes SVG ist ungültig.', 'yprint-designtool') . ' ' . $error_details,
-                'debug' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . 
+                'debug' => "Smoothing Level: $requested_level, Original length: " . strlen($original_svg) . 
                           ", Result length: " . strlen($smoothed_svg)
             ));
             return;
@@ -234,8 +240,7 @@ error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungs
         // Erfolg zurückmelden
         wp_send_json_success(array(
             'svg_content' => $smoothed_svg,
-            'debug_info' => "Smoothing Level: $smooth_level, Original length: " . strlen($original_svg) . 
-                           ", Result length: " . strlen($smoothed_svg) . ", Processing time: $processing_time ms"
+            'debug_info' => "Smoothing Level: $requested_level, Modified paths: $modified_paths_count, Processing time: $processing_time ms"
         ));
         
     } catch (Exception $e) {
@@ -252,6 +257,33 @@ error_log("[YPrint Backend][smooth_svg] Verarbeite mit tatsächlichem Glättungs
             'debug' => "Smoothing Level: $smooth_level"
         ));
     }
+}
+
+/**
+ * Zählt die Anzahl der modifizierten Pfade im SVG
+ * 
+ * @param string $svg_content SVG-Inhalt
+ * @return int Anzahl der modifizierten Pfade
+ */
+private function count_modified_paths($svg_content) {
+    return substr_count($svg_content, 'data-smoothed="true"');
+}
+
+/**
+ * Erzwingt eine minimale Änderung am SVG für Sicherheitsrückfall
+ * 
+ * @param string $svg_content Original SVG-Inhalt
+ * @param int $level Glättungslevel für den Kommentar
+ * @return string Leicht modifiziertes SVG
+ */
+private function force_minimal_svg_change($svg_content, $level) {
+    // Kommentar hinzufügen
+    $modified_svg = str_replace('</svg>', "<!-- YPrint SVG Enhancer processed with minimal changes, requested level: $level% -->\n</svg>", $svg_content);
+    
+    // Attribut-Änderung, wenn möglich
+    $modified_svg = preg_replace('/<svg([^>]*)>/', '<svg$1 data-enhanced="minimal">', $modified_svg, 1);
+    
+    return $modified_svg;
 }
 
 /**
@@ -712,15 +744,36 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
     $modified = 0;
     $factor = $smooth_level / 100; // 0.01-0.3
     
-    // Debug-Info
-    error_log("[YPrint Debug] Starte sanfte Glättung mit Faktor: $factor");
+    // Erweiterte Debug-Info
+    error_log("[YPrint Debug] === START apply_gentle_smoothing ===");
+    error_log("[YPrint Debug] Pfade für sanfte Glättung: " . $paths->length . ", Level: $smooth_level%, Faktor: $factor");
     
-    foreach ($paths as $path) {
+    $paths_checked = 0;
+    $paths_with_data = 0;
+    $paths_with_bezier = 0;
+    
+    foreach ($paths as $index => $path) {
+        $paths_checked++;
         $d = $path->getAttribute('d');
-        if (empty($d)) continue;
+        
+        if (empty($d)) {
+            error_log("[YPrint Debug] Pfad #$index: leeres d-Attribut, überspringe");
+            continue;
+        }
+        
+        $paths_with_data++;
         
         // Original-Pfad für Debugging
         $original_d = $d;
+        $original_length = strlen($d);
+        error_log("[YPrint Debug] Pfad #$index: Länge = $original_length, Original = " . (substr($d, 0, 40) . "..."));
+        
+        // Prüfe auf C oder c Befehle (Bezier-Kurven)
+        $has_bezier = (strpos($d, 'C') !== false || strpos($d, 'c') !== false);
+        if ($has_bezier) {
+            $paths_with_bezier++;
+            error_log("[YPrint Debug] Pfad #$index: Enthält Bezier-Kurven");
+        }
         
         // Einfache Rundung der Koordinaten
         $new_d = preg_replace_callback('/(-?\d+\.\d+)/', function($matches) use ($factor) {
@@ -730,36 +783,74 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
         }, $d);
         
         // Kubische Bezier-Kurven (C, c) leicht glätten - VERSTÄRKTE VARIATION
-        $new_d = preg_replace_callback('/([Cc])\s*([\d\.\-,\s]+)/', function($matches) use ($factor) {
-            $command = $matches[1];
-            $coords = preg_split('/[\s,]+/', trim($matches[2]));
+        $bezier_modified = false;
+        $original_bezier_count = preg_match_all('/([Cc])\s*([\d\.\-,\s]+)/', $d, $bezier_matches);
+        
+        if ($original_bezier_count > 0) {
+            error_log("[YPrint Debug] Pfad #$index: $original_bezier_count Bezier-Befehle gefunden");
             
-            // Mindestens 6 Koordinaten für eine Bezier-Kurve
-            if (count($coords) >= 6) {
-                // Leichte Anpassung der Kontrollpunkte für sanftere Kurven
-                for ($i = 0; $i < count($coords); $i += 6) {
-                    if (isset($coords[$i+5])) {
-                        // DEUTLICH VERSTÄRKTE Variation hinzufügen
-                        $variation = max(0.1, $factor * 0.3); // Mindestens 10% Variation, bis zu 30%
-                        
-                        // Ersten Kontrollpunkt anpassen
-                        $coords[$i] = round(floatval($coords[$i]) + (mt_rand(-15, 15) * $variation), 2);
-                        $coords[$i+1] = round(floatval($coords[$i+1]) + (mt_rand(-15, 15) * $variation), 2);
-                        
-                        // Zweiten Kontrollpunkt stärker anpassen
-                        $coords[$i+2] = round(floatval($coords[$i+2]) + (mt_rand(-20, 20) * $variation), 2);
-                        $coords[$i+3] = round(floatval($coords[$i+3]) + (mt_rand(-20, 20) * $variation), 2);
+            $new_d = preg_replace_callback('/([Cc])\s*([\d\.\-,\s]+)/', function($matches) use ($factor, &$bezier_modified) {
+                $command = $matches[1];
+                $coords_str = trim($matches[2]);
+                $coords = preg_split('/[\s,]+/', $coords_str);
+                
+                error_log("[YPrint Debug] Bezier-Verarbeitung: Command=$command, Coords=" . implode(',', array_slice($coords, 0, min(6, count($coords)))));
+                
+                // Mindestens 6 Koordinaten für eine Bezier-Kurve
+                if (count($coords) >= 6) {
+                    $original_coords = $coords;
+                    
+                    // Leichte Anpassung der Kontrollpunkte für sanftere Kurven
+                    for ($i = 0; $i < count($coords); $i += 6) {
+                        if (isset($coords[$i+5])) {
+                            // DEUTLICH VERSTÄRKTE Variation hinzufügen
+                            $variation = max(0.1, $factor * 0.3); // Mindestens 10% Variation, bis zu 30%
+                            
+                            // Ersten Kontrollpunkt anpassen mit zufälliger Variation
+                            $rand1 = mt_rand(-15, 15);
+                            $rand2 = mt_rand(-15, 15);
+                            $change1 = $rand1 * $variation;
+                            $change2 = $rand2 * $variation;
+                            
+                            $old_coord1 = floatval($coords[$i]);
+                            $old_coord2 = floatval($coords[$i+1]);
+                            
+                            $coords[$i] = round($old_coord1 + $change1, 2);
+                            $coords[$i+1] = round($old_coord2 + $change2, 2);
+                            
+                            // Zweiten Kontrollpunkt stärker anpassen
+                            $rand3 = mt_rand(-20, 20);
+                            $rand4 = mt_rand(-20, 20);
+                            $change3 = $rand3 * $variation;
+                            $change4 = $rand4 * $variation;
+                            
+                            $old_coord3 = floatval($coords[$i+2]);
+                            $old_coord4 = floatval($coords[$i+3]);
+                            
+                            $coords[$i+2] = round($old_coord3 + $change3, 2);
+                            $coords[$i+3] = round($old_coord4 + $change4, 2);
+                            
+                            // Wenn irgendeine Koordinate geändert wurde, markiere als geändert
+                            if ($old_coord1 != $coords[$i] || $old_coord2 != $coords[$i+1] || 
+                                $old_coord3 != $coords[$i+2] || $old_coord4 != $coords[$i+3]) {
+                                $bezier_modified = true;
+                                error_log("[YPrint Debug] Bezier-Kurve modifiziert!");
+                            }
+                        }
                     }
+                    
+                    return $command . ' ' . implode(' ', $coords);
                 }
                 
-                return $command . ' ' . implode(' ', $coords);
-            }
-            
-            return $matches[0];
-        }, $new_d);
+                return $matches[0];
+            }, $new_d);
+        }
         
         // Wenn keine automatische Änderung erkannt wurde, erzwinge eine minimale Änderung
+        $force_modified = false;
         if ($new_d === $d) {
+            error_log("[YPrint Debug] Pfad #$index: Keine Änderung durch Regex-Ersetzungen, versuche erzwungene Änderung");
+            
             // Bei sehr geringen Glättungswerten trotzdem eine Änderung erzwingen
             if (preg_match('/(-?\d+\.\d+)/', $new_d, $matches, PREG_OFFSET_CAPTURE)) {
                 $number = $matches[0][0];
@@ -767,28 +858,50 @@ private function apply_gentle_smoothing($paths, $smooth_level) {
                 
                 // Leichte Änderung der Zahl
                 $modified_number = floatval($number) + 0.1;
+                error_log("[YPrint Debug] Pfad #$index: Erzwungene Änderung von $number zu $modified_number");
                 
                 // Pfad mit der geänderten Zahl zurückgeben
                 $new_d = substr($new_d, 0, $position) . $modified_number . substr($new_d, $position + strlen($number));
+                $force_modified = true;
+            } else {
+                error_log("[YPrint Debug] Pfad #$index: Konnte keine Zahl zum Ändern finden!");
             }
         }
         
+        // Final überprüfen, ob der Pfad wirklich verändert wurde
         if ($new_d !== $d) {
-            // Erzwinge immer einen sichtbaren Unterschied im SVG!
             $path->setAttribute('d', $new_d);
             $path->setAttribute('data-smoothed', 'true');
             $path->setAttribute('data-smooth-level', $smooth_level);
+            
+            if ($force_modified) {
+                $path->setAttribute('data-force-modified', 'true');
+            }
+            
+            if ($bezier_modified) {
+                $path->setAttribute('data-bezier-modified', 'true');
+            }
+            
             $modified++;
             
-            // Debug nur für die ersten paar Pfade
-            if ($modified <= 2) {
-                error_log("[YPrint Debug] Pfad geglättet. Vorher: " . substr($original_d, 0, 40) . "...");
-                error_log("[YPrint Debug] Pfad geglättet. Nachher: " . substr($new_d, 0, 40) . "...");
-            }
+            // Zeige Änderungsdetails
+            $new_length = strlen($new_d);
+            $diff = $new_length - $original_length;
+            error_log("[YPrint Debug] Pfad #$index GEÄNDERT: Neue Länge=$new_length, Diff=$diff");
+            error_log("[YPrint Debug] Original: " . substr($original_d, 0, 40) . "...");
+            error_log("[YPrint Debug] Neu: " . substr($new_d, 0, 40) . "...");
+        } else {
+            error_log("[YPrint Debug] Pfad #$index: KEINE ÄNDERUNG trotz Versuchen!");
         }
     }
     
-    error_log("[YPrint Debug] Sanfte Glättung abgeschlossen: $modified Pfade modifiziert");
+    error_log("[YPrint Debug] Sanfte Glättung Zusammenfassung:");
+    error_log("[YPrint Debug] - Geprüfte Pfade: $paths_checked");
+    error_log("[YPrint Debug] - Pfade mit Daten: $paths_with_data");
+    error_log("[YPrint Debug] - Pfade mit Bezier-Kurven: $paths_with_bezier");
+    error_log("[YPrint Debug] - Modifizierte Pfade: $modified");
+    error_log("[YPrint Debug] === ENDE apply_gentle_smoothing ===");
+    
     return $modified;
 }
 

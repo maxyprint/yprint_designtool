@@ -602,23 +602,41 @@ self.showMessage('<?php echo esc_js(__('SVG erfolgreich verschönert!', 'yprint-
     });
     
     // Wenn der Benutzer die Maus loslässt, speichern wir die Änderung
-    $('#yprint-smooth-level').off('change').on('change', function() {
-        var smoothLevel = parseInt($(this).val());
-        console.log("Slider Änderung bestätigt: " + smoothLevel + "%");
-        
-        if (smoothLevel === 0) {
-            // Bei 0% setzen wir auf das Original zurück
-            currentSVG = safeOriginalSVG;
-            self.updateSVGDisplay(currentSVG);
-            return;
-        }
-        
-        // Keine Begrenzung mehr für höhere Glättungswerte
-var actualSmoothLevel = smoothLevel;
-if (smoothLevel > 10) {
-    console.info("Hoher Glättungswert wird angewendet: " + smoothLevel + "%");
-}
-        
+// AJAX-Anfragen-Throttling mit Verzögerung
+var smoothingTimeout = null;
+var lastRequestedLevel = -1;
+
+$('#yprint-smooth-level').off('change').on('change', function() {
+    var smoothLevel = parseInt($(this).val());
+    console.log("Slider Änderung bestätigt: " + smoothLevel + "%");
+    
+    // Verhindere doppelte Anfragen mit dem gleichen Wert
+    if (smoothLevel === lastRequestedLevel) {
+        console.log("Ignoriere doppelte Anfrage mit Level " + smoothLevel + "%");
+        return;
+    }
+    lastRequestedLevel = smoothLevel;
+    
+    if (smoothLevel === 0) {
+        // Bei 0% setzen wir auf das Original zurück
+        currentSVG = safeOriginalSVG;
+        self.updateSVGDisplay(currentSVG);
+        return;
+    }
+    
+    // Lösche ausstehende Timeouts, um doppelte Anfragen zu verhindern
+    if (smoothingTimeout) {
+        clearTimeout(smoothingTimeout);
+    }
+    
+    // Keine Begrenzung mehr für höhere Glättungswerte
+    var actualSmoothLevel = smoothLevel;
+    if (smoothLevel > 10) {
+        console.info("Hoher Glättungswert wird angewendet: " + smoothLevel + "%");
+    }
+    
+    // Verzögere die AJAX-Anfrage um 200ms um "Rattereffekte" zu vermeiden
+    smoothingTimeout = setTimeout(function() {
         $.ajax({
             url: yprintSVGEnhancer.ajaxUrl,
             type: 'POST',
@@ -700,7 +718,8 @@ if (smoothLevel > 10) {
                 self.updateSVGDisplay(currentSVG);
             }
         });
-    });
+    }, 200);
+});
 });
             
             // Reset SVG button
