@@ -819,21 +819,102 @@ function startFallbackPolling() {
     debugLog('Starting fallback polling for Fabric.js...');
     
     let pollCount = 0;
-    const maxPolls = 20; // 10 Sekunden
+    const maxPolls = 40; // 20 Sekunden - längeres Timeout für CDN
     
     const pollInterval = setInterval(() => {
         pollCount++;
         debugLog(`Fallback poll attempt ${pollCount}/${maxPolls}`);
         
-        if (typeof window.fabric !== 'undefined') {
-            debugLog('Fabric.js found during fallback polling!');
+        // Erweiterte Prüfung
+        const fabricCheck = {
+            windowFabric: typeof window.fabric !== 'undefined',
+            canvasElement: !!document.querySelector('#octo-print-designer-canvas'),
+            canvasWithFabric: !!document.querySelector('#octo-print-designer-canvas').__fabric
+        };
+        
+        debugLog(`Poll ${pollCount} status:`, fabricCheck);
+        
+        if (fabricCheck.windowFabric) {
+            debugLog('✅ Fabric.js found during fallback polling!');
             clearInterval(pollInterval);
+            
+            // Prüfe ob Canvas bereits initialisiert ist
+            if (fabricCheck.canvasWithFabric) {
+                debugLog('Canvas already has Fabric instance');
+            } else {
+                debugLog('Fabric available but canvas not initialized');
+                // Versuche Canvas-Initialisierung
+                tryInitializeCanvas();
+            }
+            
             waitForDesigner();
         } else if (pollCount >= maxPolls) {
-            debugError('Fallback polling timeout - Fabric.js still not available');
+            debugError('Fallback polling timeout - Fabric.js still not available after', maxPolls * 500, 'ms');
+            debugError('Final state:', fabricCheck);
             clearInterval(pollInterval);
+            
+            // Als letzte Option: Zeige Benutzer-Nachricht
+            showFabricLoadingError();
         }
     }, 500);
+}
+
+function tryInitializeCanvas() {
+    debugLog('Attempting to initialize canvas with available Fabric.js...');
+    
+    const canvasElement = document.querySelector('#octo-print-designer-canvas');
+    if (canvasElement && typeof window.fabric !== 'undefined' && !canvasElement.__fabric) {
+        try {
+            const fabricCanvas = new window.fabric.Canvas('octo-print-designer-canvas', {
+                width: canvasElement.offsetWidth || 800,
+                height: canvasElement.offsetHeight || 600,
+                backgroundColor: '#ffffff'
+            });
+            
+            debugLog('Canvas initialized successfully with Fabric.js');
+            return true;
+        } catch (e) {
+            debugError('Failed to initialize canvas:', e);
+        }
+    }
+    return false;
+}
+
+function showFabricLoadingError() {
+    debugError('Showing user error message for Fabric.js loading failure');
+    
+    // Erstelle Benutzer-freundliche Fehlermeldung
+    const designerContainer = document.querySelector('.octo-print-designer');
+    if (designerContainer) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff6b6b;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+        `;
+        errorDiv.innerHTML = `
+            <h3>Designer Loading Error</h3>
+            <p>The design editor could not be loaded properly.</p>
+            <button onclick="window.location.reload()" style="
+                background: white;
+                color: #ff6b6b;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 10px;
+            ">Reload Page</button>
+        `;
+        
+        designerContainer.appendChild(errorDiv);
+    }
 }
     
     console.log('%c=== DESIGN LOADER DEBUG END ===', 'color: blue; font-weight: bold;');

@@ -1,5 +1,6 @@
 <?php
 
+
 class Octo_Print_Designer_Designer {
 
     public function __construct() {
@@ -16,6 +17,7 @@ class Octo_Print_Designer_Designer {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_user_designs', $this, 'get_user_designs');
     }
 
+    
     /**
      * Create the database table on plugin activation
      */
@@ -64,6 +66,8 @@ class Octo_Print_Designer_Designer {
     
         wp_enqueue_script('octo-print-designer-designer');
 
+
+        
 // Fabric.js global verfügbar machen NACH dem Designer Bundle
 wp_add_inline_script('octo-print-designer-designer', '
     console.log("Checking Fabric.js availability after script load:", typeof window.fabric);
@@ -138,12 +142,185 @@ function tryWebpackExtraction() {
     
     return false;
 }
+
+// Stelle sicher dass Designer-Initialisierung nach DOM-Load stattfindet
+console.log("Setting up designer initialization...");
+
+function initializeDesignerAfterDOM() {
+    console.log("DOM ready, initializing designer...");
+    
+    // Warte auf alle Scripts
+    setTimeout(() => {
+        console.log("All scripts should be loaded, checking designer state...");
+        
+        const designerContainer = document.querySelector(".octo-print-designer");
+        if (!designerContainer) {
+            console.error("Designer container not found in DOM");
+            return;
+        }
+        
+        // Prüfe ob Designer-Bundle geladen ist
+        const designerScripts = Array.from(document.scripts).filter(script => 
+            script.src && script.src.includes("designer.bundle")
+        );
+        
+        console.log("Designer bundle scripts found:", designerScripts.length);
+        
+        if (designerScripts.length === 0) {
+            console.error("Designer bundle script not found");
+            return;
+        }
+        
+        // Prüfe ob Designer bereits initialisiert ist
+        const canvas = document.querySelector("#octo-print-designer-canvas");
+        if (canvas && canvas.__fabric) {
+            console.log("Designer already initialized");
+            extractFabricFromExistingCanvas();
+        } else {
+            console.log("Designer not initialized, waiting for automatic initialization...");
+            
+            // Überwache Designer-Initialisierung
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "attributes" && mutation.target.id === "octo-print-designer-canvas") {
+                        console.log("Canvas attributes changed, checking for Fabric...");
+                        if (mutation.target.__fabric) {
+                            console.log("Fabric instance detected on canvas!");
+                            extractFabricFromExistingCanvas();
+                            observer.disconnect();
+                        }
+                    }
+                });
+            });
+            
+            if (canvas) {
+                observer.observe(canvas, { 
+                    attributes: true, 
+                    attributeOldValue: true 
+                });
+            }
+            
+            // Timeout für Observer
+            setTimeout(() => {
+                observer.disconnect();
+                console.log("Canvas observer timeout");
+            }, 10000);
+        }
+    }, 1000);
+}
+
+function extractFabricFromExistingCanvas() {
+    const canvas = document.querySelector("#octo-print-designer-canvas");
+    if (canvas && canvas.__fabric) {
+        console.log("Extracting Fabric from existing canvas...");
+        
+        const fabricInstance = canvas.__fabric;
+        window.fabric = {
+            Canvas: fabricInstance.constructor,
+            Image: fabricInstance.constructor.Image || createImageMock(),
+            util: fabricInstance.constructor.util || {},
+            Object: fabricInstance.constructor.Object || class FabricObject {},
+            filters: fabricInstance.constructor.filters || {},
+            getInstances: function() {
+                return [fabricInstance];
+            }
+        };
+        
+        console.log("Fabric extracted successfully from existing canvas");
+        window.dispatchEvent(new CustomEvent("fabricReady", { 
+            detail: { source: "existing_canvas" } 
+        }));
+        
+        return true;
+    }
+    return false;
+}
+
+// Starte Initialisierung wenn DOM bereit ist
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeDesignerAfterDOM);
+} else {
+    initializeDesignerAfterDOM();
+}
         
         // Versuche sofortige Extraktion
         if (!tryWebpackExtraction()) {
             console.log("Immediate webpack extraction failed, setting up canvas watcher...");
             
-            // Alternative: Warte auf DesignerWidget Initialisierung
+            // Prüfe zuerst ob Designer überhaupt initialisiert wird
+console.log("Checking if designer is properly initialized...");
+
+function checkDesignerInitialization() {
+    const designerElement = document.querySelector(".octo-print-designer");
+    const canvasElement = document.querySelector("#octo-print-designer-canvas");
+    
+    console.log("Designer initialization check:", {
+        designerElement: !!designerElement,
+        canvasElement: !!canvasElement,
+        canvasWidth: canvasElement?.width || 0,
+        canvasHeight: canvasElement?.height || 0,
+        canvasContext: canvasElement ? !!canvasElement.getContext("2d") : false
+    });
+    
+    // Prüfe ob DOM-Ereignisse auf Designer-Elementen gebunden sind
+    if (designerElement) {
+        const hasEventListeners = designerElement._eventsCount || 
+                                 Object.keys(designerElement).some(key => key.startsWith("on")) ||
+                                 designerElement.onclick !== null;
+        console.log("Designer has event listeners:", hasEventListeners);
+    }
+    
+    return designerElement && canvasElement;
+}
+
+function forceDesignerInitialization() {
+    console.log("Attempting to force designer initialization...");
+    
+    // Prüfe ob DesignerWidget Klasse verfügbar ist
+    if (typeof window.DesignerWidget !== "undefined") {
+        console.log("DesignerWidget class found, creating instance...");
+        try {
+            new window.DesignerWidget();
+            console.log("DesignerWidget instance created successfully");
+        } catch (e) {
+            console.error("Failed to create DesignerWidget instance:", e);
+        }
+    } else {
+        console.log("DesignerWidget class not found, checking for initialization functions...");
+        
+        // Suche nach Designer-Initialisierungs-Funktionen
+        const designerFunctions = Object.keys(window).filter(key => 
+            key.toLowerCase().includes("designer") && 
+            typeof window[key] === "function"
+        );
+        console.log("Found designer-related functions:", designerFunctions);
+        
+        // Versuche diese Funktionen aufzurufen
+        designerFunctions.forEach(funcName => {
+            try {
+                console.log(`Attempting to call ${funcName}...`);
+                window[funcName]();
+            } catch (e) {
+                console.log(`Failed to call ${funcName}:`, e.message);
+            }
+        });
+    }
+}
+
+// Prüfe Designer-Initialisierung
+if (!checkDesignerInitialization()) {
+    console.log("Designer not properly initialized, attempting to force initialization...");
+    forceDesignerInitialization();
+    
+    // Warte kurz und prüfe erneut
+    setTimeout(() => {
+        if (!checkDesignerInitialization()) {
+            console.error("Designer initialization failed even after forcing");
+        }
+    }, 1000);
+}
+
+// Alternative: Warte auf DesignerWidget Initialisierung
 let checkCount = 0;
 const maxChecks = 60; // 30 Sekunden
 const checkInterval = setInterval(() => {
@@ -237,6 +414,77 @@ const checkInterval = setInterval(() => {
         clearInterval(checkInterval);
     }
 }, 500);
+
+// Fallback: Lade Fabric.js von CDN falls alle anderen Methoden fehlschlagen
+function loadFabricFromCDN() {
+    console.log("Loading Fabric.js from CDN as fallback...");
+    
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js";
+    script.crossOrigin = "anonymous";
+    
+    script.onload = function() {
+        console.log("Fabric.js loaded from CDN successfully");
+        
+        if (typeof window.fabric !== "undefined") {
+            console.log("Fabric.js now available globally via CDN");
+            window.dispatchEvent(new CustomEvent("fabricReady", { 
+                detail: { source: "cdn_fallback" } 
+            }));
+            
+            // Initialisiere Canvas falls noch nicht geschehen
+            setTimeout(() => {
+                initializeCanvasWithFabric();
+            }, 100);
+        }
+    };
+    
+    script.onerror = function() {
+        console.error("Failed to load Fabric.js from CDN");
+        
+        // Als allerletzte Option: Minimales Mock
+        window.fabric = createMinimalFabricMock();
+        window.dispatchEvent(new CustomEvent("fabricReady", { 
+            detail: { source: "final_mock" } 
+        }));
+    };
+    
+    document.head.appendChild(script);
+}
+
+function initializeCanvasWithFabric() {
+    const canvasElement = document.querySelector("#octo-print-designer-canvas");
+    
+    if (canvasElement && typeof window.fabric !== "undefined" && !canvasElement.__fabric) {
+        console.log("Initializing canvas with Fabric.js...");
+        
+        try {
+            const fabricCanvas = new window.fabric.Canvas("octo-print-designer-canvas", {
+                width: canvasElement.offsetWidth || 800,
+                height: canvasElement.offsetHeight || 600,
+                backgroundColor: "#ffffff"
+            });
+            
+            console.log("Canvas initialized with Fabric.js successfully");
+            
+            // Trigger erneutes fabricReady Event
+            window.dispatchEvent(new CustomEvent("fabricReady", { 
+                detail: { source: "manual_canvas_init" } 
+            }));
+            
+        } catch (e) {
+            console.error("Failed to initialize canvas with Fabric.js:", e);
+        }
+    }
+}
+
+// CDN Fallback nach 10 Sekunden wenn immer noch kein Fabric
+setTimeout(() => {
+    if (typeof window.fabric === "undefined") {
+        console.log("Fabric.js still not available after 10 seconds, trying CDN fallback...");
+        loadFabricFromCDN();
+    }
+}, 10000);
 
 // Hilfsfunktionen
 function createImageMock() {
