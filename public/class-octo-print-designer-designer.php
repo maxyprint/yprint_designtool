@@ -80,14 +80,33 @@ class Octo_Print_Designer_Designer {
             }
         }
     
-        // JavaScript-Variablen für Auto-Loading bereitstellen
-        wp_add_inline_script('octo-print-designer-designer', '
-            window.octoPrintDesignerAutoLoad = ' . json_encode([
-                'designId' => $design_id,
-                'designData' => $design_data,
-                'hasDesignToLoad' => !is_null($design_data)
-            ]) . ';
-        ', 'before');
+        // Debug-Ausgabe für Design-Loading
+error_log('=== SHORTCODE DEBUG ===');
+error_log('design_id from URL: ' . ($design_id ? $design_id : 'none'));
+error_log('design_data available: ' . (!is_null($design_data) ? 'yes' : 'no'));
+
+if ($design_data) {
+    error_log('Design data keys: ' . implode(', ', array_keys($design_data)));
+    error_log('Design data size: ' . strlen($design_data['design_data']) . ' characters');
+}
+
+// JavaScript-Variablen für Auto-Loading bereitstellen
+$auto_load_data = [
+    'designId' => $design_id,
+    'designData' => $design_data,
+    'hasDesignToLoad' => !is_null($design_data),
+    'debug' => [
+        'timestamp' => time(),
+        'user_id' => get_current_user_id(),
+        'has_design_data' => !is_null($design_data),
+        'design_data_length' => $design_data ? strlen($design_data['design_data']) : 0
+    ]
+];
+
+wp_add_inline_script('octo-print-designer-designer', '
+    window.octoPrintDesignerAutoLoad = ' . json_encode($auto_load_data) . ';
+    console.log("Auto-load data prepared:", window.octoPrintDesignerAutoLoad);
+', 'before');
     
         ob_start();
         extract($atts);
@@ -389,41 +408,80 @@ class Octo_Print_Designer_Designer {
         ));
     }
 
-    /**
-     * Handle design loading request
-     */
     public function handle_load_design() {
+        error_log('=== DESIGN LOAD DEBUG START ===');
+        
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+            error_log('DESIGN LOAD ERROR: Security check failed');
             wp_send_json_error(array(
-                'message' => __('Security check failed', 'octo-print-designer')
+                'message' => __('Security check failed', 'octo-print-designer'),
+                'debug' => 'nonce_verification_failed'
             ));
         }
-
+    
         // Check if user is logged in
         if (!is_user_logged_in()) {
+            error_log('DESIGN LOAD ERROR: User not logged in');
             wp_send_json_error(array(
-                'message' => __('You must be logged in to load designs', 'octo-print-designer')
+                'message' => __('You must be logged in to load designs', 'octo-print-designer'),
+                'debug' => 'user_not_logged_in'
             ));
         }
-
+    
         // Validate design ID
         if (!isset($_POST['design_id'])) {
+            error_log('DESIGN LOAD ERROR: No design ID provided');
             wp_send_json_error(array(
-                'message' => __('No design ID provided', 'octo-print-designer')
+                'message' => __('No design ID provided', 'octo-print-designer'),
+                'debug' => 'no_design_id'
             ));
         }
-
+    
         $design_id = absint($_POST['design_id']);
-        $design = $this->get_design_from_db($design_id, get_current_user_id());
-
+        $user_id = get_current_user_id();
+        
+        error_log("DESIGN LOAD: Loading design ID {$design_id} for user {$user_id}");
+        
+        $design = $this->get_design_from_db($design_id, $user_id);
+    
         if (is_wp_error($design)) {
+            error_log('DESIGN LOAD ERROR: ' . $design->get_error_message());
             wp_send_json_error(array(
-                'message' => $design->get_error_message()
+                'message' => $design->get_error_message(),
+                'debug' => 'database_error'
             ));
         }
-
-        wp_send_json_success($design);
+    
+        error_log('DESIGN LOAD SUCCESS: Design data retrieved');
+        error_log('Design data keys: ' . implode(', ', array_keys($design)));
+        error_log('Design data size: ' . strlen($design['design_data']) . ' characters');
+        error_log('First 200 chars of design_data: ' . substr($design['design_data'], 0, 200));
+        
+        // Test JSON validity
+        $test_decode = json_decode($design['design_data'], true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('DESIGN LOAD ERROR: Invalid JSON in design_data - ' . json_last_error_msg());
+            wp_send_json_error(array(
+                'message' => 'Invalid design data format',
+                'debug' => 'invalid_json',
+                'json_error' => json_last_error_msg()
+            ));
+        }
+        
+        error_log('DESIGN LOAD: JSON validation passed');
+        error_log('=== DESIGN LOAD DEBUG END ===');
+    
+        wp_send_json_success(array(
+            'design' => $design,
+            'debug' => array(
+                'design_id' => $design_id,
+                'user_id' => $user_id,
+                'design_data_length' => strlen($design['design_data']),
+                'has_variation_images' => isset($test_decode['variationImages']),
+                'variation_images_count' => isset($test_decode['variationImages']) ? count($test_decode['variationImages']) : 0
+            )
+        ));
     }
 
     /**

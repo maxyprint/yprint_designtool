@@ -1,145 +1,269 @@
-// Design Auto-Loader Script
+// Design Auto-Loader Script mit umfassendem Debugging
 (function() {
     'use strict';
     
-    console.log('Design Auto-Loader initialized');
+    console.log('%c=== DESIGN LOADER DEBUG START ===', 'color: blue; font-weight: bold;');
+    console.log('Design Auto-Loader initialized at:', new Date().toISOString());
+    
+    // Debug-Hilfsfunktionen
+    function debugLog(message, data = null) {
+        console.log('%c[DESIGN-LOADER]', 'color: green;', message, data || '');
+    }
+    
+    function debugError(message, error = null) {
+        console.error('%c[DESIGN-LOADER ERROR]', 'color: red;', message, error || '');
+    }
+    
+    function debugWarn(message, data = null) {
+        console.warn('%c[DESIGN-LOADER WARNING]', 'color: orange;', message, data || '');
+    }
     
     // Warte bis Designer geladen ist
     function waitForDesigner() {
-        if (typeof window.DesignerWidget !== 'undefined' || 
-            document.querySelector('.octo-print-designer')) {
-            
-            console.log('Designer found, checking for auto-load data');
+        debugLog('Waiting for designer...');
+        
+        const designerElement = document.querySelector('.octo-print-designer');
+        const canvasElement = document.querySelector('#octo-print-designer-canvas');
+        
+        debugLog('Designer element found:', !!designerElement);
+        debugLog('Canvas element found:', !!canvasElement);
+        debugLog('Fabric.js available:', typeof window.fabric !== 'undefined');
+        debugLog('Auto-load data available:', !!window.octoPrintDesignerAutoLoad);
+        
+        if (designerElement && canvasElement && typeof window.fabric !== 'undefined') {
+            debugLog('All requirements met, checking for auto-load data');
             
             // Prüfe auf Auto-Load Daten
-            if (window.octoPrintDesignerAutoLoad && 
-                window.octoPrintDesignerAutoLoad.hasDesignToLoad) {
+            if (window.octoPrintDesignerAutoLoad) {
+                debugLog('Auto-load data found:', window.octoPrintDesignerAutoLoad);
                 
-                console.log('Auto-loading design:', window.octoPrintDesignerAutoLoad);
-                loadDesignFromData(window.octoPrintDesignerAutoLoad.designData);
+                if (window.octoPrintDesignerAutoLoad.hasDesignToLoad) {
+                    debugLog('Design data available, starting load process');
+                    loadDesignFromData(window.octoPrintDesignerAutoLoad.designData);
+                } else {
+                    debugWarn('No design data to load');
+                }
+            } else {
+                debugWarn('No auto-load data available');
             }
         } else {
+            debugLog('Requirements not met, retrying in 500ms');
             setTimeout(waitForDesigner, 500);
         }
     }
     
     function loadDesignFromData(designData) {
         try {
-            console.log('Loading design from server data:', designData);
+            debugLog('=== LOAD DESIGN FROM DATA START ===');
+            debugLog('Design data received:', designData);
+            
+            if (!designData) {
+                debugError('No design data provided');
+                return;
+            }
+            
+            // Prüfe design_data Feld
+            if (!designData.design_data) {
+                debugError('No design_data field in design object');
+                return;
+            }
+            
+            debugLog('Raw design_data field:', designData.design_data);
+            debugLog('design_data type:', typeof designData.design_data);
+            debugLog('design_data length:', designData.design_data.length);
             
             // Parse design_data JSON
             let parsedDesignData;
             try {
-                parsedDesignData = typeof designData.design_data === 'string' 
-                    ? JSON.parse(designData.design_data) 
-                    : designData.design_data;
+                if (typeof designData.design_data === 'string') {
+                    debugLog('Parsing design_data from string...');
+                    parsedDesignData = JSON.parse(designData.design_data);
+                } else {
+                    debugLog('Using design_data as object...');
+                    parsedDesignData = designData.design_data;
+                }
+                
+                debugLog('Parsed design data:', parsedDesignData);
+                debugLog('Parsed design data keys:', Object.keys(parsedDesignData));
+                
             } catch (e) {
-                console.error('Error parsing design data:', e);
+                debugError('Error parsing design data JSON:', e);
+                debugError('Raw design_data that failed to parse:', designData.design_data);
                 return;
             }
             
             // Warte auf Canvas
+            debugLog('Waiting for canvas to be ready...');
             waitForCanvas(function() {
                 applyDesignToCanvas(parsedDesignData, designData);
             });
             
         } catch (error) {
-            console.error('Error in loadDesignFromData:', error);
+            debugError('Error in loadDesignFromData:', error);
         }
     }
     
     function waitForCanvas(callback) {
+        debugLog('Checking canvas availability...');
+        
         const canvas = document.querySelector('#octo-print-designer-canvas');
-        if (canvas && window.fabric) {
-            // Canvas gefunden, kurz warten damit es initialisiert ist
+        const fabricCanvas = window.fabric && window.fabric.Canvas.getInstances()[0];
+        
+        debugLog('Canvas element found:', !!canvas);
+        debugLog('Fabric canvas instance found:', !!fabricCanvas);
+        
+        if (canvas && fabricCanvas) {
+            debugLog('Canvas ready, executing callback after 1s delay');
             setTimeout(callback, 1000);
         } else {
+            debugLog('Canvas not ready, retrying in 500ms');
             setTimeout(() => waitForCanvas(callback), 500);
         }
     }
     
     function applyDesignToCanvas(parsedDesignData, designData) {
         try {
-            console.log('Applying design to canvas:', parsedDesignData);
+            debugLog('=== APPLY DESIGN TO CANVAS START ===');
+            debugLog('Parsed design data for application:', parsedDesignData);
             
             // Template laden falls verfügbar
             if (parsedDesignData.templateId) {
+                debugLog('Template ID found:', parsedDesignData.templateId);
                 triggerTemplateLoad(parsedDesignData.templateId);
+            } else {
+                debugWarn('No template ID in design data');
             }
             
             // Variation Images verarbeiten
             if (parsedDesignData.variationImages) {
+                debugLog('Variation images found:', parsedDesignData.variationImages);
+                debugLog('Number of variation image entries:', Object.keys(parsedDesignData.variationImages).length);
+                
                 setTimeout(() => {
                     processVariationImages(parsedDesignData.variationImages);
-                }, 2000); // Warte bis Template geladen ist
+                }, 3000); // Längere Wartezeit für Template-Loading
+            } else {
+                debugWarn('No variation images in design data');
             }
             
             // Design Name setzen
             if (designData.name) {
+                debugLog('Setting design name:', designData.name);
                 const nameInput = document.getElementById('designName');
                 if (nameInput) {
                     nameInput.value = designData.name;
+                    debugLog('Design name set successfully');
+                } else {
+                    debugWarn('Design name input not found');
                 }
             }
             
             // URL bereinigen
             if (window.history && window.history.replaceState) {
+                debugLog('Cleaning URL parameters');
                 window.history.replaceState({}, '', window.location.pathname);
             }
             
+            debugLog('=== APPLY DESIGN TO CANVAS END ===');
+            
         } catch (error) {
-            console.error('Error applying design to canvas:', error);
+            debugError('Error applying design to canvas:', error);
         }
     }
     
     function triggerTemplateLoad(templateId) {
-        // Simuliere Template-Auswahl durch Klick
-        const templateElements = document.querySelectorAll('.library-item');
-        templateElements.forEach(element => {
-            if (element.dataset.templateId === templateId) {
-                element.click();
+        debugLog('Triggering template load for ID:', templateId);
+        
+        // Verschiedene Selektoren ausprobieren
+        const selectors = [
+            `[data-template-id="${templateId}"]`,
+            `.library-item[data-template-id="${templateId}"]`,
+            `.template-item[data-template-id="${templateId}"]`
+        ];
+        
+        let templateElement = null;
+        for (const selector of selectors) {
+            templateElement = document.querySelector(selector);
+            if (templateElement) {
+                debugLog('Template element found with selector:', selector);
+                break;
             }
-        });
+        }
+        
+        if (templateElement) {
+            debugLog('Clicking template element');
+            templateElement.click();
+        } else {
+            debugWarn('Template element not found for ID:', templateId);
+            debugLog('Available elements with data-template-id:', 
+                document.querySelectorAll('[data-template-id]'));
+        }
     }
     
     function processVariationImages(variationImages) {
-        console.log('Processing variation images:', variationImages);
+        debugLog('=== PROCESS VARIATION IMAGES START ===');
+        debugLog('Processing variation images:', variationImages);
+        
+        let totalImages = 0;
         
         Object.entries(variationImages).forEach(([key, imageData]) => {
             const [variationId, viewId] = key.split('_');
-            console.log(`Processing ${key}:`, imageData);
+            debugLog(`Processing key: ${key} (variation: ${variationId}, view: ${viewId})`);
+            debugLog(`Image data for ${key}:`, imageData);
             
             // Handle both array and single object formats
             const images = Array.isArray(imageData) ? imageData : [imageData];
+            debugLog(`Number of images for ${key}:`, images.length);
             
-            images.forEach(imgData => {
+            images.forEach((imgData, index) => {
+                debugLog(`Processing image ${index + 1} for ${key}:`, imgData);
+                
                 if (imgData.url) {
-                    addImageToCanvas(imgData.url, imgData.transform || {});
+                    debugLog(`Adding image to canvas: ${imgData.url}`);
+                    addImageToCanvas(imgData.url, imgData.transform || {}, key, index);
+                    totalImages++;
+                } else {
+                    debugWarn(`No URL found for image ${index + 1} in ${key}`);
                 }
             });
         });
+        
+        debugLog(`Total images processed: ${totalImages}`);
+        debugLog('=== PROCESS VARIATION IMAGES END ===');
     }
     
-    function addImageToCanvas(imageUrl, transform) {
+    function addImageToCanvas(imageUrl, transform, viewKey, imageIndex) {
+        debugLog(`=== ADD IMAGE TO CANVAS START ===`);
+        debugLog(`URL: ${imageUrl}`);
+        debugLog(`Transform:`, transform);
+        debugLog(`View key: ${viewKey}`);
+        debugLog(`Image index: ${imageIndex}`);
+        
         if (!window.fabric) {
-            console.error('Fabric.js not available');
+            debugError('Fabric.js not available');
             return;
         }
         
-        fabric.Image.fromURL(imageUrl, function(img) {
+        const canvas = window.fabric.Canvas.getInstances()[0];
+        if (!canvas) {
+            debugError('No canvas instance found');
+            debugLog('Available canvas instances:', window.fabric.Canvas.getInstances());
+            return;
+        }
+        
+        debugLog('Canvas found, loading image...');
+        
+        window.fabric.Image.fromURL(imageUrl, function(img) {
             if (!img) {
-                console.error('Failed to load image:', imageUrl);
+                debugError('Failed to load image:', imageUrl);
                 return;
             }
             
-            const canvas = window.fabric.Canvas.getInstances()[0];
-            if (!canvas) {
-                console.error('No canvas instance found');
-                return;
-            }
+            debugLog('Image loaded successfully:', imageUrl);
+            debugLog('Image dimensions:', { width: img.width, height: img.height });
             
             // Transform anwenden
-            img.set({
+            const finalTransform = {
                 left: transform.left || canvas.width / 2,
                 top: transform.top || canvas.height / 2,
                 scaleX: transform.scaleX || 1,
@@ -147,20 +271,31 @@
                 angle: transform.angle || 0,
                 originX: 'center',
                 originY: 'center'
-            });
+            };
+            
+            debugLog('Applying transform:', finalTransform);
+            img.set(finalTransform);
             
             canvas.add(img);
             canvas.renderAll();
             
-            console.log('Image added to canvas:', imageUrl);
-        });
+            debugLog('Image added to canvas successfully');
+            debugLog('Canvas object count:', canvas.getObjects().length);
+            
+        }, { crossOrigin: 'anonymous' });
+        
+        debugLog(`=== ADD IMAGE TO CANVAS END ===`);
     }
     
     // Starte den Auto-Loader wenn DOM bereit ist
     if (document.readyState === 'loading') {
+        debugLog('DOM still loading, waiting for DOMContentLoaded');
         document.addEventListener('DOMContentLoaded', waitForDesigner);
     } else {
+        debugLog('DOM already loaded, starting immediately');
         waitForDesigner();
     }
+    
+    console.log('%c=== DESIGN LOADER DEBUG END ===', 'color: blue; font-weight: bold;');
     
 })();
