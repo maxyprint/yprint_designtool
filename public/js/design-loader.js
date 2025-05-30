@@ -25,12 +25,15 @@
         const designerElement = document.querySelector('.octo-print-designer');
         const canvasElement = document.querySelector('#octo-print-designer-canvas');
         
+        // Erweiterte Fabric.js Prüfung
+        const fabricAvailable = checkFabricAvailability();
+        
         debugLog('Designer element found:', !!designerElement);
         debugLog('Canvas element found:', !!canvasElement);
-        debugLog('Fabric.js available:', typeof window.fabric !== 'undefined');
+        debugLog('Fabric.js available:', fabricAvailable);
         debugLog('Auto-load data available:', !!window.octoPrintDesignerAutoLoad);
         
-        if (designerElement && canvasElement && typeof window.fabric !== 'undefined') {
+        if (designerElement && canvasElement && fabricAvailable) {
             debugLog('All requirements met, checking for auto-load data');
             
             // Prüfe auf Auto-Load Daten
@@ -48,8 +51,35 @@
             }
         } else {
             debugLog('Requirements not met, retrying in 500ms');
+            debugLog('Missing requirements:', {
+                designerElement: !designerElement,
+                canvasElement: !canvasElement,
+                fabricJs: !fabricAvailable
+            });
             setTimeout(waitForDesigner, 500);
         }
+    }
+    
+    function checkFabricAvailability() {
+        debugLog('Checking Fabric.js availability...');
+        
+        // Prüfe verschiedene Fabric.js Verfügbarkeitsmuster
+        const checks = {
+            windowFabric: typeof window.fabric !== 'undefined',
+            fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
+            fabricImage: typeof window.fabric?.Image !== 'undefined',
+            fabricInstances: window.fabric?.Canvas?.getInstances ? true : false
+        };
+        
+        debugLog('Fabric.js checks:', checks);
+        
+        // Prüfe auch ob Fabric-Scripts geladen sind
+        const fabricScripts = Array.from(document.scripts).filter(script => 
+            script.src && script.src.includes('fabric')
+        );
+        debugLog('Fabric scripts found:', fabricScripts.length, fabricScripts.map(s => s.src));
+        
+        return checks.windowFabric && checks.fabricCanvas && checks.fabricImage;
     }
     
     function loadDesignFromData(designData) {
@@ -288,14 +318,85 @@
     }
     
     // Starte den Auto-Loader wenn DOM bereit ist
-    if (document.readyState === 'loading') {
-        debugLog('DOM still loading, waiting for DOMContentLoaded');
-        document.addEventListener('DOMContentLoaded', waitForDesigner);
-    } else {
-        debugLog('DOM already loaded, starting immediately');
-        waitForDesigner();
-    }
+if (document.readyState === 'loading') {
+    debugLog('DOM still loading, waiting for DOMContentLoaded');
+    document.addEventListener('DOMContentLoaded', initializeDesignLoader);
+} else {
+    debugLog('DOM already loaded, starting immediately');
+    initializeDesignLoader();
+}
+
+function initializeDesignLoader() {
+    debugLog('Initializing design loader...');
+    
+    // Starte Fabric.js Watcher parallel
+    startFabricWatcher();
+    
+    // Starte normale Warteschleife
+    waitForDesignerWithTimeout();
+    
+    // Zusätzlicher Check nach Scripts-Loading
+    window.addEventListener('load', () => {
+        debugLog('Window load event fired, doing final check...');
+        setTimeout(() => {
+            if (retryCount < maxRetries && typeof window.fabric !== 'undefined') {
+                debugLog('Fabric.js available after window load, retrying...');
+                waitForDesigner();
+            }
+        }, 1000);
+    });
+}
     
     console.log('%c=== DESIGN LOADER DEBUG END ===', 'color: blue; font-weight: bold;');
     
+// Globale Variablen für Retry-Logik
+let retryCount = 0;
+const maxRetries = 20; // 10 Sekunden maximum
+let fabricCheckInterval = null;
+
+// Erweiterte waitForDesigner Funktion
+function waitForDesignerWithTimeout() {
+    debugLog(`Attempt ${retryCount + 1}/${maxRetries} to find designer requirements`);
+    
+    if (retryCount >= maxRetries) {
+        debugError('Maximum retry attempts reached. Giving up.');
+        debugError('Final state check:');
+        debugError('- Designer element:', !!document.querySelector('.octo-print-designer'));
+        debugError('- Canvas element:', !!document.querySelector('#octo-print-designer-canvas'));
+        debugError('- Fabric.js:', checkFabricAvailability());
+        debugError('- Auto-load data:', !!window.octoPrintDesignerAutoLoad);
+        return;
+    }
+    
+    retryCount++;
+    waitForDesigner();
+}
+
+// Spezielle Fabric.js Watcher
+function startFabricWatcher() {
+    debugLog('Starting Fabric.js watcher...');
+    
+    fabricCheckInterval = setInterval(() => {
+        if (typeof window.fabric !== 'undefined') {
+            debugLog('Fabric.js detected! Stopping watcher.');
+            clearInterval(fabricCheckInterval);
+            
+            // Kurz warten, dann nochmal versuchen
+            setTimeout(() => {
+                if (retryCount < maxRetries) {
+                    waitForDesigner();
+                }
+            }, 500);
+        }
+    }, 100);
+    
+    // Stoppe Watcher nach 15 Sekunden
+    setTimeout(() => {
+        if (fabricCheckInterval) {
+            debugWarn('Fabric.js watcher timeout after 15 seconds');
+            clearInterval(fabricCheckInterval);
+        }
+    }, 15000);
+}
+
 })();

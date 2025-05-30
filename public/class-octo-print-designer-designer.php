@@ -63,7 +63,12 @@ class Octo_Print_Designer_Designer {
         ], $atts);
     
         wp_enqueue_script('octo-print-designer-designer');
-        wp_enqueue_script('octo-print-designer-designer');
+$this->enqueue_design_loader();
+
+// Stelle sicher dass Fabric.js geladen wird
+wp_add_inline_script('octo-print-designer-designer', '
+    console.log("Checking Fabric.js availability after script load:", typeof window.fabric);
+', 'after');
         $this->enqueue_design_loader(); // Diese Zeile hinzufügen
         
         wp_enqueue_style('octo-print-designer-toast-style');
@@ -868,9 +873,15 @@ private function enqueue_design_loader() {
     wp_enqueue_script(
         'octo-print-designer-loader',
         OCTO_PRINT_DESIGNER_URL . 'public/js/design-loader.js',
-        array('octo-print-designer-designer'),
+        array('octo-print-designer-designer'), // Abhängigkeit zu Designer
         OCTO_PRINT_DESIGNER_VERSION,
-        true
+        true // Im Footer laden
     );
+    
+    // Debug-Information hinzufügen
+    wp_add_inline_script('octo-print-designer-loader', '
+        console.log("Design loader script enqueued successfully");
+        console.log("Dependencies loaded:", typeof window.fabric !== "undefined");
+    ', 'before');
 }
 }
