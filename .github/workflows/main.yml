@@ -21,6 +21,6 @@ jobs:
           username: a549875
           password: ${{ secrets.SFTP_PASSWORD }}
           local_path: ./
-          remote_path: wordpress/wp-content/plugins/yprint_designtool
+          remote_path: wordpress/wp-content/plugins/octo-print-designer
           port: 22
           delete_remote_files: true
