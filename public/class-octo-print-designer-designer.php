@@ -61,17 +61,39 @@ class Octo_Print_Designer_Designer {
         $atts = shortcode_atts([
             'template_id' => null
         ], $atts);
-
+    
         wp_enqueue_script('octo-print-designer-designer');
+        wp_enqueue_script('octo-print-designer-designer');
+        $this->enqueue_design_loader(); // Diese Zeile hinzufügen
         
         wp_enqueue_style('octo-print-designer-toast-style');
         wp_enqueue_style('octo-print-designer-designer-style');
-
+    
+        // Prüfe auf design_id Parameter und lade Design-Daten
+        $design_data = null;
+        $design_id = isset($_GET['design_id']) ? intval($_GET['design_id']) : null;
+        
+        if ($design_id && is_user_logged_in()) {
+            $design = $this->get_design_from_db($design_id, get_current_user_id());
+            if (!is_wp_error($design)) {
+                $design_data = $design;
+            }
+        }
+    
+        // JavaScript-Variablen für Auto-Loading bereitstellen
+        wp_add_inline_script('octo-print-designer-designer', '
+            window.octoPrintDesignerAutoLoad = ' . json_encode([
+                'designId' => $design_id,
+                'designData' => $design_data,
+                'hasDesignToLoad' => !is_null($design_data)
+            ]) . ';
+        ', 'before');
+    
         ob_start();
         extract($atts);
         include OCTO_PRINT_DESIGNER_PATH . 'public/partials/designer/widget.php';
         return ob_get_clean();
-
+    
     }
 
     /**
@@ -780,4 +802,17 @@ class Octo_Print_Designer_Designer {
         
         return $url;
     }
+
+    /**
+ * Enqueue design loader script
+ */
+private function enqueue_design_loader() {
+    wp_enqueue_script(
+        'octo-print-designer-loader',
+        OCTO_PRINT_DESIGNER_URL . 'public/js/design-loader.js',
+        array('octo-print-designer-designer'),
+        OCTO_PRINT_DESIGNER_VERSION,
+        true
+    );
+}
 }
