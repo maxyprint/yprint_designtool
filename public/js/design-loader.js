@@ -81,7 +81,7 @@
     function checkFabricAvailability() {
         debugLog('Checking Fabric.js availability...');
         
-        // Prüfe verschiedene Fabric.js Verfügbarkeitsmuster
+        // Basis-Checks
         const checks = {
             windowFabric: typeof window.fabric !== 'undefined',
             fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
@@ -89,85 +89,240 @@
             fabricInstances: window.fabric?.Canvas?.getInstances ? true : false
         };
         
-        debugLog('Fabric.js checks:', checks);
+        debugLog('Basic Fabric.js checks:', checks);
         
-        // Zusätzliche Prüfung: Schaue nach bereits initialisierten Fabric Canvas Instanzen
-        let fabricFromCanvas = false;
+        // Wenn Basis-Checks fehlschlagen, prüfe tiefere Ebenen
+        if (!checks.windowFabric) {
+            debugLog('Basic fabric check failed, checking deeper...');
+            
+            // Prüfe ob Fabric.js in anderen globalen Variablen versteckt ist
+            const globalVars = Object.keys(window).filter(key => 
+                key.toLowerCase().includes('fabric') || 
+                (window[key] && typeof window[key] === 'object' && window[key].Canvas)
+            );
+            
+            debugLog('Potential fabric-related globals:', globalVars);
+            
+            // Versuche Fabric aus versteckten Variablen zu extrahieren
+            for (const varName of globalVars) {
+                try {
+                    const candidate = window[varName];
+                    if (candidate && candidate.Canvas && candidate.Image) {
+                        debugLog(`Found Fabric.js in global variable: ${varName}`);
+                        window.fabric = candidate;
+                        checks.windowFabric = true;
+                        checks.fabricCanvas = true;
+                        checks.fabricImage = true;
+                        break;
+                    }
+                } catch (e) {
+                    debugLog(`Error checking global variable ${varName}:`, e);
+                }
+            }
+        }
+        
+        // Canvas-basierte Erkennung
+        if (!checks.windowFabric) {
+            const canvasBasedFabric = extractFabricFromCanvas();
+            if (canvasBasedFabric) {
+                Object.assign(checks, {
+                    windowFabric: true,
+                    fabricCanvas: true,
+                    fabricImage: true,
+                    fabricFromCanvas: true
+                });
+            }
+        }
+        
+        debugLog('Final Fabric.js checks:', checks);
+        
+        return checks.windowFabric && checks.fabricCanvas;
+    }
+    
+    function extractFabricFromCanvas() {
+        debugLog('Attempting to extract Fabric.js from canvas instances...');
+        
         const canvasElements = document.querySelectorAll('canvas');
         
-        canvasElements.forEach((canvas, index) => {
-            const canvasInfo = {
+        for (let i = 0; i < canvasElements.length; i++) {
+            const canvas = canvasElements[i];
+            debugLog(`Checking canvas ${i}:`, {
                 id: canvas.id,
                 className: canvas.className,
-                hasContext: !!canvas.getContext,
-                hasFabricInstance: !!canvas.__fabric,
-                fabricType: canvas.__fabric ? typeof canvas.__fabric : 'none'
-            };
+                hasFabricInstance: !!canvas.__fabric
+            });
             
-            debugLog(`Canvas ${index} analysis:`, canvasInfo);
-            
-            // Wenn Canvas eine Fabric-Instanz hat, versuche Fabric zu extrahieren
             if (canvas.__fabric) {
                 try {
                     const fabricInstance = canvas.__fabric;
                     
-                    // Prüfe ob es sich um eine echte Fabric Canvas Instanz handelt
-                    if (fabricInstance.getObjects && fabricInstance.add && fabricInstance.renderAll) {
-                        debugLog(`Canvas ${index} has valid Fabric instance`);
-                        fabricFromCanvas = true;
+                    // Validiere dass es sich um eine echte Fabric-Instanz handelt
+                    const requiredMethods = ['getObjects', 'add', 'remove', 'renderAll', 'clear'];
+                    const hasRequiredMethods = requiredMethods.every(method => 
+                        typeof fabricInstance[method] === 'function'
+                    );
+                    
+                    if (hasRequiredMethods && fabricInstance.constructor) {
+                        debugLog(`Valid Fabric instance found in canvas ${i}`);
                         
-                        // Versuche Fabric-Konstruktor zu finden
-                        if (fabricInstance.constructor && !window.fabric) {
-                            debugLog('Attempting to extract Fabric from canvas instance...');
-                            
-                            // Erstelle minimales globales Fabric-Objekt
-                            window.fabric = {
-                                Canvas: fabricInstance.constructor,
-                                Image: fabricInstance.constructor.Image || class MockImage {},
-                                util: fabricInstance.constructor.util || {},
-                                Object: fabricInstance.constructor.Object || class MockObject {},
-                                filters: fabricInstance.constructor.filters || {}
-                            };
-                            
-                            debugLog('Fabric extracted and made global:', typeof window.fabric);
-                        }
+                        // Erstelle globales Fabric-Objekt
+                        window.fabric = {
+                            Canvas: fabricInstance.constructor,
+                            Image: fabricInstance.constructor.Image || createFabricImageMock(),
+                            util: fabricInstance.constructor.util || {},
+                            Object: fabricInstance.constructor.Object || class FabricObject {},
+                            filters: fabricInstance.constructor.filters || {},
+                            getInstances: function() {
+                                return fabricInstance.constructor.getInstances ? 
+                                       fabricInstance.constructor.getInstances() : [fabricInstance];
+                            }
+                        };
+                        
+                        debugLog('Fabric.js successfully extracted and made global');
+                        return true;
                     }
                 } catch (e) {
-                    debugLog(`Error analyzing canvas ${index}:`, e);
+                    debugLog(`Error extracting fabric from canvas ${i}:`, e);
                 }
             }
-        });
+        }
         
-        // Aktualisierte Checks nach möglicher Extraktion
-        const updatedChecks = {
-            windowFabric: typeof window.fabric !== 'undefined',
-            fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
-            fabricImage: typeof window.fabric?.Image !== 'undefined',
-            fabricInstances: window.fabric?.Canvas?.getInstances ? true : false,
-            fabricFromCanvas: fabricFromCanvas
-        };
-        
-        debugLog('Updated Fabric.js checks:', updatedChecks);
-        
-        // Prüfe auch ob Fabric-Scripts geladen sind
-        const fabricScripts = Array.from(document.scripts).filter(script => 
-            script.src && (script.src.includes('fabric') || script.src.includes('designer'))
-        );
-        debugLog('Relevant scripts found:', fabricScripts.length, fabricScripts.map(s => s.src));
-        
-        // Prüfe ob Designer Bundle geladen ist (da Fabric.js darin enthalten sein könnte)
-        const designerScripts = Array.from(document.scripts).filter(script => 
-            script.src && script.src.includes('designer')
-        );
-        debugLog('Designer scripts found:', designerScripts.length);
-        
-        // Zusätzliche Prüfung: Suche nach Fabric in globalen Variablen
-        const globalFabricCheck = Object.keys(window).filter(key => 
-            key.toLowerCase().includes('fabric')
-        );
-        debugLog('Global variables containing "fabric":', globalFabricCheck);
-        
+        return false;
     }
+    
+    /**
+ * Erstellt ein Mock-Objekt für Fabric.Image, falls Fabric.js nicht vollständig geladen ist.
+ * Ermöglicht das Laden von Bildern, um Fehler zu vermeiden.
+ */
+function createFabricImageMock() {
+    return {
+        fromURL: function(url, callback, options) {
+            debugLog('Mock Fabric.Image.fromURL called with:', url);
+
+            const img = new Image();
+            img.crossOrigin = options?.crossOrigin || 'anonymous';
+
+            img.onload = function() {
+                const fabricImg = {
+                    width: img.width,
+                    height: img.height,
+                    src: url,
+                    element: img,
+                    set: function(props) {
+                        Object.assign(this, props);
+                        return this;
+                    },
+                    setCoords: function() { return this; },
+                    clone: function() { return this; }
+                };
+
+                if (callback) callback(fabricImg);
+            };
+
+            img.onerror = function() {
+                debugError('Mock image loading failed:', url);
+                if (callback) callback(null);
+            };
+
+            img.src = url;
+        }
+    };
+}
+
+/**
+ * Überprüft die Verfügbarkeit von Fabric.js im globalen Scope und auf Canvas-Elementen.
+ * Versucht, Fabric.js aus einer Canvas-Instanz zu extrahieren und global verfügbar zu machen.
+ */
+function checkFabricAvailability() {
+    debugLog('Checking Fabric.js availability...');
+
+    // Prüfe verschiedene Fabric.js Verfügbarkeitsmuster
+    const checks = {
+        windowFabric: typeof window.fabric !== 'undefined',
+        fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
+        fabricImage: typeof window.fabric?.Image !== 'undefined',
+        fabricInstances: window.fabric?.Canvas?.getInstances ? true : false
+    };
+
+    debugLog('Fabric.js checks:', checks);
+
+    // Zusätzliche Prüfung: Schaue nach bereits initialisierten Fabric Canvas Instanzen
+    let fabricFromCanvas = false;
+    const canvasElements = document.querySelectorAll('canvas');
+
+    canvasElements.forEach((canvas, index) => {
+        const canvasInfo = {
+            id: canvas.id,
+            className: canvas.className,
+            hasContext: !!canvas.getContext,
+            hasFabricInstance: !!canvas.__fabric,
+            fabricType: canvas.__fabric ? typeof canvas.__fabric : 'none'
+        };
+
+        debugLog(`Canvas ${index} analysis:`, canvasInfo);
+
+        // Wenn Canvas eine Fabric-Instanz hat, versuche Fabric zu extrahieren
+        if (canvas.__fabric) {
+            try {
+                const fabricInstance = canvas.__fabric;
+
+                // Prüfe ob es sich um eine echte Fabric Canvas Instanz handelt
+                if (fabricInstance.getObjects && fabricInstance.add && fabricInstance.renderAll) {
+                    debugLog(`Canvas ${index} has valid Fabric instance`);
+                    fabricFromCanvas = true;
+
+                    // Versuche Fabric-Konstruktor zu finden
+                    if (fabricInstance.constructor && !window.fabric) {
+                        debugLog('Attempting to extract Fabric from canvas instance...');
+
+                        // Erstelle minimales globales Fabric-Objekt
+                        window.fabric = {
+                            Canvas: fabricInstance.constructor,
+                            Image: fabricInstance.constructor.Image || createFabricImageMock(),
+                            util: fabricInstance.constructor.util || {},
+                            Object: fabricInstance.constructor.Object || class MockObject {},
+                            filters: fabricInstance.constructor.filters || {}
+                        };
+
+                        debugLog('Fabric extracted and made global:', typeof window.fabric);
+                    }
+                }
+            } catch (e) {
+                debugLog(`Error analyzing canvas ${index}:`, e);
+            }
+        }
+    });
+
+    // Aktualisierte Checks nach möglicher Extraktion
+    const updatedChecks = {
+        windowFabric: typeof window.fabric !== 'undefined',
+        fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
+        fabricImage: typeof window.fabric?.Image !== 'undefined',
+        fabricInstances: window.fabric?.Canvas?.getInstances ? true : false,
+        fabricFromCanvas: fabricFromCanvas
+    };
+
+    debugLog('Updated Fabric.js checks:', updatedChecks);
+
+    // Prüfe auch ob Fabric-Scripts geladen sind
+    const fabricScripts = Array.from(document.scripts).filter(script =>
+        script.src && (script.src.includes('fabric') || script.src.includes('designer'))
+    );
+    debugLog('Relevant scripts found:', fabricScripts.length, fabricScripts.map(s => s.src));
+
+    // Prüfe ob Designer Bundle geladen ist (da Fabric.js darin enthalten sein könnte)
+    const designerScripts = Array.from(document.scripts).filter(script =>
+        script.src && script.src.includes('designer')
+    );
+    debugLog('Designer scripts found:', designerScripts.length);
+
+    // Zusätzliche Prüfung: Suche nach Fabric in globalen Variablen
+    const globalFabricCheck = Object.keys(window).filter(key =>
+        key.toLowerCase().includes('fabric')
+    );
+    debugLog('Global variables containing "fabric":', globalFabricCheck);
+
+}
     
 // Alternative Methode: Prüfe ob Designer bereits initialisiert ist
 function checkDesignerInitialization() {
@@ -593,22 +748,64 @@ if (document.readyState === 'loading') {
 function initializeDesignLoader() {
     debugLog('Initializing design loader...');
     
-    // Starte Fabric.js Watcher parallel
-    startFabricWatcher();
+    // Event-Listener für Fabric.js Ready Event
+    window.addEventListener('fabricReady', (event) => {
+        debugLog('Fabric.js ready event received:', event.detail);
+        
+        // Kurz warten damit alles initialisiert ist
+        setTimeout(() => {
+            debugLog('Attempting design load after fabric ready event...');
+            waitForDesigner();
+        }, 100);
+    });
     
-    // Starte normale Warteschleife
-    waitForDesignerWithTimeout();
+    // Prüfe ob Fabric.js bereits verfügbar ist
+    if (typeof window.fabric !== 'undefined') {
+        debugLog('Fabric.js already available at initialization');
+        setTimeout(waitForDesigner, 100);
+    } else {
+        debugLog('Fabric.js not immediately available, waiting for fabricReady event...');
+        
+        // Fallback: Normale Warteschleife mit längeren Intervallen
+        setTimeout(() => {
+            if (typeof window.fabric === 'undefined') {
+                debugLog('Starting fallback polling after 2 seconds...');
+                startFallbackPolling();
+            }
+        }, 2000);
+    }
     
-    // Zusätzlicher Check nach Scripts-Loading
+    // Zusätzlicher Check nach vollständigem Page Load
     window.addEventListener('load', () => {
         debugLog('Window load event fired, doing final check...');
         setTimeout(() => {
-            if (retryCount < maxRetries && typeof window.fabric !== 'undefined') {
+            if (typeof window.fabric !== 'undefined' && retryCount < maxRetries) {
                 debugLog('Fabric.js available after window load, retrying...');
                 waitForDesigner();
             }
         }, 1000);
     });
+}
+
+function startFallbackPolling() {
+    debugLog('Starting fallback polling for Fabric.js...');
+    
+    let pollCount = 0;
+    const maxPolls = 20; // 10 Sekunden
+    
+    const pollInterval = setInterval(() => {
+        pollCount++;
+        debugLog(`Fallback poll attempt ${pollCount}/${maxPolls}`);
+        
+        if (typeof window.fabric !== 'undefined') {
+            debugLog('Fabric.js found during fallback polling!');
+            clearInterval(pollInterval);
+            waitForDesigner();
+        } else if (pollCount >= maxPolls) {
+            debugError('Fallback polling timeout - Fabric.js still not available');
+            clearInterval(pollInterval);
+        }
+    }, 500);
 }
     
     console.log('%c=== DESIGN LOADER DEBUG END ===', 'color: blue; font-weight: bold;');
