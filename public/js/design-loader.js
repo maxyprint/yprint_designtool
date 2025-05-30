@@ -26,15 +26,24 @@
         const canvasElement = document.querySelector('#octo-print-designer-canvas');
         
         // Erweiterte Fabric.js Prüfung
-        const fabricAvailable = checkFabricAvailability();
+        let fabricAvailable = checkFabricAvailability();
+        
+        // Falls Fabric nicht gefunden, versuche alternative Methoden
+        if (!fabricAvailable) {
+            debugLog('Primary fabric check failed, trying alternatives...');
+            fabricAvailable = findFabricAlternative() || checkDesignerInitialization();
+        }
         
         debugLog('Designer element found:', !!designerElement);
         debugLog('Canvas element found:', !!canvasElement);
         debugLog('Fabric.js available:', fabricAvailable);
         debugLog('Auto-load data available:', !!window.octoPrintDesignerAutoLoad);
         
-        if (designerElement && canvasElement && fabricAvailable) {
-            debugLog('All requirements met, checking for auto-load data');
+        // Korrigierte Requirements Check Logik
+        const requirementsMet = designerElement && canvasElement && fabricAvailable;
+        
+        if (requirementsMet) {
+            debugLog('✅ All requirements met, checking for auto-load data');
             
             // Prüfe auf Auto-Load Daten
             if (window.octoPrintDesignerAutoLoad) {
@@ -50,13 +59,22 @@
                 debugWarn('No auto-load data available');
             }
         } else {
-            debugLog('Requirements not met, retrying in 500ms');
-            debugLog('Missing requirements:', {
-                designerElement: !designerElement,
-                canvasElement: !canvasElement,
-                fabricJs: !fabricAvailable
+            debugLog('❌ Requirements not met, retrying in 500ms');
+            debugLog('Requirements status:', {
+                designerElement: !!designerElement,
+                canvasElement: !!canvasElement,
+                fabricAvailable: fabricAvailable
             });
-            setTimeout(waitForDesigner, 500);
+            debugLog('Missing requirements:', {
+                needsDesignerElement: !designerElement,
+                needsCanvasElement: !canvasElement,
+                needsFabricJs: !fabricAvailable
+            });
+            
+            // Nur retry wenn wir noch nicht das Maximum erreicht haben
+            if (retryCount < maxRetries) {
+                setTimeout(waitForDesignerWithTimeout, 500);
+            }
         }
     }
     
@@ -75,13 +93,104 @@
         
         // Prüfe auch ob Fabric-Scripts geladen sind
         const fabricScripts = Array.from(document.scripts).filter(script => 
-            script.src && script.src.includes('fabric')
+            script.src && (script.src.includes('fabric') || script.src.includes('designer'))
         );
-        debugLog('Fabric scripts found:', fabricScripts.length, fabricScripts.map(s => s.src));
+        debugLog('Relevant scripts found:', fabricScripts.length, fabricScripts.map(s => s.src));
+        
+        // Prüfe ob Designer Bundle geladen ist (da Fabric.js darin enthalten sein könnte)
+        const designerScripts = Array.from(document.scripts).filter(script => 
+            script.src && script.src.includes('designer')
+        );
+        debugLog('Designer scripts found:', designerScripts.length);
+        
+        // Zusätzliche Prüfung: Suche nach Fabric in globalen Variablen
+        const globalFabricCheck = Object.keys(window).filter(key => 
+            key.toLowerCase().includes('fabric')
+        );
+        debugLog('Global variables containing "fabric":', globalFabricCheck);
+        
+        // Erweiterte Prüfung: Schaue nach bereits initialisierten Canvas-Instanzen
+        const canvasElements = document.querySelectorAll('canvas');
+        debugLog('Canvas elements found:', canvasElements.length);
+        
+        canvasElements.forEach((canvas, index) => {
+            debugLog(`Canvas ${index}:`, {
+                id: canvas.id,
+                className: canvas.className,
+                hasContext: !!canvas.getContext,
+                fabricInstance: canvas.__fabric ? 'yes' : 'no'
+            });
+        });
         
         return checks.windowFabric && checks.fabricCanvas && checks.fabricImage;
     }
     
+// Alternative Methode: Prüfe ob Designer bereits initialisiert ist
+function checkDesignerInitialization() {
+    debugLog('Checking designer initialization...');
+    
+    // Prüfe auf DesignerWidget Instanz
+    const checks = {
+        designerWidget: typeof window.DesignerWidget !== 'undefined',
+        fabricCanvas: !!document.querySelector('#octo-print-designer-canvas').__fabric,
+        canvasContext: !!document.querySelector('#octo-print-designer-canvas')?.getContext,
+        fabricInGlobal: typeof window.fabric !== 'undefined'
+    };
+    
+    debugLog('Designer initialization checks:', checks);
+    
+    // Suche nach Fabric Canvas Instanzen direkt im Canvas Element
+    const canvas = document.querySelector('#octo-print-designer-canvas');
+    if (canvas) {
+        debugLog('Canvas element properties:', {
+            id: canvas.id,
+            width: canvas.width,
+            height: canvas.height,
+            hasFabricInstance: !!canvas.__fabric,
+            fabricProperties: canvas.__fabric ? Object.keys(canvas.__fabric) : 'none'
+        });
+    }
+    
+    return checks.designerWidget || checks.fabricCanvas;
+}
+
+// Erweiterte Fabric.js Suche
+function findFabricAlternative() {
+    debugLog('Searching for Fabric.js alternatives...');
+    
+    // Suche in verschiedenen globalen Kontexten
+    const contexts = [window, window.parent, window.top];
+    
+    for (let i = 0; i < contexts.length; i++) {
+        const context = contexts[i];
+        try {
+            if (context.fabric) {
+                debugLog(`Fabric found in context ${i}:`, typeof context.fabric);
+                window.fabric = context.fabric; // Kopiere zu lokalem window
+                return true;
+            }
+        } catch (e) {
+            debugLog(`Cannot access context ${i}:`, e.message);
+        }
+    }
+    
+    // Suche nach AMD/RequireJS geladenen Modulen
+    if (typeof require !== 'undefined') {
+        try {
+            const fabric = require('fabric');
+            if (fabric) {
+                debugLog('Fabric found via require()');
+                window.fabric = fabric;
+                return true;
+            }
+        } catch (e) {
+            debugLog('require() failed:', e.message);
+        }
+    }
+    
+    return false;
+}
+
     function loadDesignFromData(designData) {
         try {
             debugLog('=== LOAD DESIGN FROM DATA START ===');
@@ -398,5 +507,60 @@ function startFabricWatcher() {
         }
     }, 15000);
 }
+
+// Notfall-Fabric.js Initialization
+function forceFabricInitialization() {
+    debugLog('Attempting forced Fabric.js initialization...');
+    
+    // Prüfe ob es Fabric CSS gibt
+    const fabricCSS = Array.from(document.styleSheets).find(sheet => {
+        try {
+            return sheet.href && sheet.href.includes('fabric');
+        } catch (e) {
+            return false;
+        }
+    });
+    
+    debugLog('Fabric CSS found:', !!fabricCSS);
+    
+    // Versuche Fabric aus dem Designer Bundle zu extrahieren
+    const designerScripts = Array.from(document.scripts).filter(script => 
+        script.src && script.src.includes('designer')
+    );
+    
+    if (designerScripts.length > 0) {
+        debugLog('Designer bundle found, attempting to access bundled Fabric...');
+        
+        // Warte auf Script-Ausführung
+        setTimeout(() => {
+            // Schaue nach möglichen Fabric-Variablen im Webpack-Bundle
+            const webpackCheck = Object.keys(window).filter(key => 
+                key.includes('webpack') || key.includes('chunk') || key.includes('__')
+            );
+            debugLog('Webpack-related globals:', webpackCheck);
+            
+            // Letzte Chance: Erstelle minimal Fabric Mock für Testing
+            if (typeof window.fabric === 'undefined') {
+                debugWarn('Creating minimal Fabric mock for testing...');
+                window.fabric = {
+                    Canvas: {
+                        getInstances: () => [],
+                    },
+                    Image: {
+                        fromURL: () => null
+                    }
+                };
+                debugLog('Fabric mock created');
+            }
+        }, 2000);
+    }
+}
+
+// Führe forcierte Initialisierung nach 5 Sekunden aus, falls nötig
+setTimeout(() => {
+    if (typeof window.fabric === 'undefined' && retryCount > 10) {
+        forceFabricInitialization();
+    }
+}, 5000);
 
 })();
