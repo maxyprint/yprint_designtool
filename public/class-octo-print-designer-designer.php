@@ -73,87 +73,230 @@ wp_add_inline_script('octo-print-designer-designer', '
         console.log("Making Fabric.js globally available...");
         
         // Sofortige Webpack-Prüfung
-        function tryWebpackExtraction() {
-            if (typeof __webpack_require__ !== "undefined") {
-                try {
-                    // Verschiedene mögliche Modul-IDs ausprobieren
-                    const fabricModules = [
-                        "./node_modules/fabric/dist/index.min.mjs",
-                        "fabric",
-                        "./node_modules/fabric/dist/fabric.min.js"
-                    ];
-                    
-                    for (const moduleId of fabricModules) {
-                        try {
-                            const fabric = __webpack_require__(moduleId);
-                            if (fabric && (fabric.Canvas || fabric.default?.Canvas)) {
-                                window.fabric = fabric.default || fabric;
-                                console.log("Fabric.js made globally available via webpack:", typeof window.fabric);
-                                // Event für Design-Loader triggern
-                                window.dispatchEvent(new CustomEvent("fabricReady", { detail: { source: "webpack" } }));
+function tryWebpackExtraction() {
+    console.log("Attempting webpack extraction...");
+    
+    if (typeof __webpack_require__ !== "undefined") {
+        try {
+            console.log("Webpack require available, searching for fabric modules...");
+            
+            // Zuerst alle verfügbaren Module auflisten
+            if (typeof __webpack_require__.cache !== "undefined") {
+                const moduleKeys = Object.keys(__webpack_require__.cache);
+                const fabricModules = moduleKeys.filter(key => 
+                    key.toLowerCase().includes("fabric") || 
+                    key.includes("node_modules/fabric")
+                );
+                console.log("Found potential fabric modules:", fabricModules);
+                
+                // Versuche diese Module zu laden
+                for (const moduleKey of fabricModules) {
+                    try {
+                        const fabricModule = __webpack_require__.cache[moduleKey];
+                        if (fabricModule && fabricModule.exports) {
+                            const fabric = fabricModule.exports.default || fabricModule.exports;
+                            if (fabric && (fabric.Canvas || fabric.fabric?.Canvas)) {
+                                window.fabric = fabric.fabric || fabric;
+                                console.log("Fabric.js extracted from cached module:", moduleKey);
+                                window.dispatchEvent(new CustomEvent("fabricReady", { detail: { source: "webpack_cache" } }));
                                 return true;
                             }
-                        } catch (e) {
-                            console.log("Module", moduleId, "not found:", e.message);
                         }
+                    } catch (e) {
+                        console.log("Failed to extract from module", moduleKey, ":", e.message);
                     }
-                } catch (e) {
-                    console.log("Webpack require not accessible:", e);
                 }
             }
-            return false;
+            
+            // Fallback: Bekannte Modul-IDs versuchen
+            const knownModules = [
+                "./node_modules/fabric/dist/index.min.mjs",
+                "fabric",
+                "./node_modules/fabric/dist/fabric.min.js",
+                "./node_modules/fabric/dist/index.mjs"
+            ];
+            
+            for (const moduleId of knownModules) {
+                try {
+                    const fabric = __webpack_require__(moduleId);
+                    if (fabric && (fabric.Canvas || fabric.default?.Canvas)) {
+                        window.fabric = fabric.default || fabric;
+                        console.log("Fabric.js made globally available via webpack:", moduleId);
+                        window.dispatchEvent(new CustomEvent("fabricReady", { detail: { source: "webpack_direct" } }));
+                        return true;
+                    }
+                } catch (e) {
+                    console.log("Module", moduleId, "not found:", e.message);
+                }
+            }
+        } catch (e) {
+            console.error("Error during webpack extraction:", e);
         }
+    } else {
+        console.log("Webpack require not available");
+    }
+    
+    return false;
+}
         
         // Versuche sofortige Extraktion
         if (!tryWebpackExtraction()) {
             console.log("Immediate webpack extraction failed, setting up canvas watcher...");
             
             // Alternative: Warte auf DesignerWidget Initialisierung
-            let checkCount = 0;
-            const checkInterval = setInterval(() => {
-                checkCount++;
+let checkCount = 0;
+const maxChecks = 60; // 30 Sekunden
+const checkInterval = setInterval(() => {
+    checkCount++;
+    console.log(`Canvas watcher attempt ${checkCount}/${maxChecks}`);
+    
+    // Versuche Webpack-Extraktion erneut
+    if (tryWebpackExtraction()) {
+        clearInterval(checkInterval);
+        return;
+    }
+    
+    // Suche nach Canvas-Instanzen die bereits Fabric verwenden
+    const canvasElements = document.querySelectorAll("canvas");
+    let fabricFound = false;
+    
+    for (let i = 0; i < canvasElements.length; i++) {
+        const canvas = canvasElements[i];
+        console.log(`Checking canvas ${i}:`, {
+            id: canvas.id,
+            className: canvas.className,
+            hasFabric: !!canvas.__fabric,
+            fabricType: canvas.__fabric ? typeof canvas.__fabric : "none"
+        });
+        
+        if (canvas.__fabric && canvas.__fabric.constructor) {
+            const fabricInstance = canvas.__fabric;
+            console.log("Found fabric instance, checking methods...");
+            
+            // Validiere Fabric-Methoden
+            const requiredMethods = ["getObjects", "add", "remove", "renderAll"];
+            const hasRequiredMethods = requiredMethods.every(method => 
+                typeof fabricInstance[method] === "function"
+            );
+            
+            console.log("Required methods check:", {
+                hasGetObjects: typeof fabricInstance.getObjects === "function",
+                hasAdd: typeof fabricInstance.add === "function",
+                hasRemove: typeof fabricInstance.remove === "function",
+                hasRenderAll: typeof fabricInstance.renderAll === "function",
+                allMethodsPresent: hasRequiredMethods
+            });
+            
+            if (hasRequiredMethods) {
+                const fabricConstructor = fabricInstance.constructor;
                 
-                // Versuche Webpack-Extraktion erneut
-                if (tryWebpackExtraction()) {
-                    clearInterval(checkInterval);
-                    return;
-                }
-                
-                // Suche nach Canvas-Instanzen die bereits Fabric verwenden
-                const canvasElements = document.querySelectorAll("canvas");
-                for (const canvas of canvasElements) {
-                    if (canvas.__fabric && canvas.__fabric.constructor) {
-                        const fabricConstructor = canvas.__fabric.constructor;
-                        if (fabricConstructor.getInstances) {
-                            // Extrahiere Fabric aus der Canvas-Instanz
-                            window.fabric = {
-                                Canvas: fabricConstructor,
-                                Image: fabricConstructor.Image || window.fabric?.Image,
-                                util: fabricConstructor.util || {},
-                                Object: fabricConstructor.Object || class FabricObject {},
-                                filters: fabricConstructor.filters || {}
-                            };
-                            console.log("Fabric.js extracted from canvas instance");
-                            // Event für Design-Loader triggern
-                            window.dispatchEvent(new CustomEvent("fabricReady", { detail: { source: "canvas" } }));
-                            clearInterval(checkInterval);
-                            return;
-                        }
+                // Erstelle globales Fabric-Objekt
+                window.fabric = {
+                    Canvas: fabricConstructor,
+                    Image: fabricConstructor.Image || createImageMock(),
+                    util: fabricConstructor.util || {},
+                    Object: fabricConstructor.Object || class FabricObject {},
+                    filters: fabricConstructor.filters || {},
+                    getInstances: function() {
+                        return fabricConstructor.getInstances ? 
+                               fabricConstructor.getInstances() : [fabricInstance];
                     }
-                }
+                };
                 
-                // Nach 30 Versuchen (15 Sekunden) aufgeben
-                if (checkCount >= 30) {
-                    console.warn("Could not extract Fabric.js after 15 seconds");
-                    clearInterval(checkInterval);
-                }
-            }, 500);
+                console.log("Fabric.js extracted from canvas instance:", typeof window.fabric);
+                console.log("Available Fabric methods:", Object.keys(window.fabric));
+                
+                // Event für Design-Loader triggern
+                window.dispatchEvent(new CustomEvent("fabricReady", { 
+                    detail: { 
+                        source: "canvas",
+                        canvasId: canvas.id,
+                        attempt: checkCount
+                    } 
+                }));
+                
+                fabricFound = true;
+                clearInterval(checkInterval);
+                break;
+            }
+        }
+    }
+    
+    if (!fabricFound && checkCount >= maxChecks) {
+        console.error("Could not extract Fabric.js after", maxChecks, "attempts");
+        
+        // Als letzter Ausweg: Erstelle minimales Mock
+        if (typeof window.fabric === "undefined") {
+            console.log("Creating minimal Fabric.js mock as fallback");
+            window.fabric = createMinimalFabricMock();
+            window.dispatchEvent(new CustomEvent("fabricReady", { 
+                detail: { source: "mock", attempt: checkCount } 
+            }));
+        }
+        
+        clearInterval(checkInterval);
+    }
+}, 500);
+
+// Hilfsfunktionen
+function createImageMock() {
+    return {
+        fromURL: function(url, callback, options) {
+            console.log("Mock Image.fromURL called:", url);
+            const img = new Image();
+            img.crossOrigin = options?.crossOrigin || "anonymous";
+            img.onload = () => {
+                const mockFabricImage = {
+                    width: img.width,
+                    height: img.height,
+                    src: url,
+                    element: img,
+                    set: function(props) { Object.assign(this, props); return this; },
+                    setCoords: function() { return this; }
+                };
+                callback && callback(mockFabricImage);
+            };
+            img.onerror = () => {
+                console.error("Failed to load image:", url);
+                callback && callback(null);
+            };
+            img.src = url;
+        }
+    };
+}
+
+function createMinimalFabricMock() {
+    return {
+        Canvas: {
+            getInstances: function() { return []; }
+        },
+        Image: createImageMock(),
+        util: {},
+        Object: class MockFabricObject {},
+        filters: {}
+    };
+}
         }
     } else {
-        console.log("Fabric.js already available globally");
-        // Event für Design-Loader triggern
-        window.dispatchEvent(new CustomEvent("fabricReady", { detail: { source: "already_available" } }));
-    }
+    console.log("Fabric.js already available globally");
+    console.log("Fabric.js details:", {
+        hasCanvas: typeof window.fabric.Canvas !== "undefined",
+        hasImage: typeof window.fabric.Image !== "undefined",
+        canvasInstances: window.fabric.Canvas?.getInstances?.().length || 0
+    });
+    
+    // Event für Design-Loader triggern - sofort und nach kurzer Verzögerung
+    window.dispatchEvent(new CustomEvent("fabricReady", { 
+        detail: { source: "already_available" } 
+    }));
+    
+    // Zusätzliches Event nach kurzer Verzögerung für den Fall dass der Listener noch nicht bereit ist
+    setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("fabricReady", { 
+            detail: { source: "delayed_trigger" } 
+        }));
+    }, 100);
+}
 ', 'after');
 
 $this->enqueue_design_loader();

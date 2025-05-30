@@ -749,15 +749,43 @@ function initializeDesignLoader() {
     debugLog('Initializing design loader...');
     
     // Event-Listener für Fabric.js Ready Event
-    window.addEventListener('fabricReady', (event) => {
-        debugLog('Fabric.js ready event received:', event.detail);
+window.addEventListener('fabricReady', (event) => {
+    debugLog('🎉 Fabric.js ready event received:', event.detail);
+    
+    // Validiere dass Fabric tatsächlich verfügbar ist
+    const fabricCheck = {
+        windowFabric: typeof window.fabric !== 'undefined',
+        fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
+        fabricImage: typeof window.fabric?.Image !== 'undefined'
+    };
+    
+    debugLog('Post-event Fabric validation:', fabricCheck);
+    
+    if (fabricCheck.windowFabric && fabricCheck.fabricCanvas) {
+        debugLog('✅ Fabric.js confirmed available, proceeding with design load...');
+        
+        // Reset retry counter
+        retryCount = 0;
         
         // Kurz warten damit alles initialisiert ist
         setTimeout(() => {
-            debugLog('Attempting design load after fabric ready event...');
             waitForDesigner();
-        }, 100);
-    });
+        }, 200);
+    } else {
+        debugWarn('❌ Fabric.js event received but validation failed');
+        debugLog('Fabric object:', window.fabric);
+    }
+});
+
+// Zusätzlicher Event-Listener für den Fall dass Events mehrfach ausgelöst werden
+let fabricReadyReceived = false;
+window.addEventListener('fabricReady', (event) => {
+    if (fabricReadyReceived) {
+        debugLog('Duplicate fabricReady event ignored:', event.detail);
+        return;
+    }
+    fabricReadyReceived = true;
+}, { once: false }); // Nicht once, damit wir Duplikate loggen können
     
     // Prüfe ob Fabric.js bereits verfügbar ist
     if (typeof window.fabric !== 'undefined') {
