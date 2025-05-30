@@ -63,12 +63,76 @@ class Octo_Print_Designer_Designer {
         ], $atts);
     
         wp_enqueue_script('octo-print-designer-designer');
-$this->enqueue_design_loader();
 
-// Stelle sicher dass Fabric.js geladen wird
+// Fabric.js global verfügbar machen NACH dem Designer Bundle
 wp_add_inline_script('octo-print-designer-designer', '
     console.log("Checking Fabric.js availability after script load:", typeof window.fabric);
+    
+    // Extrahiere Fabric.js aus dem Webpack Bundle und mache es global verfügbar
+    if (typeof window.fabric === "undefined") {
+        console.log("Making Fabric.js globally available...");
+        
+        // Suche nach dem Webpack Fabric Module
+        if (typeof __webpack_require__ !== "undefined") {
+            try {
+                // Verschiedene mögliche Modul-IDs ausprobieren
+                const fabricModules = [
+                    "./node_modules/fabric/dist/index.min.mjs",
+                    "fabric",
+                    "./node_modules/fabric/dist/fabric.min.js"
+                ];
+                
+                for (const moduleId of fabricModules) {
+                    try {
+                        const fabric = __webpack_require__(moduleId);
+                        if (fabric && (fabric.Canvas || fabric.default?.Canvas)) {
+                            window.fabric = fabric.default || fabric;
+                            console.log("Fabric.js made globally available via webpack:", typeof window.fabric);
+                            break;
+                        }
+                    } catch (e) {
+                        console.log("Module", moduleId, "not found");
+                    }
+                }
+            } catch (e) {
+                console.log("Webpack require not accessible:", e);
+            }
+        }
+        
+        // Alternative: Warte auf DesignerWidget Initialisierung
+        let checkCount = 0;
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            
+            // Suche nach Canvas-Instanzen die bereits Fabric verwenden
+            const canvasElements = document.querySelectorAll("canvas");
+            for (const canvas of canvasElements) {
+                if (canvas.__fabric && canvas.__fabric.constructor) {
+                    const fabricConstructor = canvas.__fabric.constructor;
+                    if (fabricConstructor.getInstances) {
+                        // Extrahiere Fabric aus der Canvas-Instanz
+                        window.fabric = {
+                            Canvas: fabricConstructor,
+                            Image: fabricConstructor.Image || window.fabric?.Image,
+                            ...canvas.__fabric.constructor.fabric || {}
+                        };
+                        console.log("Fabric.js extracted from canvas instance");
+                        clearInterval(checkInterval);
+                        return;
+                    }
+                }
+            }
+            
+            // Nach 30 Versuchen (15 Sekunden) aufgeben
+            if (checkCount >= 30) {
+                console.warn("Could not extract Fabric.js after 15 seconds");
+                clearInterval(checkInterval);
+            }
+        }, 500);
+    }
 ', 'after');
+
+$this->enqueue_design_loader();
         $this->enqueue_design_loader(); // Diese Zeile hinzufügen
         
         wp_enqueue_style('octo-print-designer-toast-style');

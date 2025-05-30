@@ -91,6 +91,64 @@
         
         debugLog('Fabric.js checks:', checks);
         
+        // Zusätzliche Prüfung: Schaue nach bereits initialisierten Fabric Canvas Instanzen
+        let fabricFromCanvas = false;
+        const canvasElements = document.querySelectorAll('canvas');
+        
+        canvasElements.forEach((canvas, index) => {
+            const canvasInfo = {
+                id: canvas.id,
+                className: canvas.className,
+                hasContext: !!canvas.getContext,
+                hasFabricInstance: !!canvas.__fabric,
+                fabricType: canvas.__fabric ? typeof canvas.__fabric : 'none'
+            };
+            
+            debugLog(`Canvas ${index} analysis:`, canvasInfo);
+            
+            // Wenn Canvas eine Fabric-Instanz hat, versuche Fabric zu extrahieren
+            if (canvas.__fabric) {
+                try {
+                    const fabricInstance = canvas.__fabric;
+                    
+                    // Prüfe ob es sich um eine echte Fabric Canvas Instanz handelt
+                    if (fabricInstance.getObjects && fabricInstance.add && fabricInstance.renderAll) {
+                        debugLog(`Canvas ${index} has valid Fabric instance`);
+                        fabricFromCanvas = true;
+                        
+                        // Versuche Fabric-Konstruktor zu finden
+                        if (fabricInstance.constructor && !window.fabric) {
+                            debugLog('Attempting to extract Fabric from canvas instance...');
+                            
+                            // Erstelle minimales globales Fabric-Objekt
+                            window.fabric = {
+                                Canvas: fabricInstance.constructor,
+                                Image: fabricInstance.constructor.Image || class MockImage {},
+                                util: fabricInstance.constructor.util || {},
+                                Object: fabricInstance.constructor.Object || class MockObject {},
+                                filters: fabricInstance.constructor.filters || {}
+                            };
+                            
+                            debugLog('Fabric extracted and made global:', typeof window.fabric);
+                        }
+                    }
+                } catch (e) {
+                    debugLog(`Error analyzing canvas ${index}:`, e);
+                }
+            }
+        });
+        
+        // Aktualisierte Checks nach möglicher Extraktion
+        const updatedChecks = {
+            windowFabric: typeof window.fabric !== 'undefined',
+            fabricCanvas: typeof window.fabric?.Canvas !== 'undefined',
+            fabricImage: typeof window.fabric?.Image !== 'undefined',
+            fabricInstances: window.fabric?.Canvas?.getInstances ? true : false,
+            fabricFromCanvas: fabricFromCanvas
+        };
+        
+        debugLog('Updated Fabric.js checks:', updatedChecks);
+        
         // Prüfe auch ob Fabric-Scripts geladen sind
         const fabricScripts = Array.from(document.scripts).filter(script => 
             script.src && (script.src.includes('fabric') || script.src.includes('designer'))
@@ -109,49 +167,90 @@
         );
         debugLog('Global variables containing "fabric":', globalFabricCheck);
         
-        // Erweiterte Prüfung: Schaue nach bereits initialisierten Canvas-Instanzen
-        const canvasElements = document.querySelectorAll('canvas');
-        debugLog('Canvas elements found:', canvasElements.length);
-        
-        canvasElements.forEach((canvas, index) => {
-            debugLog(`Canvas ${index}:`, {
-                id: canvas.id,
-                className: canvas.className,
-                hasContext: !!canvas.getContext,
-                fabricInstance: canvas.__fabric ? 'yes' : 'no'
-            });
-        });
-        
-        return checks.windowFabric && checks.fabricCanvas && checks.fabricImage;
     }
     
 // Alternative Methode: Prüfe ob Designer bereits initialisiert ist
 function checkDesignerInitialization() {
     debugLog('Checking designer initialization...');
     
+    const canvas = document.querySelector('#octo-print-designer-canvas');
+    
     // Prüfe auf DesignerWidget Instanz
     const checks = {
         designerWidget: typeof window.DesignerWidget !== 'undefined',
-        fabricCanvas: !!document.querySelector('#octo-print-designer-canvas').__fabric,
-        canvasContext: !!document.querySelector('#octo-print-designer-canvas')?.getContext,
+        fabricCanvas: canvas ? !!canvas.__fabric : false,
+        canvasContext: canvas ? !!canvas.getContext : false,
         fabricInGlobal: typeof window.fabric !== 'undefined'
     };
     
     debugLog('Designer initialization checks:', checks);
     
     // Suche nach Fabric Canvas Instanzen direkt im Canvas Element
-    const canvas = document.querySelector('#octo-print-designer-canvas');
     if (canvas) {
-        debugLog('Canvas element properties:', {
+        const canvasAnalysis = {
             id: canvas.id,
             width: canvas.width,
             height: canvas.height,
             hasFabricInstance: !!canvas.__fabric,
-            fabricProperties: canvas.__fabric ? Object.keys(canvas.__fabric) : 'none'
-        });
+            fabricMethods: canvas.__fabric ? [
+                'getObjects', 'add', 'remove', 'renderAll', 'clear'
+            ].filter(method => typeof canvas.__fabric[method] === 'function') : [],
+            fabricProperties: canvas.__fabric ? Object.keys(canvas.__fabric).slice(0, 10) : 'none'
+        };
+        
+        debugLog('Detailed canvas analysis:', canvasAnalysis);
+        
+        // Wenn Fabric Canvas gefunden, aber globales Fabric fehlt, erstelle Wrapper
+        if (canvas.__fabric && !window.fabric) {
+            debugLog('Creating Fabric wrapper from canvas instance...');
+            
+            const fabricInstance = canvas.__fabric;
+            
+            // Erstelle funktionalen Fabric Wrapper
+            window.fabric = {
+                Canvas: fabricInstance.constructor,
+                Image: {
+                    fromURL: function(url, callback, options) {
+                        debugLog('Fabric.Image.fromURL called with:', url);
+                        
+                        // Verwende native Image-Erstellung und füge zu Canvas hinzu
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = function() {
+                            // Simuliere Fabric Image Objekt
+                            const fabricImage = {
+                                width: img.width,
+                                height: img.height,
+                                src: url,
+                                set: function(props) {
+                                    Object.assign(this, props);
+                                    return this;
+                                },
+                                setCoords: function() { return this; }
+                            };
+                            
+                            if (callback) callback(fabricImage);
+                        };
+                        img.onerror = function() {
+                            debugError('Failed to load image:', url);
+                            if (callback) callback(null);
+                        };
+                        img.src = url;
+                    }
+                },
+                util: fabricInstance.constructor.util || {},
+                getInstances: function() {
+                    return fabricInstance.constructor.getInstances ? 
+                           fabricInstance.constructor.getInstances() : [fabricInstance];
+                }
+            };
+            
+            debugLog('Fabric wrapper created successfully');
+            checks.fabricInGlobal = true;
+        }
     }
     
-    return checks.designerWidget || checks.fabricCanvas;
+    return checks.designerWidget || checks.fabricCanvas || checks.fabricInGlobal;
 }
 
 // Erweiterte Fabric.js Suche
@@ -378,21 +477,65 @@ function findFabricAlternative() {
         debugLog(`View key: ${viewKey}`);
         debugLog(`Image index: ${imageIndex}`);
         
-        if (!window.fabric) {
-            debugError('Fabric.js not available');
-            return;
+        // Erweiterte Canvas-Suche
+        let canvas = null;
+        
+        if (window.fabric && window.fabric.Canvas && window.fabric.Canvas.getInstances) {
+            const instances = window.fabric.Canvas.getInstances();
+            canvas = instances[0];
+            debugLog('Canvas found via Fabric.Canvas.getInstances():', !!canvas);
         }
         
-        const canvas = window.fabric.Canvas.getInstances()[0];
+        // Fallback: Direkte Canvas-Suche
+        if (!canvas) {
+            const canvasElement = document.querySelector('#octo-print-designer-canvas');
+            if (canvasElement && canvasElement.__fabric) {
+                canvas = canvasElement.__fabric;
+                debugLog('Canvas found via direct element access:', !!canvas);
+            }
+        }
+        
         if (!canvas) {
             debugError('No canvas instance found');
-            debugLog('Available canvas instances:', window.fabric.Canvas.getInstances());
+            debugError('Available fabric instances:', window.fabric ? window.fabric.Canvas?.getInstances?.() || 'getInstances not available' : 'fabric not available');
             return;
         }
         
         debugLog('Canvas found, loading image...');
         
-        window.fabric.Image.fromURL(imageUrl, function(img) {
+        // Verwende verfügbare Fabric.Image.fromURL oder Fallback
+        const imageLoader = window.fabric?.Image?.fromURL || function(url, callback, options) {
+            debugLog('Using fallback image loader for:', url);
+            
+            const img = new Image();
+            img.crossOrigin = options?.crossOrigin || 'anonymous';
+            
+            img.onload = function() {
+                // Erstelle Fabric-ähnliches Objekt
+                const fabricImg = {
+                    width: img.width,
+                    height: img.height,
+                    src: url,
+                    element: img,
+                    set: function(props) {
+                        Object.assign(this, props);
+                        return this;
+                    },
+                    setCoords: function() { return this; }
+                };
+                
+                callback(fabricImg);
+            };
+            
+            img.onerror = function() {
+                debugError('Failed to load image:', url);
+                callback(null);
+            };
+            
+            img.src = url;
+        };
+        
+        imageLoader(imageUrl, function(img) {
             if (!img) {
                 debugError('Failed to load image:', imageUrl);
                 return;
@@ -415,11 +558,23 @@ function findFabricAlternative() {
             debugLog('Applying transform:', finalTransform);
             img.set(finalTransform);
             
-            canvas.add(img);
-            canvas.renderAll();
+            // Canvas-Methoden prüfen und verwenden
+            if (canvas.add && typeof canvas.add === 'function') {
+                canvas.add(img);
+                debugLog('Image added to canvas via canvas.add()');
+            } else {
+                debugError('Canvas.add method not available');
+            }
             
-            debugLog('Image added to canvas successfully');
-            debugLog('Canvas object count:', canvas.getObjects().length);
+            if (canvas.renderAll && typeof canvas.renderAll === 'function') {
+                canvas.renderAll();
+                debugLog('Canvas rendered via canvas.renderAll()');
+            } else {
+                debugError('Canvas.renderAll method not available');
+            }
+            
+            const objectCount = canvas.getObjects ? canvas.getObjects().length : 'unknown';
+            debugLog('Canvas object count:', objectCount);
             
         }, { crossOrigin: 'anonymous' });
         
