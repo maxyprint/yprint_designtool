@@ -856,7 +856,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         <?php if ($item['is_design_product']) : ?>
             <div style="margin: 20px 0; padding: 15px; background: #fff; border: 2px solid #0079FF; border-radius: 8px;">
                 <h3 style="margin: 0 0 15px 0; color: #0079FF; font-size: 16px;">
-                    🧾 <strong>Druckdaten-Aufstellung für „<?php echo esc_html($item['name']); ?>"</strong>
+                     <strong>Druckdaten-Aufstellung für „<?php echo esc_html($item['name']); ?>"</strong>
                 </h3>
                 
                 <p style="margin: 0 0 15px 0; font-size: 13px; line-height: 1.4;">
@@ -879,7 +879,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 <?php if (!empty($item['design_views'])) : ?>
                     <?php foreach ($item['design_views'] as $view_index => $view) : ?>
                         <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #0079FF; border-radius: 4px;">
-                            <h4 style="margin: 0 0 10px 0; color: #0079FF; font-size: 14px;">🔹 <strong>View <?php echo ($view_index + 1); ?>: <?php echo esc_html($view['view_name']); ?></strong></h4>
+                            <h4 style="margin: 0 0 10px 0; color: #0079FF; font-size: 14px;"> <strong>View <?php echo ($view_index + 1); ?>: <?php echo esc_html($view['view_name']); ?></strong></h4>
                             
                             <p style="margin: 5px 0; font-size: 11px;">
                                 • <strong>System-ID der View:</strong> <code><?php echo esc_html($view['view_id']); ?></code><br>
@@ -889,7 +889,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                             <?php if (!empty($view['images'])) : ?>
                                 <?php foreach ($view['images'] as $img_index => $img) : ?>
                                     <div style="margin: 10px 0; padding: 8px; background-color: #ffffff; border: 1px solid #e1e5e9; border-radius: 3px;">
-                                        <h5 style="margin: 0 0 8px 0; color: #333; font-size: 12px;">🎨 <strong>Bild <?php echo ($img_index + 1); ?>: <?php echo esc_html($img['filename']); ?></strong></h5>
+                                        <h5 style="margin: 0 0 8px 0; color: #333; font-size: 12px;"><strong>Bild <?php echo ($img_index + 1); ?>: <?php echo esc_html($img['filename']); ?></strong></h5>
                                         
                                         <p style="margin: 3px 0; font-size: 10px; line-height: 1.3;">
                                             • <strong>Dateiname:</strong> <code style="font-size: 9px;"><?php echo esc_html($img['filename']); ?></code><br>
@@ -897,20 +897,20 @@ private function build_print_provider_email_content($order, $design_items, $note
                                             • <strong>Originalgröße:</strong> <?php echo esc_html($img['original_width_px']); ?> px × <?php echo esc_html($img['original_height_px']); ?> px
                                         </p>
                                         
-                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;">📍 <strong>Platzierung:</strong></p>
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;"><strong>Platzierung:</strong></p>
                                         <p style="margin: 0 0 5px 15px; font-size: 10px;">
                                             <code>left</code>: <strong><?php echo esc_html($img['position_left_px']); ?> px</strong> | 
                                             <code>top</code>: <strong><?php echo esc_html($img['position_top_px']); ?> px</strong>
                                         </p>
                                         
-                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;">🔍 <strong>Skalierung:</strong></p>
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;"> <strong>Skalierung:</strong></p>
                                         <p style="margin: 0 0 5px 15px; font-size: 10px;">
                                             <code>scaleX</code>: <strong><?php echo esc_html($img['scale_x']); ?></strong> (ca. <strong><?php echo esc_html($img['scale_x_percent']); ?>%</strong>) | 
                                             <code>scaleY</code>: <strong><?php echo esc_html($img['scale_y']); ?></strong> (ca. <strong><?php echo esc_html($img['scale_y_percent']); ?>%</strong>)
                                         </p>
                                         
                                         <div style="margin: 5px 0; padding: 5px; background-color: #e8f5e8; border-radius: 3px;">
-                                            <p style="margin: 0; font-weight: bold; color: #2d5016; font-size: 10px;">🎯 <strong>Druckgröße (berechnet):</strong></p>
+                                            <p style="margin: 0; font-weight: bold; color: #2d5016; font-size: 10px;"><strong>Druckgröße (berechnet):</strong></p>
                                             <p style="margin: 2px 0 0 10px; font-size: 10px; color: #2d5016;">
                                                 <strong>Breite:</strong> <?php echo esc_html($img['original_width_px']); ?> × <?php echo esc_html($img['scale_x']); ?> = <strong>~<?php echo esc_html($img['print_width_mm']); ?> mm</strong><br>
                                                 <strong>Höhe:</strong> <?php echo esc_html($img['original_height_px']); ?> × <?php echo esc_html($img['scale_y']); ?> = <strong>~<?php echo esc_html($img['print_height_mm']); ?> mm</strong>
@@ -970,7 +970,6 @@ private function build_print_provider_email_content($order, $design_items, $note
 
     <p style="color: #343434; line-height: 1.5;">
         Vielen Dank für die Zusammenarbeit!<br>
-        Das YPrint Team
     </p>
     <?php
     return ob_get_clean();
