@@ -265,7 +265,7 @@ if (!defined('ABSPATH')) {
             <?php endif; ?>
         </div>
     <?php endif; ?>
-</div>
+</div> 
                 
                 <hr style="margin: 30px 0; border: 0; border-top: 1px dashed #ccc;">
             <?php endforeach; ?>
