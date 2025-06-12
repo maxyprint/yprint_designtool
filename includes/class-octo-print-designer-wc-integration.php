@@ -40,6 +40,26 @@ class Octo_Print_Designer_WC_Integration {
     }
 
     /**
+ * Check if YPrint plugin is active and email functions are available
+ */
+private function check_yprint_dependency() {
+    // Check if YPrint plugin is active
+    if (!is_plugin_active('yprint-plugin/yprint-plugin.php')) {
+        return false;
+    }
+    
+    // Try to load email functions if not already loaded
+    if (!function_exists('yprint_get_email_template')) {
+        $yprint_email_file = WP_PLUGIN_DIR . '/yprint-plugin/includes/email.php';
+        if (file_exists($yprint_email_file)) {
+            require_once $yprint_email_file;
+        }
+    }
+    
+    return function_exists('yprint_get_email_template');
+}
+
+    /**
      * Modify cart item name to include design name
      */
     public function modify_cart_item_name($name, $cart_item, $cart_item_key) {
@@ -556,156 +576,385 @@ class Octo_Print_Designer_WC_Integration {
     }
 
     /**
-     * Send print provider email
-     * 
-     * @param WC_Order $order The order object
-     * @param string $email Print provider email address
-     * @param string $notes Additional notes to include
-     * @return bool|WP_Error True on success, WP_Error on failure
-     */
-    public function send_print_provider_email($order, $email, $notes = '') {
-        if (!$order || !is_email($email)) {
-            return new WP_Error('invalid_parameters', __('Invalid order or email address', 'octo-print-designer'));
+ * Send print provider email
+ * 
+ * @param WC_Order $order The order object
+ * @param string $email Print provider email address
+ * @param string $notes Additional notes to include
+ * @return bool|WP_Error True on success, WP_Error on failure
+ */
+public function send_print_provider_email($order, $email, $notes = '') {
+    if (!$order || !is_email($email)) {
+        return new WP_Error('invalid_parameters', __('Invalid order or email address', 'octo-print-designer'));
+    }
+    
+    // Check YPrint plugin dependency
+    if (!$this->check_yprint_dependency()) {
+        return new WP_Error('yprint_dependency', __('YPrint plugin is not active or email functions are not available', 'octo-print-designer'));
+    }
+    
+    // Get design items from the order
+    $design_items = array();
+    
+    foreach ($order->get_items() as $item) {
+        $design_id = $item->get_meta('_design_id');
+        
+        // Handle design products
+        if ($design_id) {
+            $design_item = array(
+                'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
+                'size_name' => $item->get_meta('_design_size') ?: 'One Size',
+                'design_id' => $design_id,
+                'template_id' => $item->get_meta('_db_design_template_id') ?: '',
+                'preview_url' => $item->get_meta('_design_preview_url') ?: '',
+                'design_views' => $this->parse_design_views($item),
+                'is_design_product' => true
+            );
+        } else {
+            // Handle blank products
+            $design_item = array(
+                'name' => $item->get_name(),
+                'variation_name' => $this->get_product_variation_name($item),
+                'size_name' => $this->get_product_size_name($item),
+                'quantity' => $item->get_quantity(),
+                'is_design_product' => false
+            );
         }
         
-        // Get design items from the order
-        $design_items = array();
-        
-        foreach ($order->get_items() as $item) {
-            $design_id = $item->get_meta('_design_id');
-            if (!$design_id) {
-                continue;
-            }
-            
-            // Get all design data
-$design_item = array(
-    'name' => $item->get_meta('_design_name') ?: $item->get_name(),
-    'variation_name' => $item->get_meta('_design_color') ?: __('Default', 'octo-print-designer'),
-    'size_name' => $item->get_meta('_design_size') ?: __('One Size', 'octo-print-designer'),
-    'preview_url' => $item->get_meta('_design_preview_url') ?: '',
-    'width_cm' => $item->get_meta('_design_width_cm') ?: '',
-    'height_cm' => $item->get_meta('_design_height_cm') ?: '',
-    'design_image_url' => $item->get_meta('_design_image_url') ?: '',
-    'product_images' => null,
-    'aligned_files' => array()
-);
-
-// Get individual design images with their detailed transform data
-$design_images_json = $item->get_meta('_design_images');
-if ($design_images_json) {
-    try {
-        $design_images = json_decode($design_images_json, true);
-        if (is_array($design_images) && !empty($design_images)) {
-            $design_views = array();
-            
-            // Group images by view
-            $grouped_by_view = array();
-            foreach ($design_images as $image) {
-                if (!empty($image['url'])) {
-                    $view_id = isset($image['view_id']) ? $image['view_id'] : 'default';
-                    
-                    if (!isset($grouped_by_view[$view_id])) {
-                        $grouped_by_view[$view_id] = array(
-                            'view_id' => $view_id,
-                            'view_name' => isset($image['view_name']) ? $image['view_name'] : __('View', 'octo-print-designer') . ' ' . $view_id,
-                            'variation_id' => $item->get_meta('_design_variation_id') ?: 'N/A',
-                            'images' => array()
-                        );
-                    }
-                    
-                    // Extract filename from URL
-                    $filename = basename(parse_url($image['url'], PHP_URL_PATH));
-                    
-                    // Calculate print dimensions in mm (more precise than cm)
-                    $original_width = isset($image['transform']['width']) ? floatval($image['transform']['width']) : 0;
-                    $original_height = isset($image['transform']['height']) ? floatval($image['transform']['height']) : 0;
-                    $scale_x = isset($image['scaleX']) ? floatval($image['scaleX']) : 1;
-                    $scale_y = isset($image['scaleY']) ? floatval($image['scaleY']) : 1;
-                    
-                    $print_width_mm = round($original_width * $scale_x * 0.264583, 1); // px to mm conversion
-                    $print_height_mm = round($original_height * $scale_y * 0.264583, 1);
-                    
-                    $grouped_by_view[$view_id]['images'][] = array(
-                        'filename' => $filename,
-                        'url' => $image['url'],
-                        'original_width_px' => $original_width,
-                        'original_height_px' => $original_height,
-                        'position_left_px' => isset($image['transform']['left']) ? round(floatval($image['transform']['left']), 2) : 0,
-                        'position_top_px' => isset($image['transform']['top']) ? round(floatval($image['transform']['top']), 2) : 0,
-                        'scale_x' => $scale_x,
-                        'scale_y' => $scale_y,
-                        'scale_x_percent' => round($scale_x * 100, 2),
-                        'scale_y_percent' => round($scale_y * 100, 2),
-                        'print_width_mm' => $print_width_mm,
-                        'print_height_mm' => $print_height_mm,
-                        'print_width_cm' => isset($image['width_cm']) ? round(floatval($image['width_cm']), 2) : round($print_width_mm / 10, 2),
-                        'print_height_cm' => isset($image['height_cm']) ? round(floatval($image['height_cm']), 2) : round($print_height_mm / 10, 2)
-                    );
-                }
-            }
-            
-            $design_item['design_views'] = array_values($grouped_by_view);
-        }
-    } catch (Exception $e) {
-        error_log('Error processing design images for print provider email: ' . $e->getMessage());
+        $design_items[] = $design_item;
+    }
+    
+    if (empty($design_items)) {
+        return new WP_Error('no_items', __('No items found in this order', 'octo-print-designer'));
+    }
+    
+    // Create email content using YPrint template
+    $email_content = $this->build_print_provider_email_content($order, $design_items, $notes);
+    
+    // Ensure YPrint email functions are loaded
+if (!function_exists('yprint_get_email_template')) {
+    // Try to load the YPrint plugin email functions
+    $yprint_email_file = WP_PLUGIN_DIR . '/yprint-plugin/includes/email.php';
+    if (file_exists($yprint_email_file)) {
+        require_once $yprint_email_file;
+    }
+    
+    // Check again if function is now available
+    if (!function_exists('yprint_get_email_template')) {
+        return new WP_Error('template_missing', __('YPrint email template not available. Please ensure the YPrint plugin is active.', 'octo-print-designer'));
     }
 }
-            
-            // Get product images with view information
-            $product_images_json = $item->get_meta('_design_product_images');
-            if ($product_images_json) {
-                try {
-                    $design_item['product_images'] = json_decode($product_images_json, true);
-                } catch (Exception $e) {
-                    error_log('Error decoding product images JSON: ' . $e->getMessage());
-                }
-            }
-            
-            // Get all design images if available
-            $images_json = $item->get_meta('_design_images');
-            if ($images_json) {
-                try {
-                    $design_item['design_images'] = json_decode($images_json, true);
-                } catch (Exception $e) {
-                    error_log('Error decoding design images JSON: ' . $e->getMessage());
-                }
-            }
-            
-            $design_items[] = $design_item;
-        }
-        
-        if (empty($design_items)) {
-            return new WP_Error('no_designs', __('No design products found in this order', 'octo-print-designer'));
-        }
-        
-        // Get admin email as sender
-        $from_email = get_option('admin_email');
-        $from_name = get_bloginfo('name');
-        
-        // Set up email content
-        ob_start();
-        
-        // Include email template
-        include OCTO_PRINT_DESIGNER_PATH . 'includes/email-templates/print-provider-email.php';
-        
-        $email_content = ob_get_clean();
-        
-        // Set up email headers
-        $headers = array(
-            'Content-Type: text/html; charset=UTF-8',
-            "From: {$from_name} <{$from_email}>"
-        );
-        
-        // Send the email
-        $subject = sprintf(__('New yprint Order #%s', 'octo-print-designer'), $order->get_order_number());
-        $sent = wp_mail($email, $subject, $email_content, $headers);
-        
-        if (!$sent) {
-            return new WP_Error('email_failed', __('Failed to send email to print provider', 'octo-print-designer'));
-        }
-        
-        return true;
+
+$email_html = yprint_get_email_template(
+    'Neue Druckbestellung #' . $order->get_order_number(),
+    '', // No username needed
+    $email_content
+);
+    
+    // E-Mail-Header für HTML
+    $headers = array(
+        'Content-Type: text/html; charset=UTF-8',
+        'From: YPrint <noreply@yprint.de>'
+    );
+    
+    $subject = sprintf('Neue Druckbestellung #%s - YPrint', $order->get_order_number());
+    
+    // E-Mail senden
+    $sent = wp_mail($email, $subject, $email_html, $headers);
+    
+    if (!$sent) {
+        return new WP_Error('email_failed', __('Failed to send email to print provider', 'octo-print-designer'));
     }
+    
+    return true;
+}
+
+/**
+ * Parse design views from order item meta data
+ */
+private function parse_design_views($item) {
+    $views = array();
+    
+    // Get processed views data
+    $processed_views = $item->get_meta('_db_processed_views');
+    if (!empty($processed_views) && is_array($processed_views)) {
+        foreach ($processed_views as $view_key => $view_data) {
+            $views[] = array(
+                'view_name' => $view_data['view_name'] ?: 'Unbekannte Ansicht',
+                'view_id' => $view_data['system_id'] ?: '',
+                'variation_id' => $view_data['variation_id'] ?: '',
+                'images' => $this->parse_view_images($view_data['images'] ?: array())
+            );
+        }
+    }
+    
+    return $views;
+}
+
+/**
+ * Parse images from view data
+ */
+private function parse_view_images($images) {
+    $parsed_images = array();
+    
+    if (!is_array($images)) {
+        return $parsed_images;
+    }
+    
+    foreach ($images as $image) {
+        if (!isset($image['url']) || empty($image['url'])) {
+            continue;
+        }
+        
+        $transform = $image['transform'] ?: array();
+        
+        $parsed_images[] = array(
+            'filename' => $image['filename'] ?: basename($image['url']),
+            'url' => $image['url'],
+            'original_width_px' => $transform['width'] ?: 0,
+            'original_height_px' => $transform['height'] ?: 0,
+            'position_left_px' => round($transform['left'] ?: 0, 2),
+            'position_top_px' => round($transform['top'] ?: 0, 2),
+            'scale_x' => $transform['scaleX'] ?: 1,
+            'scale_y' => $transform['scaleY'] ?: 1,
+            'scale_x_percent' => round(($transform['scaleX'] ?: 1) * 100, 1),
+            'scale_y_percent' => round(($transform['scaleY'] ?: 1) * 100, 1),
+            'print_width_mm' => round(($transform['width'] ?: 0) * ($transform['scaleX'] ?: 1) * 0.264583, 1),
+            'print_height_mm' => round(($transform['height'] ?: 0) * ($transform['scaleY'] ?: 1) * 0.264583, 1)
+        );
+    }
+    
+    return $parsed_images;
+}
+
+/**
+ * Get product variation name for blank products
+ */
+private function get_product_variation_name($item) {
+    $product = $item->get_product();
+    if (!$product) {
+        return 'Standard';
+    }
+    
+    if ($product->is_type('variation')) {
+        $attributes = $product->get_variation_attributes();
+        if (!empty($attributes)) {
+            return implode(', ', array_values($attributes));
+        }
+    }
+    
+    return 'Standard';
+}
+
+/**
+ * Get product size name for blank products
+ */
+private function get_product_size_name($item) {
+    $product = $item->get_product();
+    if (!$product) {
+        return 'One Size';
+    }
+    
+    if ($product->is_type('variation')) {
+        $attributes = $product->get_variation_attributes();
+        foreach ($attributes as $key => $value) {
+            if (strpos(strtolower($key), 'size') !== false || strpos(strtolower($key), 'größe') !== false) {
+                return $value;
+            }
+        }
+    }
+    
+    return 'One Size';
+}
+
+/**
+ * Build print provider email content
+ */
+private function build_print_provider_email_content($order, $design_items, $notes = '') {
+    ob_start();
+    ?>
+    <p style="margin-bottom: 20px; color: #343434; line-height: 1.5;">
+        Hi!<br><br>
+        Eine neue Bestellung ist eingegangen, die gedruckt werden muss. Hier sind alle Details:
+    </p>
+
+    <!-- Bestelldetails -->
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
+        <tr style="background: #0079FF; color: white;">
+            <td colspan="2" style="padding: 15px; font-weight: bold; font-size: 16px;">
+                📦 Bestelldetails
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5; font-weight: bold;">Bestellnummer:</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5;">#<?php echo esc_html($order->get_order_number()); ?></td>
+        </tr>
+        <tr>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5; font-weight: bold;">Bestelldatum:</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5;"><?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?></td>
+        </tr>
+        <tr>
+            <td style="padding: 10px 15px; font-weight: bold;">Gesamtbetrag:</td>
+            <td style="padding: 10px 15px; font-weight: bold; color: #0079FF;"><?php echo wp_kses_post($order->get_formatted_order_total()); ?></td>
+        </tr>
+    </table>
+
+    <!-- Lieferadresse -->
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
+        <tr style="background: #0079FF; color: white;">
+            <td style="padding: 15px; font-weight: bold; font-size: 16px;">
+                🏠 Lieferadresse
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 15px; line-height: 1.5;">
+                <?php 
+                if ($order->has_shipping_address()) {
+                    echo wp_kses_post($order->get_formatted_shipping_address());
+                } else {
+                    echo wp_kses_post($order->get_formatted_billing_address());
+                }
+                ?>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Produktdetails -->
+    <?php foreach ($design_items as $index => $item) : ?>
+        <?php if ($item['is_design_product']) : ?>
+            <table style="width: 100%; border-collapse: collapse; margin: 30px 0; background: #fff; border: 2px solid #0079FF; border-radius: 8px; overflow: hidden;">
+                <tr style="background: #0079FF; color: white;">
+                    <td style="padding: 15px; font-weight: bold; font-size: 16px;">
+                        🧾 <strong>Druckdaten-Aufstellung für „<?php echo esc_html($item['name']); ?>"</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 20px;">
+                        <p style="margin: 0 0 15px 0; font-size: 14px;">
+                            <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
+                            <?php if (!empty($item['design_id'])) : ?>
+                                <strong>Design-ID:</strong> <?php echo esc_html($item['design_id']); ?><br>
+                            <?php endif; ?>
+                            <?php if (!empty($item['template_id'])) : ?>
+                                <strong>Template-ID:</strong> <?php echo esc_html($item['template_id']); ?><br>
+                            <?php endif; ?>
+                        </p>
+
+                        <?php if (!empty($item['preview_url'])) : ?>
+                            <div style="text-align: center; margin: 15px 0;">
+                                <strong>Produkt-Preview:</strong><br>
+                                <img src="<?php echo esc_url($item['preview_url']); ?>" alt="Produkt Preview" style="max-width: 300px; height: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 5px;">
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($item['design_views'])) : ?>
+                            <?php foreach ($item['design_views'] as $view_index => $view) : ?>
+                                <div style="margin: 25px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #0079FF; border-radius: 4px;">
+                                    <h4 style="margin-top: 0; color: #0079FF;">🔹 <strong>View <?php echo ($view_index + 1); ?>: <?php echo esc_html($view['view_name']); ?></strong></h4>
+                                    
+                                    <ul style="margin: 8px 0; padding-left: 0; list-style: none; font-size: 13px;">
+                                        <li>• <strong>System-ID der View:</strong> <code><?php echo esc_html($view['view_id']); ?></code></li>
+                                        <li>• <strong>Produktvariante (Variation-ID):</strong> <code><?php echo esc_html($view['variation_id']); ?></code></li>
+                                    </ul>
+                                    
+                                    <?php if (!empty($view['images'])) : ?>
+                                        <?php foreach ($view['images'] as $img_index => $img) : ?>
+                                            <div style="margin: 15px 0; padding: 12px; background-color: #ffffff; border: 1px solid #e1e5e9; border-radius: 3px;">
+                                                <h5 style="margin-top: 0; color: #333;">🎨 <strong>Bild <?php echo ($img_index + 1); ?>: <?php echo esc_html($img['filename']); ?></strong></h5>
+                                                
+                                                <ul style="margin: 5px 0; padding-left: 0; list-style: none; font-size: 12px;">
+                                                    <li>• <strong>Dateiname:</strong> <code><?php echo esc_html($img['filename']); ?></code></li>
+                                                    <li>• <strong>Bild-URL:</strong> <a href="<?php echo esc_url($img['url']); ?>" target="_blank" style="color: #0079FF;"><?php echo esc_html($img['filename']); ?></a></li>
+                                                    <li>• <strong>Originalgröße:</strong> <?php echo esc_html($img['original_width_px']); ?> px × <?php echo esc_html($img['original_height_px']); ?> px</li>
+                                                </ul>
+                                                
+                                                <p style="margin: 8px 0 5px 0; font-weight: bold; font-size: 12px;">📍 <strong>Platzierung im Designbereich:</strong></p>
+                                                <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">
+                                                    <li><code>left</code>: <strong><?php echo esc_html($img['position_left_px']); ?> px</strong></li>
+                                                    <li><code>top</code>: <strong><?php echo esc_html($img['position_top_px']); ?> px</strong></li>
+                                                </ul>
+                                                
+                                                <p style="margin: 8px 0 5px 0; font-weight: bold; font-size: 12px;">🔍 <strong>Skalierung:</strong></p>
+                                                <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">
+                                                    <li><code>scaleX</code>: <strong><?php echo esc_html($img['scale_x']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_x_percent']); ?>%</strong></li>
+                                                    <li><code>scaleY</code>: <strong><?php echo esc_html($img['scale_y']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_y_percent']); ?>%</strong></li>
+                                                </ul>
+                                                
+                                                <div style="margin: 8px 0; padding: 8px; background-color: #e8f5e8; border-radius: 3px;">
+                                                    <p style="margin: 0; font-weight: bold; color: #2d5016; font-size: 12px;">🎯 <strong>Druckgröße (berechnet):</strong></p>
+                                                    <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px; color: #2d5016;">
+                                                        <li><strong>Breite:</strong> <?php echo esc_html($img['original_width_px']); ?> × <?php echo esc_html($img['scale_x']); ?> = <strong>~<?php echo esc_html($img['print_width_mm']); ?> mm</strong></li>
+                                                        <li><strong>Höhe:</strong> <?php echo esc_html($img['original_height_px']); ?> × <?php echo esc_html($img['scale_y']); ?> = <strong>~<?php echo esc_html($img['print_height_mm']); ?> mm</strong></li>
+                                                    </ul>
+                                                </div>
+                                                
+                                                <p style="margin: 8px 0 0 0; text-align: center;">
+                                                    <a href="<?php echo esc_url($img['url']); ?>" target="_blank" 
+                                                       style="display: inline-block; padding: 8px 16px; background-color: #0079FF; color: white; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 12px;">
+                                                        📥 Download Original File
+                                                    </a>
+                                                </p>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </table>
+        <?php else : ?>
+            <!-- Blank Product -->
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fff; border: 2px solid #ccc; border-radius: 8px; overflow: hidden;">
+                <tr style="background: #666; color: white;">
+                    <td style="padding: 15px; font-weight: bold; font-size: 16px;">
+                        📦 <strong>Blank-Produkt: „<?php echo esc_html($item['name']); ?>"</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 20px;">
+                        <p style="margin: 0; font-size: 14px;">
+                            <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
+                            <strong>Menge:</strong> <?php echo esc_html($item['quantity']); ?><br>
+                            <strong>Hinweis:</strong> <em>Dies ist ein Blank-Produkt ohne Design - einfach das Standardprodukt versenden.</em>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        <?php endif; ?>
+    <?php endforeach; ?>
+
+    <?php if (!empty($notes)) : ?>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fff3cd; border-radius: 8px; overflow: hidden;">
+            <tr style="background: #ffc107; color: #856404;">
+                <td style="padding: 15px; font-weight: bold; font-size: 16px;">
+                    📝 Zusätzliche Notizen
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; line-height: 1.5; color: #856404;">
+                    <?php echo wp_kses_post(nl2br($notes)); ?>
+                </td>
+            </tr>
+        </table>
+    <?php endif; ?>
+
+    <p style="margin-top: 30px; color: #343434; line-height: 1.5;">
+        <strong>Wichtige Hinweise:</strong><br>
+        • Bitte alle Druckdateien über die bereitgestellten Download-Links herunterladen<br>
+        • Die Druckgrößen sind bereits in Millimetern berechnet<br>
+        • Bei Fragen zur Bestellung bitte die Bestellnummer <strong>#<?php echo esc_html($order->get_order_number()); ?></strong> angeben<br>
+        • Nach dem Druck und Versand bitte eine Tracking-Nummer übermitteln
+    </p>
+
+    <p style="color: #343434; line-height: 1.5;">
+        Vielen Dank für die Zusammenarbeit!<br>
+        Das YPrint Team
+    </p>
+    <?php
+    return ob_get_clean();
+}
 
     public function add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
         // If this is a print design product
