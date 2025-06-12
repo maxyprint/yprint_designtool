@@ -648,9 +648,10 @@ if (!function_exists('yprint_get_email_template')) {
 
 $email_html = yprint_get_email_template(
     'Neue Druckbestellung #' . $order->get_order_number(),
-    '!', // Username wird zu "Hi !," - das passt zu deinem gewünschten "Hi!"
+    null, // Username ist null – vermeidet Leerzeichen in "Hi!"
     $email_content
 );
+
     
     // E-Mail-Header für HTML
     $headers = array(
@@ -799,12 +800,8 @@ private function build_print_provider_email_content($order, $design_items, $note
             <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5;">#<?php echo esc_html($order->get_order_number()); ?></td>
         </tr>
         <tr>
-            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5; font-weight: bold;">Bestelldatum:</td>
-            <td style="padding: 10px 15px; border-bottom: 1px solid #e5e5e5;"><?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?></td>
-        </tr>
-        <tr>
-            <td style="padding: 10px 15px; font-weight: bold;">Gesamtbetrag:</td>
-            <td style="padding: 10px 15px; font-weight: bold; color: #0079FF;"><?php echo wp_kses_post($order->get_formatted_order_total()); ?></td>
+            <td style="padding: 10px 15px; font-weight: bold;">Bestelldatum:</td>
+            <td style="padding: 10px 15px; font-weight: bold;"><?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?></td>
         </tr>
     </table>
 
@@ -826,6 +823,32 @@ private function build_print_provider_email_content($order, $design_items, $note
                 ?>
             </td>
         </tr>
+    </table>
+
+    <!-- Paketinhalt Übersicht -->
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
+        <tr style="background: #0079FF; color: white;">
+            <td colspan="2" style="padding: 15px; font-weight: bold; font-size: 16px;">
+                📋 Paketinhalt (Übersicht)
+            </td>
+        </tr>
+        <?php foreach ($design_items as $index => $item) : ?>
+            <tr>
+                <td style="padding: 8px 15px; border-bottom: 1px solid #e5e5e5; font-weight: bold; font-size: 13px;">
+                    <?php if ($item['is_design_product']) : ?>
+                        🎨 <?php echo esc_html($item['name']); ?>
+                    <?php else : ?>
+                        📦 <?php echo esc_html($item['name']); ?>
+                    <?php endif; ?>
+                </td>
+                <td style="padding: 8px 15px; border-bottom: 1px solid #e5e5e5; font-size: 12px;">
+                    <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?>
+                    <?php if (!$item['is_design_product']) : ?>
+                        <br><em style="color: #666;">(Menge: <?php echo esc_html($item['quantity']); ?>)</em>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
     </table>
 
     <!-- Produktdetails -->
