@@ -578,15 +578,46 @@ class Octo_Print_Designer_WC_Integration {
             }
             
             // Get all design data
-            $design_item = array(
-                'name' => $item->get_meta('_design_name') ?: $item->get_name(),
-                'variation_name' => $item->get_meta('_design_color') ?: __('Default', 'octo-print-designer'),
-                'size_name' => $item->get_meta('_design_size') ?: __('One Size', 'octo-print-designer'),
-                'preview_url' => $item->get_meta('_design_preview_url') ?: '',
-                'width_cm' => $item->get_meta('_design_width_cm') ?: '',
-                'height_cm' => $item->get_meta('_design_height_cm') ?: '',
-                'design_image_url' => $item->get_meta('_design_image_url') ?: ''
-            );
+$design_item = array(
+    'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+    'variation_name' => $item->get_meta('_design_color') ?: __('Default', 'octo-print-designer'),
+    'size_name' => $item->get_meta('_design_size') ?: __('One Size', 'octo-print-designer'),
+    'preview_url' => $item->get_meta('_design_preview_url') ?: '',
+    'width_cm' => $item->get_meta('_design_width_cm') ?: '',
+    'height_cm' => $item->get_meta('_design_height_cm') ?: '',
+    'design_image_url' => $item->get_meta('_design_image_url') ?: '',
+    'product_images' => null,
+    'aligned_files' => array()
+);
+
+// Get individual design images with their calculated dimensions
+$design_images_json = $item->get_meta('_design_images');
+if ($design_images_json) {
+    try {
+        $design_images = json_decode($design_images_json, true);
+        if (is_array($design_images) && !empty($design_images)) {
+            $aligned_files = array();
+            
+            foreach ($design_images as $image) {
+                if (!empty($image['url'])) {
+                    $aligned_files[] = array(
+                        'url' => $image['url'],
+                        'view_name' => isset($image['view_name']) ? $image['view_name'] : __('Design File', 'octo-print-designer'),
+                        'view_id' => isset($image['view_id']) ? $image['view_id'] : '',
+                        'width_cm' => isset($image['width_cm']) ? round(floatval($image['width_cm']), 2) : 0,
+                        'height_cm' => isset($image['height_cm']) ? round(floatval($image['height_cm']), 2) : 0,
+                        'scaleX' => isset($image['scaleX']) ? $image['scaleX'] : 1,
+                        'scaleY' => isset($image['scaleY']) ? $image['scaleY'] : 1
+                    );
+                }
+            }
+            
+            $design_item['aligned_files'] = $aligned_files;
+        }
+    } catch (Exception $e) {
+        error_log('Error processing design images for print provider email: ' . $e->getMessage());
+    }
+}
             
             // Get product images with view information
             $product_images_json = $item->get_meta('_design_product_images');
