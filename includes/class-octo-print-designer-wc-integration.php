@@ -590,29 +590,61 @@ $design_item = array(
     'aligned_files' => array()
 );
 
-// Get individual design images with their calculated dimensions
+// Get individual design images with their detailed transform data
 $design_images_json = $item->get_meta('_design_images');
 if ($design_images_json) {
     try {
         $design_images = json_decode($design_images_json, true);
         if (is_array($design_images) && !empty($design_images)) {
-            $aligned_files = array();
+            $design_views = array();
             
+            // Group images by view
+            $grouped_by_view = array();
             foreach ($design_images as $image) {
                 if (!empty($image['url'])) {
-                    $aligned_files[] = array(
+                    $view_id = isset($image['view_id']) ? $image['view_id'] : 'default';
+                    
+                    if (!isset($grouped_by_view[$view_id])) {
+                        $grouped_by_view[$view_id] = array(
+                            'view_id' => $view_id,
+                            'view_name' => isset($image['view_name']) ? $image['view_name'] : __('View', 'octo-print-designer') . ' ' . $view_id,
+                            'variation_id' => $item->get_meta('_design_variation_id') ?: 'N/A',
+                            'images' => array()
+                        );
+                    }
+                    
+                    // Extract filename from URL
+                    $filename = basename(parse_url($image['url'], PHP_URL_PATH));
+                    
+                    // Calculate print dimensions in mm (more precise than cm)
+                    $original_width = isset($image['transform']['width']) ? floatval($image['transform']['width']) : 0;
+                    $original_height = isset($image['transform']['height']) ? floatval($image['transform']['height']) : 0;
+                    $scale_x = isset($image['scaleX']) ? floatval($image['scaleX']) : 1;
+                    $scale_y = isset($image['scaleY']) ? floatval($image['scaleY']) : 1;
+                    
+                    $print_width_mm = round($original_width * $scale_x * 0.264583, 1); // px to mm conversion
+                    $print_height_mm = round($original_height * $scale_y * 0.264583, 1);
+                    
+                    $grouped_by_view[$view_id]['images'][] = array(
+                        'filename' => $filename,
                         'url' => $image['url'],
-                        'view_name' => isset($image['view_name']) ? $image['view_name'] : __('Design File', 'octo-print-designer'),
-                        'view_id' => isset($image['view_id']) ? $image['view_id'] : '',
-                        'width_cm' => isset($image['width_cm']) ? round(floatval($image['width_cm']), 2) : 0,
-                        'height_cm' => isset($image['height_cm']) ? round(floatval($image['height_cm']), 2) : 0,
-                        'scaleX' => isset($image['scaleX']) ? $image['scaleX'] : 1,
-                        'scaleY' => isset($image['scaleY']) ? $image['scaleY'] : 1
+                        'original_width_px' => $original_width,
+                        'original_height_px' => $original_height,
+                        'position_left_px' => isset($image['transform']['left']) ? round(floatval($image['transform']['left']), 2) : 0,
+                        'position_top_px' => isset($image['transform']['top']) ? round(floatval($image['transform']['top']), 2) : 0,
+                        'scale_x' => $scale_x,
+                        'scale_y' => $scale_y,
+                        'scale_x_percent' => round($scale_x * 100, 2),
+                        'scale_y_percent' => round($scale_y * 100, 2),
+                        'print_width_mm' => $print_width_mm,
+                        'print_height_mm' => $print_height_mm,
+                        'print_width_cm' => isset($image['width_cm']) ? round(floatval($image['width_cm']), 2) : round($print_width_mm / 10, 2),
+                        'print_height_cm' => isset($image['height_cm']) ? round(floatval($image['height_cm']), 2) : round($print_height_mm / 10, 2)
                     );
                 }
             }
             
-            $design_item['aligned_files'] = $aligned_files;
+            $design_item['design_views'] = array_values($grouped_by_view);
         }
     } catch (Exception $e) {
         error_log('Error processing design images for print provider email: ' . $e->getMessage());

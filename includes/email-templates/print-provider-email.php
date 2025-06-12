@@ -156,30 +156,77 @@ if (!defined('ABSPATH')) {
                 </div>
                 
                 <div class="design-files">
-    <h4>Print Files (mit exakten Druckabmessungen):</h4>
-
-    <!-- Druckanweisungen Übersicht -->
-<div style="margin: 30px 0; padding: 20px; background-color: #f0f8ff; border-left: 4px solid #0073aa; border-radius: 4px;">
-    <h3 style="margin-top: 0; color: #0073aa;">📋 Druckanweisungen für <?php echo esc_html($item['name']); ?></h3>
+    <h4>🎯 Detaillierte Druckanweisungen:</h4>
     
-    <p><strong>Produkt:</strong> <?php echo esc_html($item['variation_name']); ?> - <?php echo esc_html($item['size_name']); ?></p>
-    
-    <?php if (!empty($item['aligned_files']) && count($item['aligned_files']) > 1) : ?>
-        <p><strong>⚠️ Mehrere Druckbereiche:</strong> Dieses Design hat <?php echo count($item['aligned_files']); ?> separate Druckdateien für verschiedene Produktbereiche.</p>
-        
-        <ul style="margin: 10px 0; padding-left: 20px;">
-            <?php foreach ($item['aligned_files'] as $file) : ?>
-                <li>
-                    <strong><?php echo esc_html($file['view_name']); ?>:</strong> 
-                    <?php echo esc_html($file['width_cm']); ?>cm × <?php echo esc_html($file['height_cm']); ?>cm
-                </li>
-            <?php endforeach; ?>
-        </ul>
+    <?php if (!empty($item['design_views']) && is_array($item['design_views'])) : ?>
+        <?php foreach ($item['design_views'] as $view_index => $view) : ?>
+            <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #007cba; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #007cba;">🔹 <strong><?php echo esc_html($view['view_name']); ?></strong></h4>
+                
+                <ul style="margin: 8px 0; padding-left: 0; list-style: none;">
+                    <li><strong>System-ID der View:</strong> <code><?php echo esc_html($view['view_id']); ?></code></li>
+                    <li><strong>Variation (Produktvariante):</strong> <code><?php echo esc_html($view['variation_id']); ?></code></li>
+                </ul>
+                
+                <?php foreach ($view['images'] as $img_index => $img) : ?>
+                    <div style="margin: 15px 0; padding: 12px; background-color: #ffffff; border: 1px solid #e1e5e9; border-radius: 3px;">
+                        <h5 style="margin-top: 0; color: #333;">🎨 <strong>Bild <?php echo ($img_index + 1); ?>:</strong></h5>
+                        
+                        <ul style="margin: 5px 0; padding-left: 0; list-style: none; font-size: 13px;">
+                            <li><strong>Dateiname:</strong> <code><?php echo esc_html($img['filename']); ?></code></li>
+                            <li><strong>URL</strong> (<code>url</code>): <a href="<?php echo esc_url($img['url']); ?>" target="_blank" style="color: #007cba;"><?php echo esc_html($img['url']); ?></a></li>
+                            <li><strong>Originalgröße</strong> (<code>transform.width</code> / <code>transform.height</code>): <code><?php echo esc_html($img['original_width_px']); ?> px × <?php echo esc_html($img['original_height_px']); ?> px</code></li>
+                        </ul>
+                        
+                        <p style="margin: 8px 0 5px 0; font-weight: bold;">📍 <strong>Platzierung:</strong></p>
+                        <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                            <li><code>left</code>: <strong><?php echo esc_html($img['position_left_px']); ?> px</strong> (<code>transform.left</code>)</li>
+                            <li><code>top</code>: <strong><?php echo esc_html($img['position_top_px']); ?> px</strong> (<code>transform.top</code>)</li>
+                        </ul>
+                        
+                        <p style="margin: 8px 0 5px 0; font-weight: bold;">🔍 <strong>Skalierung:</strong></p>
+                        <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                            <li><code>scaleX</code>: <strong><?php echo esc_html($img['scale_x']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_x_percent']); ?>%</strong></li>
+                            <li><code>scaleY</code>: <strong><?php echo esc_html($img['scale_y']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_y_percent']); ?>%</strong></li>
+                        </ul>
+                        
+                        <div style="margin: 8px 0; padding: 8px; background-color: #e8f5e8; border-radius: 3px;">
+                            <p style="margin: 0; font-weight: bold; color: #2d5016;">🎯 <strong>Druckgröße (berechnet aus Originalgröße × Skalierung):</strong></p>
+                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px; color: #2d5016;">
+                                <li><strong>Breite:</strong> <?php echo esc_html($img['original_width_px']); ?> × <?php echo esc_html($img['scale_x']); ?> = <strong>~<?php echo esc_html($img['print_width_mm']); ?> mm</strong></li>
+                                <li><strong>Höhe:</strong> <?php echo esc_html($img['original_height_px']); ?> × <?php echo esc_html($img['scale_y']); ?> = <strong>~<?php echo esc_html($img['print_height_mm']); ?> mm</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <p style="margin: 8px 0 0 0; text-align: center;">
+                            <a href="<?php echo esc_url($img['url']); ?>" target="_blank" 
+                               style="display: inline-block; padding: 8px 16px; background-color: #007cba; color: white; text-decoration: none; border-radius: 3px; font-weight: bold;">
+                                📥 Download Original File
+                            </a>
+                        </p>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endforeach; ?>
     <?php else : ?>
-        <p><strong>Einzelne Druckdatei:</strong> <?php echo esc_html($item['width_cm']); ?>cm × <?php echo esc_html($item['height_cm']); ?>cm</p>
+        <!-- Fallback für alte Designs ohne detaillierte View-Daten -->
+        <div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: #856404;">⚠️ Legacy Design Format</h4>
+            <div class="design-file">
+                <strong>Design File</strong>
+                <br>
+                <a href="<?php echo esc_url($item['design_image_url']); ?>" target="_blank" style="color: #007cba;">
+                    📥 Download Druckdatei
+                </a>
+                <?php if (!empty($item['width_cm']) && !empty($item['height_cm'])) : ?>
+                    <br>
+                    <span style="background-color: #e8f5e8; padding: 2px 6px; border-radius: 3px; font-weight: bold; color: #2d5016;">
+                        🎯 Druckgröße: <?php echo esc_html($item['width_cm']); ?>cm × <?php echo esc_html($item['height_cm']); ?>cm
+                    </span>
+                <?php endif; ?>
+            </div>
+        </div>
     <?php endif; ?>
-    
-    <p style="margin-bottom: 0;"><em>Alle Abmessungen sind finale Druckgrößen. Dateien sind bereits optimal ausgerichtet.</em></p>
 </div>
     
     <?php if (!empty($item['aligned_files']) && is_array($item['aligned_files'])) : ?>
