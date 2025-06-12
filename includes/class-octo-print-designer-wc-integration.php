@@ -648,7 +648,7 @@ if (!function_exists('yprint_get_email_template')) {
 
 $email_html = yprint_get_email_template(
     'Neue Druckbestellung #' . $order->get_order_number(),
-    '', // No username needed
+    '!', // Username wird zu "Hi !," - das passt zu deinem gewünschten "Hi!"
     $email_content
 );
     
@@ -676,16 +676,25 @@ $email_html = yprint_get_email_template(
 private function parse_design_views($item) {
     $views = array();
     
-    // Get processed views data
-    $processed_views = $item->get_meta('_db_processed_views');
-    if (!empty($processed_views) && is_array($processed_views)) {
-        foreach ($processed_views as $view_key => $view_data) {
-            $views[] = array(
-                'view_name' => $view_data['view_name'] ?: 'Unbekannte Ansicht',
-                'view_id' => $view_data['system_id'] ?: '',
-                'variation_id' => $view_data['variation_id'] ?: '',
-                'images' => $this->parse_view_images($view_data['images'] ?: array())
-            );
+    // Get processed views data (als String gespeichert, muss dekodiert werden)
+    $processed_views_json = $item->get_meta('_db_processed_views');
+    if (!empty($processed_views_json)) {
+        // Dekodiere JSON falls es als String gespeichert ist
+        if (is_string($processed_views_json)) {
+            $processed_views = json_decode($processed_views_json, true);
+        } else {
+            $processed_views = $processed_views_json;
+        }
+        
+        if (is_array($processed_views)) {
+            foreach ($processed_views as $view_key => $view_data) {
+                $views[] = array(
+                    'view_name' => $view_data['view_name'] ?: 'Unbekannte Ansicht',
+                    'view_id' => $view_data['system_id'] ?: '',
+                    'variation_id' => $view_data['variation_id'] ?: '',
+                    'images' => $this->parse_view_images($view_data['images'] ?: array())
+                );
+            }
         }
     }
     
@@ -775,7 +784,6 @@ private function build_print_provider_email_content($order, $design_items, $note
     ob_start();
     ?>
     <p style="margin-bottom: 20px; color: #343434; line-height: 1.5;">
-        Hi!<br><br>
         Eine neue Bestellung ist eingegangen, die gedruckt werden muss. Hier sind alle Details:
     </p>
 
@@ -823,105 +831,94 @@ private function build_print_provider_email_content($order, $design_items, $note
     <!-- Produktdetails -->
     <?php foreach ($design_items as $index => $item) : ?>
         <?php if ($item['is_design_product']) : ?>
-            <table style="width: 100%; border-collapse: collapse; margin: 30px 0; background: #fff; border: 2px solid #0079FF; border-radius: 8px; overflow: hidden;">
-                <tr style="background: #0079FF; color: white;">
-                    <td style="padding: 15px; font-weight: bold; font-size: 16px;">
-                        🧾 <strong>Druckdaten-Aufstellung für „<?php echo esc_html($item['name']); ?>"</strong>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 20px;">
-                        <p style="margin: 0 0 15px 0; font-size: 14px;">
-                            <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
-                            <?php if (!empty($item['design_id'])) : ?>
-                                <strong>Design-ID:</strong> <?php echo esc_html($item['design_id']); ?><br>
-                            <?php endif; ?>
-                            <?php if (!empty($item['template_id'])) : ?>
-                                <strong>Template-ID:</strong> <?php echo esc_html($item['template_id']); ?><br>
-                            <?php endif; ?>
-                        </p>
+            <div style="margin: 20px 0; padding: 15px; background: #fff; border: 2px solid #0079FF; border-radius: 8px;">
+                <h3 style="margin: 0 0 15px 0; color: #0079FF; font-size: 16px;">
+                    🧾 <strong>Druckdaten-Aufstellung für „<?php echo esc_html($item['name']); ?>"</strong>
+                </h3>
+                
+                <p style="margin: 0 0 15px 0; font-size: 13px; line-height: 1.4;">
+                    <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
+                    <?php if (!empty($item['design_id'])) : ?>
+                        <strong>Design-ID:</strong> <?php echo esc_html($item['design_id']); ?><br>
+                    <?php endif; ?>
+                    <?php if (!empty($item['template_id'])) : ?>
+                        <strong>Template-ID:</strong> <?php echo esc_html($item['template_id']); ?><br>
+                    <?php endif; ?>
+                </p>
 
-                        <?php if (!empty($item['preview_url'])) : ?>
-                            <div style="text-align: center; margin: 15px 0;">
-                                <strong>Produkt-Preview:</strong><br>
-                                <img src="<?php echo esc_url($item['preview_url']); ?>" alt="Produkt Preview" style="max-width: 300px; height: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 5px;">
-                            </div>
-                        <?php endif; ?>
+                <?php if (!empty($item['preview_url'])) : ?>
+                    <div style="text-align: center; margin: 15px 0;">
+                        <strong>Produkt-Preview:</strong><br>
+                        <img src="<?php echo esc_url($item['preview_url']); ?>" alt="Produkt Preview" style="max-width: 250px; height: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 5px;">
+                    </div>
+                <?php endif; ?>
 
-                        <?php if (!empty($item['design_views'])) : ?>
-                            <?php foreach ($item['design_views'] as $view_index => $view) : ?>
-                                <div style="margin: 25px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #0079FF; border-radius: 4px;">
-                                    <h4 style="margin-top: 0; color: #0079FF;">🔹 <strong>View <?php echo ($view_index + 1); ?>: <?php echo esc_html($view['view_name']); ?></strong></h4>
-                                    
-                                    <ul style="margin: 8px 0; padding-left: 0; list-style: none; font-size: 13px;">
-                                        <li>• <strong>System-ID der View:</strong> <code><?php echo esc_html($view['view_id']); ?></code></li>
-                                        <li>• <strong>Produktvariante (Variation-ID):</strong> <code><?php echo esc_html($view['variation_id']); ?></code></li>
-                                    </ul>
-                                    
-                                    <?php if (!empty($view['images'])) : ?>
-                                        <?php foreach ($view['images'] as $img_index => $img) : ?>
-                                            <div style="margin: 15px 0; padding: 12px; background-color: #ffffff; border: 1px solid #e1e5e9; border-radius: 3px;">
-                                                <h5 style="margin-top: 0; color: #333;">🎨 <strong>Bild <?php echo ($img_index + 1); ?>: <?php echo esc_html($img['filename']); ?></strong></h5>
-                                                
-                                                <ul style="margin: 5px 0; padding-left: 0; list-style: none; font-size: 12px;">
-                                                    <li>• <strong>Dateiname:</strong> <code><?php echo esc_html($img['filename']); ?></code></li>
-                                                    <li>• <strong>Bild-URL:</strong> <a href="<?php echo esc_url($img['url']); ?>" target="_blank" style="color: #0079FF;"><?php echo esc_html($img['filename']); ?></a></li>
-                                                    <li>• <strong>Originalgröße:</strong> <?php echo esc_html($img['original_width_px']); ?> px × <?php echo esc_html($img['original_height_px']); ?> px</li>
-                                                </ul>
-                                                
-                                                <p style="margin: 8px 0 5px 0; font-weight: bold; font-size: 12px;">📍 <strong>Platzierung im Designbereich:</strong></p>
-                                                <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">
-                                                    <li><code>left</code>: <strong><?php echo esc_html($img['position_left_px']); ?> px</strong></li>
-                                                    <li><code>top</code>: <strong><?php echo esc_html($img['position_top_px']); ?> px</strong></li>
-                                                </ul>
-                                                
-                                                <p style="margin: 8px 0 5px 0; font-weight: bold; font-size: 12px;">🔍 <strong>Skalierung:</strong></p>
-                                                <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">
-                                                    <li><code>scaleX</code>: <strong><?php echo esc_html($img['scale_x']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_x_percent']); ?>%</strong></li>
-                                                    <li><code>scaleY</code>: <strong><?php echo esc_html($img['scale_y']); ?></strong> → ca. <strong><?php echo esc_html($img['scale_y_percent']); ?>%</strong></li>
-                                                </ul>
-                                                
-                                                <div style="margin: 8px 0; padding: 8px; background-color: #e8f5e8; border-radius: 3px;">
-                                                    <p style="margin: 0; font-weight: bold; color: #2d5016; font-size: 12px;">🎯 <strong>Druckgröße (berechnet):</strong></p>
-                                                    <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px; color: #2d5016;">
-                                                        <li><strong>Breite:</strong> <?php echo esc_html($img['original_width_px']); ?> × <?php echo esc_html($img['scale_x']); ?> = <strong>~<?php echo esc_html($img['print_width_mm']); ?> mm</strong></li>
-                                                        <li><strong>Höhe:</strong> <?php echo esc_html($img['original_height_px']); ?> × <?php echo esc_html($img['scale_y']); ?> = <strong>~<?php echo esc_html($img['print_height_mm']); ?> mm</strong></li>
-                                                    </ul>
-                                                </div>
-                                                
-                                                <p style="margin: 8px 0 0 0; text-align: center;">
-                                                    <a href="<?php echo esc_url($img['url']); ?>" target="_blank" 
-                                                       style="display: inline-block; padding: 8px 16px; background-color: #0079FF; color: white; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 12px;">
-                                                        📥 Download Original File
-                                                    </a>
-                                                </p>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            </table>
+                <?php if (!empty($item['design_views'])) : ?>
+                    <?php foreach ($item['design_views'] as $view_index => $view) : ?>
+                        <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #0079FF; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #0079FF; font-size: 14px;">🔹 <strong>View <?php echo ($view_index + 1); ?>: <?php echo esc_html($view['view_name']); ?></strong></h4>
+                            
+                            <p style="margin: 5px 0; font-size: 11px;">
+                                • <strong>System-ID der View:</strong> <code><?php echo esc_html($view['view_id']); ?></code><br>
+                                • <strong>Produktvariante (Variation-ID):</strong> <code><?php echo esc_html($view['variation_id']); ?></code>
+                            </p>
+                            
+                            <?php if (!empty($view['images'])) : ?>
+                                <?php foreach ($view['images'] as $img_index => $img) : ?>
+                                    <div style="margin: 10px 0; padding: 8px; background-color: #ffffff; border: 1px solid #e1e5e9; border-radius: 3px;">
+                                        <h5 style="margin: 0 0 8px 0; color: #333; font-size: 12px;">🎨 <strong>Bild <?php echo ($img_index + 1); ?>: <?php echo esc_html($img['filename']); ?></strong></h5>
+                                        
+                                        <p style="margin: 3px 0; font-size: 10px; line-height: 1.3;">
+                                            • <strong>Dateiname:</strong> <code style="font-size: 9px;"><?php echo esc_html($img['filename']); ?></code><br>
+                                            • <strong>Bild-URL:</strong> <a href="<?php echo esc_url($img['url']); ?>" target="_blank" style="color: #0079FF; font-size: 9px;"><?php echo esc_html($img['filename']); ?></a><br>
+                                            • <strong>Originalgröße:</strong> <?php echo esc_html($img['original_width_px']); ?> px × <?php echo esc_html($img['original_height_px']); ?> px
+                                        </p>
+                                        
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;">📍 <strong>Platzierung:</strong></p>
+                                        <p style="margin: 0 0 5px 15px; font-size: 10px;">
+                                            <code>left</code>: <strong><?php echo esc_html($img['position_left_px']); ?> px</strong> | 
+                                            <code>top</code>: <strong><?php echo esc_html($img['position_top_px']); ?> px</strong>
+                                        </p>
+                                        
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 10px;">🔍 <strong>Skalierung:</strong></p>
+                                        <p style="margin: 0 0 5px 15px; font-size: 10px;">
+                                            <code>scaleX</code>: <strong><?php echo esc_html($img['scale_x']); ?></strong> (ca. <strong><?php echo esc_html($img['scale_x_percent']); ?>%</strong>) | 
+                                            <code>scaleY</code>: <strong><?php echo esc_html($img['scale_y']); ?></strong> (ca. <strong><?php echo esc_html($img['scale_y_percent']); ?>%</strong>)
+                                        </p>
+                                        
+                                        <div style="margin: 5px 0; padding: 5px; background-color: #e8f5e8; border-radius: 3px;">
+                                            <p style="margin: 0; font-weight: bold; color: #2d5016; font-size: 10px;">🎯 <strong>Druckgröße (berechnet):</strong></p>
+                                            <p style="margin: 2px 0 0 10px; font-size: 10px; color: #2d5016;">
+                                                <strong>Breite:</strong> <?php echo esc_html($img['original_width_px']); ?> × <?php echo esc_html($img['scale_x']); ?> = <strong>~<?php echo esc_html($img['print_width_mm']); ?> mm</strong><br>
+                                                <strong>Höhe:</strong> <?php echo esc_html($img['original_height_px']); ?> × <?php echo esc_html($img['scale_y']); ?> = <strong>~<?php echo esc_html($img['print_height_mm']); ?> mm</strong>
+                                            </p>
+                                        </div>
+                                        
+                                        <p style="margin: 5px 0 0 0; text-align: center;">
+                                            <a href="<?php echo esc_url($img['url']); ?>" target="_blank" 
+                                               style="display: inline-block; padding: 5px 10px; background-color: #0079FF; color: white; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 10px;">
+                                                📥 Download Original File
+                                            </a>
+                                        </p>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         <?php else : ?>
             <!-- Blank Product -->
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fff; border: 2px solid #ccc; border-radius: 8px; overflow: hidden;">
-                <tr style="background: #666; color: white;">
-                    <td style="padding: 15px; font-weight: bold; font-size: 16px;">
-                        📦 <strong>Blank-Produkt: „<?php echo esc_html($item['name']); ?>"</strong>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 20px;">
-                        <p style="margin: 0; font-size: 14px;">
-                            <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
-                            <strong>Menge:</strong> <?php echo esc_html($item['quantity']); ?><br>
-                            <strong>Hinweis:</strong> <em>Dies ist ein Blank-Produkt ohne Design - einfach das Standardprodukt versenden.</em>
-                        </p>
-                    </td>
-                </tr>
-            </table>
+            <div style="margin: 15px 0; padding: 10px; background: #fff; border: 2px solid #ccc; border-radius: 8px;">
+                <h3 style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                    📦 <strong>Blank-Produkt: „<?php echo esc_html($item['name']); ?>"</strong>
+                </h3>
+                <p style="margin: 0; font-size: 12px;">
+                    <strong>Produktvariante:</strong> <?php echo esc_html($item['variation_name']); ?> – <?php echo esc_html($item['size_name']); ?><br>
+                    <strong>Menge:</strong> <?php echo esc_html($item['quantity']); ?><br>
+                    <strong>Hinweis:</strong> <em>Dies ist ein Blank-Produkt ohne Design - einfach das Standardprodukt versenden.</em>
+                </p>
+            </div>
         <?php endif; ?>
     <?php endforeach; ?>
 
