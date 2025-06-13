@@ -1793,9 +1793,9 @@ var DesignerWidget = /*#__PURE__*/function () {
               }
               this.toastManager.show('Design saved!', 'success');
               this.currentDesignId = data.data.design_id;
-              setTimeout(function () {
-                // window.location.href = data.data.redirect_url;
-              }, 1000);
+setTimeout(function () {
+  window.location.href = data.data.redirect_url;
+}, 1000);
               _context10.next = 47;
               break;
             case 46:
