@@ -34,6 +34,7 @@ class Octo_Print_Designer_WC_Integration {
 
         add_action('add_meta_boxes', array($this, 'add_print_provider_meta_box'));
         add_action('wp_ajax_octo_send_print_provider_email', array($this, 'ajax_send_print_provider_email'));
+        add_action('wp_ajax_octo_refresh_print_data', array($this, 'ajax_refresh_print_data'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -460,6 +461,13 @@ private function check_yprint_dependency() {
             <?php endif; ?>
             
             <p>
+                <button type="button" id="refresh_print_data" class="button" data-order-id="<?php echo $order_id; ?>" style="margin-bottom: 10px;">
+                    <?php _e('🔄 Druckdaten aus DB laden', 'octo-print-designer'); ?>
+                </button>
+                <span class="refresh-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
+            </p>
+            
+            <p>
                 <button type="button" id="send_to_print_provider" class="button button-primary">
                     <?php _e('Send to Print Provider', 'octo-print-designer'); ?>
                 </button>
@@ -469,6 +477,49 @@ private function check_yprint_dependency() {
         
         <script>
             jQuery(document).ready(function($) {
+                // Refresh Print Data Button
+                $('#refresh_print_data').on('click', function() {
+                    var button = $(this);
+                    var spinner = button.next('.refresh-spinner');
+                    var orderId = button.data('order-id');
+                    
+                    button.prop('disabled', true).text('🔄 Lade...');
+                    spinner.css('visibility', 'visible');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'octo_refresh_print_data',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $('<div class="notice notice-success"><p>✅ Druckdaten erfolgreich aus Datenbank geladen!</p></div>')
+                                    .insertBefore(button.parent());
+                                    
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1500);
+                            } else {
+                                $('<div class="notice notice-error"><p>❌ Fehler: ' + response.data.message + '</p></div>')
+                                    .insertBefore(button.parent());
+                                button.prop('disabled', false).text('🔄 Druckdaten aus DB laden');
+                            }
+                        },
+                        error: function() {
+                            $('<div class="notice notice-error"><p>❌ Netzwerkfehler beim Laden der Druckdaten</p></div>')
+                                .insertBefore(button.parent());
+                            button.prop('disabled', false).text('🔄 Druckdaten aus DB laden');
+                        },
+                        complete: function() {
+                            spinner.css('visibility', 'hidden');
+                        }
+                    });
+                });
+                
+                // Existing Send Email Button
                 $('#send_to_print_provider').on('click', function() {
                     var button = $(this);
                     var spinner = button.next('.spinner');
@@ -990,5 +1041,102 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         
         return $cart_item_data;
+    }
+
+    /**
+     * AJAX handler to refresh print data from database
+     */
+    public function ajax_refresh_print_data() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'octo-print-designer')));
+        }
+        
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Invalid order ID', 'octo-print-designer')));
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+        
+        // Refresh print data from database
+        $refreshed_items = 0;
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'octo_user_designs';
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            $design_id = $item->get_meta('_design_id');
+            
+            if (!$design_id) {
+                continue; // Skip non-design items
+            }
+            
+            // Get design from database
+            $design = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT design_data FROM {$table_name} WHERE id = %d",
+                    $design_id
+                ),
+                ARRAY_A
+            );
+            
+            if (!$design || empty($design['design_data'])) {
+                continue;
+            }
+            
+            // Parse design_data JSON to extract variationImages
+            $design_data = json_decode($design['design_data'], true);
+            if (json_last_error() !== JSON_ERROR_NONE || !isset($design_data['variationImages'])) {
+                continue;
+            }
+            
+            // Convert variationImages to the format expected by parse_design_views()
+            $processed_views = array();
+            
+            foreach ($design_data['variationImages'] as $variation_key => $variation_data) {
+                if (!isset($variation_data['views']) || !is_array($variation_data['views'])) {
+                    continue;
+                }
+                
+                foreach ($variation_data['views'] as $view_key => $view_data) {
+                    $processed_views[$variation_key . '_' . $view_key] = array(
+                        'view_name' => $view_data['viewName'] ?? 'Unbekannte Ansicht',
+                        'system_id' => $view_data['systemId'] ?? '',
+                        'variation_id' => $variation_key,
+                        'images' => $view_data['images'] ?? array()
+                    );
+                }
+            }
+            
+            // Update order item with processed views
+            if (!empty($processed_views)) {
+                $item->update_meta_data('_db_processed_views', wp_json_encode($processed_views));
+                $item->save_meta_data();
+                $refreshed_items++;
+            }
+        }
+        
+        if ($refreshed_items === 0) {
+            wp_send_json_error(array('message' => __('No design items found to refresh', 'octo-print-designer')));
+        }
+        
+        // Add order note
+        $order->add_order_note(
+            sprintf(__('Print data refreshed from database (%d items)', 'octo-print-designer'), $refreshed_items),
+            false,
+            true
+        );
+        
+        wp_send_json_success(array(
+            'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items)
+        ));
     }
 }
