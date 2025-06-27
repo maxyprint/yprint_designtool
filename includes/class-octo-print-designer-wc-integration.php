@@ -477,14 +477,47 @@ private function check_yprint_dependency() {
         
         <script>
             jQuery(document).ready(function($) {
-                // Refresh Print Data Button
+                // Helper function to create detailed status messages
+                function createStatusMessage(type, title, message, details = null) {
+                    var className = type === 'success' ? 'notice-success' : type === 'error' ? 'notice-error' : 'notice-info';
+                    var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+                    
+                    var html = '<div class="notice ' + className + '" style="margin: 10px 0; padding: 10px;">';
+                    html += '<p style="margin: 0 0 5px 0; font-weight: bold;">' + icon + ' ' + title + '</p>';
+                    html += '<p style="margin: 0; font-size: 13px;">' + message + '</p>';
+                    
+                    if (details && details.length > 0) {
+                        html += '<details style="margin-top: 8px; font-size: 11px; color: #666;">';
+                        html += '<summary style="cursor: pointer; font-weight: bold;">🔍 Details anzeigen</summary>';
+                        html += '<ul style="margin: 5px 0 0 15px; padding: 0;">';
+                        for (var i = 0; i < details.length; i++) {
+                            html += '<li>' + details[i] + '</li>';
+                        }
+                        html += '</ul></details>';
+                    }
+                    
+                    html += '</div>';
+                    return $(html);
+                }
+                
+                // Enhanced Refresh Print Data Button
                 $('#refresh_print_data').on('click', function() {
                     var button = $(this);
                     var spinner = button.next('.refresh-spinner');
                     var orderId = button.data('order-id');
                     
-                    button.prop('disabled', true).text('🔄 Lade...');
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).text('🔄 Starte Datenabfrage...');
                     spinner.css('visibility', 'visible');
+                    
+                    // Create progress container
+                    var progressContainer = $('<div class="refresh-progress" style="margin: 10px 0; padding: 8px; background: #f0f0f1; border-radius: 4px;"></div>');
+                    var progressText = $('<p style="margin: 0; font-size: 12px; color: #666;">📡 Verbinde mit Datenbank...</p>');
+                    progressContainer.append(progressText);
+                    progressContainer.insertBefore(button.parent());
                     
                     $.ajax({
                         url: ajaxurl,
@@ -494,24 +527,68 @@ private function check_yprint_dependency() {
                             order_id: orderId,
                             nonce: $('#octo_print_provider_nonce').val()
                         },
-                        success: function(response) {
-                            if (response.success) {
-                                $('<div class="notice notice-success"><p>✅ Druckdaten erfolgreich aus Datenbank geladen!</p></div>')
-                                    .insertBefore(button.parent());
-                                    
-                                setTimeout(function() {
-                                    location.reload();
-                                }, 1500);
-                            } else {
-                                $('<div class="notice notice-error"><p>❌ Fehler: ' + response.data.message + '</p></div>')
-                                    .insertBefore(button.parent());
-                                button.prop('disabled', false).text('🔄 Druckdaten aus DB laden');
-                            }
+                        beforeSend: function() {
+                            progressText.html('🔍 Suche Design-Items in Bestellung...');
+                            button.text('🔄 Analysiere Bestellung...');
                         },
-                        error: function() {
-                            $('<div class="notice notice-error"><p>❌ Netzwerkfehler beim Laden der Druckdaten</p></div>')
+                        success: function(response) {
+                            progressText.html('📊 Verarbeite Server-Antwort...');
+                            button.text('🔄 Verarbeite Daten...');
+                            
+                            setTimeout(function() {
+                                progressContainer.remove();
+                                
+                                if (response.success) {
+                                    // Success with detailed info
+                                    var title = 'Druckdaten erfolgreich geladen!';
+                                    var message = response.data.message || 'Daten wurden aus der Datenbank aktualisiert.';
+                                    var details = response.data.debug || [];
+                                    
+                                    createStatusMessage('success', title, message, details)
+                                        .insertBefore(button.parent());
+                                    
+                                    button.text('✅ Erfolgreich!').css('background-color', '#46b450');
+                                    
+                                    // Show countdown
+                                    var countdown = 3;
+                                    var countdownInterval = setInterval(function() {
+                                        button.text('✅ Neu laden in ' + countdown + 's...');
+                                        countdown--;
+                                        
+                                        if (countdown < 0) {
+                                            clearInterval(countdownInterval);
+                                            location.reload();
+                                        }
+                                    }, 1000);
+                                    
+                                } else {
+                                    // Error with debug info
+                                    var title = 'Fehler beim Laden der Druckdaten';
+                                    var message = response.data.message || 'Unbekannter Fehler aufgetreten.';
+                                    var details = response.data.debug || [];
+                                    
+                                    createStatusMessage('error', title, message, details)
+                                        .insertBefore(button.parent());
+                                    
+                                    button.prop('disabled', false).text('🔄 Erneut versuchen').css('background-color', '');
+                                }
+                            }, 500);
+                        },
+                        error: function(xhr, status, error) {
+                            progressContainer.remove();
+                            
+                            var title = 'Netzwerkfehler';
+                            var message = 'Verbindung zum Server fehlgeschlagen.';
+                            var details = [
+                                'HTTP Status: ' + (xhr.status || 'Unbekannt'),
+                                'Fehler: ' + (error || 'Unbekannt'),
+                                'Status: ' + (status || 'Unbekannt')
+                            ];
+                            
+                            createStatusMessage('error', title, message, details)
                                 .insertBefore(button.parent());
-                            button.prop('disabled', false).text('🔄 Druckdaten aus DB laden');
+                            
+                            button.prop('disabled', false).text('🔄 Druckdaten aus DB laden').css('background-color', '');
                         },
                         complete: function() {
                             spinner.css('visibility', 'hidden');
@@ -519,7 +596,7 @@ private function check_yprint_dependency() {
                     });
                 });
                 
-                // Existing Send Email Button
+                // Enhanced Send Email Button
                 $('#send_to_print_provider').on('click', function() {
                     var button = $(this);
                     var spinner = button.next('.spinner');
@@ -530,8 +607,17 @@ private function check_yprint_dependency() {
                         return;
                     }
                     
-                    button.prop('disabled', true);
+                    // Remove any existing notices
+                    $('.notice').not('.email-sent-notice').remove();
+                    
+                    button.prop('disabled', true).text('📧 Bereite E-Mail vor...');
                     spinner.css('visibility', 'visible');
+                    
+                    // Create progress for email
+                    var emailProgress = $('<div class="email-progress" style="margin: 10px 0; padding: 8px; background: #e8f4fd; border-radius: 4px;"></div>');
+                    var emailProgressText = $('<p style="margin: 0; font-size: 12px; color: #0073aa;">📧 Sammle Druckdaten...</p>');
+                    emailProgress.append(emailProgressText);
+                    emailProgress.insertBefore(button.parent());
                     
                     $.ajax({
                         url: ajaxurl,
@@ -543,28 +629,76 @@ private function check_yprint_dependency() {
                             notes: $('#print_provider_notes').val(),
                             nonce: $('#octo_print_provider_nonce').val()
                         },
+                        beforeSend: function() {
+                            emailProgressText.html('🔧 Erstelle E-Mail-Vorlage...');
+                            button.text('📧 Erstelle E-Mail...');
+                        },
+                        xhr: function() {
+                            var xhr = new window.XMLHttpRequest();
+                            
+                            // Simulate progress updates
+                            var progress = 0;
+                            var progressInterval = setInterval(function() {
+                                progress += 10;
+                                if (progress <= 50) {
+                                    emailProgressText.html('📊 Verarbeite Druckdaten (' + progress + '%)...');
+                                } else if (progress <= 80) {
+                                    emailProgressText.html('📧 Sende E-Mail (' + progress + '%)...');
+                                    button.text('📤 Sende E-Mail...');
+                                } else {
+                                    clearInterval(progressInterval);
+                                    emailProgressText.html('✅ Fertigstelle...');
+                                }
+                            }, 200);
+                            
+                            xhr.addEventListener('load', function() {
+                                clearInterval(progressInterval);
+                            });
+                            
+                            return xhr;
+                        },
                         success: function(response) {
-                            if (response.success) {
-                                $('<div class="notice notice-success"><p>' + response.data.message + '</p></div>')
-                                    .insertBefore(button.parent())
-                                    .delay(5000)
-                                    .fadeOut();
+                            setTimeout(function() {
+                                emailProgress.remove();
+                                
+                                if (response.success) {
+                                    var title = 'E-Mail erfolgreich versendet!';
+                                    var message = response.data.message || 'Print Provider wurde benachrichtigt.';
                                     
-                                // Refresh page after a short delay
-                                setTimeout(function() {
-                                    location.reload();
-                                }, 1500);
-                            } else {
-                                $('<div class="notice notice-error"><p>' + response.data.message + '</p></div>')
-                                    .insertBefore(button.parent());
-                            }
+                                    createStatusMessage('success', title, message)
+                                        .insertBefore(button.parent());
+                                    
+                                    button.text('✅ E-Mail gesendet!').css('background-color', '#46b450');
+                                    
+                                    // Clear notes field
+                                    $('#print_provider_notes').val('');
+                                    
+                                    setTimeout(function() {
+                                        location.reload();
+                                    }, 2000);
+                                } else {
+                                    var title = 'E-Mail konnte nicht gesendet werden';
+                                    var message = response.data.message || 'Unbekannter Fehler beim E-Mail-Versand.';
+                                    
+                                    createStatusMessage('error', title, message)
+                                        .insertBefore(button.parent());
+                                    
+                                    button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
+                                }
+                            }, 300);
                         },
                         error: function() {
-                            $('<div class="notice notice-error"><p><?php echo esc_js(__('An error occurred. Please try again.', 'octo-print-designer')); ?></p></div>')
+                            emailProgress.remove();
+                            
+                            var title = 'E-Mail-Versand fehlgeschlagen';
+                            var message = 'Netzwerkfehler beim Senden der E-Mail.';
+                            
+                            createStatusMessage('error', title, message)
                                 .insertBefore(button.parent());
+                            
+                            button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
                         },
                         complete: function() {
-                            button.prop('disabled', false);
                             spinner.css('visibility', 'hidden');
                         }
                     });
