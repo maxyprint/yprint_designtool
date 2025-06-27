@@ -35,6 +35,7 @@ class Octo_Print_Designer_WC_Integration {
         add_action('add_meta_boxes', array($this, 'add_print_provider_meta_box'));
         add_action('wp_ajax_octo_send_print_provider_email', array($this, 'ajax_send_print_provider_email'));
         add_action('wp_ajax_octo_refresh_print_data', array($this, 'ajax_refresh_print_data'));
+        add_action('wp_ajax_octo_preview_print_provider_email', array($this, 'ajax_preview_print_provider_email'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -429,6 +430,36 @@ private function check_yprint_dependency() {
             return;
         }
         
+        // Analyze print data status for all design items
+        $design_items_status = array();
+        $all_data_complete = true;
+        $total_design_items = 0;
+        $items_with_data = 0;
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            $design_id = $item->get_meta('_design_id');
+            if (!$design_id) continue;
+            
+            $total_design_items++;
+            $has_processed_views = !empty($item->get_meta('_db_processed_views'));
+            $has_preview = !empty($item->get_meta('_design_preview_url'));
+            
+            if ($has_processed_views) $items_with_data++;
+            
+            $design_items_status[] = array(
+                'item_id' => $item_id,
+                'design_id' => $design_id,
+                'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                'has_processed_views' => $has_processed_views,
+                'has_preview' => $has_preview,
+                'is_complete' => $has_processed_views && $has_preview
+            );
+            
+            if (!$has_processed_views || !$has_preview) {
+                $all_data_complete = false;
+            }
+        }
+        
         // Get saved print provider email
         $print_provider_email = get_post_meta($order_id, '_print_provider_email', true);
         $email_sent = get_post_meta($order_id, '_print_provider_email_sent', true);
@@ -437,6 +468,44 @@ private function check_yprint_dependency() {
         
         ?>
         <div class="print-provider-form">
+            
+            <!-- Print Data Status Section -->
+            <div class="print-data-status-section" style="margin-bottom: 15px; padding: 12px; border-radius: 6px; <?php echo $all_data_complete ? 'background-color: #d4edda; border-left: 4px solid #28a745;' : 'background-color: #fff3cd; border-left: 4px solid #ffc107;'; ?>">
+                <h4 style="margin: 0 0 8px 0; font-size: 14px; <?php echo $all_data_complete ? 'color: #155724;' : 'color: #856404;'; ?>">
+                    <?php echo $all_data_complete ? '✅' : '⚠️'; ?> Druckdaten-Status
+                </h4>
+                
+                <p style="margin: 0 0 8px 0; font-size: 12px; <?php echo $all_data_complete ? 'color: #155724;' : 'color: #856404;'; ?>">
+                    <strong><?php echo $items_with_data; ?> von <?php echo $total_design_items; ?> Design-Items</strong> haben vollständige Druckdaten
+                </p>
+                
+                <?php if (!$all_data_complete) : ?>
+                    <p style="margin: 0; font-size: 11px; color: #856404;">
+                        <em>💡 Tipp: Klicken Sie "Druckdaten aus DB laden" um fehlende Daten zu ergänzen</em>
+                    </p>
+                <?php else : ?>
+                    <p style="margin: 0; font-size: 11px; color: #155724;">
+                        <em>🎉 Alle Druckdaten sind vollständig! E-Mail kann versendet werden.</em>
+                    </p>
+                <?php endif; ?>
+                
+                <!-- Detailed Item Status -->
+                <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-size: 11px; font-weight: bold; <?php echo $all_data_complete ? 'color: #155724;' : 'color: #856404;'; ?>">
+                        📋 Details zu einzelnen Items anzeigen
+                    </summary>
+                    <div style="margin-top: 5px; padding: 5px; background: rgba(255,255,255,0.5); border-radius: 3px;">
+                        <?php foreach ($design_items_status as $status) : ?>
+                            <div style="font-size: 10px; margin-bottom: 3px; padding: 3px; background: white; border-radius: 2px;">
+                                <strong><?php echo esc_html($status['name']); ?></strong> (ID: <?php echo $status['design_id']; ?>)
+                                <br>
+                                Views: <?php echo $status['has_processed_views'] ? '<span style="color: #28a745;">✓</span>' : '<span style="color: #dc3545;">✗</span>'; ?>
+                                | Preview: <?php echo $status['has_preview'] ? '<span style="color: #28a745;">✓</span>' : '<span style="color: #dc3545;">✗</span>'; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+            </div>
             <p>
                 <label for="print_provider_email"><?php _e('Print Provider Email:', 'octo-print-designer'); ?></label>
                 <input type="email" id="print_provider_email" name="print_provider_email" 
@@ -460,19 +529,28 @@ private function check_yprint_dependency() {
                 </div>
             <?php endif; ?>
             
-            <p>
-                <button type="button" id="refresh_print_data" class="button" data-order-id="<?php echo $order_id; ?>" style="margin-bottom: 10px;">
-                    <?php _e('🔄 Druckdaten aus DB laden', 'octo-print-designer'); ?>
-                </button>
-                <span class="refresh-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
-            </p>
-            
-            <p>
-                <button type="button" id="send_to_print_provider" class="button button-primary">
-                    <?php _e('Send to Print Provider', 'octo-print-designer'); ?>
-                </button>
-                <span class="spinner" style="float: none; margin: 0 0 0 5px;"></span>
-            </p>
+            <div class="print-actions-section" style="border-top: 1px solid #e1e1e1; padding-top: 15px;">
+                <p style="margin-bottom: 8px;">
+                    <button type="button" id="refresh_print_data" class="button" data-order-id="<?php echo $order_id; ?>">
+                        <?php _e('🔄 Druckdaten aus DB laden', 'octo-print-designer'); ?>
+                    </button>
+                    <span class="refresh-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
+                </p>
+                
+                <p style="margin-bottom: 8px;">
+                    <button type="button" id="preview_print_provider_email" class="button" data-order-id="<?php echo $order_id; ?>" <?php echo !$all_data_complete ? 'disabled title="Erst alle Druckdaten laden"' : ''; ?>>
+                        <?php _e('👁️ E-Mail Vorschau', 'octo-print-designer'); ?>
+                    </button>
+                    <span class="preview-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
+                </p>
+                
+                <p style="margin-bottom: 0;">
+                    <button type="button" id="send_to_print_provider" class="button button-primary" <?php echo !$all_data_complete ? 'disabled title="Erst alle Druckdaten laden"' : ''; ?>>
+                        <?php _e('📧 Send to Print Provider', 'octo-print-designer'); ?>
+                    </button>
+                    <span class="spinner" style="float: none; margin: 0 0 0 5px;"></span>
+                </p>
+            </div>
         </div>
         
         <script>
@@ -589,6 +667,88 @@ private function check_yprint_dependency() {
                                 .insertBefore(button.parent());
                             
                             button.prop('disabled', false).text('🔄 Druckdaten aus DB laden').css('background-color', '');
+                        },
+                        complete: function() {
+                            spinner.css('visibility', 'hidden');
+                        }
+                    });
+                });
+                
+                // Preview Email Button
+                $('#preview_print_provider_email').on('click', function() {
+                    var button = $(this);
+                    var spinner = button.next('.preview-spinner');
+                    var orderId = button.data('order-id');
+                    
+                    if (button.prop('disabled')) {
+                        return;
+                    }
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    button.prop('disabled', true).text('👁️ Lade Preview...');
+                    spinner.css('visibility', 'visible');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'octo_preview_print_provider_email',
+                            order_id: orderId,
+                            email: $('#print_provider_email').val() || 'preview@example.com',
+                            notes: $('#print_provider_notes').val(),
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Create modal overlay
+                                var modal = $('<div id="email-preview-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100000; display: flex; align-items: center; justify-content: center;"></div>');
+                                
+                                var modalContent = $('<div style="background: white; width: 90%; max-width: 800px; max-height: 90%; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3);"></div>');
+                                
+                                var modalHeader = $('<div style="padding: 15px 20px; background: #0073aa; color: white; display: flex; justify-content: between; align-items: center;"><h3 style="margin: 0; color: white;">📧 E-Mail Vorschau - Print Provider</h3><button id="close-preview" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; float: right;">&times;</button></div>');
+                                
+                                var modalBody = $('<div style="padding: 0; max-height: 70vh; overflow-y: auto;"></div>');
+                                modalBody.html(response.data.preview);
+                                
+                                var modalFooter = $('<div style="padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right;"><button id="close-preview-footer" class="button">Schließen</button></div>');
+                                
+                                modalContent.append(modalHeader);
+                                modalContent.append(modalBody);
+                                modalContent.append(modalFooter);
+                                modal.append(modalContent);
+                                
+                                $('body').append(modal);
+                                
+                                // Close modal handlers
+                                $('#close-preview, #close-preview-footer').on('click', function() {
+                                    modal.remove();
+                                });
+                                
+                                modal.on('click', function(e) {
+                                    if (e.target === modal[0]) {
+                                        modal.remove();
+                                    }
+                                });
+                                
+                                button.text('✅ Preview erstellt!').css('background-color', '#46b450');
+                                setTimeout(function() {
+                                    button.prop('disabled', false).text('👁️ E-Mail Vorschau').css('background-color', '');
+                                }, 2000);
+                                
+                            } else {
+                                createStatusMessage('error', 'Preview-Fehler', response.data.message || 'Konnte keine Vorschau erstellen.')
+                                    .insertBefore(button.parent());
+                                
+                                button.prop('disabled', false).text('👁️ E-Mail Vorschau');
+                            }
+                        },
+                        error: function() {
+                            createStatusMessage('error', 'Preview-Fehler', 'Netzwerkfehler beim Erstellen der Vorschau.')
+                                .insertBefore(button.parent());
+                            
+                            button.prop('disabled', false).text('👁️ E-Mail Vorschau');
                         },
                         complete: function() {
                             spinner.css('visibility', 'hidden');
@@ -1331,6 +1491,96 @@ private function build_print_provider_email_content($order, $design_items, $note
         wp_send_json_success(array(
             'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
             'debug' => $debug_info
+        ));
+    }
+
+    /**
+     * AJAX handler for email preview
+     */
+    public function ajax_preview_print_provider_email() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'octo-print-designer')));
+        }
+        
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : 'preview@example.com';
+        $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Invalid order ID', 'octo-print-designer')));
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+        
+        // Get design items from the order (same logic as send_print_provider_email)
+        $design_items = array();
+        
+        foreach ($order->get_items() as $item) {
+            $design_id = $item->get_meta('_design_id');
+            
+            // Handle design products
+            if ($design_id) {
+                $design_item = array(
+                    'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                    'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
+                    'size_name' => $item->get_meta('_design_size') ?: 'One Size',
+                    'design_id' => $design_id,
+                    'template_id' => $item->get_meta('_db_design_template_id') ?: '',
+                    'preview_url' => $item->get_meta('_design_preview_url') ?: '',
+                    'design_views' => $this->parse_design_views($item),
+                    'is_design_product' => true
+                );
+            } else {
+                // Handle blank products
+                $design_item = array(
+                    'name' => $item->get_name(),
+                    'variation_name' => $this->get_product_variation_name($item),
+                    'size_name' => $this->get_product_size_name($item),
+                    'quantity' => $item->get_quantity(),
+                    'is_design_product' => false
+                );
+            }
+            
+            $design_items[] = $design_item;
+        }
+        
+        if (empty($design_items)) {
+            wp_send_json_error(array('message' => __('No items found in this order', 'octo-print-designer')));
+        }
+        
+        // Create email content
+        $email_content = $this->build_print_provider_email_content($order, $design_items, $notes);
+        
+        // Check if YPrint template function is available
+        if (function_exists('yprint_get_email_template')) {
+            $email_html = yprint_get_email_template(
+                'Neue Druckbestellung #' . $order->get_order_number() . ' (VORSCHAU)',
+                null,
+                $email_content
+            );
+        } else {
+            // Fallback: Create simple HTML wrapper
+            $email_html = '<html><head><meta charset="UTF-8"><title>E-Mail Vorschau</title></head><body style="font-family: Arial, sans-serif; margin: 20px;">';
+            $email_html .= '<div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 20px;">';
+            $email_html .= '<h2 style="margin: 0; color: #0073aa;">📧 VORSCHAU: Neue Druckbestellung #' . $order->get_order_number() . '</h2>';
+            $email_html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #666;"><em>Dies ist eine Vorschau der E-Mail, die an den Print Provider gesendet wird</em></p>';
+            $email_html .= '</div>';
+            $email_html .= $email_content;
+            $email_html .= '</body></html>';
+        }
+        
+        wp_send_json_success(array(
+            'preview' => $email_html,
+            'message' => __('Preview successfully generated', 'octo-print-designer')
         ));
     }
 }
