@@ -1069,6 +1069,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         
         // Refresh print data from database
         $refreshed_items = 0;
+        $debug_info = array();
         global $wpdb;
         $table_name = $wpdb->prefix . 'octo_user_designs';
         
@@ -1076,43 +1077,95 @@ private function build_print_provider_email_content($order, $design_items, $note
             $design_id = $item->get_meta('_design_id');
             
             if (!$design_id) {
+                $debug_info[] = "Item {$item_id}: No design_id found";
                 continue; // Skip non-design items
             }
             
-            // Get design from database
+            $debug_info[] = "Item {$item_id}: Found design_id = {$design_id}";
+            
+            // Get complete design record from database
             $design = $wpdb->get_row(
                 $wpdb->prepare(
-                    "SELECT design_data FROM {$table_name} WHERE id = %d",
+                    "SELECT * FROM {$table_name} WHERE id = %d",
                     $design_id
                 ),
                 ARRAY_A
             );
             
-            if (!$design || empty($design['design_data'])) {
+            if (!$design) {
+                $debug_info[] = "Design {$design_id}: Not found in database";
                 continue;
             }
             
-            // Parse design_data JSON to extract variationImages
-            $design_data = json_decode($design['design_data'], true);
-            if (json_last_error() !== JSON_ERROR_NONE || !isset($design_data['variationImages'])) {
+            $debug_info[] = "Design {$design_id}: Found in database";
+            
+            // Check which field contains the design data
+            $design_data_raw = null;
+            if (!empty($design['design_data'])) {
+                $design_data_raw = $design['design_data'];
+                $debug_info[] = "Design {$design_id}: Using design_data field";
+            }
+            
+            if (!$design_data_raw) {
+                $debug_info[] = "Design {$design_id}: No design_data found";
                 continue;
             }
             
-            // Convert variationImages to the format expected by parse_design_views()
+            // Parse design_data JSON
+            $design_data = json_decode($design_data_raw, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $debug_info[] = "Design {$design_id}: JSON parse error - " . json_last_error_msg();
+                continue;
+            }
+            
+            $debug_info[] = "Design {$design_id}: JSON parsed successfully";
+            
+            // Debug: Show what's in the JSON
+            if (isset($design_data['variationImages'])) {
+                $debug_info[] = "Design {$design_id}: variationImages found with " . count($design_data['variationImages']) . " variations";
+            } else {
+                $debug_info[] = "Design {$design_id}: No variationImages in JSON";
+                $debug_info[] = "Design {$design_id}: Available keys: " . implode(', ', array_keys($design_data));
+                continue;
+            }
+            
+            // Convert variationImages to processed_views format
+            // Structure is: "167359_189542" => [image1, image2, ...]
             $processed_views = array();
             
-            foreach ($design_data['variationImages'] as $variation_key => $variation_data) {
-                if (!isset($variation_data['views']) || !is_array($variation_data['views'])) {
-                    continue;
+            foreach ($design_data['variationImages'] as $combined_key => $images_array) {
+                $debug_info[] = "Design {$design_id}: Processing combined key {$combined_key}";
+                
+                // Split the combined key "167359_189542" into variation_id and view_id
+                $parts = explode('_', $combined_key);
+                $variation_id = $parts[0] ?? $combined_key;
+                $view_id = $parts[1] ?? 'default';
+                
+                // Try to get view name from the order item's product_images data
+                $view_name = 'Design View';
+                $product_images_json = $item->get_meta('_design_product_images');
+                if ($product_images_json) {
+                    $product_images = json_decode($product_images_json, true);
+                    if (is_array($product_images)) {
+                        foreach ($product_images as $product_image) {
+                            if (isset($product_image['view_id']) && $product_image['view_id'] == $view_id) {
+                                $view_name = $product_image['view_name'] ?? 'Design View';
+                                break;
+                            }
+                        }
+                    }
                 }
                 
-                foreach ($variation_data['views'] as $view_key => $view_data) {
-                    $processed_views[$variation_key . '_' . $view_key] = array(
-                        'view_name' => $view_data['viewName'] ?? 'Unbekannte Ansicht',
-                        'system_id' => $view_data['systemId'] ?? '',
-                        'variation_id' => $variation_key,
-                        'images' => $view_data['images'] ?? array()
+                if (is_array($images_array) && !empty($images_array)) {
+                    $processed_views[$combined_key] = array(
+                        'view_name' => $view_name,
+                        'system_id' => $view_id,
+                        'variation_id' => $variation_id,
+                        'images' => $images_array
                     );
+                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$variation_id} with " . count($images_array) . " images";
+                } else {
+                    $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid images array";
                 }
             }
             
@@ -1121,11 +1174,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $item->update_meta_data('_db_processed_views', wp_json_encode($processed_views));
                 $item->save_meta_data();
                 $refreshed_items++;
+                $debug_info[] = "Design {$design_id}: Updated order item with " . count($processed_views) . " views";
+            } else {
+                $debug_info[] = "Design {$design_id}: No processed views to save";
             }
         }
         
         if ($refreshed_items === 0) {
-            wp_send_json_error(array('message' => __('No design items found to refresh', 'octo-print-designer')));
+            wp_send_json_error(array(
+                'message' => __('No design items found to refresh', 'octo-print-designer'),
+                'debug' => $debug_info
+            ));
         }
         
         // Add order note
@@ -1136,7 +1195,8 @@ private function build_print_provider_email_content($order, $design_items, $note
         );
         
         wp_send_json_success(array(
-            'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items)
+            'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
+            'debug' => $debug_info
         ));
     }
 }
