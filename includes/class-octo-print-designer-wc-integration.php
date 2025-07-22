@@ -967,19 +967,20 @@ public function send_print_provider_email($order, $email, $notes = '') {
     $design_items = array();
     
     foreach ($order->get_items() as $item) {
-        $design_id = $item->get_meta('_design_id');
+        $design_id = $this->get_design_meta($item, 'design_id');
         
         // Handle design products
         if ($design_id) {
             $design_item = array(
-                'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
-                'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
-                'size_name' => $item->get_meta('_design_size') ?: 'One Size',
+                'name' => $this->get_design_meta($item, 'name'),
+                'variation_name' => $this->get_design_meta($item, 'design_color') ?: 'Standard',
+                'size_name' => $this->get_design_meta($item, 'size_name') ?: 'One Size',
                 'design_id' => $design_id,
-                'template_id' => $item->get_meta('_db_design_template_id') ?: '',
-                'preview_url' => $item->get_meta('_design_preview_url') ?: '',
+                'template_id' => $this->get_design_meta($item, 'template_id') ?: '',
+                'preview_url' => $this->get_design_meta($item, 'preview_url') ?: '',
                 'design_views' => $this->parse_design_views($item),
-                'is_design_product' => true
+                'is_design_product' => true,
+                'quantity' => $item->get_quantity()
             );
         } else {
             // Handle blank products
@@ -1018,7 +1019,7 @@ if (!function_exists('yprint_get_email_template')) {
 
 $email_html = yprint_get_email_template(
     'Neue Druckbestellung #' . $order->get_order_number(),
-    null, // Username ist null – vermeidet Leerzeichen in "Hi!"
+    '', // Leerer Username für Print Provider
     $email_content
 );
 
@@ -1550,19 +1551,20 @@ private function build_print_provider_email_content($order, $design_items, $note
         $design_items = array();
         
         foreach ($order->get_items() as $item) {
-            $design_id = $item->get_meta('_design_id');
+            $design_id = $this->get_design_meta($item, 'design_id');
             
             // Handle design products
             if ($design_id) {
                 $design_item = array(
-                    'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
-                    'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
-                    'size_name' => $item->get_meta('_design_size') ?: 'One Size',
+                    'name' => $this->get_design_meta($item, 'name'),
+                    'variation_name' => $this->get_design_meta($item, 'design_color') ?: 'Standard',
+                    'size_name' => $this->get_design_meta($item, 'size_name') ?: 'One Size',
                     'design_id' => $design_id,
-                    'template_id' => $item->get_meta('_db_design_template_id') ?: '',
-                    'preview_url' => $item->get_meta('_design_preview_url') ?: '',
+                    'template_id' => $this->get_design_meta($item, 'template_id') ?: '',
+                    'preview_url' => $this->get_design_meta($item, 'preview_url') ?: '',
                     'design_views' => $this->parse_design_views($item),
-                    'is_design_product' => true
+                    'is_design_product' => true,
+                    'quantity' => $item->get_quantity()
                 );
             } else {
                 // Handle blank products
