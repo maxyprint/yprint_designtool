@@ -475,8 +475,8 @@ private function check_yprint_dependency() {
                     <?php echo $all_data_complete ? '✅' : '⚠️'; ?> Druckdaten-Status
                 </h4>
                 
-                <p style="margin: 0 0 8px 0; font-size: 12px; <?php echo $all_data_complete ? 'color: #155724;' : 'color: #856404;'; ?>">
-                    <strong><?php echo $items_with_data; ?> von <?php echo $total_design_items; ?> Design-Items</strong> haben vollständige Druckdaten
+                <p style="margin: 0 0 8px 0; font-size: 12px; <?php echo $all_data_complete ? 'color: #155724;' : 'color: #0073aa;'; ?>">
+                    <?php echo $all_data_complete ? 'Alle Druckdaten verfügbar - bereit zum Versenden' : "Druckdaten werden automatisch aus der Datenbank geladen ({$items_with_data}/{$total_design_items} Items bereit)"; ?>
                 </p>
                 
                 <?php if (!$all_data_complete) : ?>
@@ -545,8 +545,8 @@ private function check_yprint_dependency() {
                 </p>
                 
                 <p style="margin-bottom: 0;">
-                    <button type="button" id="send_to_print_provider" class="button button-primary" <?php echo !$all_data_complete ? 'disabled title="Erst alle Druckdaten laden"' : ''; ?>>
-                        <?php _e('📧 Send to Print Provider', 'octo-print-designer'); ?>
+                    <button type="button" id="send_to_print_provider" class="button button-primary" data-auto-refresh="<?php echo !$all_data_complete ? 'true' : 'false'; ?>">
+                        <?php echo !$all_data_complete ? '🔄 Daten laden & senden' : '📧 Send to Print Provider'; ?>
                     </button>
                     <span class="spinner" style="float: none; margin: 0 0 0 5px;"></span>
                 </p>
@@ -761,107 +761,124 @@ private function check_yprint_dependency() {
                     var button = $(this);
                     var spinner = button.next('.spinner');
                     var email = $('#print_provider_email').val();
-                    
+                    var autoRefresh = button.data('auto-refresh');
+                    var orderId = <?php echo intval($order_id); ?>;
+
                     if (!email) {
                         alert('<?php echo esc_js(__('Please enter a valid email address', 'octo-print-designer')); ?>');
                         return;
                     }
-                    
+
                     // Remove any existing notices
                     $('.notice').not('.email-sent-notice').remove();
-                    
-                    button.prop('disabled', true).text('📧 Bereite E-Mail vor...');
-                    spinner.css('visibility', 'visible');
-                    
-                    // Create progress for email
-                    var emailProgress = $('<div class="email-progress" style="margin: 10px 0; padding: 8px; background: #e8f4fd; border-radius: 4px;"></div>');
-                    var emailProgressText = $('<p style="margin: 0; font-size: 12px; color: #0073aa;">📧 Sammle Druckdaten...</p>');
-                    emailProgress.append(emailProgressText);
-                    emailProgress.insertBefore(button.parent());
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'octo_send_print_provider_email',
-                            order_id: <?php echo intval($order_id); ?>,
-                            email: email,
-                            notes: $('#print_provider_notes').val(),
+
+                    // Wenn Daten fehlen, erst automatisch refreshen
+                    if (autoRefresh === 'true') {
+                        button.text('🔄 Lade Druckdaten...');
+                        spinner.css('visibility', 'visible');
+                        $.post(ajaxurl, {
+                            action: 'octo_refresh_print_data',
+                            order_id: orderId,
                             nonce: $('#octo_print_provider_nonce').val()
-                        },
-                        beforeSend: function() {
-                            emailProgressText.html('🔧 Erstelle E-Mail-Vorlage...');
-                            button.text('📧 Erstelle E-Mail...');
-                        },
-                        xhr: function() {
-                            var xhr = new window.XMLHttpRequest();
-                            
-                            // Simulate progress updates
-                            var progress = 0;
-                            var progressInterval = setInterval(function() {
-                                progress += 10;
-                                if (progress <= 50) {
-                                    emailProgressText.html('📊 Verarbeite Druckdaten (' + progress + '%)...');
-                                } else if (progress <= 80) {
-                                    emailProgressText.html('📧 Sende E-Mail (' + progress + '%)...');
-                                    button.text('📤 Sende E-Mail...');
-                                } else {
+                        }, function(refreshResponse) {
+                            if (refreshResponse.success) {
+                                // Nach Refresh normal weitermachen
+                                button.text('📧 Sende E-Mail...');
+                                spinner.css('visibility', 'visible');
+                                sendPrintProviderEmail();
+                            } else {
+                                alert('Fehler beim Laden der Druckdaten: ' + (refreshResponse.data && refreshResponse.data.message ? refreshResponse.data.message : 'Unbekannter Fehler'));
+                                button.text('❌ Fehler - erneut versuchen');
+                                spinner.css('visibility', 'hidden');
+                                return;
+                            }
+                        });
+                        return;
+                    }
+
+                    sendPrintProviderEmail();
+
+                    function sendPrintProviderEmail() {
+                        button.prop('disabled', true).text('📧 Bereite E-Mail vor...');
+                        spinner.css('visibility', 'visible');
+
+                        // Create progress for email
+                        var emailProgress = $('<div class="email-progress" style="margin: 10px 0; padding: 8px; background: #e8f4fd; border-radius: 4px;"></div>');
+                        var emailProgressText = $('<p style="margin: 0; font-size: 12px; color: #0073aa;">📧 Sammle Druckdaten...</p>');
+                        emailProgress.append(emailProgressText);
+                        emailProgress.insertBefore(button.parent());
+
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: {
+                                action: 'octo_send_print_provider_email',
+                                order_id: orderId,
+                                email: email,
+                                notes: $('#print_provider_notes').val(),
+                                nonce: $('#octo_print_provider_nonce').val()
+                            },
+                            beforeSend: function() {
+                                emailProgressText.html('🔧 Erstelle E-Mail-Vorlage...');
+                                button.text('📧 Erstelle E-Mail...');
+                            },
+                            xhr: function() {
+                                var xhr = new window.XMLHttpRequest();
+                                // Simulate progress updates
+                                var progress = 0;
+                                var progressInterval = setInterval(function() {
+                                    progress += 10;
+                                    if (progress <= 50) {
+                                        emailProgressText.html('📊 Verarbeite Druckdaten (' + progress + '%)...');
+                                    } else if (progress <= 80) {
+                                        emailProgressText.html('📧 Sende E-Mail (' + progress + '%)...');
+                                        button.text('📤 Sende E-Mail...');
+                                    } else {
+                                        clearInterval(progressInterval);
+                                        emailProgressText.html('✅ Fertigstelle...');
+                                    }
+                                }, 200);
+                                xhr.addEventListener('load', function() {
                                     clearInterval(progressInterval);
-                                    emailProgressText.html('✅ Fertigstelle...');
-                                }
-                            }, 200);
-                            
-                            xhr.addEventListener('load', function() {
-                                clearInterval(progressInterval);
-                            });
-                            
-                            return xhr;
-                        },
-                        success: function(response) {
-                            setTimeout(function() {
+                                });
+                                return xhr;
+                            },
+                            success: function(response) {
+                                setTimeout(function() {
+                                    emailProgress.remove();
+                                    if (response.success) {
+                                        var title = 'E-Mail erfolgreich versendet!';
+                                        var message = response.data.message || 'Print Provider wurde benachrichtigt.';
+                                        createStatusMessage('success', title, message)
+                                            .insertBefore(button.parent());
+                                        button.text('✅ E-Mail gesendet!').css('background-color', '#46b450');
+                                        // Clear notes field
+                                        $('#print_provider_notes').val('');
+                                        setTimeout(function() {
+                                            location.reload();
+                                        }, 2000);
+                                    } else {
+                                        var title = 'Fehler beim Senden der E-Mail';
+                                        var message = response.data && response.data.message ? response.data.message : 'Unbekannter Fehler beim Senden.';
+                                        createStatusMessage('error', title, message)
+                                            .insertBefore(button.parent());
+                                        button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
+                                    }
+                                }, 500);
+                            },
+                            error: function() {
                                 emailProgress.remove();
-                                
-                                if (response.success) {
-                                    var title = 'E-Mail erfolgreich versendet!';
-                                    var message = response.data.message || 'Print Provider wurde benachrichtigt.';
-                                    
-                                    createStatusMessage('success', title, message)
-                                        .insertBefore(button.parent());
-                                    
-                                    button.text('✅ E-Mail gesendet!').css('background-color', '#46b450');
-                                    
-                                    // Clear notes field
-                                    $('#print_provider_notes').val('');
-                                    
-                                    setTimeout(function() {
-                                        location.reload();
-                                    }, 2000);
-                                } else {
-                                    var title = 'E-Mail konnte nicht gesendet werden';
-                                    var message = response.data.message || 'Unbekannter Fehler beim E-Mail-Versand.';
-                                    
-                                    createStatusMessage('error', title, message)
-                                        .insertBefore(button.parent());
-                                    
-                                    button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
-                                }
-                            }, 300);
-                        },
-                        error: function() {
-                            emailProgress.remove();
-                            
-                            var title = 'E-Mail-Versand fehlgeschlagen';
-                            var message = 'Netzwerkfehler beim Senden der E-Mail.';
-                            
-                            createStatusMessage('error', title, message)
-                                .insertBefore(button.parent());
-                            
-                            button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
-                        },
-                        complete: function() {
-                            spinner.css('visibility', 'hidden');
-                        }
-                    });
+                                var title = 'Netzwerkfehler';
+                                var message = 'Verbindung zum Server fehlgeschlagen.';
+                                createStatusMessage('error', title, message)
+                                    .insertBefore(button.parent());
+                                button.prop('disabled', false).text('📧 Send to Print Provider').css('background-color', '');
+                            },
+                            complete: function() {
+                                spinner.css('visibility', 'hidden');
+                            }
+                        });
+                    }
                 });
             });
         </script>
