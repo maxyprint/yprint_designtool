@@ -419,7 +419,12 @@ private function check_yprint_dependency() {
         // Check if order has any design products
         $has_design_products = false;
         foreach ($order->get_items() as $item) {
-            if ($item->get_meta('_design_id') || $item->get_meta('yprint_design_id')) {
+            if (
+                $item->get_meta('_design_id') ||
+                $item->get_meta('yprint_design_id') ||
+                $item->get_meta('_yprint_design_id') ||
+                $item->get_meta('_is_design_product')
+            ) {
                 $has_design_products = true;
                 break;
             }
@@ -437,7 +442,7 @@ private function check_yprint_dependency() {
         $items_with_data = 0;
         
         foreach ($order->get_items() as $item_id => $item) {
-            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id');
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
             if (!$design_id) {
                 $debug_info[] = "Item {$item_id}: No design_id found (checked _design_id and yprint_design_id)";
                 continue; // Skip non-design items
@@ -445,7 +450,7 @@ private function check_yprint_dependency() {
             
             $total_design_items++;
             $has_processed_views = !empty($item->get_meta('_db_processed_views'));
-            $has_preview = !empty($item->get_meta('_design_preview_url'));
+            $has_preview = !empty($item->get_meta('_design_preview_url')) || !empty($item->get_meta('_yprint_preview_url'));
             
             if ($has_processed_views) $items_with_data++;
             
@@ -1388,7 +1393,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $table_name = $wpdb->prefix . 'octo_user_designs';
         
         foreach ($order->get_items() as $item_id => $item) {
-            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id');
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
             
             if (!$design_id) {
                 $debug_info[] = "Item {$item_id}: No design_id found (checked _design_id and yprint_design_id)";
@@ -1613,6 +1618,10 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Fallback to yprint naming
         if (!$value) {
             $value = $item->get_meta('yprint_' . $key);
+        }
+        // Fallback to _yprint naming (actual format!)
+        if (!$value) {
+            $value = $item->get_meta('_yprint_' . $key);
         }
         return $value;
     }
