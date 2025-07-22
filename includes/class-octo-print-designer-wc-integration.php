@@ -193,7 +193,7 @@ private function check_yprint_dependency() {
      */
     public function modify_order_item_name($item_name, $item) {
         // Get design details
-        $design_name = $item->get_meta('_design_name');
+        $design_name = $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name');
         $design_color = $item->get_meta('_design_color');
         $design_size = $item->get_meta('_design_size');
         
@@ -419,7 +419,7 @@ private function check_yprint_dependency() {
         // Check if order has any design products
         $has_design_products = false;
         foreach ($order->get_items() as $item) {
-            if ($item->get_meta('_design_id')) {
+            if ($item->get_meta('_design_id') || $item->get_meta('yprint_design_id')) {
                 $has_design_products = true;
                 break;
             }
@@ -437,8 +437,11 @@ private function check_yprint_dependency() {
         $items_with_data = 0;
         
         foreach ($order->get_items() as $item_id => $item) {
-            $design_id = $item->get_meta('_design_id');
-            if (!$design_id) continue;
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id');
+            if (!$design_id) {
+                $debug_info[] = "Item {$item_id}: No design_id found (checked _design_id and yprint_design_id)";
+                continue; // Skip non-design items
+            }
             
             $total_design_items++;
             $has_processed_views = !empty($item->get_meta('_db_processed_views'));
@@ -449,7 +452,7 @@ private function check_yprint_dependency() {
             $design_items_status[] = array(
                 'item_id' => $item_id,
                 'design_id' => $design_id,
-                'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
                 'has_processed_views' => $has_processed_views,
                 'has_preview' => $has_preview,
                 'is_complete' => $has_processed_views && $has_preview
@@ -964,7 +967,7 @@ public function send_print_provider_email($order, $email, $notes = '') {
         // Handle design products
         if ($design_id) {
             $design_item = array(
-                'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
                 'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
                 'size_name' => $item->get_meta('_design_size') ?: 'One Size',
                 'design_id' => $design_id,
@@ -1385,10 +1388,10 @@ private function build_print_provider_email_content($order, $design_items, $note
         $table_name = $wpdb->prefix . 'octo_user_designs';
         
         foreach ($order->get_items() as $item_id => $item) {
-            $design_id = $item->get_meta('_design_id');
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id');
             
             if (!$design_id) {
-                $debug_info[] = "Item {$item_id}: No design_id found";
+                $debug_info[] = "Item {$item_id}: No design_id found (checked _design_id and yprint_design_id)";
                 continue; // Skip non-design items
             }
             
@@ -1547,7 +1550,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             // Handle design products
             if ($design_id) {
                 $design_item = array(
-                    'name' => $item->get_meta('_design_name') ?: $item->get_name(),
+                    'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
                     'variation_name' => $item->get_meta('_design_color') ?: 'Standard',
                     'size_name' => $item->get_meta('_design_size') ?: 'One Size',
                     'design_id' => $design_id,
@@ -1599,5 +1602,18 @@ private function build_print_provider_email_content($order, $design_items, $note
             'preview' => $email_html,
             'message' => __('Preview successfully generated', 'octo-print-designer')
         ));
+    }
+
+    /**
+     * Get design meta value with fallback for different naming conventions
+     */
+    private function get_design_meta($item, $key) {
+        // Try standard naming first
+        $value = $item->get_meta('_' . $key);
+        // Fallback to yprint naming
+        if (!$value) {
+            $value = $item->get_meta('yprint_' . $key);
+        }
+        return $value;
     }
 }
