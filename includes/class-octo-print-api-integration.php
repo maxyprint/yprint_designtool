@@ -686,4 +686,233 @@ class Octo_Print_API_Integration {
     public function has_credentials() {
         return $this->has_valid_credentials();
     }
+
+    /**
+     * AJAX handler for sending order to AllesKlarDruck API
+     */
+    public function ajax_send_print_provider_api() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+        
+        // Check if user has permission
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'octo-print-designer')));
+        }
+        
+        // Get and validate parameters
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Missing required order ID', 'octo-print-designer')));
+        }
+        
+        // Get order
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+        
+        // Get API integration instance
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        
+        // Check API credentials
+        if (!$api_integration->has_credentials()) {
+            wp_send_json_error(array(
+                'message' => __('AllesKlarDruck API credentials are not configured. Please configure them in the plugin settings.', 'octo-print-designer')
+            ));
+        }
+        
+        // Transform order data for API
+        $api_order_data = $this->transform_order_for_api($order);
+        
+        if (is_wp_error($api_order_data)) {
+            wp_send_json_error(array('message' => $api_order_data->get_error_message()));
+        }
+        
+        // Send to API
+        $result = $api_integration->send_order($api_order_data);
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error(array('message' => $result->get_error_message()));
+        }
+        
+        // Save API response information
+        update_post_meta($order_id, '_allesklardruck_api_sent', time());
+        if (isset($result['response_data']['order_id'])) {
+            update_post_meta($order_id, '_allesklardruck_order_id', $result['response_data']['order_id']);
+        }
+        
+        // Add order note
+        $order->add_order_note(
+            sprintf(__('Order sent to AllesKlarDruck API successfully. API Response: %s', 'octo-print-designer'), 
+                wp_json_encode($result['response_data'])),
+            false, // Customer note
+            true   // Added by user
+        );
+        
+        wp_send_json_success(array(
+            'message' => __('Order successfully sent to AllesKlarDruck API', 'octo-print-designer'),
+            'api_response' => $result['response_data']
+        ));
+    }
+    
+    /**
+     * Transform WordPress order data to AllesKlarDruck API format
+     * 
+     * @param WC_Order $order The WooCommerce order
+     * @return array|WP_Error Transformed data or error
+     */
+    private function transform_order_for_api($order) {
+        // Get design items from the order
+        $design_items = array();
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            $design_id = $this->get_design_meta($item, 'design_id');
+            
+            // Only process design products for now
+            if ($design_id) {
+                $design_item = array(
+                    'name' => $this->get_design_meta($item, 'name'),
+                    'variation_name' => $this->get_design_meta($item, 'design_color') ?: 'Standard',
+                    'size_name' => $this->get_design_meta($item, 'size_name') ?: 'One Size',
+                    'design_id' => $design_id,
+                    'template_id' => $this->get_design_meta($item, 'template_id') ?: '',
+                    'design_views' => $this->parse_design_views($item),
+                    'quantity' => $item->get_quantity()
+                );
+                
+                $design_items[] = $design_item;
+            }
+        }
+        
+        if (empty($design_items)) {
+            return new WP_Error('no_design_items', __('No design items found in this order for API processing', 'octo-print-designer'));
+        }
+        
+        // Get shipping address
+        $shipping_address = array(
+            'name' => trim($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name()),
+            'street' => $order->get_shipping_address_1(),
+            'city' => $order->get_shipping_city(),
+            'postalCode' => $order->get_shipping_postcode(),
+            'country' => $order->get_shipping_country()
+        );
+        
+        // Fallback to billing address if shipping is empty
+        if (empty($shipping_address['name']) || empty($shipping_address['street'])) {
+            $shipping_address = array(
+                'name' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()),
+                'street' => $order->get_billing_address_1(),
+                'city' => $order->get_billing_city(),
+                'postalCode' => $order->get_billing_postcode(),
+                'country' => $order->get_billing_country()
+            );
+        }
+        
+        // Default sender address (should be configurable in future)
+        $sender_address = array(
+            'name' => 'YPrint',
+            'street' => 'YPrint Street 1',
+            'city' => 'YPrint City',
+            'postalCode' => '12345',
+            'country' => 'DE'
+        );
+        
+        // Transform design items to API order positions
+        $order_positions = array();
+        
+        foreach ($design_items as $design_item) {
+            $print_positions = array();
+            
+            // Process design views/images
+            if (!empty($design_item['design_views'])) {
+                foreach ($design_item['design_views'] as $view) {
+                    if (!empty($view['images'])) {
+                        foreach ($view['images'] as $image) {
+                            if (!empty($image['url'])) {
+                                $print_positions[] = array(
+                                    'position' => strtolower($view['view_name'] ?: 'front'),
+                                    'width' => round($image['print_width_mm'] ?: 200), // Default 200mm if not calculated
+                                    'height' => round($image['print_height_mm'] ?: 250), // Default 250mm if not calculated
+                                    'printFile' => $image['url']
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (empty($print_positions)) {
+                continue; // Skip items without printable content
+            }
+            
+            // Map product data (simplified mapping for Phase 3)
+            $order_positions[] = array(
+                'printMethod' => 'DTG', // Default print method
+                'manufacturer' => 'Generic', // Would need product mapping
+                'series' => 'Basic', // Would need product mapping  
+                'color' => $this->map_color_name($design_item['variation_name']),
+                'type' => 'T-Shirt', // Would need product mapping
+                'size' => $this->map_size_name($design_item['size_name']),
+                'quantity' => $design_item['quantity'],
+                'printPositions' => $print_positions
+            );
+        }
+        
+        if (empty($order_positions)) {
+            return new WP_Error('no_printable_items', __('No printable items found in design data', 'octo-print-designer'));
+        }
+        
+        // Build final API payload
+        $api_order = array(
+            'orderNumber' => (string) $order->get_order_number(),
+            'orderDate' => $order->get_date_created()->format('c'), // ISO 8601 format
+            'shipping' => array(
+                'recipient' => $shipping_address,
+                'sender' => $sender_address
+            ),
+            'orderPositions' => $order_positions
+        );
+        
+        return $api_order;
+    }
+    
+    /**
+     * Map WordPress color name to API color name
+     * 
+     * @param string $wp_color WordPress color name
+     * @return string API color name
+     */
+    private function map_color_name($wp_color) {
+        $color_mapping = array(
+            'Schwarz' => 'Black',
+            'Weiß' => 'White',
+            'Grau' => 'Grey',
+            'Rot' => 'Red',
+            'Blau' => 'Blue',
+            'Grün' => 'Green'
+        );
+        
+        return $color_mapping[$wp_color] ?? $wp_color;
+    }
+    
+    /**
+     * Map WordPress size name to API size name
+     * 
+     * @param string $wp_size WordPress size name
+     * @return string API size name
+     */
+    private function map_size_name($wp_size) {
+        $size_mapping = array(
+            'One Size' => 'M',
+            'Klein' => 'S',
+            'Mittel' => 'M', 
+            'Groß' => 'L',
+            'Extra Groß' => 'XL'
+        );
+        
+        return $size_mapping[$wp_size] ?? $wp_size;
+    }
 }
