@@ -37,7 +37,7 @@ class Octo_Print_Designer_Settings {
      */
     public function add_api_admin_menu() {
         add_submenu_page(
-            'edit.php?post_type=shop_order', // Parent menu (WooCommerce Orders)
+            'octo-print-designer', // Parent menu (Print Designer)
             __('AllesKlarDruck API', 'octo-print-designer'),
             __('Print Provider API', 'octo-print-designer'),
             'manage_options',
