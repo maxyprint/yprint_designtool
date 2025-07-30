@@ -15,7 +15,9 @@ class Octo_Print_Designer_Settings {
         $this->options = get_option($this->option_name, array());
         
         add_action('admin_menu', array($this, 'add_plugin_page'));
+        add_action('admin_menu', array($this, 'add_api_admin_menu'));
         add_action('admin_init', array($this, 'page_init'));
+        add_action('wp_ajax_octo_test_api_connection', array($this, 'test_api_connection'));
     }
 
     public function add_plugin_page() {
@@ -28,6 +30,255 @@ class Octo_Print_Designer_Settings {
             'dashicons-art',
             20
         );
+    }
+
+    /**
+     * Add admin menu item for API settings
+     */
+    public function add_api_admin_menu() {
+        add_submenu_page(
+            'edit.php?post_type=shop_order', // Parent menu (WooCommerce Orders)
+            __('AllesKlarDruck API', 'octo-print-designer'),
+            __('Print Provider API', 'octo-print-designer'),
+            'manage_options',
+            'octo-api-settings',
+            array($this, 'render_api_settings_page')
+        );
+    }
+
+    /**
+     * AJAX handler for testing API connection
+     */
+    public function test_api_connection() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_api_test')) {
+            wp_die('Security check failed');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+
+        try {
+            $api_integration = Octo_Print_API_Integration::get_instance();
+            $result = $api_integration->test_connection();
+            
+            if ($result['success']) {
+                wp_send_json_success(array(
+                    'message' => 'API connection successful!',
+                    'status_code' => $result['status_code'] ?? '200'
+                ));
+            } else {
+                wp_send_json_error(array(
+                    'message' => $result['message'] ?? 'API connection failed',
+                    'code' => $result['code'] ?? 'unknown'
+                ));
+            }
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => 'Exception occurred: ' . $e->getMessage(),
+                'code' => 'exception'
+            ));
+        }
+    }
+
+    /**
+     * Render API settings page
+     */
+    public function render_api_settings_page() {
+        // Handle form submission
+        if (isset($_POST['submit']) && wp_verify_nonce($_POST['_wpnonce'], 'octo_api_settings')) {
+            update_option('octo_allesklardruck_app_id', sanitize_text_field($_POST['app_id']));
+            update_option('octo_allesklardruck_api_key', sanitize_text_field($_POST['api_key']));
+            
+            echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'octo-print-designer') . '</p></div>';
+        }
+        
+        // Get current values
+        $app_id = get_option('octo_allesklardruck_app_id', '');
+        $api_key = get_option('octo_allesklardruck_api_key', '');
+        
+        // Get API status
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        $api_status = $api_integration->get_api_status();
+        
+        ?>
+        <div class="wrap">
+            <h1><?php _e('AllesKlarDruck API Settings', 'octo-print-designer'); ?></h1>
+            
+            <!-- API Status Card -->
+            <div class="card" style="max-width: 600px; margin-bottom: 20px;">
+                <h2 class="title"><?php _e('API Connection Status', 'octo-print-designer'); ?></h2>
+                <div style="padding: 15px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <span style="width: 12px; height: 12px; border-radius: 50%; background-color: <?php echo esc_attr($api_status['color']); ?>; margin-right: 8px;"></span>
+                        <strong><?php echo esc_html($api_status['message']); ?></strong>
+                    </div>
+                    
+                    <button type="button" id="test-api-connection" class="button button-secondary">
+                        <?php _e('🔄 Test Connection', 'octo-print-designer'); ?>
+                    </button>
+                    <span class="test-spinner spinner" style="float: none; margin-left: 5px;"></span>
+                    
+                    <div id="test-result" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+            
+            <!-- Settings Form -->
+            <form method="post" action="">
+                <?php wp_nonce_field('octo_api_settings'); ?>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="app_id"><?php _e('App ID', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="app_id" name="app_id" value="<?php echo esc_attr($app_id); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Your AllesKlarDruck App ID (X-App-Id header)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="api_key"><?php _e('API Key', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="password" id="api_key" name="api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Your AllesKlarDruck API Key (X-Api-Key header)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <?php submit_button(__('Save Settings', 'octo-print-designer')); ?>
+            </form>
+            
+            <!-- Development Info -->
+            <?php if (defined('WP_DEBUG') && WP_DEBUG) : ?>
+                <div class="card" style="max-width: 600px; margin-top: 20px; background-color: #fff3cd;">
+                    <h3><?php _e('Development Info', 'octo-print-designer'); ?></h3>
+                    <div style="padding: 15px;">
+                        <p><strong><?php _e('API Base URL:', 'octo-print-designer'); ?></strong> https://api.allesklardruck.de</p>
+                        <p><strong><?php _e('Plugin Version:', 'octo-print-designer'); ?></strong> <?php echo OCTO_PRINT_DESIGNER_VERSION; ?></p>
+                        <p><strong><?php _e('Has Credentials:', 'octo-print-designer'); ?></strong> <?php echo $api_integration->has_credentials() ? '✅ Yes' : '❌ No'; ?></p>
+                        <p style="font-size: 11px; color: #666;">
+                            <em><?php _e('Debug information is only shown when WP_DEBUG is enabled.', 'octo-print-designer'); ?></em>
+                        </p>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <script>
+            jQuery(document).ready(function($) {
+                function createStatusMessage(type, title, message, details = null) {
+                    var className = type === 'success' ? 'notice-success' : type === 'error' ? 'notice-error' : 'notice-info';
+                    var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+                    
+                    var html = '<div class="notice ' + className + '" style="margin: 10px 0; padding: 10px;">';
+                    html += '<p style="margin: 0 0 5px 0; font-weight: bold;">' + icon + ' ' + title + '</p>';
+                    if (message) {
+                        html += '<p style="margin: 0; font-size: 13px;">' + message + '</p>';
+                    }
+                    
+                    if (details && details.length > 0) {
+                        html += '<details style="margin-top: 8px; font-size: 11px; color: #666;">';
+                        html += '<summary style="cursor: pointer; font-weight: bold;">🔍 Technical Details</summary>';
+                        html += '<ul style="margin: 5px 0 0 15px; padding: 0;">';
+                        for (var i = 0; i < details.length; i++) {
+                            html += '<li>' + details[i] + '</li>';
+                        }
+                        html += '</ul></details>';
+                    }
+                    
+                    html += '</div>';
+                    return $(html);
+                }
+                
+                $('#test-api-connection').on('click', function() {
+                    var button = $(this);
+                    var spinner = $('.test-spinner');
+                    var resultDiv = $('#test-result');
+                    
+                    // Clear previous results
+                    resultDiv.empty();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).text('🔄 Testing...');
+                    spinner.css('visibility', 'visible');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'octo_test_api_connection',
+                            nonce: '<?php echo wp_create_nonce('octo_print_api_test'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                var title = 'API Connection Successful!';
+                                var message = response.data.message || 'Connection test passed.';
+                                var details = [
+                                    'Status Code: ' + (response.data.status_code || 'Unknown'),
+                                    'Test completed at: ' + new Date().toLocaleString()
+                                ];
+                                
+                                createStatusMessage('success', title, message, details)
+                                    .appendTo(resultDiv);
+                                    
+                                button.text('✅ Connection OK!').css('background-color', '#46b450');
+                                
+                                // Reset button after 3 seconds
+                                setTimeout(function() {
+                                    button.prop('disabled', false).text('🔄 Test Connection').css('background-color', '');
+                                }, 3000);
+                                
+                            } else {
+                                var title = 'API Connection Failed';
+                                var message = response.data && response.data.message ? response.data.message : 'Unknown error occurred.';
+                                var details = [
+                                    'Error Code: ' + (response.data && response.data.code ? response.data.code : 'unknown'),
+                                    'Test completed at: ' + new Date().toLocaleString()
+                                ];
+                                
+                                createStatusMessage('error', title, message, details)
+                                    .appendTo(resultDiv);
+                                    
+                                button.prop('disabled', false).text('❌ Test Failed').css('background-color', '#dc3545');
+                                
+                                // Reset button after 5 seconds
+                                setTimeout(function() {
+                                    button.text('🔄 Test Connection').css('background-color', '');
+                                }, 5000);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            var title = 'Network Error';
+                            var message = 'Could not connect to server.';
+                            var details = [
+                                'HTTP Status: ' + (xhr.status || 'Unknown'),
+                                'Error: ' + (error || 'Unknown'),
+                                'Status: ' + (status || 'Unknown')
+                            ];
+                            
+                            createStatusMessage('error', title, message, details)
+                                .appendTo(resultDiv);
+                                
+                            button.prop('disabled', false).text('❌ Network Error').css('background-color', '#dc3545');
+                            
+                            // Reset button after 5 seconds
+                            setTimeout(function() {
+                                button.text('🔄 Test Connection').css('background-color', '');
+                            }, 5000);
+                        },
+                        complete: function() {
+                            spinner.css('visibility', 'hidden');
+                        }
+                    });
+                });
+            });
+        </script>
+        <?php
     }
 
     public function create_admin_page() {
