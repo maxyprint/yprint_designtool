@@ -37,6 +37,7 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_octo_refresh_print_data', array($this, 'ajax_refresh_print_data'));
         add_action('wp_ajax_octo_preview_print_provider_email', array($this, 'ajax_preview_print_provider_email'));
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_print_provider_api'));
+        add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -607,21 +608,35 @@ private function check_yprint_dependency() {
                 </div>
 
                 <p style="margin-bottom: 8px;">
+                    <button type="button" id="preview_api_payload" class="button button-secondary" 
+                            data-order-id="<?php echo $order_id; ?>" 
+                            style="margin-right: 8px;"
+                            title="API-Daten vor dem Versand anzeigen">
+                        👁️ Preview API-Daten
+                    </button>
+                    
                     <button type="button" id="send_to_print_provider_api" class="button button-secondary" 
                             data-order-id="<?php echo $order_id; ?>" 
                             data-auto-refresh="<?php echo !$all_data_complete ? 'true' : 'false'; ?>"
-                            <?php echo ($api_status['status'] !== 'connected' || !$all_data_complete || $order_api_status['sent']) ? 'disabled' : ''; ?>
-                            title="<?php echo $order_api_status['sent'] ? 'Bereits an API gesendet' : esc_attr($api_status['message']); ?>">
+                            <?php echo ($api_status['status'] !== 'connected' || !$all_data_complete) ? 'disabled' : ''; ?>
+                            title="<?php echo esc_attr($api_status['message']); ?>">
                         
-                        <?php if ($order_api_status['sent']) : ?>
-                            ✅ Bereits an API gesendet
-                        <?php elseif ($api_status['status'] === 'connected') : ?>
+                        <?php if ($api_status['status'] === 'connected') : ?>
                             <?php echo !$all_data_complete ? '🔄 Daten laden & API senden' : '📡 Send to AllesKlarDruck API'; ?>
                         <?php else : ?>
                             📡 API nicht verfügbar
                         <?php endif; ?>
                     </button>
                     <span class="api-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
+                    
+                    <?php if ($order_api_status['sent']) : ?>
+                        <button type="button" id="resend_to_print_provider_api" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>" 
+                                style="margin-left: 8px;"
+                                title="Bestellung erneut an AllesKlarDruck API senden">
+                            🔄 Dennoch erneut senden
+                        </button>
+                    <?php endif; ?>
                 </p>
                 
                 <p style="margin-bottom: 0;">
@@ -1136,6 +1151,134 @@ private function check_yprint_dependency() {
                             }
                         });
                     }
+                });
+                
+                // Preview API Payload Button
+                $('#preview_api_payload').on('click', function() {
+                    var button = $(this);
+                    var orderId = button.data('order-id');
+                    
+                    if (button.prop('disabled')) {
+                        return;
+                    }
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    button.prop('disabled', true).text('👁️ Generiere Preview...');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'octo_preview_api_payload',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Create modal for API payload preview
+                                var modal = $('<div class="api-preview-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999999; display: flex; align-items: center; justify-content: center;"></div>');
+                                var modalContent = $('<div style="background: white; border-radius: 8px; padding: 20px; max-width: 90%; max-height: 90%; overflow: auto; position: relative;"></div>');
+                                
+                                var header = $('<div style="margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px;"></div>');
+                                header.append('<h3 style="margin: 0; color: #333;">👁️ API-Daten Preview</h3>');
+                                header.append('<p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Exakte Daten, die an AllesKlarDruck API gesendet werden:</p>');
+                                
+                                var closeButton = $('<button type="button" style="position: absolute; top: 15px; right: 15px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px;">✕ Schließen</button>');
+                                
+                                var payloadContainer = $('<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding: 15px; margin-top: 15px; font-family: monospace; font-size: 12px; line-height: 1.4; max-height: 400px; overflow-y: auto;"></div>');
+                                payloadContainer.html('<pre style="margin: 0; white-space: pre-wrap;">' + response.data.formatted_payload + '</pre>');
+                                
+                                var actionButtons = $('<div style="margin-top: 20px; text-align: center;"></div>');
+                                var sendButton = $('<button type="button" class="button button-primary" style="margin-right: 10px;">📡 Jetzt an API senden</button>');
+                                var cancelButton = $('<button type="button" class="button button-secondary">❌ Abbrechen</button>');
+                                
+                                actionButtons.append(sendButton).append(cancelButton);
+                                
+                                modalContent.append(closeButton).append(header).append(payloadContainer).append(actionButtons);
+                                modal.append(modalContent);
+                                $('body').append(modal);
+                                
+                                // Close modal handlers
+                                closeButton.on('click', function() {
+                                    modal.remove();
+                                    button.prop('disabled', false).text('👁️ Preview API-Daten');
+                                });
+                                
+                                cancelButton.on('click', function() {
+                                    modal.remove();
+                                    button.prop('disabled', false).text('👁️ Preview API-Daten');
+                                });
+                                
+                                // Send to API from preview
+                                sendButton.on('click', function() {
+                                    modal.remove();
+                                    $('#send_to_print_provider_api').click();
+                                });
+                                
+                            } else {
+                                createStatusMessage('error', 'Preview fehlgeschlagen', 
+                                    response.data && response.data.message ? response.data.message : 'Unbekannter Fehler')
+                                    .insertBefore(button.parent());
+                                button.prop('disabled', false).text('👁️ Preview API-Daten');
+                            }
+                        },
+                        error: function() {
+                            createStatusMessage('error', 'Preview fehlgeschlagen', 'Netzwerkfehler beim Generieren der API-Preview')
+                                .insertBefore(button.parent());
+                            button.prop('disabled', false).text('👁️ Preview API-Daten');
+                        }
+                    });
+                });
+                
+                // Resend to API Button
+                $('#resend_to_print_provider_api').on('click', function() {
+                    var button = $(this);
+                    var orderId = button.data('order-id');
+                    
+                    if (button.prop('disabled')) {
+                        return;
+                    }
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show confirmation dialog
+                    if (!confirm('⚠️ Bestätigung\n\nDiese Bestellung wurde bereits an die AllesKlarDruck API gesendet.\n\nMöchten Sie sie dennoch erneut senden?\n\nDies könnte zu Duplikaten führen.')) {
+                        return;
+                    }
+                    
+                    button.prop('disabled', true).text('🔄 Sende erneut...');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'octo_send_print_provider_api',
+                            order_id: orderId,
+                            resend: 'true',
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                createStatusMessage('success', '🔄 Erneuter API-Versand erfolgreich!', 
+                                    response.data.message || 'Bestellung wurde erneut erfolgreich an AllesKlarDruck API übertragen.')
+                                    .insertBefore(button.parent());
+                                button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                            } else {
+                                createStatusMessage('error', 'Erneuter API-Versand fehlgeschlagen', 
+                                    response.data && response.data.message ? response.data.message : 'Unbekannter Fehler')
+                                    .insertBefore(button.parent());
+                                button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                            }
+                        },
+                        error: function() {
+                            createStatusMessage('error', 'Erneuter API-Versand fehlgeschlagen', 'Netzwerkfehler beim erneuten API-Versand')
+                                .insertBefore(button.parent());
+                            button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                        }
+                    });
                 });
             });
         </script>
@@ -1880,6 +2023,56 @@ private function build_print_provider_email_content($order, $design_items, $note
     /**
      * AJAX handler for sending order to AllesKlarDruck API with enhanced error handling
      */
+    public function ajax_preview_api_payload() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'octo-print-designer')));
+        }
+        
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Invalid order ID', 'octo-print-designer')));
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+        
+        // Get API integration instance
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        
+        // Check API credentials
+        if (!$api_integration->has_valid_credentials()) {
+            wp_send_json_error(array(
+                'message' => __('AllesKlarDruck API credentials are not configured. Please configure them in the plugin settings.', 'octo-print-designer')
+            ));
+        }
+        
+        // Build API payload for preview
+        $payload = $api_integration->build_api_payload($order);
+        
+        if (is_wp_error($payload)) {
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    __('Failed to build API payload: %s', 'octo-print-designer'),
+                    $payload->get_error_message()
+                )
+            ));
+        }
+        
+        wp_send_json_success(array(
+            'message' => __('API payload preview generated successfully', 'octo-print-designer'),
+            'payload' => $payload,
+            'formatted_payload' => wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        ));
+    }
+
     public function ajax_send_print_provider_api() {
         // Security check
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
@@ -1904,9 +2097,11 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Get API integration instance
         $api_integration = Octo_Print_API_Integration::get_instance();
         
-        // Check if already sent to avoid duplicate sends
+        // Check if already sent to avoid duplicate sends (only for normal send, not resend)
         $order_api_status = $api_integration->get_order_api_status($order_id);
-        if ($order_api_status['sent'] && $order_api_status['status'] === 'success') {
+        $is_resend = isset($_POST['resend']) && $_POST['resend'] === 'true';
+        
+        if (!$is_resend && $order_api_status['sent'] && $order_api_status['status'] === 'success') {
             wp_send_json_error(array(
                 'message' => __('Order has already been successfully sent to AllesKlarDruck API', 'octo-print-designer'),
                 'details' => $order_api_status['details']
