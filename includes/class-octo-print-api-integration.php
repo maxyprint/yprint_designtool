@@ -1207,6 +1207,12 @@ class Octo_Print_API_Integration {
                     $error_message
                 ), array('status_code' => 404, 'response_body' => $body));
                 
+            case 409:
+                return new WP_Error('duplicate_order', sprintf(
+                    __('Duplicate Order (409): %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 409, 'response_body' => $body));
+                
             case 422:
                 return new WP_Error('validation_error', sprintf(
                     __('Validation Error (422): %s', 'octo-print-designer'),

@@ -1262,15 +1262,30 @@ private function check_yprint_dependency() {
                         },
                         success: function(response) {
                             if (response.success) {
-                                createStatusMessage('success', '🔄 Erneuter API-Versand erfolgreich!', 
-                                    response.data.message || 'Bestellung wurde erneut erfolgreich an AllesKlarDruck API übertragen.')
-                                    .insertBefore(button.parent());
+                                // Check if this is a duplicate order confirmation
+                                if (response.data && response.data.api_response && response.data.api_response.status === 'duplicate_confirmed') {
+                                    createStatusMessage('success', '✅ Bestellung bereits vorhanden', 
+                                        response.data.message || 'Diese Bestellung existiert bereits bei AllesKlarDruck und wurde erfolgreich verarbeitet.')
+                                        .insertBefore(button.parent());
+                                } else {
+                                    createStatusMessage('success', '🔄 Erneuter API-Versand erfolgreich!', 
+                                        response.data.message || 'Bestellung wurde erneut erfolgreich an AllesKlarDruck API übertragen.')
+                                        .insertBefore(button.parent());
+                                }
                                 button.prop('disabled', false).text('🔄 Dennoch erneut senden');
                             } else {
-                                createStatusMessage('error', 'Erneuter API-Versand fehlgeschlagen', 
-                                    response.data && response.data.message ? response.data.message : 'Unbekannter Fehler')
-                                    .insertBefore(button.parent());
-                                button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                                // Special handling for duplicate order during resend
+                                if (response.data && response.data.error_code === 'duplicate_order') {
+                                    createStatusMessage('success', '✅ Bestellung bereits vorhanden', 
+                                        response.data.message || 'Diese Bestellung existiert bereits bei AllesKlarDruck und wurde erfolgreich verarbeitet.')
+                                        .insertBefore(button.parent());
+                                    button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                                } else {
+                                    createStatusMessage('error', 'Erneuter API-Versand fehlgeschlagen', 
+                                        response.data && response.data.message ? response.data.message : 'Unbekannter Fehler')
+                                        .insertBefore(button.parent());
+                                    button.prop('disabled', false).text('🔄 Dennoch erneut senden');
+                                }
                             }
                         },
                         error: function() {
@@ -2150,6 +2165,23 @@ private function build_print_provider_email_content($order, $design_items, $note
             $error_message = $result->get_error_message();
             $error_data = $result->get_error_data();
             
+            // Special handling for duplicate order during resend
+            if ($error_code === 'duplicate_order' && $is_resend) {
+                // For resend operations, treat duplicate order as success
+                wp_send_json_success(array(
+                    'message' => 'Diese Bestellung existiert bereits bei AllesKlarDruck. Der erneute Versand wurde erfolgreich verarbeitet.',
+                    'api_response' => array('status' => 'duplicate_confirmed'),
+                    'details' => array(
+                        'order_id' => $order_id,
+                        'allesklardruck_order_id' => 'existing',
+                        'tracking_number' => 'existing',
+                        'order_status' => 'confirmed',
+                        'timestamp' => time(),
+                        'sent_date' => date_i18n(get_option('date_format') . ' ' . get_option('time_format'), time())
+                    )
+                ));
+            }
+            
             // Provide specific user guidance based on error type
             $user_message = $error_message;
             $troubleshooting_tips = array();
@@ -2158,6 +2190,18 @@ private function build_print_provider_email_content($order, $design_items, $note
                 case 'unauthorized':
                     $troubleshooting_tips[] = 'Überprüfen Sie die API-Credentials in den Plugin-Einstellungen';
                     $troubleshooting_tips[] = 'Kontaktieren Sie AllesKlarDruck für neue API-Keys';
+                    break;
+                    
+                case 'duplicate_order':
+                    if ($is_resend) {
+                        $user_message = 'Diese Bestellung existiert bereits bei AllesKlarDruck. Der erneute Versand wurde erfolgreich verarbeitet.';
+                        $troubleshooting_tips[] = 'Die Bestellung ist bereits im AllesKlarDruck System vorhanden';
+                        $troubleshooting_tips[] = 'Keine weitere Aktion erforderlich - die Bestellung wird normal verarbeitet';
+                    } else {
+                        $user_message = 'Diese Bestellung wurde bereits an AllesKlarDruck gesendet.';
+                        $troubleshooting_tips[] = 'Die Bestellung existiert bereits im AllesKlarDruck System';
+                        $troubleshooting_tips[] = 'Verwenden Sie "Dennoch erneut senden" wenn Sie sicher sind';
+                    }
                     break;
                     
                 case 'validation_error':
