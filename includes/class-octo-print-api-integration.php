@@ -296,7 +296,7 @@ class Octo_Print_API_Integration {
         $recipient = array(
             'name' => trim($shipping_address['first_name'] . ' ' . $shipping_address['last_name']),
             'street' => $shipping_address['address_1'],
-            'city' => $shipping_address['city'],
+            'city' => $this->sanitize_city_name($shipping_address['city']),
             'postalCode' => $shipping_address['postcode'],
             'country' => $shipping_address['country']
         );
@@ -310,7 +310,7 @@ class Octo_Print_API_Integration {
         $sender = array(
             'name' => get_option('octo_allesklardruck_sender_name', 'YPrint'),
             'street' => get_option('octo_allesklardruck_sender_street', 'Company Street 1'),
-            'city' => get_option('octo_allesklardruck_sender_city', 'Company City'),
+            'city' => $this->sanitize_city_name(get_option('octo_allesklardruck_sender_city', 'Company City')),
             'postalCode' => get_option('octo_allesklardruck_sender_postal', '12345'),
             'country' => get_option('octo_allesklardruck_sender_country', 'DE')
         );
@@ -592,6 +592,31 @@ class Octo_Print_API_Integration {
             $value = $item->get_meta('_yprint_' . $key);
         }
         return $value;
+    }
+
+    /**
+     * Sanitize city name to contain only letters (a-zA-Z) as required by AllesKlarDruck API
+     * 
+     * @param string $city_name Raw city name
+     * @return string Sanitized city name
+     */
+    private function sanitize_city_name($city_name) {
+        if (empty($city_name)) {
+            return 'Unknown';
+        }
+        
+        // Remove all non-letter characters except spaces and common city name characters
+        $sanitized = preg_replace('/[^a-zA-ZäöüßÄÖÜ\s\-\.]/', '', $city_name);
+        
+        // Remove multiple spaces and trim
+        $sanitized = preg_replace('/\s+/', ' ', trim($sanitized));
+        
+        // If result is empty, return a default
+        if (empty($sanitized)) {
+            return 'Unknown';
+        }
+        
+        return $sanitized;
     }
 
     /**
