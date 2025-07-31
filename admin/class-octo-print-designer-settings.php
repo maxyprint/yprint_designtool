@@ -64,21 +64,30 @@ class Octo_Print_Designer_Settings {
             $api_integration = Octo_Print_API_Integration::get_instance();
             $result = $api_integration->test_connection();
             
-            if ($result['success']) {
-                wp_send_json_success(array(
-                    'message' => 'API connection successful!',
-                    'status_code' => $result['status_code'] ?? '200'
+            if (is_wp_error($result)) {
+                $error_data = $result->get_error_data();
+                $debug_info = isset($error_data['debug_info']) ? $error_data['debug_info'] : array();
+                
+                wp_send_json_error(array(
+                    'message' => $result->get_error_message(),
+                    'code' => $result->get_error_code(),
+                    'debug_info' => $debug_info,
+                    'status_code' => isset($error_data['status_code']) ? $error_data['status_code'] : 'unknown'
                 ));
             } else {
-                wp_send_json_error(array(
-                    'message' => $result['message'] ?? 'API connection failed',
-                    'code' => $result['code'] ?? 'unknown'
+                wp_send_json_success(array(
+                    'message' => $result['message'] ?? 'API connection successful!',
+                    'status_code' => $result['status_code'] ?? '200',
+                    'endpoint' => $result['endpoint'] ?? 'unknown',
+                    'response_time_ms' => $result['response_time_ms'] ?? 0,
+                    'debug_info' => $result['debug_info'] ?? array()
                 ));
             }
         } catch (Exception $e) {
             wp_send_json_error(array(
                 'message' => 'Exception occurred: ' . $e->getMessage(),
-                'code' => 'exception'
+                'code' => 'exception',
+                'debug_info' => array('Exception: ' . $e->getMessage())
             ));
         }
     }
@@ -220,8 +229,18 @@ class Octo_Print_Designer_Settings {
                                 var message = response.data.message || 'Connection test passed.';
                                 var details = [
                                     'Status Code: ' + (response.data.status_code || 'Unknown'),
+                                    'Endpoint: ' + (response.data.endpoint || 'Unknown'),
+                                    'Response Time: ' + (response.data.response_time_ms || 'Unknown') + ' ms',
                                     'Test completed at: ' + new Date().toLocaleString()
                                 ];
+                                
+                                // Add debug info if available
+                                if (response.data.debug_info && response.data.debug_info.length > 0) {
+                                    details.push('Debug Info:');
+                                    for (var i = 0; i < response.data.debug_info.length; i++) {
+                                        details.push('  • ' + response.data.debug_info[i]);
+                                    }
+                                }
                                 
                                 createStatusMessage('success', title, message, details)
                                     .appendTo(resultDiv);
@@ -238,8 +257,17 @@ class Octo_Print_Designer_Settings {
                                 var message = response.data && response.data.message ? response.data.message : 'Unknown error occurred.';
                                 var details = [
                                     'Error Code: ' + (response.data && response.data.code ? response.data.code : 'unknown'),
+                                    'Status Code: ' + (response.data && response.data.status_code ? response.data.status_code : 'unknown'),
                                     'Test completed at: ' + new Date().toLocaleString()
                                 ];
+                                
+                                // Add debug info if available
+                                if (response.data && response.data.debug_info && response.data.debug_info.length > 0) {
+                                    details.push('Debug Info:');
+                                    for (var i = 0; i < response.data.debug_info.length; i++) {
+                                        details.push('  • ' + response.data.debug_info[i]);
+                                    }
+                                }
                                 
                                 createStatusMessage('error', title, message, details)
                                     .appendTo(resultDiv);

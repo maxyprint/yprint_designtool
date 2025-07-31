@@ -714,6 +714,16 @@ class Octo_Print_API_Integration {
     private function process_api_response($status_code, $body, $headers) {
         // Success responses (2xx)
         if ($status_code >= 200 && $status_code < 300) {
+            // Check if this is HTML content (like the root endpoint)
+            if (strpos($body, '<html') !== false || strpos($body, 'Das ist die Bestell-API') !== false) {
+                return array(
+                    'success' => true,
+                    'status_code' => $status_code,
+                    'data' => array('message' => 'API endpoint available'),
+                    'headers' => $headers->getAll()
+                );
+            }
+            
             $decoded_body = json_decode($body, true);
             
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -894,6 +904,112 @@ class Octo_Print_API_Integration {
     }
 
     /**
+     * Test basic server connectivity without authentication
+     */
+    public function test_server_connectivity() {
+        $url = $this->api_base_url;
+        $timeout = 10;
+        
+        $args = array(
+            'method' => 'GET',
+            'timeout' => $timeout,
+            'sslverify' => true,
+            'redirection' => 0,
+            'httpversion' => '1.1',
+            'headers' => array(
+                'User-Agent' => 'YPrint-WordPress/' . OCTO_PRINT_DESIGNER_VERSION
+            )
+        );
+        
+        $response = wp_remote_request($url, $args);
+        
+        if (is_wp_error($response)) {
+            return new WP_Error('server_unreachable', sprintf(
+                __('Server unreachable: %s', 'octo-print-designer'),
+                $response->get_error_message()
+            ));
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        
+        return array(
+            'success' => true,
+            'status_code' => $status_code,
+            'message' => sprintf(__('Server is reachable (Status: %d)', 'octo-print-designer'), $status_code)
+        );
+    }
+
+    /**
+     * Simple ping test to check basic connectivity
+     */
+    public function ping_api() {
+        if (!$this->has_valid_credentials()) {
+            return new WP_Error('no_credentials', __('API credentials not configured', 'octo-print-designer'));
+        }
+        
+        $url = $this->api_base_url;
+        $timeout = 10; // Shorter timeout for ping
+        
+        $headers = array(
+            'X-App-Id' => $this->app_id,
+            'X-Api-Key' => $this->api_key,
+            'Accept' => 'application/json',
+            'User-Agent' => 'YPrint-WordPress/' . OCTO_PRINT_DESIGNER_VERSION
+        );
+        
+        $args = array(
+            'method' => 'GET',
+            'headers' => $headers,
+            'timeout' => $timeout,
+            'sslverify' => true,
+            'redirection' => 0, // No redirects for ping
+            'httpversion' => '1.1'
+        );
+        
+        $response = wp_remote_request($url, $args);
+        
+        if (is_wp_error($response)) {
+            return new WP_Error('ping_failed', sprintf(
+                __('Ping failed: %s', 'octo-print-designer'),
+                $response->get_error_message()
+            ));
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        
+        // Any response (even 404, 500, etc.) means the server is reachable
+        return array(
+            'success' => true,
+            'status_code' => $status_code,
+            'message' => sprintf(__('Server reachable (Status: %d)', 'octo-print-designer'), $status_code)
+        );
+    }
+
+    /**
+     * Validate API credentials format
+     */
+    public function validate_credentials_format() {
+        if (empty($this->app_id)) {
+            return new WP_Error('missing_app_id', __('App ID is missing', 'octo-print-designer'));
+        }
+        
+        if (empty($this->api_key)) {
+            return new WP_Error('missing_api_key', __('API Key is missing', 'octo-print-designer'));
+        }
+        
+        // Check if credentials look like they might be valid
+        if (strlen($this->app_id) < 3) {
+            return new WP_Error('invalid_app_id', __('App ID appears to be too short', 'octo-print-designer'));
+        }
+        
+        if (strlen($this->api_key) < 10) {
+            return new WP_Error('invalid_api_key', __('API Key appears to be too short', 'octo-print-designer'));
+        }
+        
+        return true;
+    }
+
+    /**
      * Test API connection with enhanced error handling
      */
     public function test_connection() {
@@ -902,36 +1018,105 @@ class Octo_Print_API_Integration {
         }
         
         $start_time = microtime(true);
+        $debug_info = array();
         
-        // Test with health check endpoint (if available) or root endpoint
-        $test_endpoints = array('/', '/health', '/status');
+        // Validate credentials format
+        $debug_info[] = "Validating credentials format...";
+        $credentials_validation = $this->validate_credentials_format();
+        
+        if (is_wp_error($credentials_validation)) {
+            $debug_info[] = "Credentials validation failed: " . $credentials_validation->get_error_message();
+            return new WP_Error(
+                'invalid_credentials',
+                __('API credentials appear to be invalid. Please check your App ID and API Key.', 'octo-print-designer'),
+                array('debug_info' => $debug_info)
+            );
+        }
+        
+        $debug_info[] = "Credentials format validation OK";
+        
+        // First, test basic server connectivity
+        $debug_info[] = "Testing basic server connectivity...";
+        $connectivity_test = $this->test_server_connectivity();
+        
+        if (is_wp_error($connectivity_test)) {
+            $debug_info[] = "Server connectivity failed: " . $connectivity_test->get_error_message();
+            return new WP_Error(
+                'server_unreachable',
+                __('Server is not reachable. Check your internet connection and firewall settings.', 'octo-print-designer'),
+                array('debug_info' => $debug_info)
+            );
+        }
+        
+        $debug_info[] = "Server connectivity OK: " . $connectivity_test['message'];
+        
+        // Test with endpoints in order of likelihood to work
+        // The root endpoint (/) is known to work, so we'll try it first
+        $test_endpoints = array(
+            '/' => 'Root endpoint (known to work)'
+        );
+        
         $last_error = null;
         
-        foreach ($test_endpoints as $endpoint) {
+        foreach ($test_endpoints as $endpoint => $description) {
+            $debug_info[] = "Testing endpoint: {$endpoint} ({$description})";
+            
             $result = $this->make_api_request($endpoint, array(), 'GET', 0);
             
             if (!is_wp_error($result)) {
                 $response_time = round((microtime(true) - $start_time) * 1000, 2);
                 
+                // Log successful connection
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("AllesKlarDruck API: Connection test successful on endpoint {$endpoint}");
+                }
+                
                 return array(
                     'success' => true,
                     'message' => sprintf(__('API connection successful (Response time: %s ms)', 'octo-print-designer'), $response_time),
                     'endpoint' => $endpoint,
+                    'endpoint_description' => $description,
                     'response_time_ms' => $response_time,
                     'status_code' => $result['status_code'] ?? 200,
-                    'api_version' => $result['data']['version'] ?? 'Unknown'
+                    'api_version' => $result['data']['version'] ?? 'Unknown',
+                    'debug_info' => $debug_info
                 );
+            }
+            
+            $error_code = $result->get_error_code();
+            $error_message = $result->get_error_message();
+            
+            $debug_info[] = "Endpoint {$endpoint} failed: {$error_code} - {$error_message}";
+            
+            // Log the error for debugging
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("AllesKlarDruck API: Connection test failed on endpoint {$endpoint}: {$error_code} - {$error_message}");
             }
             
             $last_error = $result;
             
             // Don't retry on auth errors
-            if ($result->get_error_code() === 'unauthorized') {
+            if ($error_code === 'unauthorized') {
+                $debug_info[] = "Stopping tests due to authentication error";
                 break;
             }
         }
         
-        return $last_error;
+        // If all endpoints failed, return the last error with debug info
+        if ($last_error) {
+            $error_data = $last_error->get_error_data();
+            $enhanced_error = new WP_Error(
+                $last_error->get_error_code(),
+                sprintf(
+                    __('Server is reachable but API endpoints failed. Last error: %s. Check your API credentials.', 'octo-print-designer'),
+                    $last_error->get_error_message()
+                ),
+                array_merge($error_data ?: array(), array('debug_info' => $debug_info))
+            );
+            return $enhanced_error;
+        }
+        
+        return new WP_Error('unknown_error', __('Unknown connection error', 'octo-print-designer'));
     }
 
     /**
