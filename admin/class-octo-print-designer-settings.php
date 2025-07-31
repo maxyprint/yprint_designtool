@@ -127,6 +127,27 @@ class Octo_Print_Designer_Settings {
                 update_option('octo_allesklardruck_product_mappings', $mappings);
             }
             
+            // Save print specifications
+            if (isset($_POST['print_specs']) && is_array($_POST['print_specs'])) {
+                $specs = array();
+                foreach ($_POST['print_specs'] as $config_key => $spec) {
+                    if (!empty($spec['template_id']) && !empty($spec['position'])) {
+                        $new_key = sanitize_text_field($spec['template_id']) . '_' . sanitize_text_field($spec['position']);
+                        $specs[$new_key] = array(
+                            'unit' => sanitize_text_field($spec['unit']),
+                            'offsetUnit' => sanitize_text_field($spec['unit']), // Same as unit
+                            'referencePoint' => sanitize_text_field($spec['referencePoint']),
+                            'resolution' => intval($spec['resolution']),
+                            'colorProfile' => sanitize_text_field($spec['colorProfile']),
+                            'bleed' => floatval($spec['bleed']),
+                            'scaling' => sanitize_text_field($spec['scaling']),
+                            'printQuality' => sanitize_text_field($spec['printQuality'])
+                        );
+                    }
+                }
+                update_option('octo_allesklardruck_print_specifications', $specs);
+            }
+            
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'octo-print-designer') . '</p></div>';
         }
         
@@ -339,6 +360,132 @@ class Octo_Print_Designer_Settings {
                     <p>
                         <button type="button" id="add-mapping" class="button button-secondary">
                             <?php _e('+ Add Mapping', 'octo-print-designer'); ?>
+                        </button>
+                    </p>
+                </div>
+                
+                <table class="form-table">
+                    <tr>
+                        <th colspan="2"><h3><?php _e('Print Specifications', 'octo-print-designer'); ?></h3></th>
+                    </tr>
+                    <tr>
+                        <th colspan="2">
+                            <p class="description">
+                                <?php _e('Configure technical print specifications for enhanced API payload. These settings provide detailed information to the print provider about dimensions, coordinates, and print quality.', 'octo-print-designer'); ?>
+                            </p>
+                        </th>
+                    </tr>
+                </table>
+                
+                <!-- Print Specifications Table -->
+                <div id="print-specs-container">
+                    <table class="widefat" id="print-specs-table">
+                        <thead>
+                            <tr>
+                                <th><?php _e('Template/Position', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Unit', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Reference Point', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Resolution (DPI)', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Color Profile', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Bleed (mm)', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Scaling', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Print Quality', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Actions', 'octo-print-designer'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $print_specs = get_option('octo_allesklardruck_print_specifications', array());
+                            if (empty($print_specs)) {
+                                // Default specifications
+                                $print_specs = array(
+                                    'tshirt_001_front' => array(
+                                        'unit' => 'mm',
+                                        'offsetUnit' => 'mm',
+                                        'referencePoint' => 'top-left',
+                                        'resolution' => 300,
+                                        'colorProfile' => 'sRGB',
+                                        'bleed' => 2,
+                                        'scaling' => 'proportional',
+                                        'printQuality' => 'standard'
+                                    )
+                                );
+                            }
+                            foreach ($print_specs as $config_key => $specs) : 
+                                $parts = explode('_', $config_key);
+                                $template_id = $parts[0] ?? '';
+                                $position = $parts[1] ?? 'front';
+                            ?>
+                            <tr class="specs-row">
+                                <td>
+                                    <input type="text" name="print_specs[<?php echo esc_attr($config_key); ?>][template_id]" 
+                                           value="<?php echo esc_attr($template_id); ?>" class="regular-text" 
+                                           placeholder="<?php _e('Template ID', 'octo-print-designer'); ?>" />
+                                    <br>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][position]">
+                                        <option value="front" <?php selected($position, 'front'); ?>><?php _e('Front', 'octo-print-designer'); ?></option>
+                                        <option value="back" <?php selected($position, 'back'); ?>><?php _e('Back', 'octo-print-designer'); ?></option>
+                                        <option value="left" <?php selected($position, 'left'); ?>><?php _e('Left Sleeve', 'octo-print-designer'); ?></option>
+                                        <option value="right" <?php selected($position, 'right'); ?>><?php _e('Right Sleeve', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][unit]">
+                                        <option value="mm" <?php selected($specs['unit'], 'mm'); ?>><?php _e('Millimeters', 'octo-print-designer'); ?></option>
+                                        <option value="cm" <?php selected($specs['unit'], 'cm'); ?>><?php _e('Centimeters', 'octo-print-designer'); ?></option>
+                                        <option value="px" <?php selected($specs['unit'], 'px'); ?>><?php _e('Pixels', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][referencePoint]">
+                                        <option value="top-left" <?php selected($specs['referencePoint'], 'top-left'); ?>><?php _e('Top-Left', 'octo-print-designer'); ?></option>
+                                        <option value="center" <?php selected($specs['referencePoint'], 'center'); ?>><?php _e('Center', 'octo-print-designer'); ?></option>
+                                        <option value="top-center" <?php selected($specs['referencePoint'], 'top-center'); ?>><?php _e('Top-Center', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" name="print_specs[<?php echo esc_attr($config_key); ?>][resolution]" 
+                                           value="<?php echo esc_attr($specs['resolution']); ?>" class="small-text" 
+                                           min="72" max="600" step="1" />
+                                </td>
+                                <td>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][colorProfile]">
+                                        <option value="sRGB" <?php selected($specs['colorProfile'], 'sRGB'); ?>><?php _e('sRGB', 'octo-print-designer'); ?></option>
+                                        <option value="AdobeRGB" <?php selected($specs['colorProfile'], 'AdobeRGB'); ?>><?php _e('Adobe RGB', 'octo-print-designer'); ?></option>
+                                        <option value="CMYK" <?php selected($specs['colorProfile'], 'CMYK'); ?>><?php _e('CMYK', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" name="print_specs[<?php echo esc_attr($config_key); ?>][bleed]" 
+                                           value="<?php echo esc_attr($specs['bleed']); ?>" class="small-text" 
+                                           min="0" max="10" step="0.5" />
+                                </td>
+                                <td>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][scaling]">
+                                        <option value="proportional" <?php selected($specs['scaling'], 'proportional'); ?>><?php _e('Proportional', 'octo-print-designer'); ?></option>
+                                        <option value="stretch" <?php selected($specs['scaling'], 'stretch'); ?>><?php _e('Stretch', 'octo-print-designer'); ?></option>
+                                        <option value="fit" <?php selected($specs['scaling'], 'fit'); ?>><?php _e('Fit', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][printQuality]">
+                                        <option value="standard" <?php selected($specs['printQuality'], 'standard'); ?>><?php _e('Standard', 'octo-print-designer'); ?></option>
+                                        <option value="premium" <?php selected($specs['printQuality'], 'premium'); ?>><?php _e('Premium', 'octo-print-designer'); ?></option>
+                                        <option value="eco" <?php selected($specs['printQuality'], 'eco'); ?>><?php _e('Eco', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button type="button" class="button button-small remove-specs" 
+                                            data-key="<?php echo esc_attr($config_key); ?>"><?php _e('Remove', 'octo-print-designer'); ?></button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <p>
+                        <button type="button" id="add-specs" class="button button-secondary">
+                            <?php _e('+ Add Print Specifications', 'octo-print-designer'); ?>
                         </button>
                     </p>
                 </div>

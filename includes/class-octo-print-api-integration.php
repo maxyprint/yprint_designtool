@@ -383,12 +383,27 @@ class Octo_Print_API_Integration {
                     $position
                 );
                 
+                // Get print specifications configuration
+                $print_specs = $this->get_print_specifications(
+                    $design_item['template_id'],
+                    $design_item['product_id'],
+                    $position
+                );
+                
                 $print_positions[] = array(
                     'position' => $position,
                     'width' => $print_dimensions['width_mm'],
                     'height' => $print_dimensions['height_mm'],
+                    'unit' => $print_specs['unit'],
                     'offsetX' => $print_coordinates['offset_x_mm'],
                     'offsetY' => $print_coordinates['offset_y_mm'],
+                    'offsetUnit' => $print_specs['offsetUnit'],
+                    'referencePoint' => $print_specs['referencePoint'],
+                    'resolution' => $print_specs['resolution'],
+                    'colorProfile' => $print_specs['colorProfile'],
+                    'bleed' => $print_specs['bleed'],
+                    'scaling' => $print_specs['scaling'],
+                    'printQuality' => $print_specs['printQuality'],
                     'printFile' => $image['url']
                 );
             }
@@ -535,6 +550,34 @@ class Octo_Print_API_Integration {
         return isset($default_configs[$position]) ? 
                $default_configs[$position] : 
                $default_configs['front'];
+    }
+
+    /**
+     * Get print specifications configuration for enhanced API payload
+     */
+    private function get_print_specifications($template_id = null, $product_id = null, $position = 'front') {
+        // Get configured print specifications from WordPress options
+        $print_specs = get_option('octo_allesklardruck_print_specifications', array());
+        
+        $config_key = $template_id . '_' . $position;
+        
+        if (isset($print_specs[$config_key])) {
+            return $print_specs[$config_key];
+        }
+        
+        // Fallback to default specifications
+        $default_specs = array(
+            'unit' => 'mm',
+            'offsetUnit' => 'mm',
+            'referencePoint' => 'top-left',
+            'resolution' => 300,
+            'colorProfile' => 'sRGB',
+            'bleed' => 2,
+            'scaling' => 'proportional',
+            'printQuality' => 'standard'
+        );
+        
+        return $default_specs;
     }
 
     /**
@@ -1560,10 +1603,28 @@ class Octo_Print_API_Integration {
                     if (!empty($view['images'])) {
                         foreach ($view['images'] as $image) {
                             if (!empty($image['url'])) {
+                                // Get print specifications configuration
+                                $position = strtolower($view['view_name'] ?: 'front');
+                                $print_specs = $this->get_print_specifications(
+                                    $design_item['template_id'],
+                                    $design_item['product_id'],
+                                    $position
+                                );
+                                
                                 $print_positions[] = array(
-                                    'position' => strtolower($view['view_name'] ?: 'front'),
+                                    'position' => $position,
                                     'width' => round($image['print_width_mm'] ?: 200), // Default 200mm if not calculated
                                     'height' => round($image['print_height_mm'] ?: 250), // Default 250mm if not calculated
+                                    'unit' => $print_specs['unit'],
+                                    'offsetX' => isset($image['offset_x_mm']) ? round($image['offset_x_mm'], 1) : 0,
+                                    'offsetY' => isset($image['offset_y_mm']) ? round($image['offset_y_mm'], 1) : 0,
+                                    'offsetUnit' => $print_specs['offsetUnit'],
+                                    'referencePoint' => $print_specs['referencePoint'],
+                                    'resolution' => $print_specs['resolution'],
+                                    'colorProfile' => $print_specs['colorProfile'],
+                                    'bleed' => $print_specs['bleed'],
+                                    'scaling' => $print_specs['scaling'],
+                                    'printQuality' => $print_specs['printQuality'],
                                     'printFile' => $image['url']
                                 );
                             }
