@@ -278,7 +278,8 @@ class Octo_Print_API_Integration {
                 'quantity' => $item->get_quantity(),
                 'design_views' => $design_views,
                 'product_id' => $item->get_product_id(),
-                'variation_id' => $item->get_variation_id()
+                'variation_id' => $item->get_variation_id(),
+                'template_id' => $this->get_design_meta($item, 'template_id')
             );
         }
         
@@ -342,7 +343,8 @@ class Octo_Print_API_Integration {
         $api_positions = array();
         
         // Get product mapping
-        $product_mapping = $this->get_product_mapping($design_item['product_id'], $design_item['variation_id']);
+        $template_id = $design_item['template_id'];
+        $product_mapping = $this->get_product_mapping($template_id, $design_item['product_id'], $design_item['variation_id']);
         
         foreach ($design_item['design_views'] as $view) {
             if (empty($view['images'])) {
@@ -431,21 +433,53 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Get product mapping for AllesKlarDruck API
+     * Get product mapping for AllesKlarDruck API based on template and product data
      */
-    private function get_product_mapping($product_id, $variation_id = 0) {
-        // Default mapping - should be configurable in future versions
-        $default_mapping = array(
-            'print_method' => 'DTG',
-            'manufacturer' => 'Stanley/Stella',
-            'series' => 'Basic',
-            'type' => 'T-Shirt'
-        );
+    private function get_product_mapping($template_id = null, $product_id = null, $variation_id = 0) {
+        // Get configured mappings from WordPress options
+        $configured_mappings = get_option('octo_allesklardruck_product_mappings', array());
         
-        // TODO: Implement product-specific mapping based on template_id or product_id
-        // This could be stored in WordPress options or a custom table
+        // Build template and product mappings from configuration
+        $template_mappings = array();
+        $product_mappings = array();
         
-        return apply_filters('octo_allesklardruck_product_mapping', $default_mapping, $product_id, $variation_id);
+        foreach ($configured_mappings as $mapping) {
+            if ($mapping['type'] === 'template') {
+                $template_mappings[$mapping['id']] = array(
+                    'print_method' => $mapping['print_method'],
+                    'manufacturer' => $mapping['manufacturer'],
+                    'series' => $mapping['series'],
+                    'type' => $mapping['product_type']
+                );
+            } elseif ($mapping['type'] === 'product') {
+                $product_mappings[$mapping['id']] = array(
+                    'print_method' => $mapping['print_method'],
+                    'manufacturer' => $mapping['manufacturer'],
+                    'series' => $mapping['series'],
+                    'type' => $mapping['product_type']
+                );
+            }
+        }
+        
+        // Check if we have a specific mapping for this template
+        if ($template_id && isset($template_mappings[$template_id])) {
+            $mapping = $template_mappings[$template_id];
+        } else {
+            // Fallback: Product-ID basiertes Mapping
+            if ($product_id && isset($product_mappings[$product_id])) {
+                $mapping = $product_mappings[$product_id];
+            } else {
+                // Letzter Fallback: Standardwerte
+                $mapping = array(
+                    'print_method' => 'DTG',
+                    'manufacturer' => 'Stanley/Stella',
+                    'series' => 'Basic',
+                    'type' => 'T-Shirt'
+                );
+            }
+        }
+        
+        return apply_filters('octo_allesklardruck_product_mapping', $mapping, $template_id, $product_id, $variation_id);
     }
 
     /**
@@ -511,12 +545,17 @@ class Octo_Print_API_Integration {
             'extra small' => 'XS',
             's' => 'S',
             'small' => 'S',
+            'klein' => 'S',
             'm' => 'M',
             'medium' => 'M',
+            'mittel' => 'M',
+            'one size' => 'M',
             'l' => 'L',
             'large' => 'L',
+            'groß' => 'L',
             'xl' => 'XL',
             'extra large' => 'XL',
+            'extra groß' => 'XL',
             'xxl' => 'XXL',
             '2xl' => 'XXL'
         );
@@ -1290,6 +1329,8 @@ class Octo_Print_API_Integration {
                     'size_name' => $this->get_design_meta($item, 'size_name') ?: 'One Size',
                     'design_id' => $design_id,
                     'template_id' => $this->get_design_meta($item, 'template_id') ?: '',
+                    'product_id' => $item->get_product_id(),
+                    'variation_id' => $item->get_variation_id(),
                     'design_views' => $this->parse_design_views($item),
                     'quantity' => $item->get_quantity()
                 );
@@ -1361,14 +1402,16 @@ class Octo_Print_API_Integration {
                 continue; // Skip items without printable content
             }
             
-            // Map product data (simplified mapping for Phase 3)
+            // Get product mapping from template/product data
+            $product_mapping = $this->get_product_mapping($design_item['template_id'], $design_item['product_id'], $design_item['variation_id']);
+
             $order_positions[] = array(
-                'printMethod' => 'DTG', // Default print method
-                'manufacturer' => 'Generic', // Would need product mapping
-                'series' => 'Basic', // Would need product mapping  
-                'color' => $this->map_color_name($design_item['variation_name']),
-                'type' => 'T-Shirt', // Would need product mapping
-                'size' => $this->map_size_name($design_item['size_name']),
+                'printMethod' => $product_mapping['print_method'],
+                'manufacturer' => $product_mapping['manufacturer'],
+                'series' => $product_mapping['series'],
+                'color' => $this->map_color_to_api($design_item['variation_name']),
+                'type' => $product_mapping['type'],
+                'size' => $this->map_size_to_api($design_item['size_name']),
                 'quantity' => $design_item['quantity'],
                 'printPositions' => $print_positions
             );
@@ -1418,15 +1461,7 @@ class Octo_Print_API_Integration {
      * @return string API size name
      */
     private function map_size_name($wp_size) {
-        $size_mapping = array(
-            'One Size' => 'M',
-            'Klein' => 'S',
-            'Mittel' => 'M', 
-            'Groß' => 'L',
-            'Extra Groß' => 'XL'
-        );
-        
-        return $size_mapping[$wp_size] ?? $wp_size;
+        return $this->map_size_to_api($wp_size);
     }
 
     /**

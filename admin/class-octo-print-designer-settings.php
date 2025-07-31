@@ -109,6 +109,24 @@ class Octo_Print_Designer_Settings {
             update_option('octo_allesklardruck_sender_postal', sanitize_text_field($_POST['sender_postal']));
             update_option('octo_allesklardruck_sender_country', sanitize_text_field($_POST['sender_country']));
             
+            // Save product mappings
+            if (isset($_POST['product_mappings']) && is_array($_POST['product_mappings'])) {
+                $mappings = array();
+                foreach ($_POST['product_mappings'] as $mapping) {
+                    if (!empty($mapping['id']) && !empty($mapping['print_method'])) {
+                        $mappings[] = array(
+                            'id' => sanitize_text_field($mapping['id']),
+                            'type' => sanitize_text_field($mapping['type']), // 'template' or 'product'
+                            'print_method' => sanitize_text_field($mapping['print_method']),
+                            'manufacturer' => sanitize_text_field($mapping['manufacturer']),
+                            'series' => sanitize_text_field($mapping['series']),
+                            'product_type' => sanitize_text_field($mapping['product_type'])
+                        );
+                    }
+                }
+                update_option('octo_allesklardruck_product_mappings', $mappings);
+            }
+            
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'octo-print-designer') . '</p></div>';
         }
         
@@ -122,6 +140,30 @@ class Octo_Print_Designer_Settings {
         $sender_city = get_option('octo_allesklardruck_sender_city', 'Berlin');
         $sender_postal = get_option('octo_allesklardruck_sender_postal', '12345');
         $sender_country = get_option('octo_allesklardruck_sender_country', 'DE');
+        
+        // Get current product mappings
+        $product_mappings = get_option('octo_allesklardruck_product_mappings', array());
+        if (empty($product_mappings)) {
+            // Default mappings
+            $product_mappings = array(
+                array(
+                    'id' => '3657',
+                    'type' => 'template',
+                    'print_method' => 'DTG',
+                    'manufacturer' => 'Stanley/Stella',
+                    'series' => 'Essentials',
+                    'product_type' => 'T-Shirt'
+                ),
+                array(
+                    'id' => '3658',
+                    'type' => 'product',
+                    'print_method' => 'DTG',
+                    'manufacturer' => 'Stanley/Stella',
+                    'series' => 'Essentials',
+                    'product_type' => 'T-Shirt'
+                )
+            );
+        }
         
         // Get API status
         $api_integration = Octo_Print_API_Integration::get_instance();
@@ -224,7 +266,84 @@ class Octo_Print_Designer_Settings {
                             <p class="description"><?php _e('2-letter country code (e.g., DE, AT, CH)', 'octo-print-designer'); ?></p>
                         </td>
                     </tr>
+                    
+                    <tr>
+                        <th colspan="2"><h3><?php _e('Product Mappings', 'octo-print-designer'); ?></h3></th>
+                    </tr>
+                    <tr>
+                        <th colspan="2">
+                            <p class="description">
+                                <?php _e('Configure how templates and products are mapped to AllesKlarDruck API values. Template mappings take priority over product mappings.', 'octo-print-designer'); ?>
+                            </p>
+                        </th>
+                    </tr>
                 </table>
+                
+                <!-- Product Mappings Table -->
+                <div id="product-mappings-container">
+                    <table class="widefat" id="product-mappings-table">
+                        <thead>
+                            <tr>
+                                <th><?php _e('ID', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Type', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Print Method', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Manufacturer', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Series', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Product Type', 'octo-print-designer'); ?></th>
+                                <th><?php _e('Actions', 'octo-print-designer'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($product_mappings as $index => $mapping) : ?>
+                            <tr class="mapping-row">
+                                <td>
+                                    <input type="text" name="product_mappings[<?php echo $index; ?>][id]" 
+                                           value="<?php echo esc_attr($mapping['id']); ?>" class="regular-text" 
+                                           placeholder="<?php _e('Template/Product ID', 'octo-print-designer'); ?>" />
+                                </td>
+                                <td>
+                                    <select name="product_mappings[<?php echo $index; ?>][type]">
+                                        <option value="template" <?php selected($mapping['type'], 'template'); ?>><?php _e('Template', 'octo-print-designer'); ?></option>
+                                        <option value="product" <?php selected($mapping['type'], 'product'); ?>><?php _e('Product', 'octo-print-designer'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="text" name="product_mappings[<?php echo $index; ?>][print_method]" 
+                                           value="<?php echo esc_attr($mapping['print_method']); ?>" class="regular-text" 
+                                           placeholder="<?php _e('DTG', 'octo-print-designer'); ?>" />
+                                </td>
+                                <td>
+                                    <input type="text" name="product_mappings[<?php echo $index; ?>][manufacturer]" 
+                                           value="<?php echo esc_attr($mapping['manufacturer']); ?>" class="regular-text" 
+                                           placeholder="<?php _e('Stanley/Stella', 'octo-print-designer'); ?>" />
+                                </td>
+                                <td>
+                                    <input type="text" name="product_mappings[<?php echo $index; ?>][series]" 
+                                           value="<?php echo esc_attr($mapping['series']); ?>" class="regular-text" 
+                                           placeholder="<?php _e('Essentials', 'octo-print-designer'); ?>" />
+                                </td>
+                                <td>
+                                    <input type="text" name="product_mappings[<?php echo $index; ?>][product_type]" 
+                                           value="<?php echo esc_attr($mapping['product_type']); ?>" class="regular-text" 
+                                           placeholder="<?php _e('T-Shirt', 'octo-print-designer'); ?>" />
+                                </td>
+                                <td>
+                                    <button type="button" class="button button-small remove-mapping" 
+                                            data-index="<?php echo $index; ?>"><?php _e('Remove', 'octo-print-designer'); ?></button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <p>
+                        <button type="button" id="add-mapping" class="button button-secondary">
+                            <?php _e('+ Add Mapping', 'octo-print-designer'); ?>
+                        </button>
+                    </p>
+                </div>
+                
+                <table class="form-table">
                 
                 <?php submit_button(__('Save Settings', 'octo-print-designer')); ?>
             </form>
@@ -247,6 +366,53 @@ class Octo_Print_Designer_Settings {
         
         <script>
             jQuery(document).ready(function($) {
+                // Product Mappings Management
+                let mappingIndex = <?php echo count($product_mappings); ?>;
+                
+                // Add new mapping row
+                $('#add-mapping').on('click', function() {
+                    const newRow = `
+                        <tr class="mapping-row">
+                            <td>
+                                <input type="text" name="product_mappings[${mappingIndex}][id]" 
+                                       class="regular-text" placeholder="<?php _e('Template/Product ID', 'octo-print-designer'); ?>" />
+                            </td>
+                            <td>
+                                <select name="product_mappings[${mappingIndex}][type]">
+                                    <option value="template"><?php _e('Template', 'octo-print-designer'); ?></option>
+                                    <option value="product"><?php _e('Product', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" name="product_mappings[${mappingIndex}][print_method]" 
+                                       class="regular-text" placeholder="<?php _e('DTG', 'octo-print-designer'); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" name="product_mappings[${mappingIndex}][manufacturer]" 
+                                       class="regular-text" placeholder="<?php _e('Stanley/Stella', 'octo-print-designer'); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" name="product_mappings[${mappingIndex}][series]" 
+                                       class="regular-text" placeholder="<?php _e('Essentials', 'octo-print-designer'); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" name="product_mappings[${mappingIndex}][product_type]" 
+                                       class="regular-text" placeholder="<?php _e('T-Shirt', 'octo-print-designer'); ?>" />
+                            </td>
+                            <td>
+                                <button type="button" class="button button-small remove-mapping"><?php _e('Remove', 'octo-print-designer'); ?></button>
+                            </td>
+                        </tr>
+                    `;
+                    $('#product-mappings-table tbody').append(newRow);
+                    mappingIndex++;
+                });
+                
+                // Remove mapping row
+                $(document).on('click', '.remove-mapping', function() {
+                    $(this).closest('tr').remove();
+                });
+                
                 function createStatusMessage(type, title, message, details = null) {
                     var className = type === 'success' ? 'notice-success' : type === 'error' ? 'notice-error' : 'notice-info';
                     var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
