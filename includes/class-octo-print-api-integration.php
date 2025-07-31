@@ -296,6 +296,9 @@ class Octo_Print_API_Integration {
                 continue; // Skip items without proper design data
             }
             
+            // Template ID aus verschiedenen Quellen extrahieren
+            $template_id = $this->extract_template_id($item);
+            
             $design_items[] = array(
                 'item_id' => $item_id,
                 'item' => $item,
@@ -307,7 +310,7 @@ class Octo_Print_API_Integration {
                 'design_views' => $design_views,
                 'product_id' => $item->get_product_id(),
                 'variation_id' => $item->get_variation_id(),
-                'template_id' => $this->get_design_meta($item, 'template_id')
+                'template_id' => $template_id
             );
         }
         
@@ -575,6 +578,67 @@ class Octo_Print_API_Integration {
     }
 
     /**
+     * Extract template ID from order item using multiple strategies
+     */
+    private function extract_template_id($item) {
+        // Strategy 1: Direct template_id meta
+        $template_id = $item->get_meta('_template_id');
+        if (!empty($template_id)) {
+            error_log("YPrint Debug: Template ID found in _template_id meta: {$template_id}");
+            return $template_id;
+        }
+        
+        // Strategy 2: Get from design_data JSON
+        $design_data = $item->get_meta('_design_data');
+        if (!empty($design_data)) {
+            if (is_string($design_data)) {
+                $design_data = json_decode($design_data, true);
+            }
+            if (is_array($design_data) && isset($design_data['templateId'])) {
+                error_log("YPrint Debug: Template ID found in design_data.templateId: {$design_data['templateId']}");
+                return $design_data['templateId'];
+            }
+        }
+        
+        // Strategy 3: Get from user_designs table via design_id
+        $design_id = $item->get_meta('_yprint_design_id');
+        if (!empty($design_id)) {
+            global $wpdb;
+            $template_id = $wpdb->get_var($wpdb->prepare(
+                "SELECT template_id FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+                $design_id
+            ));
+            if (!empty($template_id)) {
+                error_log("YPrint Debug: Template ID found in user_designs table: {$template_id}");
+                return $template_id;
+            }
+        }
+        
+        // Strategy 4: Parse from processed_views JSON structure
+        $processed_views_json = $item->get_meta('_db_processed_views');
+        if (!empty($processed_views_json)) {
+            if (is_string($processed_views_json)) {
+                $processed_views = json_decode($processed_views_json, true);
+            } else {
+                $processed_views = $processed_views_json;
+            }
+            
+            if (is_array($processed_views)) {
+                // Try to extract template ID from design structure
+                foreach ($processed_views as $view_data) {
+                    if (isset($view_data['template_id'])) {
+                        error_log("YPrint Debug: Template ID found in processed_views: {$view_data['template_id']}");
+                        return $view_data['template_id'];
+                    }
+                }
+            }
+        }
+        
+        error_log("YPrint Debug: No template ID found for item");
+        return null;
+    }
+
+    /**
      * Get print specifications with enhanced validation and error handling
      */
     private function get_print_specifications($template_id = null, $product_id = null, $position = 'front') {
@@ -583,8 +647,13 @@ class Octo_Print_API_Integration {
         
         $config_key = $template_id . '_' . $position;
         
+        // Debug-Logging
+        error_log("YPrint Debug: Available print specs keys: " . implode(', ', array_keys($print_specs)));
+        error_log("YPrint Debug: Looking for config_key: '{$config_key}'");
+        
         if (isset($print_specs[$config_key])) {
             $specs = $print_specs[$config_key];
+            error_log("YPrint Debug: Print specs found for exact match: {$config_key}");
             
             // Validate print specifications
             $validation_result = $this->validate_print_specifications($specs, $template_id, $position);
@@ -1831,7 +1900,8 @@ class Octo_Print_API_Integration {
                 continue;
             }
             
-            $template_id = $item->get_meta('_template_id');
+            // Template ID aus verschiedenen Quellen extrahieren
+            $template_id = $this->extract_template_id($item);
             $views = $this->parse_design_views($item);
             
             foreach ($views as $view) {
@@ -1845,6 +1915,9 @@ class Octo_Print_API_Integration {
                     $template_id,
                     $view['images'][0]['transform_data'] ?? array()
                 );
+
+                // Debug-Logging für Print Specifications Lookup
+                error_log("YPrint Debug: Looking for print specs with template_id: '{$template_id}', position: '{$position}', config_key: '{$template_id}_{$position}'");
                 
                 $print_specs = $this->get_print_specifications($template_id, $item->get_product_id(), $position);
                 $validation_result = $this->validate_print_specifications($print_specs, $template_id, $position);
