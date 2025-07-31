@@ -151,7 +151,7 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Send order to AllesKlarDruck API
+     * Send order to AllesKlarDruck API with enhanced error handling
      */
     public function send_order_to_api($order) {
         if (!$order) {
@@ -165,8 +165,26 @@ class Octo_Print_API_Integration {
             return $payload;
         }
         
+        // Log the attempt
+        error_log("AllesKlarDruck API: Sending order #{$order->get_order_number()} to API");
+        
         // Make API request
-        return $this->make_api_request('/order', $payload, 'POST');
+        $api_response = $this->make_api_request('/order', $payload, 'POST');
+        
+        if (is_wp_error($api_response)) {
+            // Log the error
+            error_log("AllesKlarDruck API Error for order #{$order->get_order_number()}: " . $api_response->get_error_message());
+            return $api_response;
+        }
+        
+        // Process successful response
+        $processed_response = $this->save_api_response_to_order($order, $api_response, $payload);
+        
+        if (!is_wp_error($processed_response)) {
+            error_log("AllesKlarDruck API: Successfully sent order #{$order->get_order_number()}");
+        }
+        
+        return $processed_response;
     }
 
     /**
@@ -573,14 +591,16 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Make HTTP request to AllesKlarDruck API
+     * Make HTTP request to AllesKlarDruck API with enhanced retry logic and error handling
      */
-    private function make_api_request($endpoint, $data = array(), $method = 'GET') {
+    private function make_api_request($endpoint, $data = array(), $method = 'GET', $retry_count = 0) {
         if (!$this->has_valid_credentials()) {
             return new WP_Error('no_credentials', __('API credentials not configured', 'octo-print-designer'));
         }
         
         $url = $this->api_base_url . $endpoint;
+        $max_retries = 3;
+        $timeout = apply_filters('octo_allesklardruck_api_timeout', 45);
         
         $headers = array(
             'X-App-Id' => $this->app_id,
@@ -593,62 +613,325 @@ class Octo_Print_API_Integration {
         $args = array(
             'method' => $method,
             'headers' => $headers,
-            'timeout' => 30,
-            'sslverify' => true
+            'timeout' => $timeout,
+            'sslverify' => true,
+            'redirection' => 3,
+            'httpversion' => '1.1'
         );
         
         if ($method === 'POST' && !empty($data)) {
             $args['body'] = wp_json_encode($data);
+            $args['headers']['Content-Length'] = strlen($args['body']);
+        }
+        
+        // Rate limiting protection - wait between retries
+        if ($retry_count > 0) {
+            $wait_time = pow(2, $retry_count); // Exponential backoff: 2, 4, 8 seconds
+            sleep(min($wait_time, 10)); // Cap at 10 seconds
         }
         
         // Debug logging
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AllesKlarDruck API Request: ' . $method . ' ' . $url);
+            error_log(sprintf('AllesKlarDruck API Request (Attempt %d/%d): %s %s', 
+                $retry_count + 1, $max_retries + 1, $method, $url));
             if (!empty($data)) {
-                error_log('Request Data: ' . wp_json_encode($data, JSON_PRETTY_PRINT));
+                error_log('Request Data: ' . wp_json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             }
         }
         
         $response = wp_remote_request($url, $args);
         
+        // Handle WordPress HTTP errors
         if (is_wp_error($response)) {
-            return $response;
+            $error_message = $response->get_error_message();
+            
+            // Retry on certain network errors
+            if ($retry_count < $max_retries && $this->should_retry_error($response)) {
+                error_log("AllesKlarDruck API: Retrying due to network error: {$error_message}");
+                return $this->make_api_request($endpoint, $data, $method, $retry_count + 1);
+            }
+            
+            return new WP_Error('http_error', sprintf(
+                __('HTTP request failed after %d attempts: %s', 'octo-print-designer'),
+                $retry_count + 1,
+                $error_message
+            ));
         }
         
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
+        $response_headers = wp_remote_retrieve_headers($response);
         
         // Debug logging
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AllesKlarDruck API Response: ' . $status_code);
+            error_log("AllesKlarDruck API Response (Attempt {$retry_count}): Status {$status_code}");
+            error_log('Response Headers: ' . wp_json_encode($response_headers->getAll()));
             error_log('Response Body: ' . $body);
         }
         
+        // Process response based on status code
+        $processed_response = $this->process_api_response($status_code, $body, $response_headers);
+        
+        // Retry on server errors (5xx) and rate limiting (429)
+        if (is_wp_error($processed_response) && $retry_count < $max_retries) {
+            $error_code = $processed_response->get_error_code();
+            
+            if (in_array($error_code, ['server_error', 'rate_limited', 'timeout'])) {
+                error_log("AllesKlarDruck API: Retrying due to {$error_code}");
+                return $this->make_api_request($endpoint, $data, $method, $retry_count + 1);
+            }
+        }
+        
+        return $processed_response;
+    }
+
+    /**
+     * Determine if an error should trigger a retry
+     * 
+     * @param WP_Error $error The error object
+     * @return bool Whether to retry
+     */
+    private function should_retry_error($error) {
+        $retryable_errors = array(
+            'http_request_failed',
+            'timeout',
+            'connection_timeout',
+            'resolve_host',
+            'connect_error'
+        );
+        
+        return in_array($error->get_error_code(), $retryable_errors);
+    }
+
+    /**
+     * Process API response with enhanced error handling for different status codes
+     * 
+     * @param int $status_code HTTP status code
+     * @param string $body Response body
+     * @param WP_HTTP_Requests_Response_Headers $headers Response headers
+     * @return array|WP_Error Processed response or detailed error
+     */
+    private function process_api_response($status_code, $body, $headers) {
+        // Success responses (2xx)
         if ($status_code >= 200 && $status_code < 300) {
-            return json_decode($body, true);
-        } else {
-            return new WP_Error('api_error', sprintf(
-                __('API request failed with status %d: %s', 'octo-print-designer'),
-                $status_code,
-                $body
-            ));
+            $decoded_body = json_decode($body, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return new WP_Error('json_decode_error', sprintf(
+                    __('Invalid JSON response: %s', 'octo-print-designer'),
+                    json_last_error_msg()
+                ));
+            }
+            
+            return array(
+                'success' => true,
+                'status_code' => $status_code,
+                'data' => $decoded_body,
+                'headers' => $headers->getAll()
+            );
+        }
+        
+        // Parse error response body
+        $error_data = json_decode($body, true);
+        $error_message = $this->extract_error_message($error_data, $body);
+        
+        // Handle specific status codes
+        switch ($status_code) {
+            case 400:
+                return new WP_Error('bad_request', sprintf(
+                    __('Bad Request (400): %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 400, 'response_body' => $body));
+                
+            case 401:
+                return new WP_Error('unauthorized', sprintf(
+                    __('Unauthorized (401): Invalid API credentials. %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 401, 'response_body' => $body));
+                
+            case 403:
+                return new WP_Error('forbidden', sprintf(
+                    __('Forbidden (403): Access denied. %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 403, 'response_body' => $body));
+                
+            case 404:
+                return new WP_Error('not_found', sprintf(
+                    __('Not Found (404): API endpoint not found. %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 404, 'response_body' => $body));
+                
+            case 422:
+                return new WP_Error('validation_error', sprintf(
+                    __('Validation Error (422): %s', 'octo-print-designer'),
+                    $error_message
+                ), array('status_code' => 422, 'response_body' => $body));
+                
+            case 429:
+                $retry_after = $headers->offsetGet('retry-after') ?: 60;
+                return new WP_Error('rate_limited', sprintf(
+                    __('Rate Limited (429): Too many requests. Retry after %d seconds.', 'octo-print-designer'),
+                    $retry_after
+                ), array('status_code' => 429, 'retry_after' => $retry_after));
+                
+            case 500:
+            case 502:
+            case 503:
+            case 504:
+                return new WP_Error('server_error', sprintf(
+                    __('Server Error (%d): AllesKlarDruck API is temporarily unavailable. %s', 'octo-print-designer'),
+                    $status_code,
+                    $error_message
+                ), array('status_code' => $status_code, 'response_body' => $body));
+                
+            default:
+                return new WP_Error('api_error', sprintf(
+                    __('API Error (%d): %s', 'octo-print-designer'),
+                    $status_code,
+                    $error_message
+                ), array('status_code' => $status_code, 'response_body' => $body));
         }
     }
 
     /**
-     * Test API connection
+     * Extract error message from API response
+     * 
+     * @param array|null $error_data Decoded error response
+     * @param string $raw_body Raw response body
+     * @return string Error message
      */
-    public function test_connection() {
-        $result = $this->make_api_request('/');
-        
-        if (is_wp_error($result)) {
-            return $result;
+    private function extract_error_message($error_data, $raw_body) {
+        if (is_array($error_data)) {
+            // Try common error message fields
+            $message_fields = array('message', 'error', 'detail', 'description', 'errors');
+            
+            foreach ($message_fields as $field) {
+                if (isset($error_data[$field])) {
+                    if (is_string($error_data[$field])) {
+                        return $error_data[$field];
+                    } elseif (is_array($error_data[$field])) {
+                        return implode(', ', $error_data[$field]);
+                    }
+                }
+            }
+            
+            // If no standard message field, return the whole error data
+            return wp_json_encode($error_data);
         }
         
+        // Fallback to raw body if JSON parsing failed
+        return !empty($raw_body) ? $raw_body : __('Unknown API error', 'octo-print-designer');
+    }
+
+    /**
+     * Save API response data to order meta with detailed information
+     * 
+     * @param WC_Order $order WordPress order object
+     * @param array $api_response API response data
+     * @param array $payload Original payload sent to API
+     * @return array Enhanced response data
+     */
+    private function save_api_response_to_order($order, $api_response, $payload) {
+        $order_id = $order->get_id();
+        $timestamp = time();
+        
+        // Extract API response data
+        $response_data = $api_response['data'] ?? array();
+        $status_code = $api_response['status_code'] ?? 200;
+        
+        // Save comprehensive API response meta
+        update_post_meta($order_id, '_allesklardruck_api_sent', $timestamp);
+        update_post_meta($order_id, '_allesklardruck_api_status_code', $status_code);
+        update_post_meta($order_id, '_allesklardruck_api_response', $response_data);
+        update_post_meta($order_id, '_allesklardruck_api_payload', $payload);
+        
+        // Extract and save specific response fields if available
+        if (isset($response_data['orderId'])) {
+            update_post_meta($order_id, '_allesklardruck_order_id', $response_data['orderId']);
+        }
+        
+        if (isset($response_data['trackingNumber'])) {
+            update_post_meta($order_id, '_allesklardruck_tracking_number', $response_data['trackingNumber']);
+        }
+        
+        if (isset($response_data['status'])) {
+            update_post_meta($order_id, '_allesklardruck_order_status', $response_data['status']);
+        }
+        
+        // Create comprehensive order note
+        $order_note_parts = array();
+        $order_note_parts[] = '📡 Order successfully sent to AllesKlarDruck API';
+        $order_note_parts[] = "Status Code: {$status_code}";
+        
+        if (isset($response_data['orderId'])) {
+            $order_note_parts[] = "AllesKlarDruck Order ID: {$response_data['orderId']}";
+        }
+        
+        if (isset($response_data['status'])) {
+            $order_note_parts[] = "Status: {$response_data['status']}";
+        }
+        
+        if (isset($response_data['estimatedProcessingTime'])) {
+            $order_note_parts[] = "Estimated Processing: {$response_data['estimatedProcessingTime']}";
+        }
+        
+        $order_note = implode("\n", $order_note_parts);
+        
+        $order->add_order_note($order_note, false, true);
+        
+        // Return enhanced response with metadata
         return array(
             'success' => true,
-            'message' => __('API connection successful', 'octo-print-designer')
+            'message' => __('Order successfully sent to AllesKlarDruck API', 'octo-print-designer'),
+            'api_response' => $response_data,
+            'status_code' => $status_code,
+            'timestamp' => $timestamp,
+            'order_id' => $order_id,
+            'allesklardruck_order_id' => $response_data['orderId'] ?? null,
+            'tracking_number' => $response_data['trackingNumber'] ?? null,
+            'order_status' => $response_data['status'] ?? null
         );
+    }
+
+    /**
+     * Test API connection with enhanced error handling
+     */
+    public function test_connection() {
+        if (!$this->has_valid_credentials()) {
+            return new WP_Error('no_credentials', __('API credentials not configured', 'octo-print-designer'));
+        }
+        
+        $start_time = microtime(true);
+        
+        // Test with health check endpoint (if available) or root endpoint
+        $test_endpoints = array('/', '/health', '/status');
+        $last_error = null;
+        
+        foreach ($test_endpoints as $endpoint) {
+            $result = $this->make_api_request($endpoint, array(), 'GET', 0);
+            
+            if (!is_wp_error($result)) {
+                $response_time = round((microtime(true) - $start_time) * 1000, 2);
+                
+                return array(
+                    'success' => true,
+                    'message' => sprintf(__('API connection successful (Response time: %s ms)', 'octo-print-designer'), $response_time),
+                    'endpoint' => $endpoint,
+                    'response_time_ms' => $response_time,
+                    'status_code' => $result['status_code'] ?? 200,
+                    'api_version' => $result['data']['version'] ?? 'Unknown'
+                );
+            }
+            
+            $last_error = $result;
+            
+            // Don't retry on auth errors
+            if ($result->get_error_code() === 'unauthorized') {
+                break;
+            }
+        }
+        
+        return $last_error;
     }
 
     /**
@@ -914,5 +1197,57 @@ class Octo_Print_API_Integration {
         );
         
         return $size_mapping[$wp_size] ?? $wp_size;
+    }
+
+    /**
+     * Get API status for a specific order
+     * 
+     * @param int $order_id WordPress order ID
+     * @return array Order API status information
+     */
+    public function get_order_api_status($order_id) {
+        $api_sent = get_post_meta($order_id, '_allesklardruck_api_sent', true);
+        $status_code = get_post_meta($order_id, '_allesklardruck_api_status_code', true);
+        $allesklardruck_order_id = get_post_meta($order_id, '_allesklardruck_order_id', true);
+        $order_status = get_post_meta($order_id, '_allesklardruck_order_status', true);
+        $tracking_number = get_post_meta($order_id, '_allesklardruck_tracking_number', true);
+        
+        if (!$api_sent) {
+            return array(
+                'sent' => false,
+                'status' => 'not_sent',
+                'message' => __('Order not sent to API yet', 'octo-print-designer'),
+                'color' => '#6c757d'
+            );
+        }
+        
+        $sent_date = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $api_sent);
+        
+        if ($status_code && $status_code >= 200 && $status_code < 300) {
+            return array(
+                'sent' => true,
+                'status' => 'success',
+                'message' => sprintf(__('Successfully sent on %s', 'octo-print-designer'), $sent_date),
+                'details' => array(
+                    'sent_date' => $sent_date,
+                    'status_code' => $status_code,
+                    'allesklardruck_order_id' => $allesklardruck_order_id,
+                    'order_status' => $order_status,
+                    'tracking_number' => $tracking_number
+                ),
+                'color' => '#28a745'
+            );
+        } else {
+            return array(
+                'sent' => true,
+                'status' => 'error',
+                'message' => sprintf(__('API error (Status: %s) on %s', 'octo-print-designer'), $status_code ?: 'Unknown', $sent_date),
+                'details' => array(
+                    'sent_date' => $sent_date,
+                    'status_code' => $status_code
+                ),
+                'color' => '#dc3545'
+            );
+        }
     }
 }

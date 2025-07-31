@@ -553,15 +553,69 @@ private function check_yprint_dependency() {
                     <span class="preview-spinner spinner" style="float: none; margin: 0 0 0 5px;"></span>
                 </p>
                 
+                <?php
+                // Get API integration and status
+                $api_integration = Octo_Print_API_Integration::get_instance();
+                $api_status = $api_integration->get_api_status();
+                $order_api_status = $api_integration->get_order_api_status($order_id);
+                ?>
+
+                <!-- API Status Section -->
+                <div class="api-status-section" style="margin-bottom: 15px; padding: 12px; border-radius: 6px; background-color: #f8f9fa; border-left: 4px solid <?php echo esc_attr($api_status['color']); ?>;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 14px; color: <?php echo esc_attr($api_status['color']); ?>">
+                        <?php echo $api_status['status'] === 'connected' ? '🟢' : ($api_status['status'] === 'error' ? '🔴' : '🟡'); ?> 
+                        AllesKlarDruck API Status
+                    </h4>
+                    
+                    <p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">
+                        <strong>Verbindung:</strong> <?php echo esc_html($api_status['message']); ?>
+                    </p>
+                    
+                    <?php if ($order_api_status['sent']) : ?>
+                        <div style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 4px; border-left: 3px solid <?php echo esc_attr($order_api_status['color']); ?>;">
+                            <p style="margin: 0; font-size: 11px; font-weight: bold; color: <?php echo esc_attr($order_api_status['color']); ?>">
+                                📡 Diese Bestellung: <?php echo esc_html($order_api_status['message']); ?>
+                            </p>
+                            
+                            <?php if (isset($order_api_status['details'])) : ?>
+                                <details style="margin-top: 5px;">
+                                    <summary style="cursor: pointer; font-size: 10px; color: #666;">🔍 API-Details anzeigen</summary>
+                                    <div style="margin-top: 5px; font-size: 10px; color: #666;">
+                                        <?php if (!empty($order_api_status['details']['allesklardruck_order_id'])) : ?>
+                                            <strong>AllesKlarDruck Bestell-ID:</strong> <?php echo esc_html($order_api_status['details']['allesklardruck_order_id']); ?><br>
+                                        <?php endif; ?>
+                                        
+                                        <?php if (!empty($order_api_status['details']['order_status'])) : ?>
+                                            <strong>API-Status:</strong> <?php echo esc_html($order_api_status['details']['order_status']); ?><br>
+                                        <?php endif; ?>
+                                        
+                                        <?php if (!empty($order_api_status['details']['tracking_number'])) : ?>
+                                            <strong>Tracking:</strong> <?php echo esc_html($order_api_status['details']['tracking_number']); ?><br>
+                                        <?php endif; ?>
+                                        
+                                        <strong>HTTP Status:</strong> <?php echo esc_html($order_api_status['details']['status_code'] ?? 'Unknown'); ?><br>
+                                        <strong>Gesendet am:</strong> <?php echo esc_html($order_api_status['details']['sent_date']); ?>
+                                    </div>
+                                </details>
+                            <?php endif; ?>
+                        </div>
+                    <?php else : ?>
+                        <p style="margin: 5px 0 0 0; font-size: 11px; color: #856404;">
+                            <em>💡 Diese Bestellung wurde noch nicht an die API gesendet</em>
+                        </p>
+                    <?php endif; ?>
+                </div>
+
                 <p style="margin-bottom: 8px;">
-                    <?php $api_integration = Octo_Print_API_Integration::get_instance(); ?>
-                    <?php $api_status = $api_integration->get_api_status(); ?>
                     <button type="button" id="send_to_print_provider_api" class="button button-secondary" 
                             data-order-id="<?php echo $order_id; ?>" 
                             data-auto-refresh="<?php echo !$all_data_complete ? 'true' : 'false'; ?>"
-                            <?php echo ($api_status['status'] !== 'connected' || !$all_data_complete) ? 'disabled' : ''; ?>
-                            title="<?php echo esc_attr($api_status['message']); ?>">
-                        <?php if ($api_status['status'] === 'connected') : ?>
+                            <?php echo ($api_status['status'] !== 'connected' || !$all_data_complete || $order_api_status['sent']) ? 'disabled' : ''; ?>
+                            title="<?php echo $order_api_status['sent'] ? 'Bereits an API gesendet' : esc_attr($api_status['message']); ?>">
+                        
+                        <?php if ($order_api_status['sent']) : ?>
+                            ✅ Bereits an API gesendet
+                        <?php elseif ($api_status['status'] === 'connected') : ?>
                             <?php echo !$all_data_complete ? '🔄 Daten laden & API senden' : '📡 Send to AllesKlarDruck API'; ?>
                         <?php else : ?>
                             📡 API nicht verfügbar
@@ -907,7 +961,7 @@ private function check_yprint_dependency() {
                     }
                 });
                 
-                // Enhanced Send API Button
+                // Enhanced Send API Button with better error handling and progress tracking
                 $('#send_to_print_provider_api').on('click', function() {
                     var button = $(this);
                     var spinner = button.next('.api-spinner');
@@ -920,6 +974,13 @@ private function check_yprint_dependency() {
 
                     // Remove any existing notices
                     $('.notice').not('.email-sent-notice').remove();
+
+                    // Check if already sent
+                    if (button.text().includes('Bereits an API gesendet')) {
+                        createStatusMessage('info', 'Bereits versendet', 'Diese Bestellung wurde bereits erfolgreich an die AllesKlarDruck API gesendet.')
+                            .insertBefore(button.parent());
+                        return;
+                    }
 
                     // Wenn Daten fehlen, erst automatisch refreshen
                     if (autoRefresh === 'true') {
@@ -935,7 +996,9 @@ private function check_yprint_dependency() {
                                 button.text('📡 Sende an API...');
                                 sendToAPI();
                             } else {
-                                alert('Fehler beim Laden der Druckdaten: ' + (refreshResponse.data && refreshResponse.data.message ? refreshResponse.data.message : 'Unbekannter Fehler'));
+                                createStatusMessage('error', 'Daten-Refresh fehlgeschlagen', 
+                                    refreshResponse.data && refreshResponse.data.message ? refreshResponse.data.message : 'Unbekannter Fehler')
+                                    .insertBefore(button.parent());
                                 button.text('❌ Fehler - erneut versuchen');
                                 spinner.css('visibility', 'hidden');
                                 return;
@@ -947,12 +1010,12 @@ private function check_yprint_dependency() {
                     sendToAPI();
 
                     function sendToAPI() {
-                        button.prop('disabled', true).text('📡 Bereite API-Request vor...');
+                        button.prop('disabled', true).text('📡 Verbinde mit AllesKlarDruck API...');
                         spinner.css('visibility', 'visible');
 
-                        // Create progress for API
-                        var apiProgress = $('<div class="api-progress" style="margin: 10px 0; padding: 8px; background: #e8f4fd; border-radius: 4px;"></div>');
-                        var apiProgressText = $('<p style="margin: 0; font-size: 12px; color: #0073aa;">📡 Sammle Bestelldaten...</p>');
+                        // Create enhanced progress for API
+                        var apiProgress = $('<div class="api-progress" style="margin: 10px 0; padding: 12px; background: linear-gradient(90deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 6px; border-left: 4px solid #2196f3;"></div>');
+                        var apiProgressText = $('<p style="margin: 0; font-size: 12px; color: #1976d2; font-weight: bold;">🔗 Teste API-Verbindung...</p>');
                         apiProgress.append(apiProgressText);
                         apiProgress.insertBefore(button.parent());
 
@@ -965,60 +1028,107 @@ private function check_yprint_dependency() {
                                 nonce: $('#octo_print_provider_nonce').val()
                             },
                             beforeSend: function() {
-                                apiProgressText.html('🔧 Transformiere Daten für AllesKlarDruck API...');
-                                button.text('📡 Transformiere Daten...');
+                                apiProgressText.html('📊 Verarbeite Bestelldaten...');
+                                button.text('📊 Verarbeite Daten...');
                             },
                             xhr: function() {
                                 var xhr = new window.XMLHttpRequest();
-                                // Simulate progress updates for API
+                                // Enhanced progress updates for API
                                 var progress = 0;
+                                var progressSteps = [
+                                    '🔗 Verbinde mit AllesKlarDruck API...',
+                                    '📊 Transformiere Druckdaten...',
+                                    '🔄 Konvertiere zu API-Format...',
+                                    '📤 Sende Bestellung...',
+                                    '✅ Verarbeite API-Response...'
+                                ];
+                                
                                 var progressInterval = setInterval(function() {
-                                    progress += 15;
-                                    if (progress <= 30) {
-                                        apiProgressText.html('📊 Verarbeite Druckdaten (' + progress + '%)...');
-                                    } else if (progress <= 60) {
-                                        apiProgressText.html('🔄 Konvertiere zu API-Format (' + progress + '%)...');
-                                        button.text('🔄 Konvertiere Daten...');
-                                    } else if (progress <= 90) {
-                                        apiProgressText.html('📡 Sende an AllesKlarDruck (' + progress + '%)...');
-                                        button.text('📤 Sende an API...');
+                                    if (progress < progressSteps.length - 1) {
+                                        apiProgressText.html(progressSteps[progress]);
+                                        button.text(progressSteps[progress].replace(/🔗|📊|🔄|📤|✅/g, '').trim() + '...');
+                                        progress++;
                                     } else {
                                         clearInterval(progressInterval);
-                                        apiProgressText.html('✅ Fertigstelle...');
                                     }
-                                }, 300);
+                                }, 800);
+                                
                                 xhr.addEventListener('load', function() {
                                     clearInterval(progressInterval);
                                 });
+                                
                                 return xhr;
                             },
                             success: function(response) {
                                 setTimeout(function() {
                                     apiProgress.remove();
+                                    
                                     if (response.success) {
-                                        var title = 'Bestellung erfolgreich an AllesKlarDruck API gesendet!';
-                                        var message = response.data.message || 'Print Provider wurde via API benachrichtigt.';
-                                        createStatusMessage('success', title, message)
+                                        var title = '🎉 API-Versand erfolgreich!';
+                                        var message = response.data.message || 'Bestellung wurde erfolgreich an AllesKlarDruck API übertragen.';
+                                        var details = [];
+                                        
+                                        if (response.data.details) {
+                                            var det = response.data.details;
+                                            if (det.allesklardruck_order_id) {
+                                                details.push('AllesKlarDruck Bestell-ID: ' + det.allesklardruck_order_id);
+                                            }
+                                            if (det.order_status) {
+                                                details.push('Status: ' + det.order_status);
+                                            }
+                                            if (det.sent_date) {
+                                                details.push('Gesendet am: ' + det.sent_date);
+                                            }
+                                        }
+                                        
+                                        createStatusMessage('success', title, message, details)
                                             .insertBefore(button.parent());
-                                        button.text('✅ API-Versand erfolgreich!').css('background-color', '#46b450');
+                                        
+                                        button.text('✅ Erfolgreich an API gesendet!').css('background-color', '#28a745');
+                                        
                                         setTimeout(function() {
                                             location.reload();
-                                        }, 2000);
+                                        }, 3000);
+                                        
                                     } else {
-                                        var title = 'Fehler beim API-Versand';
+                                        var title = '❌ API-Versand fehlgeschlagen';
                                         var message = response.data && response.data.message ? response.data.message : 'Unbekannter Fehler beim API-Versand.';
-                                        createStatusMessage('error', title, message)
+                                        var details = [];
+                                        
+                                        // Add troubleshooting tips if available
+                                        if (response.data && response.data.troubleshooting) {
+                                            details = details.concat(response.data.troubleshooting.map(function(tip) {
+                                                return '💡 ' + tip;
+                                            }));
+                                        }
+                                        
+                                        // Add technical details if available
+                                        if (response.data && response.data.technical_details && response.data.technical_details.status_code) {
+                                            details.push('HTTP Status: ' + response.data.technical_details.status_code);
+                                        }
+                                        
+                                        createStatusMessage('error', title, message, details)
                                             .insertBefore(button.parent());
+                                        
                                         button.prop('disabled', false).text('📡 Send to AllesKlarDruck API').css('background-color', '');
                                     }
-                                }, 500);
+                                }, 1000);
                             },
-                            error: function() {
+                            error: function(xhr, status, error) {
                                 apiProgress.remove();
-                                var title = 'Netzwerkfehler';
-                                var message = 'Verbindung zur API fehlgeschlagen.';
-                                createStatusMessage('error', title, message)
+                                
+                                var title = '🌐 Netzwerkfehler';
+                                var message = 'Verbindung zur AllesKlarDruck API fehlgeschlagen.';
+                                var details = [
+                                    'HTTP Status: ' + (xhr.status || 'Unbekannt'),
+                                    'Fehler: ' + (error || 'Unbekannt'),
+                                    '💡 Überprüfen Sie Ihre Internetverbindung',
+                                    '💡 Versuchen Sie es in einigen Minuten erneut'
+                                ];
+                                
+                                createStatusMessage('error', title, message, details)
                                     .insertBefore(button.parent());
+                                
                                 button.prop('disabled', false).text('📡 Send to AllesKlarDruck API').css('background-color', '');
                             },
                             complete: function() {
@@ -1768,7 +1878,7 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * AJAX handler for sending order to AllesKlarDruck API
+     * AJAX handler for sending order to AllesKlarDruck API with enhanced error handling
      */
     public function ajax_send_print_provider_api() {
         // Security check
@@ -1794,32 +1904,105 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Get API integration instance
         $api_integration = Octo_Print_API_Integration::get_instance();
         
-        // Check if API credentials are configured
-        if (!$api_integration->has_valid_credentials()) {
-            wp_send_json_error(array('message' => __('AllesKlarDruck API credentials not configured', 'octo-print-designer')));
+        // Check if already sent to avoid duplicate sends
+        $order_api_status = $api_integration->get_order_api_status($order_id);
+        if ($order_api_status['sent'] && $order_api_status['status'] === 'success') {
+            wp_send_json_error(array(
+                'message' => __('Order has already been successfully sent to AllesKlarDruck API', 'octo-print-designer'),
+                'details' => $order_api_status['details']
+            ));
         }
         
-        // Send order to API
+        // Check API credentials and connection
+        if (!$api_integration->has_valid_credentials()) {
+            wp_send_json_error(array(
+                'message' => __('AllesKlarDruck API credentials are not configured. Please configure them in the plugin settings.', 'octo-print-designer')
+            ));
+        }
+        
+        // Test API connection before sending
+        $connection_test = $api_integration->test_connection();
+        if (is_wp_error($connection_test)) {
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    __('API connection failed: %s', 'octo-print-designer'),
+                    $connection_test->get_error_message()
+                )
+            ));
+        }
+        
+        // Check if order has design items
+        $has_design_items = false;
+        foreach ($order->get_items() as $item) {
+            if ($this->get_design_meta($item, 'design_id')) {
+                $has_design_items = true;
+                break;
+            }
+        }
+        
+        if (!$has_design_items) {
+            wp_send_json_error(array(
+                'message' => __('No design items found in this order for API processing', 'octo-print-designer')
+            ));
+        }
+        
+        // Send to API with enhanced error handling
         $result = $api_integration->send_order_to_api($order);
         
         if (is_wp_error($result)) {
-            wp_send_json_error(array('message' => $result->get_error_message()));
+            // Enhanced error response with specific guidance
+            $error_code = $result->get_error_code();
+            $error_message = $result->get_error_message();
+            $error_data = $result->get_error_data();
+            
+            // Provide specific user guidance based on error type
+            $user_message = $error_message;
+            $troubleshooting_tips = array();
+            
+            switch ($error_code) {
+                case 'unauthorized':
+                    $troubleshooting_tips[] = 'Überprüfen Sie die API-Credentials in den Plugin-Einstellungen';
+                    $troubleshooting_tips[] = 'Kontaktieren Sie AllesKlarDruck für neue API-Keys';
+                    break;
+                    
+                case 'validation_error':
+                    $troubleshooting_tips[] = 'Überprüfen Sie die Vollständigkeit der Druckdaten';
+                    $troubleshooting_tips[] = 'Stellen Sie sicher, dass alle Bilder verfügbar sind';
+                    break;
+                    
+                case 'rate_limited':
+                    $troubleshooting_tips[] = 'Warten Sie einen Moment und versuchen Sie es erneut';
+                    break;
+                    
+                case 'server_error':
+                    $troubleshooting_tips[] = 'AllesKlarDruck API ist temporär nicht verfügbar';
+                    $troubleshooting_tips[] = 'Versuchen Sie es in einigen Minuten erneut';
+                    break;
+            }
+            
+            wp_send_json_error(array(
+                'message' => $user_message,
+                'error_code' => $error_code,
+                'troubleshooting' => $troubleshooting_tips,
+                'technical_details' => array(
+                    'status_code' => $error_data['status_code'] ?? null,
+                    'response_body' => $error_data['response_body'] ?? null
+                )
+            ));
         }
         
-        // Save API response to order meta
-        update_post_meta($order_id, '_allesklardruck_api_sent', time());
-        update_post_meta($order_id, '_allesklardruck_api_response', $result);
-        
-        // Add order note
-        $order->add_order_note(
-            sprintf(__('Order sent to AllesKlarDruck API. Response: %s', 'octo-print-designer'), wp_json_encode($result)),
-            false,
-            true
-        );
-        
+        // Success response with detailed information
         wp_send_json_success(array(
-            'message' => __('Order successfully sent to AllesKlarDruck API', 'octo-print-designer'),
-            'response' => $result
+            'message' => $result['message'],
+            'api_response' => $result['api_response'],
+            'details' => array(
+                'order_id' => $result['order_id'],
+                'allesklardruck_order_id' => $result['allesklardruck_order_id'],
+                'tracking_number' => $result['tracking_number'],
+                'order_status' => $result['order_status'],
+                'timestamp' => $result['timestamp'],
+                'sent_date' => date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $result['timestamp'])
+            )
         ));
     }
 }
