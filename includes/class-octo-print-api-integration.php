@@ -429,7 +429,8 @@ class Octo_Print_API_Integration {
                     'bleed' => $print_specs['bleed'],
                     'scaling' => $print_specs['scaling'],
                     'printQuality' => $print_specs['printQuality'],
-                    'printFile' => $image['url']
+                    'printFile' => $image['url'],
+                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : '' // NEU: Preview-URL hinzufügen
                 );
             }
             
@@ -941,7 +942,7 @@ class Octo_Print_API_Integration {
                         'view_id' => $view_data['system_id'] ?: '',
                         'variation_id' => $view_data['variation_id'] ?: '',
                         'view_key' => $view_key, // Wichtig für Template-Mapping
-                        'images' => $this->parse_view_images($view_data['images'] ?: array(), $view_data)
+                        'images' => $this->parse_view_images($view_data['images'] ?: array(), $view_data, $item) // NEU: $item Parameter hinzufügen
                     );
                 }
             }
@@ -953,7 +954,7 @@ class Octo_Print_API_Integration {
     /**
      * Parse images from view data (reused from WC Integration)
      */
-    private function parse_view_images($images, $view_data = array()) {
+    private function parse_view_images($images, $view_data = array(), $item = null) {
         $parsed_images = array();
         
         if (!is_array($images)) {
@@ -970,6 +971,7 @@ class Octo_Print_API_Integration {
             $parsed_images[] = array(
                 'filename' => $image['filename'] ?: basename($image['url']),
                 'url' => $image['url'],
+                'preview_url' => $item ? $this->get_design_meta($item, 'preview_url') : '', // NEU: Preview-URL hinzufügen
                 'original_width_px' => $transform['width'] ?: 0,
                 'original_height_px' => $transform['height'] ?: 0,
                 'position_left_px' => round($transform['left'] ?: 0, 2),
