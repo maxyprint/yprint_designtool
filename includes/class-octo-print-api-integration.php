@@ -42,6 +42,10 @@ class Octo_Print_API_Integration {
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_to_allesklardruck'));
         add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
         add_action('admin_init', array($this, 'register_admin_settings'));
+        
+        // Debug AJAX handlers (TEMPORARY - Remove after testing)
+        add_action('wp_ajax_debug_api_payload', array($this, 'debug_api_payload'));
+        add_action('wp_ajax_debug_api_response', array($this, 'debug_api_response'));
     }
 
     /**
@@ -1434,5 +1438,75 @@ class Octo_Print_API_Integration {
                 'color' => '#dc3545'
             );
         }
+    }
+
+    /**
+     * Debug AJAX handler for API payload preview
+     * TEMPORARY - Remove after testing
+     */
+    public function debug_api_payload() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+        
+        $order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : 5338;
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_die('Order not found: ' . $order_id);
+        }
+        
+        echo "<h2>🧪 API Payload Preview für Bestellung #{$order->get_order_number()}</h2>";
+        
+        $api = Octo_Print_API_Integration::get_instance();
+        $payload = $api->build_api_payload($order);
+        
+        if (is_wp_error($payload)) {
+            echo "<strong>❌ Error:</strong> " . $payload->get_error_message();
+            wp_die();
+        }
+        
+        echo "<h3>✅ Payload erfolgreich erstellt!</h3>";
+        echo "<pre style='background: #f5f5f5; padding: 15px; overflow-x: auto;'>";
+        echo esc_html(wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        echo "</pre>";
+        
+        wp_die();
+    }
+
+    /**
+     * Debug AJAX handler for API response
+     * TEMPORARY - Remove after testing
+     */
+    public function debug_api_response() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+        
+        $order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : 5338;
+        
+        echo "<h3>🔍 API Response Debug für Bestellung #{$order_id}</h3>";
+        
+        // Zeige gespeicherte API-Daten
+        $api_sent = get_post_meta($order_id, '_allesklardruck_api_sent', true);
+        $status_code = get_post_meta($order_id, '_allesklardruck_api_status_code', true);
+        $api_response = get_post_meta($order_id, '_allesklardruck_api_response', true);
+        $api_payload = get_post_meta($order_id, '_allesklardruck_api_payload', true);
+        
+        if ($api_sent) {
+            echo "<p><strong>✅ API Versand:</strong> " . date('d.m.Y H:i:s', $api_sent) . "</p>";
+            echo "<p><strong>Status Code:</strong> {$status_code}</p>";
+            echo "<p><strong>API Response:</strong></p>";
+            echo "<pre>" . esc_html(wp_json_encode($api_response, JSON_PRETTY_PRINT)) . "</pre>";
+            
+            if ($api_payload) {
+                echo "<p><strong>API Payload:</strong></p>";
+                echo "<pre>" . esc_html(wp_json_encode($api_payload, JSON_PRETTY_PRINT)) . "</pre>";
+            }
+        } else {
+            echo "<p>❌ Noch nicht an API gesendet</p>";
+        }
+        
+        wp_die();
     }
 }
