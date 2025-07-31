@@ -129,11 +129,23 @@ class Octo_Print_Designer_Settings {
             
             // Save print specifications
             if (isset($_POST['print_specs']) && is_array($_POST['print_specs'])) {
-                $specs = array();
-                foreach ($_POST['print_specs'] as $config_key => $spec) {
+                // Get existing specs to preserve other entries
+                $existing_specs = get_option('octo_allesklardruck_print_specifications', array());
+                
+                // Track which keys are being updated/replaced
+                $keys_to_remove = array();
+                $new_specs = array();
+                
+                foreach ($_POST['print_specs'] as $old_config_key => $spec) {
                     if (!empty($spec['template_id']) && !empty($spec['position'])) {
                         $new_key = sanitize_text_field($spec['template_id']) . '_' . sanitize_text_field($spec['position']);
-                        $specs[$new_key] = array(
+                        
+                        // If the key changed, mark the old one for removal
+                        if ($old_config_key !== $new_key && isset($existing_specs[$old_config_key])) {
+                            $keys_to_remove[] = $old_config_key;
+                        }
+                        
+                        $new_specs[$new_key] = array(
                             'unit' => sanitize_text_field($spec['unit']),
                             'offsetUnit' => sanitize_text_field($spec['unit']), // Same as unit
                             'referencePoint' => sanitize_text_field($spec['referencePoint']),
@@ -143,12 +155,43 @@ class Octo_Print_Designer_Settings {
                             'scaling' => sanitize_text_field($spec['scaling']),
                             'printQuality' => sanitize_text_field($spec['printQuality'])
                         );
+                        
+                        // Debug logging
+                        error_log("YPrint Admin: Saving print spec - Old key: '{$old_config_key}', New key: '{$new_key}'");
                     }
                 }
-                update_option('octo_allesklardruck_print_specifications', $specs);
+                
+                // Remove old keys that were renamed
+                foreach ($keys_to_remove as $old_key) {
+                    unset($existing_specs[$old_key]);
+                    error_log("YPrint Admin: Removed old print spec key: '{$old_key}'");
+                }
+                
+                // Merge with existing specs (this preserves specs not being edited)
+                $final_specs = array_merge($existing_specs, $new_specs);
+                
+                update_option('octo_allesklardruck_print_specifications', $final_specs);
+                
+                error_log("YPrint Admin: Final print specs keys: " . implode(', ', array_keys($final_specs)));
             }
             
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'octo-print-designer') . '</p></div>';
+            
+            // Debug output for print specifications
+            $saved_specs = get_option('octo_allesklardruck_print_specifications', array());
+            $saved_count = count($saved_specs);
+            $saved_keys = implode(', ', array_keys($saved_specs));
+            
+            echo '<div class="notice notice-info">';
+            echo '<p><strong>Print Specifications Status:</strong></p>';
+            echo '<p>Gespeicherte Specifications: <strong>' . $saved_count . '</strong></p>';
+            if (!empty($saved_keys)) {
+                echo '<p>Verfügbare Keys: <code>' . esc_html($saved_keys) . '</code></p>';
+            }
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                echo '<p><strong>Debug:</strong> Detaillierte Logs findest du in /wp-content/debug.log</p>';
+            }
+            echo '</div>';
         }
         
         // Get current values - API credentials
