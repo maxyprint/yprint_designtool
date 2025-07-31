@@ -50,8 +50,16 @@ class Octo_Print_API_Integration {
      * Register admin settings for API credentials
      */
     public function register_admin_settings() {
+        // API credentials
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_app_id');
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_api_key');
+        
+        // Sender data
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_name');
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_street');
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_city');
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_postal');
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_country');
     }
 
     /**
@@ -1314,13 +1322,15 @@ class Octo_Print_API_Integration {
             );
         }
         
-        // Default sender address (should be configurable in future)
+        // Sender data from settings
+        $sender_city = $this->sanitize_city_name(get_option('octo_allesklardruck_sender_city', 'Berlin'));
+        
         $sender_address = array(
-            'name' => 'YPrint',
-            'street' => 'YPrint Street 1',
-            'city' => 'YPrint City',
-            'postalCode' => '12345',
-            'country' => 'DE'
+            'name' => get_option('octo_allesklardruck_sender_name', 'YPrint'),
+            'street' => get_option('octo_allesklardruck_sender_street', 'Company Street 1'),
+            'city' => $sender_city,
+            'postalCode' => get_option('octo_allesklardruck_sender_postal', '12345'),
+            'country' => get_option('octo_allesklardruck_sender_country', 'DE')
         );
         
         // Transform design items to API order positions

@@ -98,15 +98,30 @@ class Octo_Print_Designer_Settings {
     public function render_api_settings_page() {
         // Handle form submission
         if (isset($_POST['submit']) && wp_verify_nonce($_POST['_wpnonce'], 'octo_api_settings')) {
+            // Save API credentials
             update_option('octo_allesklardruck_app_id', sanitize_text_field($_POST['app_id']));
             update_option('octo_allesklardruck_api_key', sanitize_text_field($_POST['api_key']));
+            
+            // Save sender data
+            update_option('octo_allesklardruck_sender_name', sanitize_text_field($_POST['sender_name']));
+            update_option('octo_allesklardruck_sender_street', sanitize_text_field($_POST['sender_street']));
+            update_option('octo_allesklardruck_sender_city', sanitize_text_field($_POST['sender_city']));
+            update_option('octo_allesklardruck_sender_postal', sanitize_text_field($_POST['sender_postal']));
+            update_option('octo_allesklardruck_sender_country', sanitize_text_field($_POST['sender_country']));
             
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'octo-print-designer') . '</p></div>';
         }
         
-        // Get current values
+        // Get current values - API credentials
         $app_id = get_option('octo_allesklardruck_app_id', '');
         $api_key = get_option('octo_allesklardruck_api_key', '');
+        
+        // Get current values - Sender data
+        $sender_name = get_option('octo_allesklardruck_sender_name', 'YPrint');
+        $sender_street = get_option('octo_allesklardruck_sender_street', 'Company Street 1');
+        $sender_city = get_option('octo_allesklardruck_sender_city', 'Berlin');
+        $sender_postal = get_option('octo_allesklardruck_sender_postal', '12345');
+        $sender_country = get_option('octo_allesklardruck_sender_country', 'DE');
         
         // Get API status
         $api_integration = Octo_Print_API_Integration::get_instance();
@@ -140,6 +155,9 @@ class Octo_Print_Designer_Settings {
                 
                 <table class="form-table">
                     <tr>
+                        <th colspan="2"><h3><?php _e('API Credentials', 'octo-print-designer'); ?></h3></th>
+                    </tr>
+                    <tr>
                         <th scope="row">
                             <label for="app_id"><?php _e('App ID', 'octo-print-designer'); ?></label>
                         </th>
@@ -155,6 +173,55 @@ class Octo_Print_Designer_Settings {
                         <td>
                             <input type="password" id="api_key" name="api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
                             <p class="description"><?php _e('Your AllesKlarDruck API Key (X-Api-Key header)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th colspan="2"><h3><?php _e('Sender Information', 'octo-print-designer'); ?></h3></th>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="sender_name"><?php _e('Company Name', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sender_name" name="sender_name" value="<?php echo esc_attr($sender_name); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Name of your company (appears as sender)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="sender_street"><?php _e('Street Address', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sender_street" name="sender_street" value="<?php echo esc_attr($sender_street); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Your company street address', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="sender_city"><?php _e('City', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sender_city" name="sender_city" value="<?php echo esc_attr($sender_city); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Your company city', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="sender_postal"><?php _e('Postal Code', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sender_postal" name="sender_postal" value="<?php echo esc_attr($sender_postal); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Your company postal code', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="sender_country"><?php _e('Country Code', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sender_country" name="sender_country" value="<?php echo esc_attr($sender_country); ?>" class="regular-text" maxlength="2" />
+                            <p class="description"><?php _e('2-letter country code (e.g., DE, AT, CH)', 'octo-print-designer'); ?></p>
                         </td>
                     </tr>
                 </table>
