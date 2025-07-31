@@ -60,6 +60,9 @@ class Octo_Print_API_Integration {
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_city');
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_postal');
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_sender_country');
+        
+        // Template position mappings
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_template_position_mappings');
     }
 
     /**
@@ -362,8 +365,16 @@ class Octo_Print_API_Integration {
                 // Convert pixel dimensions to millimeters
                 $print_dimensions = $this->convert_to_print_dimensions($image);
                 
+                // Enhanced position mapping with all available data
+                $position = $this->map_view_to_position(
+                    $view['view_name'],
+                    $view['view_id'],
+                    $design_item['template_id'],
+                    $image['transform_data'] ?? array()
+                );
+                
                 $print_positions[] = array(
-                    'position' => $this->map_view_to_position($view['view_name']),
+                    'position' => $position,
                     'width' => $print_dimensions['width_mm'],
                     'height' => $print_dimensions['height_mm'],
                     'printFile' => $image['url']
@@ -483,21 +494,36 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Map WordPress view name to API position
+     * Map WordPress view to API position using multiple strategies
      */
-    private function map_view_to_position($view_name) {
+    private function map_view_to_position($view_name, $view_id = '', $template_id = '', $transform_data = array()) {
+        // Strategy 1: Check for explicit template + view mapping
+        if (!empty($template_id) && !empty($view_id)) {
+            $explicit_mapping = $this->get_template_view_position_mapping($template_id, $view_id);
+            if ($explicit_mapping !== false) {
+                return $explicit_mapping;
+            }
+        }
+        
+        // Strategy 2: Analyze view name for position keywords
         $view_name_lower = strtolower($view_name);
         
         $position_mapping = array(
             'front' => 'front',
             'vorne' => 'front',
+            'vorderseite' => 'front',
             'back' => 'back',
             'hinten' => 'back',
             'rücken' => 'back',
+            'rückseite' => 'back',
             'left' => 'left',
             'links' => 'left',
+            'left sleeve' => 'left',
+            'linker ärmel' => 'left',
             'right' => 'right',
-            'rechts' => 'right'
+            'rechts' => 'right',
+            'right sleeve' => 'right',
+            'rechter ärmel' => 'right'
         );
         
         foreach ($position_mapping as $search => $position) {
@@ -506,7 +532,59 @@ class Octo_Print_API_Integration {
             }
         }
         
-        return 'front'; // Default fallback
+        // Strategy 3: Estimate position based on canvas coordinates (fallback)
+        if (!empty($transform_data)) {
+            return $this->estimate_position_from_canvas($transform_data);
+        }
+        
+        return 'front'; // Ultimate fallback
+    }
+
+    /**
+     * Get explicit template-view position mapping
+     */
+    private function get_template_view_position_mapping($template_id, $view_id) {
+        // Get position mappings from WordPress options or database
+        $template_mappings = get_option('octo_allesklardruck_template_position_mappings', array());
+        
+        $mapping_key = $template_id . '_' . $view_id;
+        
+        if (isset($template_mappings[$mapping_key])) {
+            return $template_mappings[$mapping_key];
+        }
+        
+        return false;
+    }
+
+    /**
+     * Estimate print position based on canvas coordinates
+     */
+    private function estimate_position_from_canvas($transform_data) {
+        $left = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
+        $top = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
+        $width = isset($transform_data['width']) ? floatval($transform_data['width']) : 0;
+        
+        // Canvas dimensions estimation (adjust based on your template sizes)
+        $canvas_width = 800; // Typical canvas width
+        $canvas_height = 600; // Typical canvas height
+        
+        $center_x = $left + ($width / 2);
+        $center_y = $top;
+        
+        // Position estimation logic
+        if ($center_y < ($canvas_height * 0.6)) {
+            // Upper area = front
+            return 'front';
+        } elseif ($center_x < ($canvas_width * 0.3)) {
+            // Left side = left sleeve
+            return 'left';
+        } elseif ($center_x > ($canvas_width * 0.7)) {
+            // Right side = right sleeve  
+            return 'right';
+        } else {
+            // Lower center = back
+            return 'back';
+        }
     }
 
     /**
@@ -588,7 +666,8 @@ class Octo_Print_API_Integration {
                         'view_name' => $view_data['view_name'] ?: 'Unknown View',
                         'view_id' => $view_data['system_id'] ?: '',
                         'variation_id' => $view_data['variation_id'] ?: '',
-                        'images' => $this->parse_view_images($view_data['images'] ?: array())
+                        'view_key' => $view_key, // Wichtig für Template-Mapping
+                        'images' => $this->parse_view_images($view_data['images'] ?: array(), $view_data)
                     );
                 }
             }
@@ -600,7 +679,7 @@ class Octo_Print_API_Integration {
     /**
      * Parse images from view data (reused from WC Integration)
      */
-    private function parse_view_images($images) {
+    private function parse_view_images($images, $view_data = array()) {
         $parsed_images = array();
         
         if (!is_array($images)) {
@@ -623,7 +702,8 @@ class Octo_Print_API_Integration {
                 'position_top_px' => round($transform['top'] ?: 0, 2),
                 'scale_x' => $transform['scaleX'] ?: 1,
                 'scale_y' => $transform['scaleY'] ?: 1,
-                'transform' => $transform
+                'transform' => $transform,
+                'transform_data' => $transform // Vollständige Transform-Daten für Position-Schätzung
             );
         }
         
