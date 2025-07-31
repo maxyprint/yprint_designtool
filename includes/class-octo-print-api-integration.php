@@ -129,7 +129,7 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * AJAX handler for previewing API payload
+     * AJAX handler for previewing API payload with enhanced print specifications info
      */
     public function ajax_preview_api_payload() {
         // Security check
@@ -154,15 +154,37 @@ class Octo_Print_API_Integration {
             wp_send_json_error(array('message' => $payload->get_error_message()));
         }
         
-        // Create formatted preview
+        // Get print specifications summary
+        $print_specs_summary = $this->get_print_specifications_summary($order);
+        
+        // Create enhanced preview with print specifications info
         $preview_html = '<div style="font-family: monospace; background: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">';
         $preview_html .= '<h3 style="margin-top: 0;">AllesKlarDruck API Payload Preview</h3>';
+        
+        // Add print specifications summary
+        if (!empty($print_specs_summary)) {
+            $preview_html .= '<div style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; padding: 10px; margin-bottom: 15px;">';
+            $preview_html .= '<h4 style="margin: 0 0 10px 0; color: #0066cc;">📋 Print Specifications Summary</h4>';
+            $preview_html .= '<ul style="margin: 0; padding-left: 20px; color: #333;">';
+            foreach ($print_specs_summary as $spec) {
+                $status_icon = $spec['valid'] ? '✅' : '⚠️';
+                $preview_html .= '<li>' . $status_icon . ' <strong>' . esc_html($spec['template']) . '</strong> (' . esc_html($spec['position']) . '): ';
+                $preview_html .= esc_html($spec['resolution']) . ' DPI, ' . esc_html($spec['colorProfile']) . ', ' . esc_html($spec['printQuality']);
+                if (!$spec['valid']) {
+                    $preview_html .= ' - <span style="color: #d63384;">' . esc_html($spec['error']) . '</span>';
+                }
+                $preview_html .= '</li>';
+            }
+            $preview_html .= '</ul></div>';
+        }
+        
         $preview_html .= '<pre style="white-space: pre-wrap;">' . wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . '</pre>';
         $preview_html .= '</div>';
         
         wp_send_json_success(array(
             'preview' => $preview_html,
-            'payload' => $payload
+            'payload' => $payload,
+            'print_specs_summary' => $print_specs_summary
         ));
     }
 
@@ -553,7 +575,7 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Get print specifications configuration for enhanced API payload
+     * Get print specifications with enhanced validation and error handling
      */
     private function get_print_specifications($template_id = null, $product_id = null, $position = 'front') {
         // Get configured print specifications from WordPress options
@@ -562,10 +584,20 @@ class Octo_Print_API_Integration {
         $config_key = $template_id . '_' . $position;
         
         if (isset($print_specs[$config_key])) {
-            return $print_specs[$config_key];
+            $specs = $print_specs[$config_key];
+            
+            // Validate print specifications
+            $validation_result = $this->validate_print_specifications($specs, $template_id, $position);
+            if (is_wp_error($validation_result)) {
+                error_log("Print specifications validation failed for {$config_key}: " . $validation_result->get_error_message());
+            }
+            
+            return $specs;
         }
         
-        // Fallback to default specifications
+        // Fallback to default specifications with warning
+        error_log("No print specifications found for template: {$template_id}, position: {$position}. Using defaults.");
+        
         $default_specs = array(
             'unit' => 'mm',
             'offsetUnit' => 'mm',
@@ -578,6 +610,42 @@ class Octo_Print_API_Integration {
         );
         
         return $default_specs;
+    }
+
+    /**
+     * Validate print specifications
+     */
+    private function validate_print_specifications($specs, $template_id = null, $position = 'front') {
+        $required_fields = array('unit', 'offsetUnit', 'referencePoint', 'resolution', 'colorProfile', 'bleed', 'scaling', 'printQuality');
+        
+        foreach ($required_fields as $field) {
+            if (!isset($specs[$field]) || empty($specs[$field])) {
+                return new WP_Error(
+                    'missing_print_spec_field',
+                    sprintf(__('Missing required print specification field: %s for template %s position %s', 'octo-print-designer'), 
+                        $field, $template_id, $position)
+                );
+            }
+        }
+        
+        // Validate specific fields
+        if (!in_array($specs['unit'], array('mm', 'cm', 'px'))) {
+            return new WP_Error('invalid_unit', __('Invalid unit specified in print specifications', 'octo-print-designer'));
+        }
+        
+        if (!in_array($specs['referencePoint'], array('top-left', 'center', 'top-center'))) {
+            return new WP_Error('invalid_reference_point', __('Invalid reference point specified in print specifications', 'octo-print-designer'));
+        }
+        
+        if ($specs['resolution'] < 72 || $specs['resolution'] > 600) {
+            return new WP_Error('invalid_resolution', __('Resolution must be between 72 and 600 DPI', 'octo-print-designer'));
+        }
+        
+        if ($specs['bleed'] < 0 || $specs['bleed'] > 10) {
+            return new WP_Error('invalid_bleed', __('Bleed must be between 0 and 10mm', 'octo-print-designer'));
+        }
+        
+        return true;
     }
 
     /**
@@ -1749,6 +1817,51 @@ class Octo_Print_API_Integration {
                 'color' => '#dc3545'
             );
         }
+    }
+
+    /**
+     * Get print specifications summary for an order
+     */
+    private function get_print_specifications_summary($order) {
+        $summary = array();
+        
+        foreach ($order->get_items() as $item) {
+            $design_data = $item->get_meta('_design_data');
+            if (empty($design_data)) {
+                continue;
+            }
+            
+            $template_id = $item->get_meta('_template_id');
+            $views = $this->parse_design_views($item);
+            
+            foreach ($views as $view) {
+                if (empty($view['images'])) {
+                    continue;
+                }
+                
+                $position = $this->map_view_to_position(
+                    $view['view_name'],
+                    $view['view_id'],
+                    $template_id,
+                    $view['images'][0]['transform_data'] ?? array()
+                );
+                
+                $print_specs = $this->get_print_specifications($template_id, $item->get_product_id(), $position);
+                $validation_result = $this->validate_print_specifications($print_specs, $template_id, $position);
+                
+                $summary[] = array(
+                    'template' => $template_id ?: 'Unknown',
+                    'position' => $position,
+                    'resolution' => $print_specs['resolution'],
+                    'colorProfile' => $print_specs['colorProfile'],
+                    'printQuality' => $print_specs['printQuality'],
+                    'valid' => !is_wp_error($validation_result),
+                    'error' => is_wp_error($validation_result) ? $validation_result->get_error_message() : ''
+                );
+            }
+        }
+        
+        return $summary;
     }
 
 

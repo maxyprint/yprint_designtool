@@ -379,6 +379,16 @@ class Octo_Print_Designer_Settings {
                 
                 <!-- Print Specifications Table -->
                 <div id="print-specs-container">
+                    <div class="print-specs-header" style="margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0;">📋 Print Specifications Configuration</h4>
+                        <p class="description" style="margin: 0;">
+                            Configure technical print specifications for enhanced API payload. These settings provide detailed information to the print provider about dimensions, coordinates, and print quality.
+                        </p>
+                        <div class="print-specs-status" style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px; display: none;">
+                            <span class="status-message"></span>
+                        </div>
+                    </div>
+                    
                     <table class="widefat" id="print-specs-table">
                         <thead>
                             <tr>
@@ -416,13 +426,13 @@ class Octo_Print_Designer_Settings {
                                 $template_id = $parts[0] ?? '';
                                 $position = $parts[1] ?? 'front';
                             ?>
-                            <tr class="specs-row">
+                            <tr class="specs-row" data-config-key="<?php echo esc_attr($config_key); ?>">
                                 <td>
                                     <input type="text" name="print_specs[<?php echo esc_attr($config_key); ?>][template_id]" 
-                                           value="<?php echo esc_attr($template_id); ?>" class="regular-text" 
-                                           placeholder="<?php _e('Template ID', 'octo-print-designer'); ?>" />
+                                           value="<?php echo esc_attr($template_id); ?>" class="regular-text template-id-input" 
+                                           placeholder="<?php _e('Template ID', 'octo-print-designer'); ?>" required />
                                     <br>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][position]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][position]" class="position-select">
                                         <option value="front" <?php selected($position, 'front'); ?>><?php _e('Front', 'octo-print-designer'); ?></option>
                                         <option value="back" <?php selected($position, 'back'); ?>><?php _e('Back', 'octo-print-designer'); ?></option>
                                         <option value="left" <?php selected($position, 'left'); ?>><?php _e('Left Sleeve', 'octo-print-designer'); ?></option>
@@ -430,14 +440,14 @@ class Octo_Print_Designer_Settings {
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][unit]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][unit]" class="unit-select">
                                         <option value="mm" <?php selected($specs['unit'], 'mm'); ?>><?php _e('Millimeters', 'octo-print-designer'); ?></option>
                                         <option value="cm" <?php selected($specs['unit'], 'cm'); ?>><?php _e('Centimeters', 'octo-print-designer'); ?></option>
                                         <option value="px" <?php selected($specs['unit'], 'px'); ?>><?php _e('Pixels', 'octo-print-designer'); ?></option>
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][referencePoint]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][referencePoint]" class="reference-point-select">
                                         <option value="top-left" <?php selected($specs['referencePoint'], 'top-left'); ?>><?php _e('Top-Left', 'octo-print-designer'); ?></option>
                                         <option value="center" <?php selected($specs['referencePoint'], 'center'); ?>><?php _e('Center', 'octo-print-designer'); ?></option>
                                         <option value="top-center" <?php selected($specs['referencePoint'], 'top-center'); ?>><?php _e('Top-Center', 'octo-print-designer'); ?></option>
@@ -445,11 +455,13 @@ class Octo_Print_Designer_Settings {
                                 </td>
                                 <td>
                                     <input type="number" name="print_specs[<?php echo esc_attr($config_key); ?>][resolution]" 
-                                           value="<?php echo esc_attr($specs['resolution']); ?>" class="small-text" 
-                                           min="72" max="600" step="1" />
+                                           value="<?php echo esc_attr($specs['resolution']); ?>" class="small-text resolution-input" 
+                                           min="72" max="600" step="1" required />
+                                    <br>
+                                    <small class="resolution-hint" style="color: #666;">72-600 DPI</small>
                                 </td>
                                 <td>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][colorProfile]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][colorProfile]" class="color-profile-select">
                                         <option value="sRGB" <?php selected($specs['colorProfile'], 'sRGB'); ?>><?php _e('sRGB', 'octo-print-designer'); ?></option>
                                         <option value="AdobeRGB" <?php selected($specs['colorProfile'], 'AdobeRGB'); ?>><?php _e('Adobe RGB', 'octo-print-designer'); ?></option>
                                         <option value="CMYK" <?php selected($specs['colorProfile'], 'CMYK'); ?>><?php _e('CMYK', 'octo-print-designer'); ?></option>
@@ -457,18 +469,20 @@ class Octo_Print_Designer_Settings {
                                 </td>
                                 <td>
                                     <input type="number" name="print_specs[<?php echo esc_attr($config_key); ?>][bleed]" 
-                                           value="<?php echo esc_attr($specs['bleed']); ?>" class="small-text" 
-                                           min="0" max="10" step="0.5" />
+                                           value="<?php echo esc_attr($specs['bleed']); ?>" class="small-text bleed-input" 
+                                           min="0" max="10" step="0.5" required />
+                                    <br>
+                                    <small class="bleed-hint" style="color: #666;">0-10mm</small>
                                 </td>
                                 <td>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][scaling]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][scaling]" class="scaling-select">
                                         <option value="proportional" <?php selected($specs['scaling'], 'proportional'); ?>><?php _e('Proportional', 'octo-print-designer'); ?></option>
                                         <option value="stretch" <?php selected($specs['scaling'], 'stretch'); ?>><?php _e('Stretch', 'octo-print-designer'); ?></option>
                                         <option value="fit" <?php selected($specs['scaling'], 'fit'); ?>><?php _e('Fit', 'octo-print-designer'); ?></option>
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][printQuality]">
+                                    <select name="print_specs[<?php echo esc_attr($config_key); ?>][printQuality]" class="print-quality-select">
                                         <option value="standard" <?php selected($specs['printQuality'], 'standard'); ?>><?php _e('Standard', 'octo-print-designer'); ?></option>
                                         <option value="premium" <?php selected($specs['printQuality'], 'premium'); ?>><?php _e('Premium', 'octo-print-designer'); ?></option>
                                         <option value="eco" <?php selected($specs['printQuality'], 'eco'); ?>><?php _e('Eco', 'octo-print-designer'); ?></option>
@@ -486,6 +500,9 @@ class Octo_Print_Designer_Settings {
                     <p>
                         <button type="button" id="add-specs" class="button button-secondary">
                             <?php _e('+ Add Print Specifications', 'octo-print-designer'); ?>
+                        </button>
+                        <button type="button" id="validate-specs" class="button button-secondary">
+                            <?php _e('🔍 Validate Specifications', 'octo-print-designer'); ?>
                         </button>
                     </p>
                 </div>
@@ -559,7 +576,147 @@ class Octo_Print_Designer_Settings {
                 $(document).on('click', '.remove-mapping', function() {
                     $(this).closest('tr').remove();
                 });
-                
+
+                // Print Specifications Management
+                let specsIndex = <?php echo count($print_specs); ?>;
+
+                // Add new specs row
+                $('#add-specs').on('click', function() {
+                    const newRow = `
+                        <tr class="specs-row" data-config-key="template_${specsIndex}_front">
+                            <td>
+                                <input type="text" name="print_specs[template_${specsIndex}_front][template_id]" 
+                                       class="regular-text template-id-input" placeholder="<?php _e('Template ID', 'octo-print-designer'); ?>" required />
+                                <br>
+                                <select name="print_specs[template_${specsIndex}_front][position]" class="position-select">
+                                    <option value="front"><?php _e('Front', 'octo-print-designer'); ?></option>
+                                    <option value="back"><?php _e('Back', 'octo-print-designer'); ?></option>
+                                    <option value="left"><?php _e('Left Sleeve', 'octo-print-designer'); ?></option>
+                                    <option value="right"><?php _e('Right Sleeve', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="print_specs[template_${specsIndex}_front][unit]" class="unit-select">
+                                    <option value="mm"><?php _e('Millimeters', 'octo-print-designer'); ?></option>
+                                    <option value="cm"><?php _e('Centimeters', 'octo-print-designer'); ?></option>
+                                    <option value="px"><?php _e('Pixels', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="print_specs[template_${specsIndex}_front][referencePoint]" class="reference-point-select">
+                                    <option value="top-left"><?php _e('Top-Left', 'octo-print-designer'); ?></option>
+                                    <option value="center"><?php _e('Center', 'octo-print-designer'); ?></option>
+                                    <option value="top-center"><?php _e('Top-Center', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="print_specs[template_${specsIndex}_front][resolution]" 
+                                       class="small-text resolution-input" min="72" max="600" step="1" required />
+                                <br>
+                                <small class="resolution-hint" style="color: #666;">72-600 DPI</small>
+                            </td>
+                            <td>
+                                <select name="print_specs[template_${specsIndex}_front][colorProfile]" class="color-profile-select">
+                                    <option value="sRGB"><?php _e('sRGB', 'octo-print-designer'); ?></option>
+                                    <option value="AdobeRGB"><?php _e('Adobe RGB', 'octo-print-designer'); ?></option>
+                                    <option value="CMYK"><?php _e('CMYK', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="print_specs[template_${specsIndex}_front][bleed]" 
+                                       class="small-text bleed-input" min="0" max="10" step="0.5" required />
+                                <br>
+                                <small class="bleed-hint" style="color: #666;">0-10mm</small>
+                            </td>
+                            <td>
+                                <select name="print_specs[template_${specsIndex}_front][scaling]" class="scaling-select">
+                                    <option value="proportional"><?php _e('Proportional', 'octo-print-designer'); ?></option>
+                                    <option value="stretch"><?php _e('Stretch', 'octo-print-designer'); ?></option>
+                                    <option value="fit"><?php _e('Fit', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="print_specs[template_${specsIndex}_front][printQuality]" class="print-quality-select">
+                                    <option value="standard"><?php _e('Standard', 'octo-print-designer'); ?></option>
+                                    <option value="premium"><?php _e('Premium', 'octo-print-designer'); ?></option>
+                                    <option value="eco"><?php _e('Eco', 'octo-print-designer'); ?></option>
+                                </select>
+                            </td>
+                            <td>
+                                <button type="button" class="button button-small remove-specs"><?php _e('Remove', 'octo-print-designer'); ?></button>
+                            </td>
+                        </tr>
+                    `;
+                    $('#print-specs-table tbody').append(newRow);
+                    specsIndex++;
+                });
+
+                // Remove specs row
+                $(document).on('click', '.remove-specs', function() {
+                    $(this).closest('tr').remove();
+                });
+
+                // Validate specifications
+                $('#validate-specs').on('click', function() {
+                    var statusMessage = $('.print-specs-status .status-message');
+                    var statusContainer = $('.print-specs-status');
+                    var isValid = true;
+                    var validationErrors = [];
+
+                    $('.specs-row').each(function() {
+                        var templateIdInput = $(this).find('.template-id-input').val();
+                        var positionSelect = $(this).find('.position-select').val();
+                        var unitSelect = $(this).find('.unit-select').val();
+                        var resolutionInput = $(this).find('.resolution-input').val();
+                        var colorProfileSelect = $(this).find('.color-profile-select').val();
+                        var bleedInput = $(this).find('.bleed-input').val();
+                        var scalingSelect = $(this).find('.scaling-select').val();
+                        var printQualitySelect = $(this).find('.print-quality-select').val();
+
+                        if (!templateIdInput) {
+                            isValid = false;
+                            validationErrors.push('Template ID is required for all specifications.');
+                        }
+                        if (!positionSelect) {
+                            isValid = false;
+                            validationErrors.push('Position is required for all specifications.');
+                        }
+                        if (!unitSelect) {
+                            isValid = false;
+                            validationErrors.push('Unit is required for all specifications.');
+                        }
+                        if (!resolutionInput) {
+                            isValid = false;
+                            validationErrors.push('Resolution is required for all specifications.');
+                        }
+                        if (!colorProfileSelect) {
+                            isValid = false;
+                            validationErrors.push('Color Profile is required for all specifications.');
+                        }
+                        if (!bleedInput) {
+                            isValid = false;
+                            validationErrors.push('Bleed is required for all specifications.');
+                        }
+                        if (!scalingSelect) {
+                            isValid = false;
+                            validationErrors.push('Scaling is required for all specifications.');
+                        }
+                        if (!printQualitySelect) {
+                            isValid = false;
+                            validationErrors.push('Print Quality is required for all specifications.');
+                        }
+                    });
+
+                    if (isValid) {
+                        statusMessage.text('✅ All specifications are valid.').css('color', 'green');
+                        statusContainer.css('background', '#e0f2f7').css('border-color', '#90c2e7');
+                    } else {
+                        statusMessage.text('❌ Validation failed. Please check the highlighted fields.').css('color', 'red');
+                        statusContainer.css('background', '#ffebee').css('border-color', '#ef9a9a');
+                    }
+                    statusContainer.show();
+                });
+
                 function createStatusMessage(type, title, message, details = null) {
                     var className = type === 'success' ? 'notice-success' : type === 'error' ? 'notice-error' : 'notice-info';
                     var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';

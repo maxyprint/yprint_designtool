@@ -594,3 +594,176 @@
     border-radius: 3px;
     margin-left: 5px;
 }
+
+/* Print Specifications Styles */
+.print-specs-header {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.print-specs-header h4 {
+    color: #495057;
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.print-specs-status {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.print-specs-status .status-message {
+    display: block;
+    margin: 0;
+}
+
+#print-specs-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+#print-specs-table th {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px 8px;
+    font-weight: 600;
+    font-size: 12px;
+    text-align: left;
+    color: #495057;
+}
+
+#print-specs-table td {
+    border: 1px solid #dee2e6;
+    padding: 8px;
+    vertical-align: top;
+}
+
+.specs-row {
+    background: #fff;
+    transition: background-color 0.2s ease;
+}
+
+.specs-row:hover {
+    background: #f8f9fa;
+}
+
+.specs-row input[type="text"],
+.specs-row input[type="number"],
+.specs-row select {
+    width: 100%;
+    padding: 4px 6px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.specs-row input[type="text"]:focus,
+.specs-row input[type="number"]:focus,
+.specs-row select:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.specs-row input[type="text"].error,
+.specs-row input[type="number"].error,
+.specs-row select.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.specs-row small {
+    font-size: 10px;
+    color: #6c757d;
+    display: block;
+    margin-top: 2px;
+}
+
+.specs-row .button {
+    font-size: 11px;
+    padding: 4px 8px;
+    height: auto;
+    line-height: 1.2;
+}
+
+/* Validation styles */
+.specs-row.invalid {
+    background: #fff5f5;
+    border-left: 3px solid #dc3545;
+}
+
+.specs-row.valid {
+    background: #f0fff4;
+    border-left: 3px solid #28a745;
+}
+
+/* Button styles for print specs */
+#print-specs-container .button {
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+#print-specs-container #add-specs {
+    background: #28a745;
+    border-color: #28a745;
+    color: #fff;
+}
+
+#print-specs-container #add-specs:hover {
+    background: #218838;
+    border-color: #1e7e34;
+}
+
+#print-specs-container #validate-specs {
+    background: #17a2b8;
+    border-color: #17a2b8;
+    color: #fff;
+}
+
+#print-specs-container #validate-specs:hover {
+    background: #138496;
+    border-color: #117a8b;
+}
+
+/* Responsive design for print specs table */
+@media screen and (max-width: 1200px) {
+    #print-specs-table {
+        font-size: 11px;
+    }
+    
+    #print-specs-table th,
+    #print-specs-table td {
+        padding: 6px 4px;
+    }
+    
+    .specs-row input[type="text"],
+    .specs-row input[type="number"],
+    .specs-row select {
+        font-size: 11px;
+        padding: 3px 4px;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    #print-specs-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .print-specs-header {
+        padding: 10px;
+    }
+    
+    .print-specs-header h4 {
+        font-size: 14px;
+    }
+}
