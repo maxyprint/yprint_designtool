@@ -63,6 +63,9 @@ class Octo_Print_API_Integration {
         
         // Template position mappings
         register_setting('octo_print_designer_settings', 'octo_allesklardruck_template_position_mappings');
+        
+        // Canvas configurations for coordinate conversion
+        register_setting('octo_print_designer_settings', 'octo_allesklardruck_canvas_configs');
     }
 
     /**
@@ -373,10 +376,19 @@ class Octo_Print_API_Integration {
                     $image['transform_data'] ?? array()
                 );
                 
+                // Convert canvas coordinates to print area coordinates
+                $print_coordinates = $this->convert_canvas_to_print_coordinates(
+                    $image['transform_data'] ?? array(),
+                    $design_item['template_id'],
+                    $position
+                );
+                
                 $print_positions[] = array(
                     'position' => $position,
                     'width' => $print_dimensions['width_mm'],
                     'height' => $print_dimensions['height_mm'],
+                    'offsetX' => $print_coordinates['offset_x_mm'],
+                    'offsetY' => $print_coordinates['offset_y_mm'],
                     'printFile' => $image['url']
                 );
             }
@@ -441,6 +453,88 @@ class Octo_Print_API_Integration {
             'scale_x' => $scale_x,
             'scale_y' => $scale_y
         );
+    }
+
+    /**
+     * Convert canvas coordinates to print area coordinates for AllesKlarDruck API
+     */
+    private function convert_canvas_to_print_coordinates($transform_data, $template_id = null, $position = 'front') {
+        // Canvas-Dimensionen (template-spezifisch konfigurierbar)
+        $canvas_config = $this->get_canvas_config($template_id, $position);
+        
+        $canvas_width = $canvas_config['width'];
+        $canvas_height = $canvas_config['height'];
+        $print_area_width_mm = $canvas_config['print_area_width_mm'];
+        $print_area_height_mm = $canvas_config['print_area_height_mm'];
+        
+        // Transform-Daten aus WordPress
+        $left_px = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
+        $top_px = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
+        
+        // Canvas-Koordinaten zu Millimeter umrechnen
+        $pixel_to_mm_x = $print_area_width_mm / $canvas_width;
+        $pixel_to_mm_y = $print_area_height_mm / $canvas_height;
+        
+        // Berechne Position in mm (von top-left des Druckbereichs)
+        $offset_x_mm = round($left_px * $pixel_to_mm_x, 1);
+        $offset_y_mm = round($top_px * $pixel_to_mm_y, 1);
+        
+        // Validierung: Position muss im Druckbereich bleiben
+        $offset_x_mm = max(0, min($offset_x_mm, $print_area_width_mm));
+        $offset_y_mm = max(0, min($offset_y_mm, $print_area_height_mm));
+        
+        return array(
+            'offset_x_mm' => $offset_x_mm,
+            'offset_y_mm' => $offset_y_mm,
+            'canvas_left_px' => $left_px,
+            'canvas_top_px' => $top_px
+        );
+    }
+
+    /**
+     * Get canvas configuration for coordinate conversion
+     */
+    private function get_canvas_config($template_id = null, $position = 'front') {
+        // Template-spezifische Konfiguration aus WordPress-Optionen
+        $canvas_configs = get_option('octo_allesklardruck_canvas_configs', array());
+        
+        $config_key = $template_id . '_' . $position;
+        
+        if (isset($canvas_configs[$config_key])) {
+            return $canvas_configs[$config_key];
+        }
+        
+        // Fallback-Konfiguration für Standard T-Shirt
+        $default_configs = array(
+            'front' => array(
+                'width' => 800,                    // Canvas-Breite in Pixel
+                'height' => 600,                   // Canvas-Höhe in Pixel
+                'print_area_width_mm' => 200,      // Druckbereich-Breite in mm
+                'print_area_height_mm' => 250      // Druckbereich-Höhe in mm
+            ),
+            'back' => array(
+                'width' => 800,
+                'height' => 600,
+                'print_area_width_mm' => 200,
+                'print_area_height_mm' => 250
+            ),
+            'left' => array(
+                'width' => 400,
+                'height' => 300,
+                'print_area_width_mm' => 80,       // Kleinerer Druckbereich für Ärmel
+                'print_area_height_mm' => 100
+            ),
+            'right' => array(
+                'width' => 400,
+                'height' => 300,
+                'print_area_width_mm' => 80,
+                'print_area_height_mm' => 100
+            )
+        );
+        
+        return isset($default_configs[$position]) ? 
+               $default_configs[$position] : 
+               $default_configs['front'];
     }
 
     /**
