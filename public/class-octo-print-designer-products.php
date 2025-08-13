@@ -559,13 +559,30 @@ class Octo_Print_Designer_Products {
                 }
             }
     
-            // Get physical dimensions from template
+            // Get physical dimensions from template using new visual measurement system
             $template_id = $design->template_id;
-            $physical_width_cm = get_post_meta($template_id, '_template_physical_width_cm', true);
-            $physical_height_cm = get_post_meta($template_id, '_template_physical_height_cm', true);
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
             
-            if (empty($physical_width_cm)) $physical_width_cm = 30; // Default 30cm
-            if (empty($physical_height_cm)) $physical_height_cm = 40; // Default 40cm
+            // Get size measurements (use first available size if size_name not available)
+            $size_measurements = array();
+            if (!empty($product_dimensions)) {
+                $first_size = array_keys($product_dimensions)[0];
+                $size_measurements = $product_dimensions[$first_size] ?? array();
+            }
+            
+            // Use visual measurements if available, otherwise fallback to legacy
+            $physical_width_cm = 30; // Default
+            $physical_height_cm = 40; // Default
+            
+            if (!empty($size_measurements)) {
+                // Use chest and height_from_shoulder for front/back views
+                $physical_width_cm = $size_measurements['chest'] ?? 30;
+                $physical_height_cm = $size_measurements['height_from_shoulder'] ?? 40;
+            } else {
+                // Fallback to legacy physical dimensions
+                $physical_width_cm = get_post_meta($template_id, '_template_physical_width_cm', true) ?: 30;
+                $physical_height_cm = get_post_meta($template_id, '_template_physical_height_cm', true) ?: 40;
+            }
             
             // Get max safe zone dimensions across all views for this variation
             $max_safe_width = 800; // Default
@@ -669,13 +686,30 @@ class Octo_Print_Designer_Products {
                 }
             }
     
-            // Get physical dimensions from template
+            // Get physical dimensions from template using new visual measurement system
             $template_id = $design->template_id;
-            $physical_width_cm = get_post_meta($template_id, '_template_physical_width_cm', true);
-            $physical_height_cm = get_post_meta($template_id, '_template_physical_height_cm', true);
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
             
-            if (empty($physical_width_cm)) $physical_width_cm = 30; // Default 30cm
-            if (empty($physical_height_cm)) $physical_height_cm = 40; // Default 40cm
+            // Get size measurements (use first available size if size_name not available)
+            $size_measurements = array();
+            if (!empty($product_dimensions)) {
+                $first_size = array_keys($product_dimensions)[0];
+                $size_measurements = $product_dimensions[$first_size] ?? array();
+            }
+            
+            // Use visual measurements if available, otherwise fallback to legacy
+            $physical_width_cm = 30; // Default
+            $physical_height_cm = 40; // Default
+            
+            if (!empty($size_measurements)) {
+                // Use chest and height_from_shoulder for front/back views
+                $physical_width_cm = $size_measurements['chest'] ?? 30;
+                $physical_height_cm = $size_measurements['height_from_shoulder'] ?? 40;
+            } else {
+                // Fallback to legacy physical dimensions
+                $physical_width_cm = get_post_meta($template_id, '_template_physical_width_cm', true) ?: 30;
+                $physical_height_cm = get_post_meta($template_id, '_template_physical_height_cm', true) ?: 40;
+            }
             
             // Get max safe zone dimensions across all views for this variation
             $max_safe_width = 800; // Default

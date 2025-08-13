@@ -390,8 +390,8 @@ class Octo_Print_API_Integration {
                     continue;
                 }
                 
-                // Convert pixel dimensions to millimeters
-                $print_dimensions = $this->convert_to_print_dimensions($image);
+                // Convert pixel dimensions to millimeters using visual measurements
+                $print_dimensions = $this->convert_to_print_dimensions($image, $design_item['template_id'], $view['view_name'], $design_item['size_name']);
                 
                 // Enhanced position mapping with all available data
                 $position = $this->map_view_to_position(
@@ -454,9 +454,9 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Convert pixel dimensions to millimeters for printing
+     * Convert pixel dimensions to millimeters for printing using visual measurements
      */
-    private function convert_to_print_dimensions($image) {
+    private function convert_to_print_dimensions($image, $template_id = null, $view_name = null, $size_name = null) {
         // Get original dimensions
         $width_px = isset($image['original_width_px']) ? $image['original_width_px'] : 
                    (isset($image['transform']['width']) ? $image['transform']['width'] : 0);
@@ -473,7 +473,21 @@ class Octo_Print_API_Integration {
         $final_width_px = $width_px * $scale_x;
         $final_height_px = $height_px * $scale_y;
         
-        // Convert to millimeters (1 pixel = 0.264583 mm at 96 DPI)
+        // Try to use visual measurements for accurate calculation
+        if ($template_id && $view_name && $size_name) {
+            $visual_dimensions = $this->get_visual_print_dimensions($template_id, $view_name, $size_name, $final_width_px, $final_height_px);
+            if ($visual_dimensions) {
+                return array_merge($visual_dimensions, array(
+                    'original_width_px' => $width_px,
+                    'original_height_px' => $height_px,
+                    'scale_x' => $scale_x,
+                    'scale_y' => $scale_y,
+                    'calculation_method' => 'visual_measurements'
+                ));
+            }
+        }
+        
+        // Fallback: Convert to millimeters (1 pixel = 0.264583 mm at 96 DPI)
         $width_mm = round($final_width_px * 0.264583, 1);
         $height_mm = round($final_height_px * 0.264583, 1);
         
@@ -487,8 +501,170 @@ class Octo_Print_API_Integration {
             'original_width_px' => $width_px,
             'original_height_px' => $height_px,
             'scale_x' => $scale_x,
-            'scale_y' => $scale_y
+            'scale_y' => $scale_y,
+            'calculation_method' => 'fallback_dpi'
         );
+    }
+
+    /**
+     * Get print dimensions using visual measurements from template
+     */
+    private function get_visual_print_dimensions($template_id, $view_name, $size_name, $canvas_width_px, $canvas_height_px) {
+        // Get template data
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if (!is_array($template_variations) || !is_array($product_dimensions) || !is_array($view_print_areas)) {
+            return false;
+        }
+        
+        // Find the view configuration
+        $view_config = null;
+        foreach ($template_variations as $variation) {
+            if (isset($variation['views'])) {
+                foreach ($variation['views'] as $view_id => $view) {
+                    if (strtolower($view['name']) === strtolower($view_name)) {
+                        $view_config = $view_print_areas[$view_id] ?? array();
+                        break 2;
+                    }
+                }
+            }
+        }
+        
+        if (!$view_config) {
+            return false;
+        }
+        
+        // Get size measurements
+        $size_measurements = $product_dimensions[$size_name] ?? array();
+        if (empty($size_measurements)) {
+            return false;
+        }
+        
+        // Get canvas dimensions from view config
+        $canvas_width = $view_config['canvas_width'] ?? 800;
+        $canvas_height = $view_config['canvas_height'] ?? 600;
+        
+        // Calculate using visual measurements
+        $calculated = $this->calculate_print_area_from_visual_measurements($view_config, $size_measurements, $canvas_width, $canvas_height, $view_name);
+        
+        if ($calculated && $calculated['print_width_mm'] > 0 && $calculated['print_height_mm'] > 0) {
+            // Scale the calculated print area based on the actual image dimensions
+            $scale_factor_x = $canvas_width_px / $canvas_width;
+            $scale_factor_y = $canvas_height_px / $canvas_height;
+            
+            $width_mm = round($calculated['print_width_mm'] * $scale_factor_x, 1);
+            $height_mm = round($calculated['print_height_mm'] * $scale_factor_y, 1);
+            
+            return array(
+                'width_mm' => $width_mm,
+                'height_mm' => $height_mm,
+                'scale_factor' => $calculated['scale_factor'],
+                'used_measurements' => $calculated['used_measurements'],
+                'visual_measurements' => $calculated['visual_measurements']
+            );
+        }
+        
+        return false;
+    }
+
+    /**
+     * Calculate print area dimensions based on visual measurements (copied from template class)
+     */
+    private function calculate_print_area_from_visual_measurements($view_measurements, $size_measurements, $canvas_width, $canvas_height, $view_name = '') {
+        // Verwende visuelle Messungen falls verfügbar
+        if (isset($view_measurements['measurements']) && is_array($view_measurements['measurements'])) {
+            $measurements = $view_measurements['measurements'];
+            
+            // Finde die relevanten Messungen basierend auf View-Namen
+            $view_name_lower = strtolower($view_name);
+            $primary_measurement = null;
+            $secondary_measurement = null;
+            
+            if (strpos($view_name_lower, 'front') !== false || strpos($view_name_lower, 'back') !== false || 
+                strpos($view_name_lower, 'vorne') !== false || strpos($view_name_lower, 'hinten') !== false) {
+                // Front/Back View: Suche nach Chest und Height from Shoulder
+                foreach ($measurements as $measurement) {
+                    if ($measurement['type'] === 'chest' && !$primary_measurement) {
+                        $primary_measurement = $measurement;
+                    } elseif ($measurement['type'] === 'height_from_shoulder' && !$secondary_measurement) {
+                        $secondary_measurement = $measurement;
+                    }
+                }
+            } elseif (strpos($view_name_lower, 'sleeve') !== false || strpos($view_name_lower, 'ärmel') !== false ||
+                       strpos($view_name_lower, 'left') !== false || strpos($view_name_lower, 'right') !== false ||
+                       strpos($view_name_lower, 'links') !== false || strpos($view_name_lower, 'rechts') !== false) {
+                // Sleeve View: Suche nach Biceps und Sleeve Length
+                foreach ($measurements as $measurement) {
+                    if ($measurement['type'] === 'biceps' && !$primary_measurement) {
+                        $primary_measurement = $measurement;
+                    } elseif ($measurement['type'] === 'sleeve_length' && !$secondary_measurement) {
+                        $secondary_measurement = $measurement;
+                    }
+                }
+            }
+            
+            // Wenn keine spezifischen Messungen gefunden, verwende die ersten verfügbaren
+            if (!$primary_measurement && count($measurements) > 0) {
+                $primary_measurement = reset($measurements);
+            }
+            if (!$secondary_measurement && count($measurements) > 1) {
+                $secondary_measurement = next($measurements);
+            }
+            
+            // Berechne Skalierungsfaktoren basierend auf visuellen Messungen
+            $scale_x = 0;
+            $scale_y = 0;
+            
+            if ($primary_measurement) {
+                $real_width_cm = $size_measurements[$primary_measurement['type']] ?? 50;
+                $pixel_distance = $primary_measurement['pixel_distance'];
+                if ($pixel_distance > 0) {
+                    $scale_x = $real_width_cm / $pixel_distance;
+                }
+            }
+            
+            if ($secondary_measurement) {
+                $real_height_cm = $size_measurements[$secondary_measurement['type']] ?? 68;
+                $pixel_distance = $secondary_measurement['pixel_distance'];
+                if ($pixel_distance > 0) {
+                    $scale_y = $real_height_cm / $pixel_distance;
+                }
+            }
+            
+            // Verwende den kleineren Skalierungsfaktor für konsistente Berechnung
+            $scale = 0;
+            if ($scale_x > 0 && $scale_y > 0) {
+                $scale = min($scale_x, $scale_y);
+            } elseif ($scale_x > 0) {
+                $scale = $scale_x;
+            } elseif ($scale_y > 0) {
+                $scale = $scale_y;
+            }
+            
+            if ($scale > 0) {
+                // Berechne Druckbereich basierend auf Canvas-Größe
+                $print_width_mm = ($canvas_width * $scale) * 10; // Konvertiere zu mm
+                $print_height_mm = ($canvas_height * $scale) * 10;
+                
+                return array(
+                    'print_width_mm' => round($print_width_mm, 1),
+                    'print_height_mm' => round($print_height_mm, 1),
+                    'scale_factor' => $scale,
+                    'used_measurements' => array(
+                        'width' => $primary_measurement ? ($size_measurements[$primary_measurement['type']] ?? 0) : 0,
+                        'height' => $secondary_measurement ? ($size_measurements[$secondary_measurement['type']] ?? 0) : 0
+                    ),
+                    'visual_measurements' => array(
+                        'primary' => $primary_measurement,
+                        'secondary' => $secondary_measurement
+                    )
+                );
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -1802,17 +1978,21 @@ class Octo_Print_API_Integration {
                                     $position
                                 );
                                 
+                                // Calculate print dimensions using visual measurements
+                                $print_dimensions = $this->convert_to_print_dimensions($image, $design_item['template_id'], $view['view_name'], $design_item['size_name']);
+                                
                                 $print_positions[] = array(
                                     'position' => $position,
-                                    'width' => round($image['print_width_mm'] ?: 200), // Default 200mm if not calculated
-                                    'height' => round($image['print_height_mm'] ?: 250), // Default 250mm if not calculated
+                                    'width' => $print_dimensions['width_mm'],
+                                    'height' => $print_dimensions['height_mm'],
                                     'unit' => $print_specs['unit'],
                                     'offsetX' => isset($image['offset_x_mm']) ? round($image['offset_x_mm'], 1) : 0,
                                     'offsetY' => isset($image['offset_y_mm']) ? round($image['offset_y_mm'], 1) : 0,
                                     'offsetUnit' => $print_specs['offsetUnit'],
                                     'referencePoint' => $print_specs['referencePoint'],
                                     'printFile' => $image['url'],
-                                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : ''
+                                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : '',
+                                    'calculation_method' => $print_dimensions['calculation_method'] ?? 'unknown'
                                 );
                             }
                         }
