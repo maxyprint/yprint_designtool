@@ -44,6 +44,16 @@ class Octo_Print_Designer_Settings {
             'octo-api-settings',
             array($this, 'render_api_settings_page')
         );
+        
+        // Add API Information page
+        add_submenu_page(
+            'octo-print-designer', // Parent menu (Print Designer)
+            __('API Configuration Guide', 'octo-print-designer'),
+            __('API Setup Guide', 'octo-print-designer'),
+            'manage_options',
+            'octo-api-guide',
+            array($this, 'render_api_guide_page')
+        );
     }
 
     /**
@@ -1085,5 +1095,423 @@ class Octo_Print_Designer_Settings {
     public static function get_base_product_id() {
         $instance = self::get_instance();
         return isset($instance->options['base_product_id']) ? absint($instance->options['base_product_id']) : 0;
+    }
+
+    /**
+     * Render API Configuration Guide page
+     */
+    public function render_api_guide_page() {
+        ?>
+        <div class="wrap">
+            <h1>🔧 API Configuration Guide - AllesKlarDruck Integration</h1>
+            
+            <div class="notice notice-info">
+                <p><strong>📋 Übersicht:</strong> Diese Anleitung zeigt dir, was du manuell pflegen musst, damit die API-Übermittlung korrekt funktioniert.</p>
+            </div>
+
+            <!-- Quick Navigation -->
+            <div class="nav-tab-wrapper">
+                <a href="#credentials" class="nav-tab nav-tab-active">🔑 Credentials</a>
+                <a href="#mappings" class="nav-tab">📋 Mappings</a>
+                <a href="#specifications" class="nav-tab">🖨️ Specifications</a>
+                <a href="#automated" class="nav-tab">🤖 Automatisch</a>
+                <a href="#maintenance" class="nav-tab">🛠️ Pflege</a>
+                <a href="#troubleshooting" class="nav-tab">🔍 Troubleshooting</a>
+            </div>
+
+            <!-- Credentials Section -->
+            <div id="credentials" class="tab-content">
+                <h2>🔑 1. API-Credentials (Pflicht)</h2>
+                
+                <div class="card">
+                    <h3>WordPress Admin-Einstellungen</h3>
+                    <p>Gehe zu <strong>"Print Designer" → "Print Provider API"</strong> und konfiguriere:</p>
+                    
+                    <h4>API-Credentials:</h4>
+                    <ul>
+                        <li><strong>App ID:</strong> Deine AllesKlarDruck App ID</li>
+                        <li><strong>API Key:</strong> Dein AllesKlarDruck API Key</li>
+                    </ul>
+                    
+                    <h4>Absender-Daten:</h4>
+                    <ul>
+                        <li><strong>Name:</strong> "YPrint"</li>
+                        <li><strong>Straße:</strong> "Rottendorfer Straße 35A"</li>
+                        <li><strong>Stadt:</strong> "Würzburg"</li>
+                        <li><strong>PLZ:</strong> "97074"</li>
+                        <li><strong>Land:</strong> "DE"</li>
+                    </ul>
+                    
+                    <div class="notice notice-warning">
+                        <p><strong>⚠️ Wichtig:</strong> Ohne gültige API-Credentials funktioniert die Integration nicht!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mappings Section -->
+            <div id="mappings" class="tab-content" style="display: none;">
+                <h2>📋 2. Produkt-Mappings (WICHTIG!)</h2>
+                
+                <div class="card">
+                    <h3>Jeder Template/Produkt braucht ein Mapping!</h3>
+                    
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th>Feld</th>
+                                <th>Beispiel</th>
+                                <th>Erklärung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>ID</strong></td>
+                                <td><code>3657</code></td>
+                                <td>Template-ID oder Produkt-ID</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Type</strong></td>
+                                <td><code>template</code> oder <code>product</code></td>
+                                <td>Template hat Priorität</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Print Method</strong></td>
+                                <td><code>DTG</code>, <code>DTF</code>, <code>Siebdruck</code></td>
+                                <td>Wird zu API-Werten gemappt</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Manufacturer</strong></td>
+                                <td><code>yprint</code></td>
+                                <td>Hersteller-Name</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Series</strong></td>
+                                <td><code>SS25</code></td>
+                                <td>Produktserie</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Product Type</strong></td>
+                                <td><code>T-Shirt</code>, <code>Hoodie</code>, <code>Zipper</code></td>
+                                <td>Wird zu API-Werten gemappt</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4>Beispiel-Mappings:</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <ul>
+                            <li><code>Template 3657</code> → DTG, yprint, SS25, T-Shirt</li>
+                            <li><code>Template 3658</code> → DTF, yprint, SS25, Hoodie</li>
+                            <li><code>Product 123</code> → Siebdruck, yprint, SS25, Zipper</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="notice notice-info">
+                        <p><strong>💡 Tipp:</strong> Verwende die "API Payload Preview" Funktion, um zu überprüfen, ob deine Mappings korrekt sind.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Specifications Section -->
+            <div id="specifications" class="tab-content" style="display: none;">
+                <h2>🖨️ 3. Print Specifications (Technische Details)</h2>
+                
+                <div class="card">
+                    <h3>Für jede Template-Position technische Spezifikationen definieren</h3>
+                    
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th>Feld</th>
+                                <th>Beispiel</th>
+                                <th>Erklärung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Template/Position</strong></td>
+                                <td><code>3657_front</code></td>
+                                <td>Template-ID + Position</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unit</strong></td>
+                                <td><code>cm</code></td>
+                                <td>Maßeinheit (cm/mm)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Reference Point</strong></td>
+                                <td><code>center</code></td>
+                                <td>Referenzpunkt für Positionierung</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Resolution</strong></td>
+                                <td><code>300</code></td>
+                                <td>DPI für Druckqualität</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Color Profile</strong></td>
+                                <td><code>sRGB</code></td>
+                                <td>Farbprofil</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Bleed</strong></td>
+                                <td><code>2</code></td>
+                                <td>Beschnitt in mm</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Scaling</strong></td>
+                                <td><code>proportional</code></td>
+                                <td>Skalierungsart</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Print Quality</strong></td>
+                                <td><code>standard</code></td>
+                                <td>Druckqualität</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Automated Section -->
+            <div id="automated" class="tab-content" style="display: none;">
+                <h2>🤖 4. Was automatisch funktioniert</h2>
+                
+                <div class="card">
+                    <h3>Diese Werte werden automatisch gemappt</h3>
+                    
+                    <h4>A) Produkttypen-Mapping:</h4>
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <ul>
+                            <li><code>T-Shirt</code> → <code>TSHIRT</code></li>
+                            <li><code>Hoodie</code> → <code>HOODIE</code></li>
+                            <li><code>Zipper</code> → <code>ZIPPER_JACKET</code></li>
+                            <li><code>Polo</code> → <code>POLO</code></li>
+                            <li><code>Longsleeve</code> → <code>LONG_SLEEVE</code></li>
+                        </ul>
+                    </div>
+                    
+                    <h4>B) Druckmethoden-Mapping:</h4>
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <ul>
+                            <li><code>DTG</code> → <code>DTG</code></li>
+                            <li><code>DTF</code> → <code>DTF</code></li>
+                            <li><code>Siebdruck</code> → <code>SCREEN</code></li>
+                        </ul>
+                    </div>
+                    
+                    <h4>C) Größen-Mapping:</h4>
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <ul>
+                            <li><code>S, M, L, XL, XXL</code> → <code>S, M, L, XL, XXL</code></li>
+                        </ul>
+                    </div>
+                    
+                    <h4>D) Farben-Mapping:</h4>
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <ul>
+                            <li><code>Schwarz</code> → <code>Black</code></li>
+                            <li><code>Weiß</code> → <code>White</code></li>
+                            <li><code>Grau</code> → <code>Grey</code></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="notice notice-info">
+                        <p><strong>💡 Hinweis:</strong> Alle Mapping-Funktionen haben Fallback-Werte für unbekannte Eingaben.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Maintenance Section -->
+            <div id="maintenance" class="tab-content" style="display: none;">
+                <h2>🛠️ 5. Praktische Pflege-Schritte</h2>
+                
+                <div class="card">
+                    <h3>Schritt-für-Schritt Anleitung</h3>
+                    
+                    <h4>Schritt 1: Template-IDs sammeln</h4>
+                    <ol>
+                        <li>Gehe zu deinen Templates</li>
+                        <li>Notiere alle Template-IDs</li>
+                        <li>Identifiziere die Positionen (front, back, etc.)</li>
+                    </ol>
+                    
+                    <h4>Schritt 2: Produkt-Mappings erstellen</h4>
+                    <ol>
+                        <li>Admin → Print Designer → Print Provider API</li>
+                        <li>"Product Mappings" Sektion</li>
+                        <li>Für jeden Template/Produkt ein Mapping hinzufügen</li>
+                        <li>Korrekte Werte eintragen</li>
+                    </ol>
+                    
+                    <h4>Schritt 3: Print Specifications konfigurieren</h4>
+                    <ol>
+                        <li>"Print Specifications" Sektion</li>
+                        <li>Für jede Template-Position Spezifikationen definieren</li>
+                        <li>Technische Details eintragen</li>
+                    </ol>
+                    
+                    <h4>Schritt 4: Testen</h4>
+                    <ol>
+                        <li>Bestellung erstellen</li>
+                        <li>API Payload Preview verwenden</li>
+                        <li>Überprüfen ob alle Werte korrekt sind</li>
+                    </ol>
+                    
+                    <h3>Prioritäten für die Pflege</h3>
+                    
+                    <h4>🔴 Hoch (Sofort):</h4>
+                    <ul>
+                        <li>API-Credentials konfigurieren</li>
+                        <li>Absender-Daten eintragen</li>
+                        <li>Mindestens ein Template-Mapping erstellen</li>
+                    </ul>
+                    
+                    <h4>🟡 Mittel (Innerhalb 1 Woche):</h4>
+                    <ul>
+                        <li>Alle Template-Mappings erstellen</li>
+                        <li>Print Specifications für Hauptpositionen</li>
+                        <li>Produkt-Mappings für wichtige Artikel</li>
+                    </ul>
+                    
+                    <h4>🟢 Niedrig (Nach Bedarf):</h4>
+                    <ul>
+                        <li>Erweiterte Print Specifications</li>
+                        <li>Spezielle Positionen (left, right)</li>
+                        <li>Zusätzliche Produkttypen</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Troubleshooting Section -->
+            <div id="troubleshooting" class="tab-content" style="display: none;">
+                <h2>🔍 6. Troubleshooting & Hilfsmittel</h2>
+                
+                <div class="card">
+                    <h3>Häufige Probleme und Lösungen</h3>
+                    
+                    <h4>API-Fehler bei unbekannten Produkttypen:</h4>
+                    <ul>
+                        <li>Überprüfe die Mapping-Tabelle in den Einstellungen</li>
+                        <li>Füge neue Produkttypen hinzu, falls erforderlich</li>
+                        <li>Verwende die Fallback-Werte als Orientierung</li>
+                    </ul>
+                    
+                    <h4>API-Fehler bei unbekannten Druckmethoden:</h4>
+                    <ul>
+                        <li>Überprüfe die Mapping-Tabelle in den Einstellungen</li>
+                        <li>Füge neue Druckmethoden hinzu, falls erforderlich</li>
+                        <li>Verwende die Fallback-Werte als Orientierung</li>
+                    </ul>
+                    
+                    <h4>Fehlende Preview-URLs:</h4>
+                    <ul>
+                        <li>Stelle sicher, dass die Preview-Generierung korrekt funktioniert</li>
+                        <li>Überprüfe die Dateipfade und Berechtigungen</li>
+                        <li>Teste die Preview-URL-Generierung</li>
+                    </ul>
+                    
+                    <h3>Hilfsmittel für die Pflege</h3>
+                    
+                    <h4>A) API Payload Preview:</h4>
+                    <ul>
+                        <li>Zeigt dir die generierte JSON-Struktur</li>
+                        <li>Überprüft ob alle Mappings korrekt sind</li>
+                        <li>Validiert die API-Konformität</li>
+                    </ul>
+                    
+                    <h4>B) Test-Dateien:</h4>
+                    <ul>
+                        <li><code>test_api_mapping_updates.php</code> - Überprüft alle Mapping-Funktionen</li>
+                        <li>Zeigt Fallback-Verhalten</li>
+                        <li>Validiert die API-Struktur</li>
+                    </ul>
+                    
+                    <h4>C) Debug-Logging:</h4>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <p><strong>In den Logs siehst du:</strong></p>
+                        <ul>
+                            <li>Welche Mappings verwendet werden</li>
+                            <li>Fallback-Werte bei fehlenden Mappings</li>
+                            <li>API-Fehler und deren Ursachen</li>
+                        </ul>
+                    </div>
+                    
+                    <h3>Erfolgskriterien</h3>
+                    <p>Du weißt, dass alles korrekt konfiguriert ist, wenn:</p>
+                    <ul>
+                        <li>✅ API Payload Preview zeigt korrekte JSON-Struktur</li>
+                        <li>✅ Alle <code>type</code> und <code>printMethod</code> Werte sind API-konform</li>
+                        <li>✅ <code>referencePoint</code> ist auf "center" gesetzt</li>
+                        <li>✅ <code>previewUrl</code> wird korrekt generiert</li>
+                        <li>✅ Keine API-Fehler bei Bestellungen</li>
+                    </ul>
+                    
+                    <div class="notice notice-success">
+                        <p><strong>🎯 Wichtigste Regel:</strong> <strong>Jeder Template/Produkt braucht ein Mapping!</strong> Ohne Mapping werden Fallback-Werte verwendet, die möglicherweise nicht korrekt sind.</p>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                .card {
+                    background: white;
+                    border: 1px solid #ccd0d4;
+                    border-radius: 4px;
+                    padding: 20px;
+                    margin: 20px 0;
+                    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+                }
+                
+                .tab-content {
+                    margin-top: 20px;
+                }
+                
+                .nav-tab-wrapper {
+                    margin-bottom: 20px;
+                }
+                
+                .nav-tab {
+                    cursor: pointer;
+                }
+                
+                .nav-tab-active {
+                    background: #0073aa;
+                    color: white;
+                }
+                
+                code {
+                    background: #f1f1f1;
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    font-family: monospace;
+                }
+                
+                .notice {
+                    margin: 15px 0;
+                }
+            </style>
+
+            <script>
+                jQuery(document).ready(function($) {
+                    // Tab functionality
+                    $('.nav-tab').on('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Remove active class from all tabs
+                        $('.nav-tab').removeClass('nav-tab-active');
+                        $('.tab-content').hide();
+                        
+                        // Add active class to clicked tab
+                        $(this).addClass('nav-tab-active');
+                        
+                        // Show corresponding content
+                        var target = $(this).attr('href').substring(1);
+                        $('#' + target).show();
+                    });
+                });
+            </script>
+        </div>
+        <?php
     }
 }
