@@ -806,6 +806,45 @@ class Octo_Print_API_Integration {
             }
         }
         
+        // Strategy 5: Parse from product_images meta
+        $product_images_json = $item->get_meta('_design_product_images');
+        if ($product_images_json) {
+            $product_images = json_decode($product_images_json, true);
+            if (is_array($product_images) && !empty($product_images)) {
+                $first_image = reset($product_images);
+                if (isset($first_image['template_id'])) {
+                    error_log("YPrint Debug: Template ID found in product_images: {$first_image['template_id']}");
+                    return $first_image['template_id'];
+                }
+            }
+        }
+        
+        // Strategy 6: Try to get from product variation
+        $variation_id = $item->get_variation_id();
+        if ($variation_id) {
+            $variation = wc_get_product($variation_id);
+            if ($variation) {
+                $template_id = $variation->get_meta('_template_id');
+                if (!empty($template_id)) {
+                    error_log("YPrint Debug: Template ID found in variation meta: {$template_id}");
+                    return $template_id;
+                }
+            }
+        }
+        
+        // Strategy 7: Try to get from parent product
+        $product_id = $item->get_product_id();
+        if ($product_id) {
+            $product = wc_get_product($product_id);
+            if ($product) {
+                $template_id = $product->get_meta('_template_id');
+                if (!empty($template_id)) {
+                    error_log("YPrint Debug: Template ID found in product meta: {$template_id}");
+                    return $template_id;
+                }
+            }
+        }
+        
         error_log("YPrint Debug: No template ID found for item");
         return null;
     }
@@ -1193,15 +1232,22 @@ class Octo_Print_API_Integration {
             $parsed_images[] = array(
                 'filename' => $image['filename'] ?: basename($image['url']),
                 'url' => $image['url'],
-                'preview_url' => $item ? $this->get_design_meta($item, 'preview_url') : '', // NEU: Preview-URL hinzufügen
+                'preview_url' => $item ? $this->get_design_meta($item, 'preview_url') : '',
                 'original_width_px' => $transform['width'] ?: 0,
                 'original_height_px' => $transform['height'] ?: 0,
                 'position_left_px' => round($transform['left'] ?: 0, 2),
                 'position_top_px' => round($transform['top'] ?: 0, 2),
                 'scale_x' => $transform['scaleX'] ?: 1,
                 'scale_y' => $transform['scaleY'] ?: 1,
+                'rotation' => $transform['angle'] ?: 0,
+                'opacity' => $transform['opacity'] ?: 1,
                 'transform' => $transform,
-                'transform_data' => $transform // Vollständige Transform-Daten für Position-Schätzung
+                'transform_data' => $transform,
+                // Für API-Integration notwendige Felder
+                'canvas_width' => $transform['width'] ?: 0,
+                'canvas_height' => $transform['height'] ?: 0,
+                'final_width_px' => ($transform['width'] ?: 0) * ($transform['scaleX'] ?: 1),
+                'final_height_px' => ($transform['height'] ?: 0) * ($transform['scaleY'] ?: 1)
             );
         }
         
@@ -1214,15 +1260,62 @@ class Octo_Print_API_Integration {
     private function get_design_meta($item, $key) {
         // Try standard naming first
         $value = $item->get_meta('_' . $key);
+        
         // Fallback to yprint naming
         if (!$value) {
             $value = $item->get_meta('yprint_' . $key);
         }
-        // Fallback to _yprint naming
+        
+        // Fallback to _yprint naming  
         if (!$value) {
             $value = $item->get_meta('_yprint_' . $key);
         }
+        
+        // Fallback to db_ naming
+        if (!$value) {
+            $value = $item->get_meta('_db_' . $key);
+        }
+        
+        // Special handling for size_name
+        if (!$value && $key === 'size_name') {
+            // Try variation attributes
+            $variation_id = $item->get_variation_id();
+            if ($variation_id) {
+                $variation = wc_get_product($variation_id);
+                if ($variation) {
+                    $attributes = $variation->get_attributes();
+                    $value = $attributes['pa_size'] ?? $attributes['size'] ?? '';
+                }
+            }
+            
+            // Fallback to product size name function
+            if (!$value) {
+                $value = $this->get_product_size_name($item);
+            }
+        }
+        
         return $value;
+    }
+
+    /**
+     * Get product size name from variation attributes
+     */
+    private function get_product_size_name($item) {
+        $product = $item->get_product();
+        if (!$product) {
+            return 'One Size';
+        }
+        
+        if ($product->is_type('variation')) {
+            $attributes = $product->get_variation_attributes();
+            foreach ($attributes as $key => $value) {
+                if (strpos(strtolower($key), 'size') !== false || strpos(strtolower($key), 'größe') !== false) {
+                    return $value;
+                }
+            }
+        }
+        
+        return 'One Size';
     }
 
     /**
