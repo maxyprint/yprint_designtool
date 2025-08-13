@@ -424,13 +424,8 @@ class Octo_Print_API_Integration {
                     'offsetY' => $print_coordinates['offset_y_mm'],
                     'offsetUnit' => $print_specs['offsetUnit'],
                     'referencePoint' => $print_specs['referencePoint'],
-                    'resolution' => $print_specs['resolution'],
-                    'colorProfile' => $print_specs['colorProfile'],
-                    'bleed' => $print_specs['bleed'],
-                    'scaling' => $print_specs['scaling'],
-                    'printQuality' => $print_specs['printQuality'],
                     'printFile' => $image['url'],
-                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : '' // NEU: Preview-URL hinzufügen
+                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : ''
                 );
             }
             
@@ -732,17 +727,17 @@ class Octo_Print_API_Integration {
         foreach ($configured_mappings as $mapping) {
             if ($mapping['type'] === 'template') {
                 $template_mappings[$mapping['id']] = array(
-                    'print_method' => $mapping['print_method'],
+                    'print_method' => $this->map_print_method($mapping['print_method']),
                     'manufacturer' => $mapping['manufacturer'],
                     'series' => $mapping['series'],
-                    'type' => $mapping['product_type']
+                    'type' => $this->map_product_type($mapping['product_type'])
                 );
             } elseif ($mapping['type'] === 'product') {
                 $product_mappings[$mapping['id']] = array(
-                    'print_method' => $mapping['print_method'],
+                    'print_method' => $this->map_print_method($mapping['print_method']),
                     'manufacturer' => $mapping['manufacturer'],
                     'series' => $mapping['series'],
-                    'type' => $mapping['product_type']
+                    'type' => $this->map_product_type($mapping['product_type'])
                 );
             }
         }
@@ -755,12 +750,12 @@ class Octo_Print_API_Integration {
             if ($product_id && isset($product_mappings[$product_id])) {
                 $mapping = $product_mappings[$product_id];
             } else {
-                // Letzter Fallback: Standardwerte
+                // Letzter Fallback: Standardwerte mit Mapping
                 $mapping = array(
-                    'print_method' => 'DTG',
-                    'manufacturer' => 'Stanley/Stella',
-                    'series' => 'Basic',
-                    'type' => 'T-Shirt'
+                    'print_method' => $this->map_print_method('DTG'),
+                    'manufacturer' => 'yprint',
+                    'series' => 'SS25',
+                    'type' => $this->map_product_type('T-Shirt')
                 );
             }
         }
@@ -918,6 +913,57 @@ class Octo_Print_API_Integration {
         return isset($size_mapping[$size_lower]) ? 
                $size_mapping[$size_lower] : 
                strtoupper($wordpress_size);
+    }
+
+    /**
+     * Map YPrint product type to AllesKlarDruck API product type
+     * 
+     * @param string $yprint_type YPrint product type
+     * @return string API product type
+     */
+    private function map_product_type($yprint_type) {
+        $type_mapping = array(
+            'T-Shirt' => 'TSHIRT',
+            'T-Shirts' => 'TSHIRT',
+            'Tshirt' => 'TSHIRT',
+            'Tshirts' => 'TSHIRT',
+            'Hoodie' => 'HOODIE',
+            'Hoodies' => 'HOODIE',
+            'Zipper' => 'ZIPPER_JACKET',
+            'Zipper Jacket' => 'ZIPPER_JACKET',
+            'Zip-Hoodie' => 'ZIPPER_JACKET',
+            'Zip Hoodie' => 'ZIPPER_JACKET',
+            'Polo' => 'POLO',
+            'Polo-Shirt' => 'POLO',
+            'Polo Shirt' => 'POLO',
+            'Longsleeve' => 'LONG_SLEEVE',
+            'Long Sleeve' => 'LONG_SLEEVE',
+            'Langarm' => 'LONG_SLEEVE',
+            'Langarmshirt' => 'LONG_SLEEVE'
+        );
+        
+        return isset($type_mapping[$yprint_type]) ? $type_mapping[$yprint_type] : 'TSHIRT';
+    }
+
+    /**
+     * Map YPrint print method to AllesKlarDruck API print method
+     * 
+     * @param string $yprint_method YPrint print method
+     * @return string API print method
+     */
+    private function map_print_method($yprint_method) {
+        $method_mapping = array(
+            'DTG' => 'DTG',
+            'Direct-to-Garment' => 'DTG',
+            'DTF' => 'DTF',
+            'Direct-to-Film' => 'DTF',
+            'Siebdruck' => 'SCREEN',
+            'Screen' => 'SCREEN',
+            'Screen Printing' => 'SCREEN',
+            'Screenprint' => 'SCREEN'
+        );
+        
+        return isset($method_mapping[$yprint_method]) ? $method_mapping[$yprint_method] : 'DTG';
     }
 
     /**
@@ -1765,12 +1811,8 @@ class Octo_Print_API_Integration {
                                     'offsetY' => isset($image['offset_y_mm']) ? round($image['offset_y_mm'], 1) : 0,
                                     'offsetUnit' => $print_specs['offsetUnit'],
                                     'referencePoint' => $print_specs['referencePoint'],
-                                    'resolution' => $print_specs['resolution'],
-                                    'colorProfile' => $print_specs['colorProfile'],
-                                    'bleed' => $print_specs['bleed'],
-                                    'scaling' => $print_specs['scaling'],
-                                    'printQuality' => $print_specs['printQuality'],
-                                    'printFile' => $image['url']
+                                    'printFile' => $image['url'],
+                                    'previewUrl' => !empty($image['preview_url']) ? $image['preview_url'] : ''
                                 );
                             }
                         }
