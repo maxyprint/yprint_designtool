@@ -285,12 +285,17 @@ class Octo_Print_Designer_Template {
             // Produkt-Dimensionen pro Größe
             if (isset($_POST['product_dimensions']) && is_array($_POST['product_dimensions'])) {
                 $product_dimensions = array();
+                $measurement_keys = array_keys($this->get_measurement_labels());
                 
                 foreach ($_POST['product_dimensions'] as $size_id => $config) {
-                    $product_dimensions[sanitize_text_field($size_id)] = array(
-                        'width_cm' => floatval($config['width_cm'] ?? 0),
-                        'height_cm' => floatval($config['height_cm'] ?? 0)
-                    );
+                    $product_dimensions[sanitize_text_field($size_id)] = array();
+                    
+                    // Speichere alle verfügbaren Messungen
+                    foreach ($measurement_keys as $measurement_key) {
+                        if (isset($config[$measurement_key])) {
+                            $product_dimensions[sanitize_text_field($size_id)][$measurement_key] = floatval($config[$measurement_key]);
+                        }
+                    }
                 }
                 
                 update_post_meta($post_id, '_template_product_dimensions', $product_dimensions);
@@ -607,23 +612,96 @@ class Octo_Print_Designer_Template {
         
         // Standard-Produktabmessungen basierend auf Größe (T-Shirt Beispiel)
         $dimensions = array(
-            'xs' => array('width_cm' => 44, 'height_cm' => 62),
-            's' => array('width_cm' => 47, 'height_cm' => 65),
-            'm' => array('width_cm' => 50, 'height_cm' => 68),
-            'l' => array('width_cm' => 53, 'height_cm' => 71),
-            'xl' => array('width_cm' => 56, 'height_cm' => 74),
-            'xxl' => array('width_cm' => 59, 'height_cm' => 77),
-            '3xl' => array('width_cm' => 62, 'height_cm' => 80),
-            '4xl' => array('width_cm' => 65, 'height_cm' => 83),
+            'xs' => array(
+                'chest' => 44, 'hem_width' => 40, 'height_from_shoulder' => 62, 
+                'sleeve_length' => 24.5, 'sleeve_opening' => 17, 'shoulder_to_shoulder' => 50.5,
+                'neck_opening' => 18, 'biceps' => 22.5, 'rib_height' => 2
+            ),
+            's' => array(
+                'chest' => 47, 'hem_width' => 43, 'height_from_shoulder' => 65, 
+                'sleeve_length' => 25, 'sleeve_opening' => 17.5, 'shoulder_to_shoulder' => 52,
+                'neck_opening' => 18.5, 'biceps' => 23, 'rib_height' => 2
+            ),
+            'm' => array(
+                'chest' => 50, 'hem_width' => 46, 'height_from_shoulder' => 68, 
+                'sleeve_length' => 25.5, 'sleeve_opening' => 18, 'shoulder_to_shoulder' => 53.5,
+                'neck_opening' => 19, 'biceps' => 23.5, 'rib_height' => 2
+            ),
+            'l' => array(
+                'chest' => 53, 'hem_width' => 49, 'height_from_shoulder' => 71, 
+                'sleeve_length' => 26, 'sleeve_opening' => 18.5, 'shoulder_to_shoulder' => 55,
+                'neck_opening' => 19.5, 'biceps' => 24, 'rib_height' => 2
+            ),
+            'xl' => array(
+                'chest' => 56, 'hem_width' => 52, 'height_from_shoulder' => 74, 
+                'sleeve_length' => 26.5, 'sleeve_opening' => 19, 'shoulder_to_shoulder' => 56.5,
+                'neck_opening' => 20, 'biceps' => 24.5, 'rib_height' => 2
+            ),
+            'xxl' => array(
+                'chest' => 59, 'hem_width' => 55, 'height_from_shoulder' => 77, 
+                'sleeve_length' => 27, 'sleeve_opening' => 19.5, 'shoulder_to_shoulder' => 58,
+                'neck_opening' => 20.5, 'biceps' => 25, 'rib_height' => 2
+            ),
+            '3xl' => array(
+                'chest' => 62, 'hem_width' => 58, 'height_from_shoulder' => 80, 
+                'sleeve_length' => 27.5, 'sleeve_opening' => 20, 'shoulder_to_shoulder' => 59.5,
+                'neck_opening' => 21, 'biceps' => 25.5, 'rib_height' => 2
+            ),
+            '4xl' => array(
+                'chest' => 65, 'hem_width' => 61, 'height_from_shoulder' => 83, 
+                'sleeve_length' => 28, 'sleeve_opening' => 20.5, 'shoulder_to_shoulder' => 61,
+                'neck_opening' => 21.5, 'biceps' => 26, 'rib_height' => 2
+            ),
         );
         
-        return $dimensions[$size_id_lower] ?? array('width_cm' => 50, 'height_cm' => 68);
+        return $dimensions[$size_id_lower] ?? array(
+            'chest' => 50, 'hem_width' => 46, 'height_from_shoulder' => 68, 
+            'sleeve_length' => 25.5, 'sleeve_opening' => 18, 'shoulder_to_shoulder' => 53.5,
+            'neck_opening' => 19, 'biceps' => 23.5, 'rib_height' => 2
+        );
     }
 
     /**
-     * Calculate print area dimensions based on product photo and real dimensions
+     * Get measurement labels for display
      */
-    private function calculate_print_area_from_photo($product_width_px, $product_height_px, $real_width_cm, $real_height_cm, $canvas_width, $canvas_height) {
+    private function get_measurement_labels() {
+        return array(
+            'chest' => __('Chest', 'octo-print-designer'),
+            'hem_width' => __('Hem Width', 'octo-print-designer'),
+            'height_from_shoulder' => __('Height from Shoulder', 'octo-print-designer'),
+            'sleeve_length' => __('Sleeve Length', 'octo-print-designer'),
+            'sleeve_opening' => __('Sleeve Opening', 'octo-print-designer'),
+            'shoulder_to_shoulder' => __('Shoulder to Shoulder', 'octo-print-designer'),
+            'neck_opening' => __('Neck Opening', 'octo-print-designer'),
+            'biceps' => __('Biceps', 'octo-print-designer'),
+            'rib_height' => __('Rib Height', 'octo-print-designer')
+        );
+    }
+
+    /**
+     * Calculate print area dimensions based on product photo and detailed measurements
+     */
+    private function calculate_print_area_from_photo($product_width_px, $product_height_px, $size_measurements, $canvas_width, $canvas_height, $view_name = '') {
+        // Bestimme die relevanten Messungen basierend auf View-Namen
+        $view_name_lower = strtolower($view_name);
+        
+        if (strpos($view_name_lower, 'front') !== false || strpos($view_name_lower, 'back') !== false || 
+            strpos($view_name_lower, 'vorne') !== false || strpos($view_name_lower, 'hinten') !== false) {
+            // Front/Back View: Verwende Chest und Height from Shoulder
+            $real_width_cm = $size_measurements['chest'] ?? 50;
+            $real_height_cm = $size_measurements['height_from_shoulder'] ?? 68;
+        } elseif (strpos($view_name_lower, 'sleeve') !== false || strpos($view_name_lower, 'ärmel') !== false ||
+                   strpos($view_name_lower, 'left') !== false || strpos($view_name_lower, 'right') !== false ||
+                   strpos($view_name_lower, 'links') !== false || strpos($view_name_lower, 'rechts') !== false) {
+            // Sleeve View: Verwende Biceps und Sleeve Length
+            $real_width_cm = $size_measurements['biceps'] ?? 24;
+            $real_height_cm = $size_measurements['sleeve_length'] ?? 26;
+        } else {
+            // Default: Verwende Chest und Height from Shoulder
+            $real_width_cm = $size_measurements['chest'] ?? 50;
+            $real_height_cm = $size_measurements['height_from_shoulder'] ?? 68;
+        }
+        
         // Berechne Skalierungsfaktor (cm pro Pixel)
         $scale_x = $real_width_cm / $product_width_px;
         $scale_y = $real_height_cm / $product_height_px;
@@ -638,7 +716,11 @@ class Octo_Print_Designer_Template {
         return array(
             'print_width_mm' => round($print_width_mm, 1),
             'print_height_mm' => round($print_height_mm, 1),
-            'scale_factor' => $scale
+            'scale_factor' => $scale,
+            'used_measurements' => array(
+                'width' => $real_width_cm,
+                'height' => $real_height_cm
+            )
         );
     }
 
@@ -684,60 +766,66 @@ class Octo_Print_Designer_Template {
             <!-- Produkt-Dimensionen pro Größe -->
             <?php if (is_array($template_sizes) && !empty($template_sizes)): ?>
                 <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
-                    <h4 style="margin-top: 0; color: #495057;"><?php esc_html_e('📏 Product Dimensions per Size', 'octo-print-designer'); ?></h4>
+                    <h4 style="margin-top: 0; color: #495057;"><?php esc_html_e('📏 Detailed Product Measurements per Size', 'octo-print-designer'); ?></h4>
                     <p style="margin-bottom: 20px; font-size: 14px; color: #6c757d;">
-                        <?php esc_html_e('Enter the real physical dimensions of your product for each size. These will be used to calculate print areas automatically.', 'octo-print-designer'); ?>
+                        <?php esc_html_e('Enter the detailed measurements for each size. These professional measurements will be used for accurate print area calculations.', 'octo-print-designer'); ?>
                     </p>
                     
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
-                        <?php foreach ($template_sizes as $size): ?>
-                            <?php 
-                            $size_id = $size['id'];
-                            $size_name = $size['name'];
-                            $size_config = $product_dimensions[$size_id] ?? array();
-                            
-                            // Standard-Werte basierend auf Größe
-                            $defaults = $this->get_default_product_dimensions_by_size($size_id);
-                            
-                            $width_cm = $size_config['width_cm'] ?? $defaults['width_cm'];
-                            $height_cm = $size_config['height_cm'] ?? $defaults['height_cm'];
-                            ?>
-                            
-                            <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;">
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                                    <div style="width: 40px; height: 40px; background: #007cba; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
-                                        <?php echo esc_html(strtoupper(substr($size_id, 0, 1))); ?>
-                                    </div>
-                                    <div>
-                                        <h5 style="margin: 0; font-size: 16px;"><?php echo esc_html($size_name); ?></h5>
-                                        <span style="font-size: 12px; color: #666;">ID: <?php echo esc_html($size_id); ?></span>
-                                    </div>
-                                </div>
-                                
-                                <div style="display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 12px;">
-                                            <?php esc_html_e('Width (cm)', 'octo-print-designer'); ?>
-                                        </label>
-                                        <input type="number" 
-                                               name="product_dimensions[<?php echo esc_attr($size_id); ?>][width_cm]"
-                                               value="<?php echo esc_attr($width_cm); ?>"
-                                               step="0.1" min="10" max="200" 
-                                               class="regular-text" style="width: 100%;" />
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 12px;">
-                                            <?php esc_html_e('Height (cm)', 'octo-print-designer'); ?>
-                                        </label>
-                                        <input type="number" 
-                                               name="product_dimensions[<?php echo esc_attr($size_id); ?>][height_cm]"
-                                               value="<?php echo esc_attr($height_cm); ?>"
-                                               step="0.1" min="10" max="200" 
-                                               class="regular-text" style="width: 100%;" />
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                    <?php 
+                    $measurement_labels = $this->get_measurement_labels();
+                    $measurement_keys = array_keys($measurement_labels);
+                    ?>
+                    
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <thead>
+                                <tr style="background: #007cba; color: white;">
+                                    <th style="padding: 12px; text-align: left; font-weight: 600; min-width: 120px;"><?php esc_html_e('Measurement', 'octo-print-designer'); ?></th>
+                                    <?php foreach ($template_sizes as $size): ?>
+                                        <th style="padding: 12px; text-align: center; font-weight: 600; min-width: 80px;">
+                                            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                                <div style="width: 30px; height: 30px; background: rgba(255,255,255,0.2); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">
+                                                    <?php echo esc_html(strtoupper(substr($size['id'], 0, 1))); ?>
+                                                </div>
+                                                <span style="font-size: 11px;"><?php echo esc_html($size['name']); ?></span>
+                                            </div>
+                                        </th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($measurement_keys as $measurement_key): ?>
+                                    <tr style="border-bottom: 1px solid #e0e0e0;">
+                                        <td style="padding: 12px; font-weight: 600; background: #f8f9fa; color: #495057; font-size: 13px;">
+                                            <?php echo esc_html($measurement_labels[$measurement_key]); ?>
+                                        </td>
+                                        <?php foreach ($template_sizes as $size): ?>
+                                            <?php 
+                                            $size_id = $size['id'];
+                                            $size_config = $product_dimensions[$size_id] ?? array();
+                                            $defaults = $this->get_default_product_dimensions_by_size($size_id);
+                                            $value = $size_config[$measurement_key] ?? $defaults[$measurement_key] ?? 0;
+                                            ?>
+                                            <td style="padding: 8px; text-align: center;">
+                                                <input type="number" 
+                                                       name="product_dimensions[<?php echo esc_attr($size_id); ?>][<?php echo esc_attr($measurement_key); ?>]"
+                                                       value="<?php echo esc_attr($value); ?>"
+                                                       step="0.1" min="0" max="200" 
+                                                       style="width: 60px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;" />
+                                                <span style="font-size: 10px; color: #666; display: block; margin-top: 2px;">cm</span>
+                                            </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2271b1; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 12px; color: #0c5460;">
+                            <strong><?php esc_html_e('💡 Tip:', 'octo-print-designer'); ?></strong>
+                            <?php esc_html_e('These measurements are used to calculate print areas. For front/back views, use "Chest" and "Height from Shoulder". For sleeve views, use "Sleeve Length" and "Biceps".', 'octo-print-designer'); ?>
+                        </p>
                     </div>
                 </div>
             <?php endif; ?>
@@ -862,22 +950,21 @@ class Octo_Print_Designer_Template {
                                     <h6 style="margin: 0 0 10px 0; color: #0c5460;"><?php esc_html_e('🔄 Automatically Calculated Print Areas', 'octo-print-designer'); ?></h6>
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                         <?php foreach ($template_sizes as $size): ?>
-                                            <?php 
-                                            $size_id = $size['id'];
-                                            $size_config = $product_dimensions[$size_id] ?? array();
-                                            $real_width = $size_config['width_cm'] ?? 50;
-                                            $real_height = $size_config['height_cm'] ?? 68;
-                                            
-                                            if ($photo_width_px > 0 && $photo_height_px > 0) {
-                                                $calculated = $this->calculate_print_area_from_photo(
-                                                    $photo_width_px, $photo_height_px, 
-                                                    $real_width, $real_height, 
-                                                    $canvas_width, $canvas_height
-                                                );
-                                            } else {
-                                                $calculated = array('print_width_mm' => 0, 'print_height_mm' => 0);
-                                            }
-                                            ?>
+                                                                                         <?php 
+                                             $size_id = $size['id'];
+                                             $size_config = $product_dimensions[$size_id] ?? array();
+                                             
+                                             if ($photo_width_px > 0 && $photo_height_px > 0) {
+                                                 $calculated = $this->calculate_print_area_from_photo(
+                                                     $photo_width_px, $photo_height_px, 
+                                                     $size_config, 
+                                                     $canvas_width, $canvas_height,
+                                                     $view_name
+                                                 );
+                                             } else {
+                                                 $calculated = array('print_width_mm' => 0, 'print_height_mm' => 0, 'used_measurements' => array('width' => 0, 'height' => 0));
+                                             }
+                                             ?>
                                             <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #bee5eb;">
                                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                                                     <span style="width: 20px; height: 20px; background: #007cba; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;">
@@ -885,10 +972,15 @@ class Octo_Print_Designer_Template {
                                                     </span>
                                                     <span style="font-weight: 600; font-size: 12px;"><?php echo esc_html($size['name']); ?></span>
                                                 </div>
-                                                <div style="font-size: 11px; color: #0c5460;">
-                                                    <div><?php esc_html_e('Width:', 'octo-print-designer'); ?> <strong><?php echo $calculated['print_width_mm']; ?> mm</strong></div>
-                                                    <div><?php esc_html_e('Height:', 'octo-print-designer'); ?> <strong><?php echo $calculated['print_height_mm']; ?> mm</strong></div>
-                                                </div>
+                                                                                                 <div style="font-size: 11px; color: #0c5460;">
+                                                     <div><?php esc_html_e('Width:', 'octo-print-designer'); ?> <strong><?php echo $calculated['print_width_mm']; ?> mm</strong></div>
+                                                     <div><?php esc_html_e('Height:', 'octo-print-designer'); ?> <strong><?php echo $calculated['print_height_mm']; ?> mm</strong></div>
+                                                     <?php if ($calculated['used_measurements']['width'] > 0): ?>
+                                                         <div style="font-size: 9px; color: #6c757d; margin-top: 4px; border-top: 1px solid #dee2e6; padding-top: 4px;">
+                                                             <?php esc_html_e('Based on:', 'octo-print-designer'); ?> <?php echo $calculated['used_measurements']['width']; ?>×<?php echo $calculated['used_measurements']['height']; ?> cm
+                                                         </div>
+                                                     <?php endif; ?>
+                                                 </div>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
