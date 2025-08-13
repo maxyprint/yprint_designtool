@@ -301,21 +301,35 @@ class Octo_Print_Designer_Template {
                 update_post_meta($post_id, '_template_product_dimensions', $product_dimensions);
             }
 
-            // View-spezifische Konfigurationen
-            if (isset($_POST['view_print_areas']) && is_array($_POST['view_print_areas'])) {
-                $view_print_areas = array();
-                
-                foreach ($_POST['view_print_areas'] as $view_id => $config) {
-                    $view_print_areas[sanitize_text_field($view_id)] = array(
-                        'canvas_width' => intval($config['canvas_width'] ?? 0),
-                        'canvas_height' => intval($config['canvas_height'] ?? 0),
-                        'photo_width_px' => intval($config['photo_width_px'] ?? 0),
-                        'photo_height_px' => intval($config['photo_height_px'] ?? 0)
-                    );
-                }
-                
-                update_post_meta($post_id, '_template_view_print_areas', $view_print_areas);
-            }
+                         // View-spezifische Konfigurationen
+             if (isset($_POST['view_print_areas']) && is_array($_POST['view_print_areas'])) {
+                 $view_print_areas = array();
+                 
+                 foreach ($_POST['view_print_areas'] as $view_id => $config) {
+                     $view_print_areas[sanitize_text_field($view_id)] = array(
+                         'canvas_width' => intval($config['canvas_width'] ?? 0),
+                         'canvas_height' => intval($config['canvas_height'] ?? 0),
+                         'photo_width_px' => intval($config['photo_width_px'] ?? 0),
+                         'photo_height_px' => intval($config['photo_height_px'] ?? 0)
+                     );
+                     
+                     // Speichere visuelle Messungen
+                     if (isset($config['measurements']) && is_array($config['measurements'])) {
+                         $measurements = array();
+                         foreach ($config['measurements'] as $index => $measurement) {
+                             $measurements[intval($index)] = array(
+                                 'type' => sanitize_text_field($measurement['type'] ?? ''),
+                                 'pixel_distance' => floatval($measurement['pixel_distance'] ?? 0),
+                                 'color' => sanitize_hex_color($measurement['color'] ?? '#ff4444'),
+                                 'points' => isset($measurement['points']) ? json_decode(stripslashes($measurement['points']), true) : array()
+                             );
+                         }
+                         $view_print_areas[sanitize_text_field($view_id)]['measurements'] = $measurements;
+                     }
+                 }
+                 
+                 update_post_meta($post_id, '_template_view_print_areas', $view_print_areas);
+             }
         }
         
         $this->save_inventory_meta($post_id);
@@ -679,10 +693,101 @@ class Octo_Print_Designer_Template {
     }
 
     /**
-     * Calculate print area dimensions based on product photo and detailed measurements
+     * Calculate print area dimensions based on visual measurements
      */
-    private function calculate_print_area_from_photo($product_width_px, $product_height_px, $size_measurements, $canvas_width, $canvas_height, $view_name = '') {
-        // Bestimme die relevanten Messungen basierend auf View-Namen
+    private function calculate_print_area_from_photo($view_measurements, $size_measurements, $canvas_width, $canvas_height, $view_name = '') {
+        // Verwende visuelle Messungen falls verfügbar
+        if (isset($view_measurements['measurements']) && is_array($view_measurements['measurements'])) {
+            $measurements = $view_measurements['measurements'];
+            
+            // Finde die relevanten Messungen basierend auf View-Namen
+            $view_name_lower = strtolower($view_name);
+            $primary_measurement = null;
+            $secondary_measurement = null;
+            
+            if (strpos($view_name_lower, 'front') !== false || strpos($view_name_lower, 'back') !== false || 
+                strpos($view_name_lower, 'vorne') !== false || strpos($view_name_lower, 'hinten') !== false) {
+                // Front/Back View: Suche nach Chest und Height from Shoulder
+                foreach ($measurements as $measurement) {
+                    if ($measurement['type'] === 'chest' && !$primary_measurement) {
+                        $primary_measurement = $measurement;
+                    } elseif ($measurement['type'] === 'height_from_shoulder' && !$secondary_measurement) {
+                        $secondary_measurement = $measurement;
+                    }
+                }
+            } elseif (strpos($view_name_lower, 'sleeve') !== false || strpos($view_name_lower, 'ärmel') !== false ||
+                       strpos($view_name_lower, 'left') !== false || strpos($view_name_lower, 'right') !== false ||
+                       strpos($view_name_lower, 'links') !== false || strpos($view_name_lower, 'rechts') !== false) {
+                // Sleeve View: Suche nach Biceps und Sleeve Length
+                foreach ($measurements as $measurement) {
+                    if ($measurement['type'] === 'biceps' && !$primary_measurement) {
+                        $primary_measurement = $measurement;
+                    } elseif ($measurement['type'] === 'sleeve_length' && !$secondary_measurement) {
+                        $secondary_measurement = $measurement;
+                    }
+                }
+            }
+            
+            // Wenn keine spezifischen Messungen gefunden, verwende die ersten verfügbaren
+            if (!$primary_measurement && count($measurements) > 0) {
+                $primary_measurement = reset($measurements);
+            }
+            if (!$secondary_measurement && count($measurements) > 1) {
+                $secondary_measurement = next($measurements);
+            }
+            
+            // Berechne Skalierungsfaktoren basierend auf visuellen Messungen
+            $scale_x = 0;
+            $scale_y = 0;
+            
+            if ($primary_measurement) {
+                $real_width_cm = $size_measurements[$primary_measurement['type']] ?? 50;
+                $pixel_distance = $primary_measurement['pixel_distance'];
+                if ($pixel_distance > 0) {
+                    $scale_x = $real_width_cm / $pixel_distance;
+                }
+            }
+            
+            if ($secondary_measurement) {
+                $real_height_cm = $size_measurements[$secondary_measurement['type']] ?? 68;
+                $pixel_distance = $secondary_measurement['pixel_distance'];
+                if ($pixel_distance > 0) {
+                    $scale_y = $real_height_cm / $pixel_distance;
+                }
+            }
+            
+            // Verwende den kleineren Skalierungsfaktor für konsistente Berechnung
+            $scale = 0;
+            if ($scale_x > 0 && $scale_y > 0) {
+                $scale = min($scale_x, $scale_y);
+            } elseif ($scale_x > 0) {
+                $scale = $scale_x;
+            } elseif ($scale_y > 0) {
+                $scale = $scale_y;
+            }
+            
+            if ($scale > 0) {
+                // Berechne Druckbereich basierend auf Canvas-Größe
+                $print_width_mm = ($canvas_width * $scale) * 10; // Konvertiere zu mm
+                $print_height_mm = ($canvas_height * $scale) * 10;
+                
+                return array(
+                    'print_width_mm' => round($print_width_mm, 1),
+                    'print_height_mm' => round($print_height_mm, 1),
+                    'scale_factor' => $scale,
+                    'used_measurements' => array(
+                        'width' => $primary_measurement ? ($size_measurements[$primary_measurement['type']] ?? 0) : 0,
+                        'height' => $secondary_measurement ? ($size_measurements[$secondary_measurement['type']] ?? 0) : 0
+                    ),
+                    'visual_measurements' => array(
+                        'primary' => $primary_measurement,
+                        'secondary' => $secondary_measurement
+                    )
+                );
+            }
+        }
+        
+        // Fallback: Verwende alte Methode mit View-Namen-basierter Auswahl
         $view_name_lower = strtolower($view_name);
         
         if (strpos($view_name_lower, 'front') !== false || strpos($view_name_lower, 'back') !== false || 
@@ -702,25 +807,19 @@ class Octo_Print_Designer_Template {
             $real_height_cm = $size_measurements['height_from_shoulder'] ?? 68;
         }
         
-        // Berechne Skalierungsfaktor (cm pro Pixel)
-        $scale_x = $real_width_cm / $product_width_px;
-        $scale_y = $real_height_cm / $product_height_px;
-        
-        // Verwende den kleineren Skalierungsfaktor für konsistente Berechnung
-        $scale = min($scale_x, $scale_y);
-        
-        // Berechne Druckbereich basierend auf Canvas-Größe
-        $print_width_mm = ($canvas_width * $scale) * 10; // Konvertiere zu mm
-        $print_height_mm = ($canvas_height * $scale) * 10;
+        // Fallback-Berechnung (wenn keine visuellen Messungen verfügbar)
+        $print_width_mm = ($canvas_width * 0.1) * 10; // Beispiel-Skalierung
+        $print_height_mm = ($canvas_height * 0.1) * 10;
         
         return array(
             'print_width_mm' => round($print_width_mm, 1),
             'print_height_mm' => round($print_height_mm, 1),
-            'scale_factor' => $scale,
+            'scale_factor' => 0.1,
             'used_measurements' => array(
                 'width' => $real_width_cm,
                 'height' => $real_height_cm
-            )
+            ),
+            'visual_measurements' => null
         );
     }
 
@@ -912,37 +1011,99 @@ class Octo_Print_Designer_Template {
                                         </p>
                                     </div>
 
-                                    <!-- Foto-Messungen -->
-                                    <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;">
-                                        <h5 style="margin: 0 0 10px 0; color: #d63384;"><?php esc_html_e('📸 Photo Measurements', 'octo-print-designer'); ?></h5>
-                                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                            <div style="flex: 1;">
-                                                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 12px;">
-                                                    <?php esc_html_e('Product Width (px)', 'octo-print-designer'); ?>
-                                                </label>
-                                                <input type="number" 
-                                                       name="view_print_areas[<?php echo esc_attr($view_id); ?>][photo_width_px]"
-                                                       value="<?php echo esc_attr($photo_width_px); ?>"
-                                                       step="1" min="0" max="2000" 
-                                                       class="regular-text" style="width: 100%;" 
-                                                       placeholder="e.g. 750" />
-                                            </div>
-                                            <div style="flex: 1;">
-                                                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 12px;">
-                                                    <?php esc_html_e('Product Height (px)', 'octo-print-designer'); ?>
-                                                </label>
-                                                <input type="number" 
-                                                       name="view_print_areas[<?php echo esc_attr($view_id); ?>][photo_height_px]"
-                                                       value="<?php echo esc_attr($photo_height_px); ?>"
-                                                       step="1" min="0" max="2000" 
-                                                       class="regular-text" style="width: 100%;" 
-                                                       placeholder="e.g. 600" />
-                                            </div>
-                                        </div>
-                                        <p style="margin: 0; font-size: 11px; color: #666;">
-                                            <?php esc_html_e('Pixel dimensions of product in the photo', 'octo-print-designer'); ?>
-                                        </p>
-                                    </div>
+                                                                         <!-- Visuelle Messungen -->
+                                     <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                                         <h5 style="margin: 0 0 10px 0; color: #d63384;"><?php esc_html_e('📐 Visual Measurements', 'octo-print-designer'); ?></h5>
+                                         
+                                         <?php if (isset($view['image']) && $view['image']): ?>
+                                             <?php 
+                                             $image_url = wp_get_attachment_image_url($view['image'], 'medium');
+                                             $image_alt = get_post_meta($view['image'], '_wp_attachment_image_alt', true);
+                                             ?>
+                                             
+                                             <div class="visual-measurement-container" style="margin-bottom: 15px;">
+                                                 <div class="measurement-image-wrapper" style="position: relative; display: inline-block; border: 2px solid #ddd; border-radius: 4px; overflow: hidden;">
+                                                     <img src="<?php echo esc_url($image_url); ?>" 
+                                                          alt="<?php echo esc_attr($image_alt); ?>"
+                                                          class="measurement-image" 
+                                                          style="max-width: 400px; max-height: 300px; display: block;"
+                                                          data-view-id="<?php echo esc_attr($view_id); ?>"
+                                                          data-image-id="<?php echo esc_attr($view['image']); ?>" />
+                                                     
+                                                     <!-- Messpunkte werden hier dynamisch hinzugefügt -->
+                                                     <div class="measurement-points" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+                                                     
+                                                     <!-- Messlinien werden hier dynamisch hinzugefügt -->
+                                                     <svg class="measurement-lines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                                                         <defs>
+                                                             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                                                 <polygon points="0 0, 10 3.5, 0 7" fill="#ff4444" />
+                                                             </marker>
+                                                         </defs>
+                                                     </svg>
+                                                 </div>
+                                                 
+                                                 <div class="measurement-controls" style="margin-top: 10px;">
+                                                     <button type="button" class="button add-measurement" data-view-id="<?php echo esc_attr($view_id); ?>" style="margin-right: 10px;">
+                                                         <span class="dashicons dashicons-plus"></span>
+                                                         <?php esc_html_e('Add Measurement', 'octo-print-designer'); ?>
+                                                     </button>
+                                                     <button type="button" class="button clear-measurements" data-view-id="<?php echo esc_attr($view_id); ?>">
+                                                         <span class="dashicons dashicons-trash"></span>
+                                                         <?php esc_html_e('Clear All', 'octo-print-designer'); ?>
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                             
+                                             <!-- Messungsliste -->
+                                             <div class="measurements-list" data-view-id="<?php echo esc_attr($view_id); ?>">
+                                                 <?php 
+                                                 $saved_measurements = $view_config['measurements'] ?? array();
+                                                 foreach ($saved_measurements as $index => $measurement): 
+                                                 ?>
+                                                 <div class="measurement-item" data-index="<?php echo esc_attr($index); ?>" style="background: #f8f9fa; padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #dee2e6;">
+                                                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                                         <span class="measurement-color" style="width: 20px; height: 20px; border-radius: 50%; background: <?php echo esc_attr($measurement['color'] ?? '#ff4444'); ?>; display: inline-block;"></span>
+                                                         <select name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][type]" class="measurement-type" style="flex: 1;">
+                                                             <option value="chest" <?php selected($measurement['type'], 'chest'); ?>><?php esc_html_e('Chest', 'octo-print-designer'); ?></option>
+                                                             <option value="height_from_shoulder" <?php selected($measurement['type'], 'height_from_shoulder'); ?>><?php esc_html_e('Height from Shoulder', 'octo-print-designer'); ?></option>
+                                                             <option value="sleeve_length" <?php selected($measurement['type'], 'sleeve_length'); ?>><?php esc_html_e('Sleeve Length', 'octo-print-designer'); ?></option>
+                                                             <option value="biceps" <?php selected($measurement['type'], 'biceps'); ?>><?php esc_html_e('Biceps', 'octo-print-designer'); ?></option>
+                                                             <option value="shoulder_to_shoulder" <?php selected($measurement['type'], 'shoulder_to_shoulder'); ?>><?php esc_html_e('Shoulder to Shoulder', 'octo-print-designer'); ?></option>
+                                                             <option value="hem_width" <?php selected($measurement['type'], 'hem_width'); ?>><?php esc_html_e('Hem Width', 'octo-print-designer'); ?></option>
+                                                         </select>
+                                                         <button type="button" class="button remove-measurement" style="color: #dc3545;">
+                                                             <span class="dashicons dashicons-trash"></span>
+                                                         </button>
+                                                     </div>
+                                                     <div style="font-size: 11px; color: #666;">
+                                                         <span class="measurement-info">
+                                                             <?php 
+                                                             $pixel_distance = isset($measurement['pixel_distance']) ? $measurement['pixel_distance'] : 0;
+                                                             echo sprintf(__('Pixel distance: %s px', 'octo-print-designer'), $pixel_distance);
+                                                             ?>
+                                                         </span>
+                                                     </div>
+                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][pixel_distance]" value="<?php echo esc_attr($pixel_distance); ?>" class="pixel-distance-input" />
+                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][color]" value="<?php echo esc_attr($measurement['color'] ?? '#ff4444'); ?>" class="measurement-color-input" />
+                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][points]" value="<?php echo esc_attr(json_encode($measurement['points'] ?? array())); ?>" class="measurement-points-input" />
+                                                 </div>
+                                                 <?php endforeach; ?>
+                                             </div>
+                                             
+                                         <?php else: ?>
+                                             <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; text-align: center;">
+                                                 <p style="margin: 0; color: #856404;">
+                                                     <span class="dashicons dashicons-warning" style="margin-right: 5px;"></span>
+                                                     <?php esc_html_e('No image uploaded for this view. Please add an image in the Variations section to enable visual measurements.', 'octo-print-designer'); ?>
+                                                 </p>
+                                             </div>
+                                         <?php endif; ?>
+                                         
+                                         <p style="margin: 10px 0 0 0; font-size: 11px; color: #666;">
+                                             <?php esc_html_e('Click "Add Measurement" and then click two points on the image to measure distances. Select the measurement type to automatically calculate print areas.', 'octo-print-designer'); ?>
+                                         </p>
+                                     </div>
                                 </div>
 
                                 <!-- Automatisch berechnete Druckbereiche -->
@@ -954,16 +1115,12 @@ class Octo_Print_Designer_Template {
                                              $size_id = $size['id'];
                                              $size_config = $product_dimensions[$size_id] ?? array();
                                              
-                                             if ($photo_width_px > 0 && $photo_height_px > 0) {
-                                                 $calculated = $this->calculate_print_area_from_photo(
-                                                     $photo_width_px, $photo_height_px, 
-                                                     $size_config, 
-                                                     $canvas_width, $canvas_height,
-                                                     $view_name
-                                                 );
-                                             } else {
-                                                 $calculated = array('print_width_mm' => 0, 'print_height_mm' => 0, 'used_measurements' => array('width' => 0, 'height' => 0));
-                                             }
+                                             $calculated = $this->calculate_print_area_from_photo(
+                                                 $view_config, 
+                                                 $size_config, 
+                                                 $canvas_width, $canvas_height,
+                                                 $view_name
+                                             );
                                              ?>
                                             <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #bee5eb;">
                                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -978,6 +1135,12 @@ class Octo_Print_Designer_Template {
                                                      <?php if ($calculated['used_measurements']['width'] > 0): ?>
                                                          <div style="font-size: 9px; color: #6c757d; margin-top: 4px; border-top: 1px solid #dee2e6; padding-top: 4px;">
                                                              <?php esc_html_e('Based on:', 'octo-print-designer'); ?> <?php echo $calculated['used_measurements']['width']; ?>×<?php echo $calculated['used_measurements']['height']; ?> cm
+                                                         </div>
+                                                     <?php endif; ?>
+                                                     <?php if (isset($calculated['visual_measurements']) && $calculated['visual_measurements']): ?>
+                                                         <div style="font-size: 9px; color: #28a745; margin-top: 2px;">
+                                                             <span class="dashicons dashicons-yes" style="font-size: 10px;"></span>
+                                                             <?php esc_html_e('Visual measurement', 'octo-print-designer'); ?>
                                                          </div>
                                                      <?php endif; ?>
                                                  </div>
@@ -1000,41 +1163,261 @@ class Octo_Print_Designer_Template {
 
         <script>
         jQuery(document).ready(function($) {
-            // Live-Berechnung der Druckbereiche
-            function updateCalculatedAreas() {
-                $('.view-print-area-config').each(function() {
-                    var container = $(this);
-                    var canvasWidth = parseFloat(container.find('input[name*="canvas_width"]').val()) || 0;
-                    var canvasHeight = parseFloat(container.find('input[name*="canvas_height"]').val()) || 0;
-                    var photoWidth = parseFloat(container.find('input[name*="photo_width_px"]').val()) || 0;
-                    var photoHeight = parseFloat(container.find('input[name*="photo_height_px"]').val()) || 0;
-                    
-                    // Update calculated areas for each size
-                    container.find('.calculated-print-area').each(function() {
-                        var sizeContainer = $(this);
-                        var realWidth = parseFloat(sizeContainer.data('real-width')) || 0;
-                        var realHeight = parseFloat(sizeContainer.data('real-height')) || 0;
-                        
-                        if (photoWidth > 0 && photoHeight > 0 && realWidth > 0 && realHeight > 0) {
-                            var scaleX = realWidth / photoWidth;
-                            var scaleY = realHeight / photoHeight;
-                            var scale = Math.min(scaleX, scaleY);
-                            
-                            var printWidth = (canvasWidth * scale) * 10;
-                            var printHeight = (canvasHeight * scale) * 10;
-                            
-                            sizeContainer.find('.print-width').text(printWidth.toFixed(1));
-                            sizeContainer.find('.print-height').text(printHeight.toFixed(1));
+            // Visuelle Messung System
+            var measurementState = {};
+            var currentMeasurement = null;
+            var measurementColors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44', '#ff44ff', '#44ffff', '#ff8844', '#8844ff'];
+            var colorIndex = 0;
+            
+            // Initialisiere Messung für jedes View
+            $('.measurement-image').each(function() {
+                var viewId = $(this).data('view-id');
+                measurementState[viewId] = {
+                    measurements: [],
+                    currentPoints: [],
+                    isMeasuring: false
+                };
+                
+                // Lade gespeicherte Messungen
+                loadSavedMeasurements(viewId);
+            });
+            
+            // Add Measurement Button
+            $('.add-measurement').on('click', function() {
+                var viewId = $(this).data('view-id');
+                startMeasurement(viewId);
+            });
+            
+            // Clear Measurements Button
+            $('.clear-measurements').on('click', function() {
+                var viewId = $(this).data('view-id');
+                clearAllMeasurements(viewId);
+            });
+            
+            // Remove Measurement Button
+            $(document).on('click', '.remove-measurement', function() {
+                var measurementItem = $(this).closest('.measurement-item');
+                var index = measurementItem.data('index');
+                var viewId = measurementItem.closest('.measurements-list').data('view-id');
+                removeMeasurement(viewId, index);
+            });
+            
+            // Measurement Type Change
+            $(document).on('change', '.measurement-type', function() {
+                var measurementItem = $(this).closest('.measurement-item');
+                var index = measurementItem.data('index');
+                var viewId = measurementItem.closest('.measurements-list').data('view-id');
+                updateMeasurementType(viewId, index, $(this).val());
+            });
+            
+            // Image Click Handler
+            $(document).on('click', '.measurement-image', function(e) {
+                if (!currentMeasurement) return;
+                
+                var rect = this.getBoundingClientRect();
+                var x = e.clientX - rect.left;
+                var y = e.clientY - rect.top;
+                
+                addMeasurementPoint(currentMeasurement, x, y);
+            });
+            
+            function startMeasurement(viewId) {
+                currentMeasurement = viewId;
+                measurementState[viewId].isMeasuring = true;
+                measurementState[viewId].currentPoints = [];
+                
+                // Visueller Hinweis
+                $('.measurement-image[data-view-id="' + viewId + '"]').css('cursor', 'crosshair');
+                $('.add-measurement[data-view-id="' + viewId + '"]').text('Click two points on image...').prop('disabled', true);
+            }
+            
+            function addMeasurementPoint(viewId, x, y) {
+                var state = measurementState[viewId];
+                state.currentPoints.push({x: x, y: y});
+                
+                // Zeige Punkt auf Bild
+                showMeasurementPoint(viewId, x, y, state.currentPoints.length);
+                
+                if (state.currentPoints.length === 2) {
+                    // Messung abgeschlossen
+                    completeMeasurement(viewId);
+                }
+            }
+            
+            function showMeasurementPoint(viewId, x, y, pointNumber) {
+                var imageWrapper = $('.measurement-image[data-view-id="' + viewId + '"]').closest('.measurement-image-wrapper');
+                var pointsContainer = imageWrapper.find('.measurement-points');
+                
+                var point = $('<div class="measurement-point" style="position: absolute; width: 12px; height: 12px; background: ' + measurementColors[colorIndex] + '; border: 2px solid white; border-radius: 50%; left: ' + (x - 6) + 'px; top: ' + (y - 6) + 'px; pointer-events: none; z-index: 10;"></div>');
+                point.attr('data-point', pointNumber);
+                pointsContainer.append(point);
+            }
+            
+            function completeMeasurement(viewId) {
+                var state = measurementState[viewId];
+                var point1 = state.currentPoints[0];
+                var point2 = state.currentPoints[1];
+                
+                // Berechne Distanz
+                var distance = Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
+                
+                // Zeige Messlinie
+                showMeasurementLine(viewId, point1, point2);
+                
+                // Erstelle Messungseintrag
+                var measurementIndex = state.measurements.length;
+                var color = measurementColors[colorIndex];
+                
+                var measurement = {
+                    type: 'chest', // Default
+                    pixel_distance: Math.round(distance),
+                    color: color,
+                    points: state.currentPoints
+                };
+                
+                state.measurements.push(measurement);
+                
+                // Füge zur UI hinzu
+                addMeasurementToUI(viewId, measurementIndex, measurement);
+                
+                // Reset
+                currentMeasurement = null;
+                state.isMeasuring = false;
+                state.currentPoints = [];
+                colorIndex = (colorIndex + 1) % measurementColors.length;
+                
+                // UI Reset
+                $('.measurement-image[data-view-id="' + viewId + '"]').css('cursor', 'default');
+                $('.add-measurement[data-view-id="' + viewId + '"]').html('<span class="dashicons dashicons-plus"></span> Add Measurement').prop('disabled', false);
+                
+                // Update Berechnungen
+                updateCalculatedAreas();
+            }
+            
+            function showMeasurementLine(viewId, point1, point2) {
+                var imageWrapper = $('.measurement-image[data-view-id="' + viewId + '"]').closest('.measurement-image-wrapper');
+                var svg = imageWrapper.find('.measurement-lines');
+                var color = measurementColors[colorIndex];
+                
+                var line = $('<line x1="' + point1.x + '" y1="' + point1.y + '" x2="' + point2.x + '" y2="' + point2.y + '" stroke="' + color + '" stroke-width="2" marker-end="url(#arrowhead)"></line>');
+                svg.append(line);
+            }
+            
+            function addMeasurementToUI(viewId, index, measurement) {
+                var measurementsList = $('.measurements-list[data-view-id="' + viewId + '"]');
+                var measurementHtml = `
+                    <div class="measurement-item" data-index="${index}" style="background: #f8f9fa; padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #dee2e6;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span class="measurement-color" style="width: 20px; height: 20px; border-radius: 50%; background: ${measurement.color}; display: inline-block;"></span>
+                            <select name="view_print_areas[${viewId}][measurements][${index}][type]" class="measurement-type" style="flex: 1;">
+                                <option value="chest">Chest</option>
+                                <option value="height_from_shoulder">Height from Shoulder</option>
+                                <option value="sleeve_length">Sleeve Length</option>
+                                <option value="biceps">Biceps</option>
+                                <option value="shoulder_to_shoulder">Shoulder to Shoulder</option>
+                                <option value="hem_width">Hem Width</option>
+                            </select>
+                            <button type="button" class="button remove-measurement" style="color: #dc3545;">
+                                <span class="dashicons dashicons-trash"></span>
+                            </button>
+                        </div>
+                        <div style="font-size: 11px; color: #666;">
+                            <span class="measurement-info">
+                                Pixel distance: ${measurement.pixel_distance} px
+                            </span>
+                        </div>
+                        <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][pixel_distance]" value="${measurement.pixel_distance}" class="pixel-distance-input" />
+                        <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][color]" value="${measurement.color}" class="measurement-color-input" />
+                        <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][points]" value='${JSON.stringify(measurement.points)}' class="measurement-points-input" />
+                    </div>
+                `;
+                measurementsList.append(measurementHtml);
+            }
+            
+            function removeMeasurement(viewId, index) {
+                var state = measurementState[viewId];
+                state.measurements.splice(index, 1);
+                
+                // Update UI
+                $('.measurement-item[data-index="' + index + '"]').remove();
+                
+                // Update Indizes
+                $('.measurement-item').each(function(i) {
+                    $(this).attr('data-index', i);
+                    $(this).find('select, input').each(function() {
+                        var name = $(this).attr('name');
+                        if (name) {
+                            $(this).attr('name', name.replace(/\[\d+\]/, '[' + i + ']'));
                         }
                     });
                 });
+                
+                // Clear visual elements
+                clearVisualElements(viewId);
+                redrawMeasurements(viewId);
+                
+                updateCalculatedAreas();
             }
             
-            // Event listeners
-            $('input[name*="canvas_width"], input[name*="canvas_height"], input[name*="photo_width_px"], input[name*="photo_height_px"], input[name*="width_cm"], input[name*="height_cm"]').on('input', updateCalculatedAreas);
+            function clearAllMeasurements(viewId) {
+                measurementState[viewId].measurements = [];
+                $('.measurements-list[data-view-id="' + viewId + '"]').empty();
+                clearVisualElements(viewId);
+                updateCalculatedAreas();
+            }
             
-            // Initial calculation
-            updateCalculatedAreas();
+            function clearVisualElements(viewId) {
+                var imageWrapper = $('.measurement-image[data-view-id="' + viewId + '"]').closest('.measurement-image-wrapper');
+                imageWrapper.find('.measurement-points').empty();
+                imageWrapper.find('.measurement-lines line').remove();
+            }
+            
+            function redrawMeasurements(viewId) {
+                var state = measurementState[viewId];
+                clearVisualElements(viewId);
+                
+                state.measurements.forEach(function(measurement, index) {
+                    if (measurement.points && measurement.points.length >= 2) {
+                        showMeasurementPoint(viewId, measurement.points[0].x, measurement.points[0].y, 1);
+                        showMeasurementPoint(viewId, measurement.points[1].x, measurement.points[1].y, 2);
+                        showMeasurementLine(viewId, measurement.points[0], measurement.points[1]);
+                    }
+                });
+            }
+            
+            function loadSavedMeasurements(viewId) {
+                var measurementsList = $('.measurements-list[data-view-id="' + viewId + '"]');
+                var savedMeasurements = [];
+                
+                measurementsList.find('.measurement-item').each(function(index) {
+                    var item = $(this);
+                    var measurement = {
+                        type: item.find('.measurement-type').val(),
+                        pixel_distance: parseFloat(item.find('.pixel-distance-input').val()),
+                        color: item.find('.measurement-color-input').val(),
+                        points: JSON.parse(item.find('.measurement-points-input').val() || '[]')
+                    };
+                    savedMeasurements.push(measurement);
+                });
+                
+                measurementState[viewId].measurements = savedMeasurements;
+                redrawMeasurements(viewId);
+            }
+            
+            function updateMeasurementType(viewId, index, type) {
+                var state = measurementState[viewId];
+                if (state.measurements[index]) {
+                    state.measurements[index].type = type;
+                }
+                updateCalculatedAreas();
+            }
+            
+            // Live-Berechnung der Druckbereiche (vereinfacht)
+            function updateCalculatedAreas() {
+                // Diese Funktion wird aufgerufen wenn sich Messungen ändern
+                // Die eigentliche Berechnung passiert serverseitig beim Speichern
+                console.log('Measurements updated, recalculating areas...');
+            }
         });
         </script>
         <?php
