@@ -50,16 +50,21 @@ class TemplateMeasurements {
         this.tempPoints = [];
         
         // UI-Feedback
-        const btn = document.querySelector(`[data-view-id="${viewId}"].add-measurement-btn`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return;
+        
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        if (!measurementContainer) return;
+        
+        const btn = measurementContainer.querySelector('.add-measurement-btn');
         if (btn) {
             btn.textContent = 'Click 2 points on image...';
             btn.style.background = '#ffc107';
         }
         
         // Cursor ändern
-        const img = document.querySelector(`[data-view-id="${viewId}"].measurement-image`);
-        if (img) {
-            img.style.cursor = 'crosshair';
+        if (measurementImage) {
+            measurementImage.style.cursor = 'crosshair';
         }
     }
     
@@ -122,20 +127,23 @@ class TemplateMeasurements {
     }
     
     drawPoint(viewId, point, index) {
-        const canvas = document.querySelector(`[data-view-id="${viewId}"].measurement-overlay`);
-        const img = document.querySelector(`[data-view-id="${viewId}"].measurement-image`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return;
         
-        if (!canvas || !img) return;
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        const canvas = measurementContainer ? measurementContainer.querySelector('.measurement-overlay') : null;
+        
+        if (!canvas || !measurementImage) return;
         
         // Canvas-Größe anpassen
-        canvas.width = img.offsetWidth;
-        canvas.height = img.offsetHeight;
+        canvas.width = measurementImage.offsetWidth;
+        canvas.height = measurementImage.offsetHeight;
         
         const ctx = canvas.getContext('2d');
         
         // Skaliere Punkt für Canvas
-        const scaleX = canvas.width / img.naturalWidth;
-        const scaleY = canvas.height / img.naturalHeight;
+        const scaleX = canvas.width / measurementImage.naturalWidth;
+        const scaleY = canvas.height / measurementImage.naturalHeight;
         
         const canvasX = point.x * scaleX;
         const canvasY = point.y * scaleY;
@@ -154,16 +162,19 @@ class TemplateMeasurements {
     }
     
     drawMeasurementLine(viewId, points, color) {
-        const canvas = document.querySelector(`[data-view-id="${viewId}"].measurement-overlay`);
-        const img = document.querySelector(`[data-view-id="${viewId}"].measurement-image`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return;
         
-        if (!canvas || !img) return;
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        const canvas = measurementContainer ? measurementContainer.querySelector('.measurement-overlay') : null;
+        
+        if (!canvas || !measurementImage) return;
         
         const ctx = canvas.getContext('2d');
         
         // Skaliere Punkte für Canvas
-        const scaleX = canvas.width / img.naturalWidth;
-        const scaleY = canvas.height / img.naturalHeight;
+        const scaleX = canvas.width / measurementImage.naturalWidth;
+        const scaleY = canvas.height / measurementImage.naturalHeight;
         
         const x1 = points[0].x * scaleX;
         const y1 = points[0].y * scaleY;
@@ -197,8 +208,20 @@ class TemplateMeasurements {
     }
     
     createMeasurementElement(viewId, measurement) {
-        const measurementsList = document.querySelector(`[data-view-id="${viewId}"] .measurements-list`);
-        if (!measurementsList) return;
+        // Finde die measurements-list im richtigen Container
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) {
+            console.error('Measurement image not found for view:', viewId);
+            return;
+        }
+        
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        const measurementsList = measurementContainer ? measurementContainer.querySelector('.measurements-list') : null;
+        
+        if (!measurementsList) {
+            console.error('Measurements list not found for view:', viewId);
+            return;
+        }
         
         const index = measurementsList.children.length;
         const measurementHtml = `
@@ -278,30 +301,45 @@ class TemplateMeasurements {
     
     deleteMeasurement(button) {
         const measurementItem = button.closest('.measurement-item');
-        const viewId = measurementItem.closest('.measurement-image-wrapper').querySelector('.measurement-image').dataset.viewId;
+        if (!measurementItem) return;
         
-        if (measurementItem) {
+        const measurementContainer = measurementItem.closest('.visual-measurement-container');
+        const measurementImage = measurementContainer ? measurementContainer.querySelector('.measurement-image') : null;
+        const viewId = measurementImage ? measurementImage.dataset.viewId : null;
+        
+        if (measurementItem && viewId) {
             measurementItem.remove();
             this.updateViewCalculations(viewId);
         }
     }
     
     resetMeasurementUI(viewId) {
-        const btn = document.querySelector(`[data-view-id="${viewId}"].add-measurement-btn`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return;
+        
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        if (!measurementContainer) return;
+        
+        const btn = measurementContainer.querySelector('.add-measurement-btn');
         if (btn) {
             btn.innerHTML = '<span class="dashicons dashicons-plus-alt2"></span> Add Measurement';
             btn.style.background = '';
         }
         
-        const img = document.querySelector(`[data-view-id="${viewId}"].measurement-image`);
-        if (img) {
-            img.style.cursor = 'default';
+        if (measurementImage) {
+            measurementImage.style.cursor = 'default';
         }
     }
     
     updateCalculations(input) {
         const measurementItem = input.closest('.measurement-item');
-        const viewId = measurementItem.closest('.measurement-image-wrapper').querySelector('.measurement-image').dataset.viewId;
+        if (!measurementItem) return;
+        
+        const measurementContainer = measurementItem.closest('.visual-measurement-container');
+        const measurementImage = measurementContainer ? measurementContainer.querySelector('.measurement-image') : null;
+        const viewId = measurementImage ? measurementImage.dataset.viewId : null;
+        
+        if (!viewId) return;
         
         // Update Skalierungsfaktor
         const pixelDistance = parseFloat(measurementItem.querySelector('.pixel-distance-input').value);
@@ -362,7 +400,12 @@ class TemplateMeasurements {
     }
     
     getViewMeasurements(viewId) {
-        const measurementsList = document.querySelector(`[data-view-id="${viewId}"] .measurements-list`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return [];
+        
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        const measurementsList = measurementContainer ? measurementContainer.querySelector('.measurements-list') : null;
+        
         if (!measurementsList) return [];
         
         const measurements = [];
@@ -382,9 +425,15 @@ class TemplateMeasurements {
     }
     
     updateCalculationDisplay(viewId, calculations) {
-        const printAreaDisplay = document.querySelector(`[data-view-id="${viewId}"].print-area-display`);
-        const scaleFactorDisplay = document.querySelector(`[data-view-id="${viewId}"].scale-factor-display`);
-        const accuracyDisplay = document.querySelector(`[data-view-id="${viewId}"].accuracy-display`);
+        const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
+        if (!measurementImage) return;
+        
+        const measurementContainer = measurementImage.closest('.visual-measurement-container');
+        if (!measurementContainer) return;
+        
+        const printAreaDisplay = measurementContainer.querySelector('.print-area-display');
+        const scaleFactorDisplay = measurementContainer.querySelector('.scale-factor-display');
+        const accuracyDisplay = measurementContainer.querySelector('.accuracy-display');
         
         if (printAreaDisplay) printAreaDisplay.textContent = calculations.printArea;
         if (scaleFactorDisplay) scaleFactorDisplay.textContent = calculations.scaleFactor;
