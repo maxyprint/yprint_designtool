@@ -18,7 +18,11 @@ class TemplateMeasurements {
         // Event-Listeners für Mess-Buttons
         document.addEventListener('click', (e) => {
             if (e.target.closest('.add-measurement-btn')) {
-                this.startMeasurement(e.target.closest('.add-measurement-btn').dataset.viewId);
+                const btn = e.target.closest('.add-measurement-btn');
+                const viewId = btn.dataset.viewId;
+                if (viewId) {
+                    this.startMeasurement(viewId);
+                }
             }
             
             if (e.target.closest('.delete-measurement-btn')) {
@@ -216,11 +220,25 @@ class TemplateMeasurements {
         }
         
         const measurementContainer = measurementImage.closest('.visual-measurement-container');
-        const measurementsList = measurementContainer ? measurementContainer.querySelector('.measurements-list') : null;
-        
-        if (!measurementsList) {
-            console.error('Measurements list not found for view:', viewId);
+        if (!measurementContainer) {
+            console.error('Measurement container not found for view:', viewId);
             return;
+        }
+        
+        // Suche nach der measurements-list
+        let measurementsList = measurementContainer.querySelector('.measurements-list');
+        
+        // Falls keine measurements-list existiert, erstelle sie
+        if (!measurementsList) {
+            const existingMeasurements = measurementContainer.querySelector('.existing-measurements');
+            if (existingMeasurements) {
+                measurementsList = document.createElement('div');
+                measurementsList.className = 'measurements-list';
+                existingMeasurements.appendChild(measurementsList);
+            } else {
+                console.error('Existing measurements container not found');
+                return;
+            }
         }
         
         const index = measurementsList.children.length;
@@ -286,6 +304,12 @@ class TemplateMeasurements {
         
         measurementsList.insertAdjacentHTML('beforeend', measurementHtml);
         
+        // Entferne "No measurements" Nachricht falls vorhanden
+        const noMeasurements = measurementContainer.querySelector('.no-measurements');
+        if (noMeasurements) {
+            noMeasurements.remove();
+        }
+        
         // Event-Listener für neue Elemente
         const newElement = measurementsList.lastElementChild;
         const deleteBtn = newElement.querySelector('.delete-measurement-btn');
@@ -297,6 +321,8 @@ class TemplateMeasurements {
         if (realDistanceInput) {
             realDistanceInput.addEventListener('input', () => this.updateCalculations(realDistanceInput));
         }
+        
+        console.log('Measurement element created successfully for view:', viewId);
     }
     
     deleteMeasurement(button) {
