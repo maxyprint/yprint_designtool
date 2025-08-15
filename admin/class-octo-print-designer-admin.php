@@ -64,28 +64,26 @@ class Octo_Print_Designer_Admin {
 
         // Debug-Info für Template Measurements
         wp_add_inline_script('octo-template-measurements', '
-            console.log("🎯 Template Measurements Script loaded");
+            console.log("🎯 YPrint Template Measurements Script loaded");
             console.log("DOM ready state:", document.readyState);
             
-            // Verbessertes DOM-Ready-Handling
+            // Verbessertes DOM-Ready-Handling ohne Konflikt
+            function checkYPrintMeasurements() {
+                if (typeof window.YPrintTemplateMeasurements !== "undefined") {
+                    console.log("✅ YPrintTemplateMeasurements class available");
+                } else {
+                    console.error("❌ YPrintTemplateMeasurements class not available");
+                }
+            }
+            
             if (document.readyState === "loading") {
                 document.addEventListener("DOMContentLoaded", function() {
                     console.log("🎯 DOM Content Loaded - initializing measurements");
-                    if (typeof TemplateMeasurements !== "undefined") {
-                        console.log("✅ TemplateMeasurements class available");
-                    } else {
-                        console.error("❌ TemplateMeasurements class not available");
-                    }
+                    setTimeout(checkYPrintMeasurements, 500);
                 });
             } else {
-                console.log("🎯 DOM already ready - initializing measurements immediately");
-                setTimeout(function() {
-                    if (typeof TemplateMeasurements !== "undefined") {
-                        console.log("✅ TemplateMeasurements class available");
-                    } else {
-                        console.error("❌ TemplateMeasurements class not available");
-                    }
-                }, 100);
+                console.log("🎯 DOM already ready - checking measurements immediately");
+                setTimeout(checkYPrintMeasurements, 100);
             }
         ', 'after');
     }
