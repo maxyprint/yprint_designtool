@@ -99,21 +99,25 @@ class TemplateMeasurements {
     }
     
     completeMeasurement() {
+        if (this.tempPoints.length !== 2) return;
+        
         const distance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
         const color = this.colors[this.colorIndex % this.colors.length];
         this.colorIndex++;
         
-        // Erstelle neue Messung
-        this.createMeasurementElement(this.currentViewId, {
+        // Zeichne finale Linie
+        this.drawMeasurementLine(this.currentViewId, this.tempPoints, color);
+        
+        // Erstelle neue Messung mit automatischer Index-Berechnung
+        const measurementData = {
             type: 'chest', // Standard
             pixel_distance: distance,
             color: color,
             points: this.tempPoints,
             real_distance_cm: ''
-        });
+        };
         
-        // Zeichne finale Linie
-        this.drawMeasurementLine(this.currentViewId, this.tempPoints, color);
+        this.createMeasurementElement(this.currentViewId, measurementData);
         
         // Reset
         this.measurementMode = false;
@@ -174,27 +178,58 @@ class TemplateMeasurements {
         
         if (!canvas || !measurementImage) return;
         
+        // Canvas-Größe anpassen wenn nötig
+        if (canvas.width !== measurementImage.offsetWidth || canvas.height !== measurementImage.offsetHeight) {
+            canvas.width = measurementImage.offsetWidth;
+            canvas.height = measurementImage.offsetHeight;
+        }
+        
         const ctx = canvas.getContext('2d');
         
         // Skaliere Punkte für Canvas
         const scaleX = canvas.width / measurementImage.naturalWidth;
         const scaleY = canvas.height / measurementImage.naturalHeight;
         
-        const x1 = points[0].x * scaleX;
-        const y1 = points[0].y * scaleY;
-        const x2 = points[1].x * scaleX;
-        const y2 = points[1].y * scaleY;
+        const startX = points[0].x * scaleX;
+        const startY = points[0].y * scaleY;
+        const endX = points[1].x * scaleX;
+        const endY = points[1].y * scaleY;
         
         // Zeichne Linie
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
         ctx.stroke();
         
-        // Pfeil am Ende
-        this.drawArrow(ctx, x1, y1, x2, y2, color);
+        // Zeichne Endpunkte
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        
+        // Startpunkt
+        ctx.beginPath();
+        ctx.arc(startX, startY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Endpunkt
+        ctx.beginPath();
+        ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Beschriftung mit Distanz
+        const midX = (startX + endX) / 2;
+        const midY = (startY + endY) / 2;
+        const distance = this.calculateDistance(points[0], points[1]);
+        
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.strokeText(`${distance.toFixed(0)}px`, midX, midY - 10);
+        ctx.fillText(`${distance.toFixed(0)}px`, midX, midY - 10);
     }
     
     drawArrow(ctx, x1, y1, x2, y2, color) {
@@ -212,7 +247,6 @@ class TemplateMeasurements {
     }
     
     createMeasurementElement(viewId, measurement) {
-        // Finde die measurements-list im richtigen Container
         const measurementImage = document.querySelector(`.measurement-image[data-view-id="${viewId}"]`);
         if (!measurementImage) {
             console.error('Measurement image not found for view:', viewId);
@@ -225,11 +259,10 @@ class TemplateMeasurements {
             return;
         }
         
-        // Suche nach der measurements-list
+        // Finde oder erstelle measurements-list
         let measurementsList = measurementContainer.querySelector('.measurements-list');
-        
-        // Falls keine measurements-list existiert, erstelle sie
         if (!measurementsList) {
+            // Erstelle measurements-list falls sie nicht existiert
             const existingMeasurements = measurementContainer.querySelector('.existing-measurements');
             if (existingMeasurements) {
                 measurementsList = document.createElement('div');
@@ -241,88 +274,126 @@ class TemplateMeasurements {
             }
         }
         
-        const index = measurementsList.children.length;
+        // Berechne nächsten Index
+        const existingMeasurements = measurementsList.querySelectorAll('.measurement-item');
+        const nextIndex = existingMeasurements.length;
+        
+        // HTML für neue Messung
         const measurementHtml = `
-            <div class="measurement-item" data-index="${index}" 
-                 style="background: #fff; padding: 12px; border-radius: 4px; border-left: 4px solid ${measurement.color}; margin-bottom: 8px;">
+            <div class="measurement-item" data-index="${nextIndex}" 
+                 style="background: #fff; padding: 12px; border-radius: 4px; border-left: 4px solid ${measurement.color}; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 
                 <div class="measurement-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div class="measurement-info" style="flex: 1;">
-                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                            <select name="view_print_areas[${viewId}][measurements][${index}][type]" 
-                                    class="measurement-type-select" style="margin-right: 10px;">
-                                <option value="chest">Chest</option>
-                                <option value="height_from_shoulder">Height from Shoulder</option>
-                                <option value="sleeve_length">Sleeve Length</option>
-                                <option value="biceps">Biceps</option>
-                                <option value="shoulder_to_shoulder">Shoulder to Shoulder</option>
-                                <option value="hem_width">Hem Width</option>
-                                <option value="waist">Waist</option>
-                                <option value="hip">Hip</option>
-                                <option value="length">Length</option>
+                        <div style="display: flex; align-items: center; margin-bottom: 8px; gap: 10px;">
+                            <label style="font-weight: 500; color: #495057; margin-right: 5px;">Maß-Typ:</label>
+                            <select name="view_print_areas[${viewId}][measurements][${nextIndex}][type]" 
+                                    class="measurement-type-select" 
+                                    style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 13px;">
+                                <option value="chest" ${measurement.type === 'chest' ? 'selected' : ''}>Brustweite</option>
+                                <option value="shoulder_to_shoulder" ${measurement.type === 'shoulder_to_shoulder' ? 'selected' : ''}>Schulter zu Schulter</option>
+                                <option value="height_from_shoulder" ${measurement.type === 'height_from_shoulder' ? 'selected' : ''}>Höhe ab Schulter</option>
+                                <option value="sleeve_length" ${measurement.type === 'sleeve_length' ? 'selected' : ''}>Ärmellänge</option>
+                                <option value="biceps" ${measurement.type === 'biceps' ? 'selected' : ''}>Bizeps</option>
+                                <option value="hem_width" ${measurement.type === 'hem_width' ? 'selected' : ''}>Saumweite</option>
+                                <option value="waist" ${measurement.type === 'waist' ? 'selected' : ''}>Taille</option>
+                                <option value="length" ${measurement.type === 'length' ? 'selected' : ''}>Länge</option>
                             </select>
                             
+                            <label style="font-weight: 500; color: #495057; margin-left: 15px; margin-right: 5px;">Echte Größe:</label>
                             <input type="number" 
-                                   name="view_print_areas[${viewId}][measurements][${index}][real_distance_cm]"
-                                   placeholder="Real distance (cm)"
+                                   name="view_print_areas[${viewId}][measurements][${nextIndex}][real_distance_cm]"
+                                   placeholder="z.B. 50.0"
                                    value="${measurement.real_distance_cm}"
                                    step="0.1" min="0.1" max="100"
                                    class="real-distance-input"
-                                   style="width: 120px; margin-right: 5px;" />
-                            <span style="font-size: 11px; color: #666;">cm</span>
+                                   style="width: 80px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 13px;" />
+                            <span style="font-size: 12px; color: #666;">cm</span>
                         </div>
                         
-                        <div class="measurement-stats" style="font-size: 11px; color: #666;">
+                        <div class="measurement-stats" style="font-size: 11px; color: #666; background: #f8f9fa; padding: 6px 8px; border-radius: 3px;">
                             <span class="pixel-distance">
-                                Pixel: ${measurement.pixel_distance.toFixed(1)} px
+                                📏 Pixel-Distanz: ${measurement.pixel_distance.toFixed(1)} px
                             </span>
                             <span class="separator" style="margin: 0 8px;">•</span>
                             <span class="scale-factor">
-                                Scale: Not calculated
+                                📐 Skalierung: Noch nicht berechnet
+                            </span>
+                            <span class="separator" style="margin: 0 8px;">•</span>
+                            <span class="measurement-color">
+                                🎨 Farbe: <span style="display: inline-block; width: 12px; height: 12px; background: ${measurement.color}; border-radius: 2px; margin-left: 3px; vertical-align: middle;"></span>
                             </span>
                         </div>
                     </div>
                     
-                    <div class="measurement-actions">
+                    <div class="measurement-actions" style="margin-left: 15px;">
                         <button type="button" class="button button-small delete-measurement-btn" 
-                                data-index="${index}"
-                                style="color: #d63384;">
+                                data-index="${nextIndex}"
+                                style="color: #d63384; padding: 4px 8px; font-size: 12px;"
+                                title="Messung löschen">
                             <span class="dashicons dashicons-trash" style="font-size: 14px;"></span>
                         </button>
                     </div>
                 </div>
                 
-                <!-- Hidden Fields -->
-                <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][pixel_distance]" 
+                <!-- Hidden Fields für Form-Submission -->
+                <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][pixel_distance]" 
                        value="${measurement.pixel_distance}" class="pixel-distance-input" />
-                <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][color]" 
+                <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][color]" 
                        value="${measurement.color}" class="measurement-color-input" />
-                <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][points]" 
+                <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][points]" 
                        value='${JSON.stringify(measurement.points)}' class="measurement-points-input" />
             </div>
         `;
         
+        // Füge neues Element hinzu
         measurementsList.insertAdjacentHTML('beforeend', measurementHtml);
         
         // Entferne "No measurements" Nachricht falls vorhanden
         const noMeasurements = measurementContainer.querySelector('.no-measurements');
         if (noMeasurements) {
-            noMeasurements.remove();
+            noMeasurements.style.display = 'none';
         }
         
-        // Event-Listener für neue Elemente
+        // Event-Listener für neue Elemente hinzufügen
         const newElement = measurementsList.lastElementChild;
+        
+        // Delete-Button Event
         const deleteBtn = newElement.querySelector('.delete-measurement-btn');
         if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => this.deleteMeasurement(deleteBtn));
+            deleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.deleteMeasurement(deleteBtn);
+            });
         }
         
+        // Real Distance Input Event für Live-Updates
         const realDistanceInput = newElement.querySelector('.real-distance-input');
         if (realDistanceInput) {
-            realDistanceInput.addEventListener('input', () => this.updateCalculations(realDistanceInput));
+            realDistanceInput.addEventListener('input', () => {
+                this.updateCalculations(realDistanceInput);
+                this.updateMeasurementStats(newElement, measurement.pixel_distance, parseFloat(realDistanceInput.value) || 0);
+            });
+            
+            // Focus auf Input setzen für sofortige Eingabe
+            setTimeout(() => {
+                realDistanceInput.focus();
+                realDistanceInput.select();
+            }, 100);
         }
         
-        console.log('Measurement element created successfully for view:', viewId);
+        // Type-Select Event
+        const typeSelect = newElement.querySelector('.measurement-type-select');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', () => {
+                this.updateViewCalculations(viewId);
+            });
+        }
+        
+        console.log('Measurement element created successfully for view:', viewId, 'with index:', nextIndex);
+        
+        // Scroll zum neuen Element
+        newElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     
     deleteMeasurement(button) {
@@ -346,15 +417,15 @@ class TemplateMeasurements {
         const measurementContainer = measurementImage.closest('.visual-measurement-container');
         if (!measurementContainer) return;
         
+        // Button zurücksetzen
         const btn = measurementContainer.querySelector('.add-measurement-btn');
         if (btn) {
-            btn.innerHTML = '<span class="dashicons dashicons-plus-alt2"></span> Add Measurement';
+            btn.innerHTML = '<span class="dashicons dashicons-plus-alt2"></span> Messung hinzufügen';
             btn.style.background = '';
         }
         
-        if (measurementImage) {
-            measurementImage.style.cursor = 'default';
-        }
+        // Cursor zurücksetzen
+        measurementImage.style.cursor = 'default';
     }
     
     updateCalculations(input) {
@@ -488,6 +559,20 @@ class TemplateMeasurements {
                 this.updateViewCalculations(viewId);
             }
         });
+    }
+
+    updateMeasurementStats(measurementElement, pixelDistance, realDistanceCm) {
+        const scaleFactorSpan = measurementElement.querySelector('.scale-factor');
+        if (!scaleFactorSpan) return;
+        
+        if (realDistanceCm > 0 && pixelDistance > 0) {
+            const scaleFactor = realDistanceCm / (pixelDistance / 10); // cm/mm * 10
+            scaleFactorSpan.textContent = `📐 Skalierung: ${scaleFactor.toFixed(3)} mm/px`;
+            scaleFactorSpan.style.color = '#28a745'; // Grün für gültige Berechnung
+        } else {
+            scaleFactorSpan.textContent = '📐 Skalierung: Echte Größe eingeben';
+            scaleFactorSpan.style.color = '#6c757d'; // Grau für fehlende Daten
+        }
     }
 }
 
