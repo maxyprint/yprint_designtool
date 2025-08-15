@@ -355,12 +355,20 @@ class YPrintTemplateMeasurements {
     createVisibleMeasurementElement(viewId, measurement) {
         console.log('🎯 Creating visible measurement element:', measurement);
         
-        // Erstelle sichtbares Mess-Element
+        // Hole verfügbare Größen aus dem DOM
+        const availableSizes = this.getAvailableSizes();
+        
+        // Berechne nächsten Index für diese View
+        const nextIndex = this.getNextMeasurementIndex(viewId);
+        
+        // Erstelle vollständiges Mess-Element mit WordPress-Formularfeldern
         const measurementElement = document.createElement('div');
-        measurementElement.className = 'yprint-measurement-result';
+        measurementElement.className = 'yprint-measurement-result measurement-item';
+        measurementElement.dataset.index = nextIndex;
+        measurementElement.dataset.viewId = viewId;
         measurementElement.style.cssText = `
             background: linear-gradient(135deg, #e8f4f8 0%, #d4edda 100%);
-            padding: 15px;
+            padding: 20px;
             margin: 15px 0;
             border-left: 5px solid ${measurement.color};
             border-radius: 8px;
@@ -369,82 +377,200 @@ class YPrintTemplateMeasurements {
         `;
         
         measurementElement.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="flex: 1;">
-                    <h4 style="margin: 0 0 8px 0; color: #155724; font-size: 16px;">
-                        ✅ Neue Messung erstellt
-                    </h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 13px;">
-                        <div><strong>📏 Pixel-Distanz:</strong> ${measurement.pixel_distance.toFixed(1)} px</div>
-                        <div><strong>📐 Echte Größe:</strong> ${measurement.real_distance_cm} cm</div>
-                        <div><strong>⚖️ Skalierungsfaktor:</strong> ${measurement.scale_factor.toFixed(3)} mm/px</div>
-                        <div><strong>🎨 Farbe:</strong> <span style="display: inline-block; width: 16px; height: 16px; background: ${measurement.color}; border-radius: 3px; vertical-align: middle; margin-left: 5px;"></span></div>
-                    </div>
-                    <div style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 4px; font-size: 12px; color: #666;">
-                        <strong>Punkte:</strong> (${measurement.points[0].x}, ${measurement.points[0].y}) → (${measurement.points[1].x}, ${measurement.points[1].y})
-                    </div>
-                </div>
-                <button onclick="this.parentElement.parentElement.remove()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-left: 15px;">
-                    🗑️
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: #155724; font-size: 16px;">
+                    ✅ Messung ${nextIndex + 1} (${this.getViewNameFromId(viewId)})
+                </h4>
+                <button type="button" onclick="this.closest('.measurement-item').remove()" 
+                        style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                    🗑️ Löschen
                 </button>
             </div>
+            
+            <!-- WordPress-Formularfelder -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">📏 Messungstyp:</label>
+                    <select name="view_print_areas[${viewId}][measurements][${nextIndex}][type]" 
+                            class="measurement-type-select" 
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="chest" ${measurement.type === 'chest' ? 'selected' : ''}>Brustweite</option>
+                        <option value="shoulder_to_shoulder" ${measurement.type === 'shoulder_to_shoulder' ? 'selected' : ''}>Schulter zu Schulter</option>
+                        <option value="height_from_shoulder" ${measurement.type === 'height_from_shoulder' ? 'selected' : ''}>Höhe ab Schulter</option>
+                        <option value="sleeve_length" ${measurement.type === 'sleeve_length' ? 'selected' : ''}>Ärmellänge</option>
+                        <option value="biceps" ${measurement.type === 'biceps' ? 'selected' : ''}>Bizeps</option>
+                        <option value="hem_width" ${measurement.type === 'hem_width' ? 'selected' : ''}>Saumweite</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">📐 Echte Größe (cm):</label>
+                    <input type="number" 
+                           name="view_print_areas[${viewId}][measurements][${nextIndex}][real_distance_cm]"
+                           value="${measurement.real_distance_cm}"
+                           step="0.1" min="0.1" max="200"
+                           class="real-distance-input"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                           placeholder="z.B. 62.0" />
+                </div>
+            </div>
+            
+            <!-- Größen-spezifische Skalierungsfaktoren -->
+            <div style="background: rgba(255,255,255,0.8); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <h5 style="margin: 0 0 10px 0; color: #0066cc;">⚖️ Größen-spezifische Skalierungsfaktoren</h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; font-size: 13px;">
+                    ${availableSizes.map(size => {
+                        const sizeScaleFactor = this.calculateSizeSpecificScale(measurement, size.id);
+                        return `
+                            <div style="text-align: center; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                                <div style="font-weight: 600; color: #007cba; margin-bottom: 3px;">Größe ${size.name}</div>
+                                <div style="font-size: 11px; color: #666;">
+                                    ${sizeScaleFactor ? sizeScaleFactor.toFixed(3) + ' mm/px' : 'Nicht verfügbar'}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            
+            <!-- Basis-Messungsinfo -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 13px; margin-bottom: 10px;">
+                <div><strong>📏 Pixel-Distanz:</strong> ${measurement.pixel_distance.toFixed(1)} px</div>
+                <div><strong>🎨 Farbe:</strong> <span style="display: inline-block; width: 16px; height: 16px; background: ${measurement.color}; border-radius: 3px; vertical-align: middle; margin-left: 5px;"></span></div>
+                <div><strong>📍 Punkte:</strong> (${measurement.points[0].x}, ${measurement.points[0].y}) → (${measurement.points[1].x}, ${measurement.points[1].y})</div>
+            </div>
+            
+            <!-- Hidden WordPress-Formularfelder -->
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][pixel_distance]" 
+                   value="${measurement.pixel_distance}" class="pixel-distance-input" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][color]" 
+                   value="${measurement.color}" class="measurement-color-input" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][points]" 
+                   value='${JSON.stringify(measurement.points)}' class="measurement-points-input" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][scale_factor]" 
+                   value="${measurement.scale_factor}" class="scale-factor-input" />
         `;
         
-        // Füge Animation CSS hinzu
-        if (!document.querySelector('#yprint-measurement-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'yprint-measurement-styles';
-            styles.textContent = `
-                @keyframes slideIn {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-            `;
-            document.head.appendChild(styles);
-        }
+        // Event-Listener für Live-Updates
+        this.attachMeasurementEvents(measurementElement, viewId, nextIndex);
         
-        // Finde besten Ort zum Einfügen
-        this.insertMeasurementElement(measurementElement);
+        // View-spezifisches Einfügen mit viewId
+        this.insertMeasurementElement(measurementElement, this.currentViewId);
     }
     
-    insertMeasurementElement(element) {
-        // Verschiedene Einfügestrategien
+    insertMeasurementElement(element, viewId) {
+        console.log('🎯 Inserting measurement element for viewId:', viewId);
         
-        // 1. Nach Visual Measurements Header
-        const headers = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        for (let header of headers) {
-            if (header.textContent.includes('Visual Measurements')) {
-                header.parentElement.insertBefore(element, header.nextSibling);
-                console.log('🎯 Inserted after Visual Measurements header');
+        // 1. View-spezifische Suche nach dem korrekten Visual Measurements Container
+        const viewContainers = document.querySelectorAll('[data-view-id], .visual-measurement-container');
+        
+        for (let container of viewContainers) {
+            // Prüfe ob dieser Container zur richtigen View gehört
+            const containerViewId = container.dataset.viewId || 
+                                   container.querySelector('[data-view-id]')?.dataset.viewId ||
+                                   container.querySelector('img[data-view-id]')?.dataset.viewId;
+            
+            if (containerViewId === viewId) {
+                // Suche nach dem passenden Einfügepunkt in diesem Container
+                const measurementSection = container.querySelector('.existing-measurements') ||
+                                          container.querySelector('.measurements-list') ||
+                                          container;
+                
+                measurementSection.appendChild(element);
+                console.log('🎯 Inserted in view-specific container for viewId:', viewId);
                 return;
             }
         }
         
-        // 2. Nach dem ersten Bild in einem Visual-Container
-        const images = document.querySelectorAll('img');
+        // 2. Fallback: Suche nach Header mit View-Namen
+        const images = document.querySelectorAll('img[data-view-id]');
         for (let img of images) {
-            const container = img.closest('*');
-            if (container && container.textContent.includes('Visual')) {
-                container.appendChild(element);
-                console.log('🎯 Inserted in visual container');
+            if (img.dataset.viewId === viewId) {
+                // Finde den View-Container über das Bild
+                let viewContainer = img.closest('.visual-measurement-container') ||
+                                   img.closest('[data-view-id]') ||
+                                   img.parentElement;
+                
+                // Suche nach dem Header in diesem Container
+                const headers = viewContainer.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                for (let header of headers) {
+                    if (header.textContent.includes('Visual Measurements') ||
+                        header.textContent.includes(img.alt) ||
+                        header.textContent.includes('Front') ||
+                        header.textContent.includes('Back')) {
+                        
+                        // Füge nach dem Header ein
+                        header.parentElement.insertBefore(element, header.nextSibling);
+                        console.log('🎯 Inserted after view-specific header for viewId:', viewId);
+                        return;
+                    }
+                }
+                
+                // Kein spezifischer Header - füge am Ende des View-Containers ein
+                viewContainer.appendChild(element);
+                console.log('🎯 Inserted at end of view container for viewId:', viewId);
                 return;
             }
         }
         
-        // 3. In den ersten gefundenen Container mit measurement-Kontext
-        const allContainers = document.querySelectorAll('div');
-        for (let container of allContainers) {
-            if (container.textContent.includes('measurement') || 
-                container.textContent.includes('Measurement')) {
-                container.appendChild(element);
-                console.log('🎯 Inserted in measurement context container');
-                return;
+        // 3. Erweiterte Fallback-Suche nach View-Namen
+        const allHeaders = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        for (let header of allHeaders) {
+            // Suche nach Front/Back/Left/Right in Kombination mit viewId
+            if (header.textContent.includes('Visual Measurements')) {
+                const headerContainer = header.closest('div');
+                const nearbyImage = headerContainer?.querySelector('img[data-view-id]');
+                
+                if (nearbyImage && nearbyImage.dataset.viewId === viewId) {
+                    header.parentElement.insertBefore(element, header.nextSibling);
+                    console.log('🎯 Inserted via extended fallback for viewId:', viewId);
+                    return;
+                }
             }
         }
         
-        // 4. Fallback: An Body anhängen
-        document.body.appendChild(element);
-        console.log('🎯 Inserted as fallback to body');
+        // 4. Letzter Fallback: Erstelle view-spezifischen Container
+        console.log('🎯 Creating new container for viewId:', viewId);
+        const viewName = this.getViewNameFromId(viewId);
+        const newContainer = document.createElement('div');
+        newContainer.className = 'view-measurements-container';
+        newContainer.style.cssText = `
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #007cba;
+            border-radius: 8px;
+            background: #f0f8ff;
+        `;
+        newContainer.innerHTML = `
+            <h4 style="margin: 0 0 15px 0; color: #007cba;">
+                📐 Messungen für ${viewName} (View ID: ${viewId})
+            </h4>
+        `;
+        newContainer.appendChild(element);
+        
+        // Füge nach dem ersten Visual Measurements Container ein
+        const firstMeasurementContainer = document.querySelector('.visual-measurement-container');
+        if (firstMeasurementContainer) {
+            firstMeasurementContainer.parentElement.insertBefore(newContainer, firstMeasurementContainer.nextSibling);
+        } else {
+            document.body.appendChild(newContainer);
+        }
+    }
+
+    getViewNameFromId(viewId) {
+        // Versuche View-Namen aus dem DOM zu ermitteln
+        const img = document.querySelector(`img[data-view-id="${viewId}"]`);
+        if (img) {
+            return img.alt || img.title || `View ${viewId}`;
+        }
+        
+        // Standard-Namen basierend auf bekannten IDs
+        const knownViews = {
+            '189542': 'Front',
+            '679311': 'Back'
+        };
+        
+        return knownViews[viewId] || `View ${viewId}`;
     }
     
     showNotification(message, type = 'info') {
@@ -500,6 +626,110 @@ class YPrintTemplateMeasurements {
                 }
             `;
             document.head.appendChild(styles);
+        }
+    }
+
+    getAvailableSizes() {
+        // Versuche Größen aus dem DOM zu lesen
+        const sizeInputs = document.querySelectorAll('input[name*="sizes["]');
+        const sizes = [];
+        
+        sizeInputs.forEach(input => {
+            const match = input.name.match(/sizes\[(\d+)\]\[id\]/);
+            if (match) {
+                const index = match[1];
+                const idInput = document.querySelector(`input[name="sizes[${index}][id]"]`);
+                const nameInput = document.querySelector(`input[name="sizes[${index}][name]"]`);
+                
+                if (idInput && nameInput) {
+                    sizes.push({
+                        id: idInput.value,
+                        name: nameInput.value
+                    });
+                }
+            }
+        });
+        
+        // Fallback zu Standard-Größen
+        if (sizes.length === 0) {
+            return [
+                { id: 's', name: 'S' },
+                { id: 'm', name: 'M' },
+                { id: 'l', name: 'L' },
+                { id: 'xl', name: 'XL' }
+            ];
+        }
+        
+        return sizes;
+    }
+
+    getNextMeasurementIndex(viewId) {
+        // Zähle existierende Messungen für diese View
+        const existingMeasurements = document.querySelectorAll(`[data-view-id="${viewId}"].measurement-item`);
+        return existingMeasurements.length;
+    }
+
+    calculateSizeSpecificScale(measurement, sizeId) {
+        // Versuche Produktdimensionen für diese Größe zu finden
+        const dimensionInput = document.querySelector(
+            `input[name="product_dimensions[${sizeId}][${measurement.type}]"]`
+        );
+        
+        if (dimensionInput && dimensionInput.value && parseFloat(dimensionInput.value) > 0) {
+            const realSizeCm = parseFloat(dimensionInput.value);
+            return realSizeCm / (measurement.pixel_distance / 10); // cm zu mm/px
+        }
+        
+        return null;
+    }
+
+    attachMeasurementEvents(element, viewId, index) {
+        // Type-Select Event
+        const typeSelect = element.querySelector('.measurement-type-select');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', () => {
+                this.updateSizeSpecificScales(element, viewId, index);
+            });
+        }
+        
+        // Real Distance Input Event
+        const realDistanceInput = element.querySelector('.real-distance-input');
+        if (realDistanceInput) {
+            realDistanceInput.addEventListener('input', () => {
+                this.updateSizeSpecificScales(element, viewId, index);
+            });
+        }
+    }
+
+    updateSizeSpecificScales(element, viewId, index) {
+        const typeSelect = element.querySelector('.measurement-type-select');
+        const pixelDistanceInput = element.querySelector('.pixel-distance-input');
+        
+        if (!typeSelect || !pixelDistanceInput) return;
+        
+        const measurementType = typeSelect.value;
+        const pixelDistance = parseFloat(pixelDistanceInput.value);
+        
+        const availableSizes = this.getAvailableSizes();
+        
+        // Update Größen-Display
+        const scaleContainer = element.querySelector('[style*="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr))"]');
+        if (scaleContainer) {
+            scaleContainer.innerHTML = availableSizes.map(size => {
+                const sizeScaleFactor = this.calculateSizeSpecificScale({
+                    type: measurementType,
+                    pixel_distance: pixelDistance
+                }, size.id);
+                
+                return `
+                    <div style="text-align: center; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                        <div style="font-weight: 600; color: #007cba; margin-bottom: 3px;">Größe ${size.name}</div>
+                        <div style="font-size: 11px; color: #666;">
+                            ${sizeScaleFactor ? sizeScaleFactor.toFixed(3) + ' mm/px' : 'Nicht verfügbar'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
     }
 }
