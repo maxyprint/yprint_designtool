@@ -736,59 +736,34 @@ class YPrintTemplateMeasurements {
     }
     
     showNotification(message, type = 'info') {
-        // Einfache Notification
-        const colors = {
-            info: '#007cba',
-            success: '#00a32a', 
-            error: '#d63638'
-        };
+        console.log(`🔔 ${type.toUpperCase()}: ${message}`);
         
+        // Erstelle Toast-Notification
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
-            top: 50px;
+            top: 20px;
             right: 20px;
-            background: ${colors[type]};
+            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007cba'};
             color: white;
             padding: 15px 20px;
             border-radius: 5px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             z-index: 10000;
-            max-width: 400px;
+            max-width: 300px;
             white-space: pre-line;
             font-size: 14px;
-            animation: slideInRight 0.3s ease-out;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         `;
         notification.textContent = message;
         
         document.body.appendChild(notification);
         
-        // Auto-Remove nach 5 Sekunden
+        // Automatisch nach 5 Sekunden entfernen
         setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.3s ease-in';
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
-            }, 300);
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
         }, 5000);
-        
-        // Notification-Animationen
-        if (!document.querySelector('#yprint-notification-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'yprint-notification-styles';
-            styles.textContent = `
-                @keyframes slideInRight {
-                    from { opacity: 0; transform: translateX(100%); }
-                    to { opacity: 1; transform: translateX(0); }
-                }
-                @keyframes slideOutRight {
-                    from { opacity: 1; transform: translateX(0); }
-                    to { opacity: 0; transform: translateX(100%); }
-                }
-            `;
-            document.head.appendChild(styles);
-        }
     }
 
     getAvailableSizes() {
@@ -894,6 +869,87 @@ class YPrintTemplateMeasurements {
             }).join('');
         }
     }
+
+    // ✅ NEUE FUNKTION HINZUFÜGEN:
+    drawMeasurementLine(viewId, points, color) {
+        if (!points || points.length !== 2) return;
+        
+        console.log('🎯 Drawing measurement line:', viewId, points, color);
+        
+        // Finde das Bild-Element
+        const images = document.querySelectorAll('img.measurement-image');
+        let targetImage = null;
+        
+        for (let img of images) {
+            const imgViewId = img.getAttribute('data-view-id') || 
+                             img.closest('[data-view-id]')?.getAttribute('data-view-id');
+            if (imgViewId === viewId) {
+                targetImage = img;
+                break;
+            }
+        }
+        
+        if (!targetImage) {
+            console.error('Could not find target image for line drawing');
+            return;
+        }
+        
+        // Erstelle SVG-Overlay für die Linie
+        const container = targetImage.parentElement;
+        const rect = targetImage.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Berechne relative Positionen
+        const relativeX = rect.left - containerRect.left;
+        const relativeY = rect.top - containerRect.top;
+        
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.cssText = `
+            position: absolute;
+            left: ${relativeX}px;
+            top: ${relativeY}px;
+            width: ${rect.width}px;
+            height: ${rect.height}px;
+            pointer-events: none;
+            z-index: 999;
+        `;
+        svg.className = 'measurement-line-svg';
+        
+        // Berechne Skalierung von natürlicher Bildgröße zu angezeigter Größe
+        const scaleX = rect.width / targetImage.naturalWidth;
+        const scaleY = rect.height / targetImage.naturalHeight;
+        
+        // Skaliere Punkte auf angezeigte Bildgröße
+        const displayPoint1 = {
+            x: points[0].x * scaleX,
+            y: points[0].y * scaleY
+        };
+        const displayPoint2 = {
+            x: points[1].x * scaleX,
+            y: points[1].y * scaleY
+        };
+        
+        // Erstelle Linie
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', displayPoint1.x);
+        line.setAttribute('y1', displayPoint1.y);
+        line.setAttribute('x2', displayPoint2.x);
+        line.setAttribute('y2', displayPoint2.y);
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-dasharray', '5,5');
+        
+        svg.appendChild(line);
+        
+        // Stelle sicher, dass Container relative Position hat
+        if (getComputedStyle(container).position === 'static') {
+            container.style.position = 'relative';
+        }
+        
+        container.appendChild(svg);
+        
+        console.log('✅ Measurement line drawn successfully');
+    }
 }
 
 // Globale Instanz erstellen
@@ -932,4 +988,6 @@ if (typeof window.YPrintTemplateMeasurements !== 'undefined') {
     console.log('✅ Template Measurements initialized immediately');
 } else {
     console.log('🎯 YPrint Template Measurements Script Ende erreicht'); 
-} 
+}
+
+} // Ende der if-Überprüfung für bereits geladene Klasse 
