@@ -147,8 +147,12 @@ class YPrintTemplateMeasurements {
             e.stopPropagation();
             
             const index = this.findMeasurementIndex(e.target);
+            console.log('🎯 Found measurement index:', index);
+            
             if (index !== null) {
                 this.deleteMeasurement(index);
+            } else {
+                console.error('❌ Could not find measurement index for delete button');
             }
             return;
         }
@@ -1132,6 +1136,17 @@ class YPrintTemplateMeasurements {
             return true;
         }
         
+        // 5. Suche nach Button mit data-index Attribut in der Nähe
+        let current = element;
+        let attempts = 0;
+        while (current && attempts < 5) {
+            if (current.tagName === 'BUTTON' && current.getAttribute('data-index')) {
+                return true;
+            }
+            current = current.parentElement;
+            attempts++;
+        }
+        
         return false;
     }
     
@@ -1156,6 +1171,14 @@ class YPrintTemplateMeasurements {
             attempts++;
         }
         
+        // 4. Fallback: Suche nach dem nächsten Button mit data-index
+        const nearbyButtons = document.querySelectorAll('button[data-index]');
+        for (let button of nearbyButtons) {
+            if (button.contains(element) || element.contains(button)) {
+                return button.getAttribute('data-index');
+            }
+        }
+        
         return null;
     }
     
@@ -1170,9 +1193,17 @@ class YPrintTemplateMeasurements {
                 return;
             }
             
-            // 2. Hole View-ID aus dem Measurement-Item
-            const viewId = measurementItem.getAttribute('data-view-id') || 
-                          measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
+            // 2. Hole View-ID aus dem Measurement-Item oder dem Delete-Button
+            let viewId = measurementItem.getAttribute('data-view-id') || 
+                        measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
+            
+            // Fallback: Suche nach dem Delete-Button für diese Messung
+            if (!viewId) {
+                const deleteButton = document.querySelector(`button[data-index="${index}"][data-view-id]`);
+                if (deleteButton) {
+                    viewId = deleteButton.getAttribute('data-view-id');
+                }
+            }
             
             if (!viewId) {
                 console.error('❌ View ID not found for measurement');

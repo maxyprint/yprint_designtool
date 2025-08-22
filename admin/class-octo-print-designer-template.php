@@ -1439,6 +1439,7 @@ class Octo_Print_Designer_Template {
                                                                          <div class="measurement-actions">
                                                                              <button type="button" class="button button-small delete-measurement-btn" 
                                                                                      data-index="<?php echo esc_attr($index); ?>"
+                                                                                     data-view-id="<?php echo esc_attr($view_id); ?>"
                                                                                      style="color: #d63384;">
                                                                                  <span class="dashicons dashicons-trash" style="font-size: 14px;"></span>
                                                                              </button>
