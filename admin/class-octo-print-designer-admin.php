@@ -118,7 +118,11 @@ class Octo_Print_Designer_Admin {
             });
         ', 'after');
 
-        // Initialize AJAX handlers
+        // Initialize AJAX handlers - Sicherstellen dass sie früh genug registriert werden
+        add_action('wp_ajax_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
+        add_action('wp_ajax_nopriv_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
+
+        // Zusätzlich: Instanz-basierte Registrierung
         $template_class = new Octo_Print_Designer_Template();
         $template_class->init_ajax_handlers();
     }

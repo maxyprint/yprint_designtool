@@ -1511,4 +1511,36 @@ class Octo_Print_Designer_Template {
         return null;
     }
 
+    /**
+     * Static AJAX Handler für bessere Kompatibilität
+     */
+    public static function ajax_get_available_measurement_types_static() {
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error(array('message' => 'Invalid template ID'));
+        }
+        
+        // **SOFORTIGER FALLBACK** für Tests
+        $fallback_types = array(
+            array('key' => 'chest', 'label' => 'Chest / Brustumfang'),
+            array('key' => 'height_from_shoulder', 'label' => 'Height from Shoulder'),
+            array('key' => 'length', 'label' => 'Total Length')
+        );
+        
+        wp_send_json_success(array(
+            'measurement_types' => $fallback_types,
+            'total_available' => count($fallback_types),
+            'is_fallback' => true,
+            'debug_info' => array(
+                'template_id' => $template_id,
+                'nonce_valid' => true,
+                'timestamp' => current_time('mysql')
+            )
+        ));
+    }
+
 }

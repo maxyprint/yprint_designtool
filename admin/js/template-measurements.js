@@ -367,15 +367,16 @@ class YPrintTemplateMeasurements {
         const relativeY = rect.top - containerRect.top;
         
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.style.cssText = `
-            position: absolute;
-            left: ${relativeX}px;
-            top: ${relativeY}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
-            pointer-events: none;
-            z-index: 999;
-        `;
+        
+        // ✅ FIX: Einzelne Properties setzen statt cssText
+        svg.style.position = 'absolute';
+        svg.style.left = relativeX + 'px';
+        svg.style.top = relativeY + 'px';
+        svg.style.width = rect.width + 'px';
+        svg.style.height = rect.height + 'px';
+        svg.style.pointerEvents = 'none';
+        svg.style.zIndex = '999';
+        
         svg.className = 'measurement-line-svg';
         
         // Berechne Skalierung von natürlicher Bildgröße zu angezeigter Größe
