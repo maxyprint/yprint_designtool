@@ -695,20 +695,151 @@ class YPrintTemplateMeasurements {
     createVisibleMeasurementElement(viewId, measurement) {
         console.log('🎯 Creating visible measurement element:', measurement);
         
-        // Hole verfügbare Größen aus dem DOM
-        const availableSizes = this.getAvailableSizes();
+        try {
+            // 1. Finde den Container für bestehende Messungen
+            const container = this.findMeasurementContainer(viewId);
+            if (!container) {
+                console.error('❌ Measurement container not found for viewId:', viewId);
+                return;
+            }
+            
+            // 2. Berechne nächsten Index
+            const nextIndex = this.getNextMeasurementIndex(viewId);
+            
+            // 3. Erstelle das neue Messungs-Element
+            const measurementElement = this.createMeasurementHTML(viewId, measurement, nextIndex);
+            
+            // 4. Füge es zum Container hinzu
+            container.appendChild(measurementElement);
+            
+            // 5. Aktualisiere die "No measurements" Nachricht falls vorhanden
+            this.updateNoMeasurementsMessage(container);
+            
+            console.log('✅ Measurement element successfully added to DOM');
+            
+        } catch (error) {
+            console.error('❌ Error creating visible measurement element:', error);
+        }
+    }
+    
+    findMeasurementContainer(viewId) {
+        // Suche nach dem Container für bestehende Messungen
+        const selectors = [
+            `.existing-measurements`,
+            `.measurements-list`,
+            `[data-view-id="${viewId}"] .existing-measurements`,
+            `[data-view-id="${viewId}"] .measurements-list`
+        ];
         
-        // Berechne nächsten Index für diese View
-        const nextIndex = this.getNextMeasurementIndex(viewId);
+        for (let selector of selectors) {
+            const container = document.querySelector(selector);
+            if (container) {
+                return container;
+            }
+        }
         
-        // Hier würde normalerweise das Mess-Element ins DOM eingefügt
-        // Für jetzt nur Konsole-Output
-        console.log('✅ Measurement element would be created:', {
-            viewId,
-            measurement,
-            nextIndex,
-            availableSizes
-        });
+        // Fallback: Suche nach dem View-Container
+        const viewContainer = document.querySelector(`[data-view-id="${viewId}"]`);
+        if (viewContainer) {
+            // Erstelle einen neuen Container falls keiner existiert
+            let measurementsList = viewContainer.querySelector('.measurements-list');
+            if (!measurementsList) {
+                measurementsList = document.createElement('div');
+                measurementsList.className = 'measurements-list';
+                viewContainer.appendChild(measurementsList);
+            }
+            return measurementsList;
+        }
+        
+        return null;
+    }
+    
+    createMeasurementHTML(viewId, measurement, index) {
+        const measurementType = measurement.measurement_type || measurement.type;
+        const pixelDistance = measurement.pixel_distance;
+        const color = measurement.color || '#ff4444';
+        
+        // Erstelle das HTML-Element
+        const element = document.createElement('div');
+        element.className = 'measurement-item';
+        element.setAttribute('data-index', index);
+        element.setAttribute('data-measurement-type', measurementType);
+        element.style.cssText = `
+            background: #fff; 
+            padding: 12px; 
+            border-radius: 4px; 
+            border-left: 4px solid ${color}; 
+            margin-bottom: 8px;
+        `;
+        
+        // Hole Messungs-Labels
+        const measurementLabels = this.getMeasurementLabels();
+        const label = measurementLabels[measurementType] || measurementType;
+        
+        element.innerHTML = `
+            <div class="measurement-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div class="measurement-info" style="flex: 1;">
+                    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <span style="font-weight: 600; color: #495057; margin-right: 10px;">
+                            ${label}
+                        </span>
+                        <span style="font-size: 11px; color: #666; background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">
+                            ${measurementType}
+                        </span>
+                    </div>
+                    <div class="measurement-stats" style="font-size: 11px; color: #666;">
+                        <span class="pixel-distance">
+                            Pixel: ${pixelDistance.toFixed(1)} px
+                        </span>
+                        <span class="separator" style="margin: 0 8px;">•</span>
+                        <span class="created-at">
+                            ${new Date().toLocaleString('de-DE')}
+                        </span>
+                    </div>
+                </div>
+                <div class="measurement-actions">
+                    <button type="button" class="button button-small delete-measurement-btn" 
+                            data-index="${index}"
+                            style="color: #d63384;">
+                        <span class="dashicons dashicons-trash" style="font-size: 14px;"></span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Hidden Fields für Form-Submission -->
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][type]" 
+                   value="${measurementType}" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][pixel_distance]" 
+                   value="${pixelDistance}" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][color]" 
+                   value="${color}" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${index}][points]" 
+                   value='${JSON.stringify(measurement.points || [])}' />
+        `;
+        
+        return element;
+    }
+    
+    getMeasurementLabels() {
+        return {
+            'chest': 'Chest / Brustumfang',
+            'height_from_shoulder': 'Height from Shoulder',
+            'sleeve_length': 'Sleeve Length',
+            'biceps': 'Biceps',
+            'shoulder_to_shoulder': 'Shoulder to Shoulder',
+            'hem_width': 'Hem Width',
+            'waist': 'Waist',
+            'hip': 'Hip',
+            'length': 'Total Length'
+        };
+    }
+    
+    updateNoMeasurementsMessage(container) {
+        // Entferne "No measurements" Nachricht falls vorhanden
+        const noMeasurements = container.querySelector('.no-measurements');
+        if (noMeasurements) {
+            noMeasurements.remove();
+        }
     }
 
     getAvailableSizes() {
@@ -717,8 +848,23 @@ class YPrintTemplateMeasurements {
     }
 
     getNextMeasurementIndex(viewId) {
-        // Vereinfachte Implementierung
-        return 0;
+        // Finde alle bestehenden Messungen für diese View
+        const existingMeasurements = document.querySelectorAll(`[data-view-id="${viewId}"] .measurement-item`);
+        
+        if (existingMeasurements.length === 0) {
+            return 0;
+        }
+        
+        // Finde den höchsten Index
+        let maxIndex = -1;
+        existingMeasurements.forEach(item => {
+            const index = parseInt(item.getAttribute('data-index') || '0');
+            if (index > maxIndex) {
+                maxIndex = index;
+            }
+        });
+        
+        return maxIndex + 1;
     }
 
     getExistingMeasurementTypes(viewId) {
