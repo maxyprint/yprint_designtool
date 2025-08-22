@@ -864,65 +864,78 @@ class Octo_Print_Designer_Template {
     /**
      * Generiert automatische Print-Area Berechnungen
      */
-    public function calculate_auto_print_dimensions($template_id, $view_id, $size_id) {
-        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
-        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
-        
-        if (!isset($view_print_areas[$view_id]['measurements']) || 
-            !isset($product_dimensions[$size_id])) {
-            return false;
+    public function calculate_auto_print_dimensions($view_print_areas, $product_dimensions) {
+        if (empty($view_print_areas) || empty($product_dimensions)) {
+            return array();
         }
         
-        $measurements = $view_print_areas[$view_id]['measurements'];
-        $size_dimensions = $product_dimensions[$size_id];
-        $canvas_width = $view_print_areas[$view_id]['canvas_width'] ?? 800;
-        $canvas_height = $view_print_areas[$view_id]['canvas_height'] ?? 600;
+        $results = array();
         
-        // Finde primäre Referenz-Messung (meist Chest oder Shoulder)
-        $primary_measurement = null;
-        $priority_types = ['chest', 'shoulder_to_shoulder', 'biceps', 'hem_width'];
-        
-        foreach ($priority_types as $type) {
-            foreach ($measurements as $measurement) {
-                if ($measurement['type'] === $type && isset($measurement['scale_factor'])) {
-                    $primary_measurement = $measurement;
-                    break 2;
+        foreach ($view_print_areas as $view_id => $view_config) {
+            if (!isset($view_config['measurements']) || !is_array($view_config['measurements'])) {
+                continue;
+            }
+            
+            $measurements = $view_config['measurements'];
+            $canvas_width = $view_config['canvas_width'] ?? 800;
+            $canvas_height = $view_config['canvas_height'] ?? 600;
+            
+            // Finde primäre Referenz-Messung (meist Chest oder Shoulder)
+            $primary_measurement = null;
+            $priority_types = ['chest', 'shoulder_to_shoulder', 'biceps', 'hem_width'];
+            
+            foreach ($priority_types as $type) {
+                foreach ($measurements as $measurement) {
+                    if ($measurement['type'] === $type && isset($measurement['size_scale_factors'])) {
+                        $primary_measurement = $measurement;
+                        break 2;
+                    }
                 }
+            }
+            
+            if (!$primary_measurement) {
+                continue;
+            }
+            
+            $results[$view_id] = array();
+            
+            // Berechne für jede Größe
+            foreach ($product_dimensions as $size_id => $size_dimensions) {
+                if (!isset($primary_measurement['size_scale_factors'][$size_id])) {
+                    continue;
+                }
+                
+                $scale_factor = $primary_measurement['size_scale_factors'][$size_id];
+                $print_width_mm = round($canvas_width * $scale_factor, 1);
+                $print_height_mm = round($canvas_height * $scale_factor, 1);
+                
+                // Validiere gegen physische Produktgrenzen
+                $max_chest = $size_dimensions['chest'] ?? 60;
+                $max_height = $size_dimensions['height_from_shoulder'] ?? 70;
+                
+                // Begrenze Print-Area auf realistisches Maximum (85% der Produktmaße)
+                $max_print_width = ($max_chest * 0.85) * 10; // cm zu mm
+                $max_print_height = ($max_height * 0.85) * 10;
+                
+                $print_width_mm = min($print_width_mm, $max_print_width);
+                $print_height_mm = min($print_height_mm, $max_print_height);
+                
+                $results[$view_id][$size_id] = array(
+                    'print_width_mm' => $print_width_mm,
+                    'print_height_mm' => $print_height_mm,
+                    'scale_factor' => $scale_factor,
+                    'canvas_to_mm_ratio' => $scale_factor,
+                    'used_measurement' => $primary_measurement['type'],
+                    'validation' => array(
+                        'max_width_mm' => $max_print_width,
+                        'max_height_mm' => $max_print_height,
+                        'is_within_limits' => true
+                    )
+                );
             }
         }
         
-        if (!$primary_measurement) {
-            return false;
-        }
-        
-        // Berechne Print-Area basierend auf Skalierungsfaktor
-        $scale_factor = $primary_measurement['scale_factor'];
-        $print_width_mm = round($canvas_width * $scale_factor, 1);
-        $print_height_mm = round($canvas_height * $scale_factor, 1);
-        
-        // Validiere gegen physische Produktgrenzen
-        $max_chest = $size_dimensions['chest'] ?? 60;
-        $max_height = $size_dimensions['height_from_shoulder'] ?? 70;
-        
-        // Begrenze Print-Area auf realistisches Maximum (85% der Produktmaße)
-        $max_print_width = ($max_chest * 0.85) * 10; // cm zu mm
-        $max_print_height = ($max_height * 0.85) * 10;
-        
-        $print_width_mm = min($print_width_mm, $max_print_width);
-        $print_height_mm = min($print_height_mm, $max_print_height);
-        
-        return array(
-            'print_width_mm' => $print_width_mm,
-            'print_height_mm' => $print_height_mm,
-            'scale_factor' => $scale_factor,
-            'canvas_to_mm_ratio' => $scale_factor,
-            'used_measurement' => $primary_measurement['type'],
-            'validation' => array(
-                'max_width_mm' => $max_print_width,
-                'max_height_mm' => $max_print_height,
-                'is_within_limits' => true
-            )
-        );
+        return $results;
     }
 
     /**
@@ -945,66 +958,62 @@ class Octo_Print_Designer_Template {
     /**
      * Verbesserte Mess-Daten Validierung und Verarbeitung mit größenspezifischen Faktoren
      */
-    private function process_measurement_data($config, $view_id) {
-        $view_print_areas = array();
-        $template_id = get_the_ID();
-        
-        // Hole Produktdimensionen für alle Größen
-        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
-        
-        if (empty($product_dimensions)) {
+    private function process_measurement_data($view_print_areas, $product_dimensions) {
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
             return $view_print_areas; // Keine Berechnungen möglich ohne Dimensionen
         }
         
-        if (isset($config['measurements']) && is_array($config['measurements'])) {
-            $measurements = array();
-            foreach ($config['measurements'] as $index => $measurement) {
-                // Validiere Mess-Punkte
-                $points = isset($measurement['points']) ? json_decode(stripslashes($measurement['points']), true) : array();
-                if (!$this->validate_measurement_points($points)) {
-                    continue; // Springe ungültige Messungen
-                }
-                
-                // Berechne präzise Pixel-Distanz aus Punkten
-                $pixel_distance = $this->calculate_pixel_distance($points);
-                $measurement_type = $measurement['measurement_type'] ?? $measurement['type'] ?? '';
-                
-                // Validiere Mindestanforderungen
-                if ($pixel_distance < 5 || empty($measurement_type)) {
-                    continue;
-                }
-                
-                // Berechne größenspezifische Skalierungsfaktoren
-                $size_scale_factors = array();
-                $has_valid_references = false;
-                
-                foreach ($product_dimensions as $size_id => $size_config) {
-                    $real_distance_cm = floatval($size_config[$measurement_type] ?? 0);
-                    
-                    if ($real_distance_cm > 0) {
-                        $scale_factor = $real_distance_cm / ($pixel_distance / 10);
-                        $size_scale_factors[$size_id] = round($scale_factor, 4);
-                        $has_valid_references = true;
+        foreach ($view_print_areas as $view_id => $view_config) {
+            if (isset($view_config['measurements']) && is_array($view_config['measurements'])) {
+                $measurements = array();
+                foreach ($view_config['measurements'] as $index => $measurement) {
+                    // Validiere Mess-Punkte
+                    $points = isset($measurement['points']) ? (is_array($measurement['points']) ? $measurement['points'] : json_decode(stripslashes($measurement['points']), true)) : array();
+                    if (!$this->validate_measurement_points($points)) {
+                        continue; // Springe ungültige Messungen
                     }
+                    
+                    // Berechne präzise Pixel-Distanz aus Punkten
+                    $pixel_distance = $this->calculate_pixel_distance($points);
+                    $measurement_type = $measurement['measurement_type'] ?? $measurement['type'] ?? '';
+                    
+                    // Validiere Mindestanforderungen
+                    if ($pixel_distance < 5 || empty($measurement_type)) {
+                        continue;
+                    }
+                    
+                    // Berechne größenspezifische Skalierungsfaktoren
+                    $size_scale_factors = array();
+                    $has_valid_references = false;
+                    
+                    foreach ($product_dimensions as $size_id => $size_config) {
+                        $real_distance_cm = floatval($size_config[$measurement_type] ?? 0);
+                        
+                        if ($real_distance_cm > 0) {
+                            $scale_factor = $real_distance_cm / ($pixel_distance / 10);
+                            $size_scale_factors[$size_id] = round($scale_factor, 4);
+                            $has_valid_references = true;
+                        }
+                    }
+                    
+                    if (!$has_valid_references) {
+                        continue; // Keine gültigen Referenzwerte für diesen Messungstyp
+                    }
+                    
+                    $measurements[intval($index)] = array(
+                        'type' => $measurement_type,
+                        'measurement_type' => $measurement_type,
+                        'pixel_distance' => $pixel_distance,
+                        'size_scale_factors' => $size_scale_factors, // NEU: Größenspezifische Faktoren
+                        'reference_sizes' => array_keys($size_scale_factors),
+                        'color' => sanitize_hex_color($measurement['color'] ?? '#ff4444'),
+                        'points' => $points,
+                        'created_at' => current_time('mysql'),
+                        'is_validated' => true
+                    );
                 }
-                
-                if (!$has_valid_references) {
-                    continue; // Keine gültigen Referenzwerte für diesen Messungstyp
-                }
-                
-                $measurements[intval($index)] = array(
-                    'type' => $measurement_type,
-                    'measurement_type' => $measurement_type,
-                    'pixel_distance' => $pixel_distance,
-                    'size_scale_factors' => $size_scale_factors, // NEU: Größenspezifische Faktoren
-                    'reference_sizes' => array_keys($size_scale_factors),
-                    'color' => sanitize_hex_color($measurement['color'] ?? '#ff4444'),
-                    'points' => $points,
-                    'created_at' => current_time('mysql'),
-                    'is_validated' => true
-                );
+                $view_print_areas[sanitize_text_field($view_id)]['measurements'] = $measurements;
             }
-            $view_print_areas[sanitize_text_field($view_id)]['measurements'] = $measurements;
         }
         
         return $view_print_areas;
