@@ -333,7 +333,7 @@ class YPrintTemplateMeasurements {
         });
     }
 
-    // ✅ REPARIERT: drawMeasurementLine IST JETZT TEIL DER KLASSE
+    // ✅ REPARIERT: drawMeasurementLine mit div-Fallback statt SVG
     drawMeasurementLine(viewId, points, color) {
         if (!points || points.length !== 2) return;
         
@@ -357,62 +357,108 @@ class YPrintTemplateMeasurements {
             return;
         }
         
-        // Erstelle SVG-Overlay für die Linie
+        try {
+            // ✅ EINFACHE LÖSUNG: Verwende div-Elemente statt SVG
+            const container = targetImage.parentElement;
+            const rect = targetImage.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            // Berechne relative Positionen
+            const relativeX = rect.left - containerRect.left;
+            const relativeY = rect.top - containerRect.top;
+            
+            // Berechne Skalierung
+            const scaleX = rect.width / (targetImage.naturalWidth || rect.width);
+            const scaleY = rect.height / (targetImage.naturalHeight || rect.height);
+            
+            // Skaliere Punkte
+            const displayPoint1 = {
+                x: points[0].x * scaleX,
+                y: points[0].y * scaleY
+            };
+            const displayPoint2 = {
+                x: points[1].x * scaleX,
+                y: points[1].y * scaleY
+            };
+            
+            // Erstelle Linie als div-Element
+            const lineElement = document.createElement('div');
+            lineElement.className = 'measurement-line-div';
+            
+            // Berechne Linien-Position und -Größe
+            const dx = displayPoint2.x - displayPoint1.x;
+            const dy = displayPoint2.y - displayPoint1.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            
+            // Setze div-Styles für Linie
+            lineElement.style.position = 'absolute';
+            lineElement.style.left = (relativeX + displayPoint1.x) + 'px';
+            lineElement.style.top = (relativeY + displayPoint1.y) + 'px';
+            lineElement.style.width = length + 'px';
+            lineElement.style.height = '2px';
+            lineElement.style.background = color;
+            lineElement.style.transform = `rotate(${angle}deg)`;
+            lineElement.style.transformOrigin = '0 0';
+            lineElement.style.pointerEvents = 'none';
+            lineElement.style.zIndex = '999';
+            
+            // Stelle sicher, dass Container relative Position hat
+            if (getComputedStyle(container).position === 'static') {
+                container.style.position = 'relative';
+            }
+            
+            container.appendChild(lineElement);
+            
+            console.log('✅ Measurement line drawn successfully with div');
+            
+        } catch (error) {
+            console.error('❌ Error in drawMeasurementLine:', error);
+            
+            // Fallback: Nur Punkte anzeigen
+            console.log('🔄 Using simple point display only');
+            this.showSimplePointsDisplay(targetImage, points, color);
+        }
+    }
+    
+    // ✅ NEU: Fallback für einfache Punkte-Anzeige
+    showSimplePointsDisplay(targetImage, points, color) {
         const container = targetImage.parentElement;
         const rect = targetImage.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
         
-        // Berechne relative Positionen
         const relativeX = rect.left - containerRect.left;
         const relativeY = rect.top - containerRect.top;
         
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        points.forEach((point, index) => {
+            const scaleX = rect.width / (targetImage.naturalWidth || rect.width);
+            const scaleY = rect.height / (targetImage.naturalHeight || rect.height);
+            
+            const displayX = point.x * scaleX;
+            const displayY = point.y * scaleY;
+            
+            const pointElement = document.createElement('div');
+            pointElement.style.position = 'absolute';
+            pointElement.style.left = (relativeX + displayX - 8) + 'px';
+            pointElement.style.top = (relativeY + displayY - 8) + 'px';
+            pointElement.style.width = '16px';
+            pointElement.style.height = '16px';
+            pointElement.style.background = color;
+            pointElement.style.border = '2px solid white';
+            pointElement.style.borderRadius = '50%';
+            pointElement.style.zIndex = '1000';
+            pointElement.style.pointerEvents = 'none';
+            pointElement.className = 'measurement-point-fallback';
+            pointElement.textContent = index + 1;
+            pointElement.style.color = 'white';
+            pointElement.style.fontSize = '10px';
+            pointElement.style.textAlign = 'center';
+            pointElement.style.lineHeight = '12px';
+            
+            container.appendChild(pointElement);
+        });
         
-        // ✅ FIX: Einzelne Properties setzen statt cssText
-        svg.style.position = 'absolute';
-        svg.style.left = relativeX + 'px';
-        svg.style.top = relativeY + 'px';
-        svg.style.width = rect.width + 'px';
-        svg.style.height = rect.height + 'px';
-        svg.style.pointerEvents = 'none';
-        svg.style.zIndex = '999';
-        
-        svg.className = 'measurement-line-svg';
-        
-        // Berechne Skalierung von natürlicher Bildgröße zu angezeigter Größe
-        const scaleX = rect.width / targetImage.naturalWidth;
-        const scaleY = rect.height / targetImage.naturalHeight;
-        
-        // Skaliere Punkte auf angezeigte Bildgröße
-        const displayPoint1 = {
-            x: points[0].x * scaleX,
-            y: points[0].y * scaleY
-        };
-        const displayPoint2 = {
-            x: points[1].x * scaleX,
-            y: points[1].y * scaleY
-        };
-        
-        // Erstelle Linie
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', displayPoint1.x);
-        line.setAttribute('y1', displayPoint1.y);
-        line.setAttribute('x2', displayPoint2.x);
-        line.setAttribute('y2', displayPoint2.y);
-        line.setAttribute('stroke', color);
-        line.setAttribute('stroke-width', '2');
-        line.setAttribute('stroke-dasharray', '5,5');
-        
-        svg.appendChild(line);
-        
-        // Stelle sicher, dass Container relative Position hat
-        if (getComputedStyle(container).position === 'static') {
-            container.style.position = 'relative';
-        }
-        
-        container.appendChild(svg);
-        
-        console.log('✅ Measurement line drawn successfully');
+        console.log('✅ Fallback points displayed');
     }
 
     calculateDistance(point1, point2) {
