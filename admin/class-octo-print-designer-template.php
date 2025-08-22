@@ -313,16 +313,36 @@ class Octo_Print_Designer_Template {
                          'photo_height_px' => intval($config['photo_height_px'] ?? 0)
                      );
                      
-                     // Speichere visuelle Messungen
+                     // ✅ Speichere visuelle Messungen mit allen neuen Feldern
                      if (isset($config['measurements']) && is_array($config['measurements'])) {
                          $measurements = array();
                          foreach ($config['measurements'] as $index => $measurement) {
-                             $measurements[intval($index)] = array(
+                             $measurement_data = array(
                                  'type' => sanitize_text_field($measurement['type'] ?? ''),
+                                 'measurement_type' => sanitize_text_field($measurement['type'] ?? ''),
                                  'pixel_distance' => floatval($measurement['pixel_distance'] ?? 0),
                                  'color' => sanitize_hex_color($measurement['color'] ?? '#ff4444'),
                                  'points' => isset($measurement['points']) ? json_decode(stripslashes($measurement['points']), true) : array()
                              );
+                             
+                             // ✅ Neue Felder für intelligente Messungen
+                             if (isset($measurement['size_scale_factors'])) {
+                                 $measurement_data['size_scale_factors'] = json_decode(stripslashes($measurement['size_scale_factors']), true);
+                             }
+                             
+                             if (isset($measurement['reference_sizes'])) {
+                                 $measurement_data['reference_sizes'] = json_decode(stripslashes($measurement['reference_sizes']), true);
+                             }
+                             
+                             if (isset($measurement['created_at'])) {
+                                 $measurement_data['created_at'] = sanitize_text_field($measurement['created_at']);
+                             }
+                             
+                             if (isset($measurement['is_validated'])) {
+                                 $measurement_data['is_validated'] = boolval($measurement['is_validated']);
+                             }
+                             
+                             $measurements[intval($index)] = $measurement_data;
                          }
                          $view_print_areas[sanitize_text_field($view_id)]['measurements'] = $measurements;
                      }
@@ -1288,6 +1308,9 @@ class Octo_Print_Designer_Template {
                                              <?php 
                                              $image_url = wp_get_attachment_image_url($view['image'], 'medium');
                                              $image_alt = get_post_meta($view['image'], '_wp_attachment_image_alt', true);
+                                             
+                                             // ✅ Lade bestehende Messungen für diesen View
+                                             $saved_measurements = isset($view_config['measurements']) ? $view_config['measurements'] : array();
                                              ?>
                                              
                                              <div class="visual-measurement-container" style="position: relative; margin-bottom: 20px; background: #f8f9fa; border-radius: 8px; padding: 15px;">
@@ -1355,24 +1378,17 @@ class Octo_Print_Designer_Template {
                                                                      <div class="measurement-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
                                                                          <div class="measurement-info" style="flex: 1;">
                                                                              <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                                                                                 <select name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][type]" 
-                                                                                         class="measurement-type-select" style="margin-right: 10px;">
-                                                                                     <?php foreach ($this->get_measurement_types() as $type_key => $type_label): ?>
-                                                                                         <option value="<?php echo esc_attr($type_key); ?>" 
-                                                                                                 <?php selected($measurement['type'] ?? '', $type_key); ?>>
-                                                                                             <?php echo esc_html($type_label); ?>
-                                                                                         </option>
-                                                                                     <?php endforeach; ?>
-                                                                                 </select>
+                                                                                 <span style="font-weight: 600; color: #495057; margin-right: 10px;">
+                                                                                     <?php 
+                                                                                     $measurement_type = $measurement['measurement_type'] ?? $measurement['type'] ?? 'unknown';
+                                                                                     $measurement_labels = $this->get_measurement_labels();
+                                                                                     echo esc_html($measurement_labels[$measurement_type] ?? ucfirst($measurement_type));
+                                                                                     ?>
+                                                                                 </span>
                                                                                  
-                                                                                 <input type="number" 
-                                                                                        name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][real_distance_cm]"
-                                                                                        placeholder="<?php esc_attr_e('Real distance (cm)', 'octo-print-designer'); ?>"
-                                                                                        value="<?php echo esc_attr($measurement['real_distance_cm'] ?? ''); ?>"
-                                                                                        step="0.1" min="0.1" max="100"
-                                                                                        class="real-distance-input"
-                                                                                        style="width: 120px; margin-right: 5px;" />
-                                                                                 <span style="font-size: 11px; color: #666;">cm</span>
+                                                                                 <span style="font-size: 11px; color: #666; background: #f8f9fa; padding: 2px 6px; border-radius: 3px;">
+                                                                                     <?php echo esc_html($measurement_type); ?>
+                                                                                 </span>
                                                                              </div>
                                                                              
                                                                              <div class="measurement-stats" style="font-size: 11px; color: #666;">
@@ -1382,18 +1398,42 @@ class Octo_Print_Designer_Template {
                                                                                      echo sprintf(__('Pixel: %s px', 'octo-print-designer'), number_format($pixel_distance, 1));
                                                                                      ?>
                                                                                  </span>
-                                                                                 <span class="separator" style="margin: 0 8px;">•</span>
-                                                                                 <span class="scale-factor">
-                                                                                     <?php 
-                                                                                     $scale_factor = $measurement['scale_factor'] ?? 0;
-                                                                                     if ($scale_factor > 0) {
-                                                                                         echo sprintf(__('Scale: %s mm/px', 'octo-print-designer'), number_format($scale_factor, 3));
-                                                                                     } else {
-                                                                                         echo __('Scale: Not calculated', 'octo-print-designer');
-                                                                                     }
-                                                                                     ?>
-                                                                                 </span>
+                                                                                 
+                                                                                 <?php if (isset($measurement['size_scale_factors']) && !empty($measurement['size_scale_factors'])): ?>
+                                                                                     <span class="separator" style="margin: 0 8px;">•</span>
+                                                                                     <span class="scale-factors">
+                                                                                         <?php 
+                                                                                         $scale_factors = $measurement['size_scale_factors'];
+                                                                                         $size_names = array('S' => 'Small', 'M' => 'Medium', 'L' => 'Large', 'XL' => 'XL');
+                                                                                         $scale_info = array();
+                                                                                         foreach ($scale_factors as $size_id => $factor) {
+                                                                                             $size_name = $size_names[$size_id] ?? $size_id;
+                                                                                             $scale_info[] = $size_name . ': ' . number_format($factor, 3) . ' mm/px';
+                                                                                         }
+                                                                                         echo implode(', ', $scale_info);
+                                                                                         ?>
+                                                                                     </span>
+                                                                                 <?php elseif (isset($measurement['scale_factor']) && $measurement['scale_factor'] > 0): ?>
+                                                                                     <span class="separator" style="margin: 0 8px;">•</span>
+                                                                                     <span class="scale-factor">
+                                                                                         <?php echo sprintf(__('Scale: %s mm/px', 'octo-print-designer'), number_format($measurement['scale_factor'], 3)); ?>
+                                                                                     </span>
+                                                                                 <?php endif; ?>
+                                                                                 
+                                                                                 <?php if (isset($measurement['created_at'])): ?>
+                                                                                     <span class="separator" style="margin: 0 8px;">•</span>
+                                                                                     <span class="created-at">
+                                                                                         <?php echo esc_html(date('d.m.Y H:i', strtotime($measurement['created_at']))); ?>
+                                                                                     </span>
+                                                                                 <?php endif; ?>
                                                                              </div>
+                                                                             
+                                                                             <?php if (isset($measurement['reference_sizes']) && !empty($measurement['reference_sizes'])): ?>
+                                                                                 <div style="font-size: 10px; color: #28a745; margin-top: 4px;">
+                                                                                     <span class="dashicons dashicons-yes" style="font-size: 10px;"></span>
+                                                                                     <?php echo sprintf(__('Reference sizes: %s', 'octo-print-designer'), implode(', ', $measurement['reference_sizes'])); ?>
+                                                                                 </div>
+                                                                             <?php endif; ?>
                                                                          </div>
                                                                          
                                                                          <div class="measurement-actions">
@@ -1405,13 +1445,23 @@ class Octo_Print_Designer_Template {
                                                                          </div>
                                                                      </div>
                                                                      
-                                                                     <!-- Hidden Fields -->
-                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements[<?php echo esc_attr($index); ?>][pixel_distance]" 
-                                                                            value="<?php echo esc_attr($measurement['pixel_distance'] ?? 0); ?>" class="pixel-distance-input" />
-                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements[<?php echo esc_attr($index); ?>][color]" 
-                                                                            value="<?php echo esc_attr($measurement['color'] ?? '#ff4444'); ?>" class="measurement-color-input" />
-                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements[<?php echo esc_attr($index); ?>][points]" 
-                                                                            value="<?php echo esc_attr(json_encode($measurement['points'] ?? array())); ?>" class="measurement-points-input" />
+                                                                     <!-- Hidden Fields für Form-Submission -->
+                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][type]" 
+                                                                            value="<?php echo esc_attr($measurement['measurement_type'] ?? $measurement['type'] ?? ''); ?>" />
+                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][pixel_distance]" 
+                                                                            value="<?php echo esc_attr($measurement['pixel_distance'] ?? 0); ?>" />
+                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][color]" 
+                                                                            value="<?php echo esc_attr($measurement['color'] ?? '#ff4444'); ?>" />
+                                                                     <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][points]" 
+                                                                            value="<?php echo esc_attr(json_encode($measurement['points'] ?? array())); ?>" />
+                                                                     <?php if (isset($measurement['size_scale_factors'])): ?>
+                                                                         <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][size_scale_factors]" 
+                                                                                value="<?php echo esc_attr(json_encode($measurement['size_scale_factors'])); ?>" />
+                                                                     <?php endif; ?>
+                                                                     <?php if (isset($measurement['reference_sizes'])): ?>
+                                                                         <input type="hidden" name="view_print_areas[<?php echo esc_attr($view_id); ?>][measurements][<?php echo esc_attr($index); ?>][reference_sizes]" 
+                                                                                value="<?php echo esc_attr(json_encode($measurement['reference_sizes'])); ?>" />
+                                                                     <?php endif; ?>
                                                                  </div>
                                                              <?php endforeach; ?>
                                                          </div>
