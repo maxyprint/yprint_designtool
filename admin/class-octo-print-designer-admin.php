@@ -78,8 +78,8 @@ class Octo_Print_Designer_Admin {
             true
         );
         
-        // Template Measurements JavaScript
-        wp_enqueue_script('octo-template-measurements', plugins_url('js/template-measurements.js', __FILE__), array('jquery'), rand(), true);
+        // Template Measurements JavaScript - Cache Busting
+        wp_enqueue_script('octo-template-measurements', plugins_url('js/template-measurements.js', __FILE__), array('jquery'), time(), true);
         
         // AJAX Localization für Template Measurements
         wp_localize_script('octo-template-measurements', 'templateMeasurementsAjax', array(

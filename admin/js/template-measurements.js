@@ -19,6 +19,8 @@ class YPrintTemplateMeasurements {
         this.colors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44', '#ff44ff', '#44ffff'];
         this.colorIndex = 0;
         this.isInitialized = false;
+        this.instanceId = 'instance_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        console.log('🎯 Instance ID created:', this.instanceId);
         
         this.init();
     }
@@ -26,6 +28,14 @@ class YPrintTemplateMeasurements {
     init() {
         if (this.isInitialized) {
             console.log('⚠️ Already initialized, skipping');
+            return;
+        }
+        
+        // Prüfe ob bereits eine andere Instanz existiert
+        if (window.templateMeasurements && window.templateMeasurements !== this) {
+            console.log('⚠️ Another instance already exists, destroying this one');
+            console.log('⚠️ Existing instance ID:', window.templateMeasurements.instanceId);
+            console.log('⚠️ This instance ID:', this.instanceId);
             return;
         }
         
@@ -1184,24 +1194,35 @@ class YPrintTemplateMeasurements {
     
     deleteMeasurement(index) {
         console.log('🎯 deleteMeasurement called with index:', index);
+        console.log('🎯 Current instance:', this);
+        console.log('🎯 Instance ID:', this.instanceId || 'no-id');
         
         try {
             // 1. Finde das Measurement-Item
             const measurementItem = document.querySelector(`[data-index="${index}"]`);
+            console.log('🎯 Found measurement item:', measurementItem);
+            
             if (!measurementItem) {
                 console.error('❌ Measurement item not found for index:', index);
                 return;
             }
             
             // 2. Hole View-ID aus dem Measurement-Item oder dem Delete-Button
-            let viewId = measurementItem.getAttribute('data-view-id') || 
-                        measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
+            let viewId = measurementItem.getAttribute('data-view-id');
+            console.log('🎯 View ID from measurement item:', viewId);
+            
+            if (!viewId) {
+                viewId = measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
+                console.log('🎯 View ID from closest element:', viewId);
+            }
             
             // Fallback: Suche nach dem Delete-Button für diese Messung
             if (!viewId) {
                 const deleteButton = document.querySelector(`button[data-index="${index}"][data-view-id]`);
+                console.log('🎯 Found delete button:', deleteButton);
                 if (deleteButton) {
                     viewId = deleteButton.getAttribute('data-view-id');
+                    console.log('🎯 View ID from delete button:', viewId);
                 }
             }
             
@@ -1210,14 +1231,21 @@ class YPrintTemplateMeasurements {
                 return;
             }
             
+            console.log('🎯 Final view ID:', viewId);
+            console.log('🎯 Final index:', index);
+            
             // 3. Lösche aus der Datenbank VOR dem visuellen Löschen
             this.deleteMeasurementFromDatabase(viewId, index, (success) => {
+                console.log('🎯 Database deletion callback:', success);
                 if (success) {
                     // 4. Entferne zugehörige visuelle Elemente
                     this.removeVisualElements(index);
                     
                     // 5. Entferne das Measurement-Item
-                    measurementItem.remove();
+                    if (measurementItem && measurementItem.parentNode) {
+                        measurementItem.remove();
+                        console.log('✅ Measurement item removed from DOM');
+                    }
                     
                     // 6. Zeige Bestätigung
                     this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
@@ -1230,6 +1258,7 @@ class YPrintTemplateMeasurements {
             
         } catch (error) {
             console.error('❌ Error deleting measurement:', error);
+            console.error('❌ Error stack:', error.stack);
             this.showNotification('❌ Fehler beim Löschen der Messung', 'error');
         }
     }
@@ -1331,22 +1360,22 @@ class YPrintTemplateMeasurements {
 // Globale Instanz erstellen
 window.YPrintTemplateMeasurements = YPrintTemplateMeasurements;
 
-// Globale Initialisierung
+// Globale Initialisierung - Nur EINE Instanz erlauben
 window.templateMeasurements = null;
 
 // DOM-Ready-Handler
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎯 Template Measurements DOM Ready');
     
-    // Warte kurz, bis alle Skripte geladen sind
-    setTimeout(function() {
-        if (typeof YPrintTemplateMeasurements !== 'undefined') {
-            window.templateMeasurements = new YPrintTemplateMeasurements();
-            console.log('✅ Template Measurements initialized:', window.templateMeasurements);
-        } else {
-            console.error('❌ YPrintTemplateMeasurements class not found');
-        }
-    }, 100);
+    // Nur initialisieren wenn noch keine Instanz existiert
+    if (!window.templateMeasurements && typeof YPrintTemplateMeasurements !== 'undefined') {
+        window.templateMeasurements = new YPrintTemplateMeasurements();
+        console.log('✅ Template Measurements initialized (DOM Ready):', window.templateMeasurements);
+    } else if (window.templateMeasurements) {
+        console.log('⚠️ Template Measurements already exists, skipping duplicate initialization');
+    } else {
+        console.error('❌ YPrintTemplateMeasurements class not found');
+    }
 });
 
 // Fallback für spätere Initialisierung
@@ -1357,11 +1386,13 @@ window.initTemplateMinitsIfNeeded = function() {
     }
 };
 
-// Initialisierung
+// Initialisierung - Nur wenn noch keine Instanz existiert
 console.log('🎯 Initializing YPrint Template Measurements');
-if (typeof window.YPrintTemplateMeasurements !== 'undefined') {
+if (!window.templateMeasurements && typeof window.YPrintTemplateMeasurements !== 'undefined') {
     window.templateMeasurements = new YPrintTemplateMeasurements();
     console.log('✅ Template Measurements initialized immediately');
+} else if (window.templateMeasurements) {
+    console.log('⚠️ Template Measurements already exists, skipping immediate initialization');
 } else {
     console.log('🎯 YPrint Template Measurements Script Ende erreicht'); 
 }
