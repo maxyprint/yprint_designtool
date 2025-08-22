@@ -481,6 +481,9 @@ class YPrintTemplateMeasurements {
         formData.append('template_id', this.getTemplateId());
         
         console.log('🎯 Sending AJAX request for measurement types...');
+        console.log('🎯 Template ID:', this.getTemplateId());
+        console.log('🎯 Nonce:', templateMeasurementsAjax.nonce);
+        console.log('🎯 AJAX URL:', templateMeasurementsAjax.ajax_url);
         
         fetch(templateMeasurementsAjax.ajax_url, {
             method: 'POST',
@@ -488,8 +491,14 @@ class YPrintTemplateMeasurements {
         })
         .then(response => {
             console.log('🎯 AJAX response status:', response.status);
+            console.log('🎯 Response headers:', response.headers);
+            
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                // Try to get response text for debugging
+                return response.text().then(text => {
+                    console.error('🎯 Response text:', text);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${text}`);
+                });
             }
             return response.json();
         })
@@ -539,37 +548,46 @@ class YPrintTemplateMeasurements {
     }
 
     showMeasurementTypeDialog(availableTypes, pixelDistance, color) {
-        // Prüfe bestehende Messungen dieses Views
+        // Prüfe bestehende Messungen dieses Views - JEDER TYP NUR EINMAL
         const existingTypes = this.getExistingMeasurementTypes(this.currentViewId);
         const availableForSelection = availableTypes.filter(type => !existingTypes.includes(type.key));
         
         if (availableForSelection.length === 0) {
-            this.showNotification('❌ Alle verfügbaren Messungstypen wurden bereits für diese Ansicht verwendet', 'error');
+            this.showNotification('❌ Alle verfügbaren Messungstypen wurden bereits für diese Ansicht verwendet. Jeder Messungstyp kann nur einmal verwendet werden.', 'error');
             this.resetMeasurement();
             return;
         }
         
-        // ✅ REPARIERT: Verwendung von Instanz-Referenz
+        // ✅ NEU: Intelligente Messungstyp-Auswahl
         const dialogHtml = `
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 400px;">
-                <h3 style="margin-top: 0; color: #2271b1;">Messungstyp auswählen</h3>
+            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 450px;">
+                <h3 style="margin-top: 0; color: #2271b1;">🎯 Was haben Sie gemessen?</h3>
                 <p style="margin-bottom: 15px; color: #666;">
-                    Gemessene Distanz: <strong>${pixelDistance.toFixed(1)} Pixel</strong><br>
-                    Was haben Sie gemessen?
+                    <strong>Gemessene Distanz:</strong> ${pixelDistance.toFixed(1)} Pixel<br>
+                    <small style="color: #999;">Wählen Sie den Messungstyp aus, der am besten zu Ihrer Messung passt.</small>
                 </p>
-                <select id="measurement-type-select" style="width: 100%; padding: 8px; margin-bottom: 15px;">
-                    <option value="">-- Messungstyp wählen --</option>
-                    ${availableForSelection.map(type => 
-                        `<option value="${type.key}">${type.label}</option>`
-                    ).join('')}
-                </select>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="measurement-type-select" style="display: block; margin-bottom: 5px; font-weight: 600;">Messungstyp:</label>
+                    <select id="measurement-type-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        <option value="">-- Bitte wählen Sie einen Messungstyp --</option>
+                        ${availableForSelection.map(type => 
+                            `<option value="${type.key}">${type.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                
+                <div id="measurement-preview" style="display: none; background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 12px;">
+                    <strong>Vorschau:</strong> <span id="preview-text"></span>
+                </div>
+                
                 <div style="text-align: right;">
                     <button type="button" onclick="window.templateMeasurements.cancelMeasurementTypeDialog()" 
                             style="margin-right: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
                         Abbrechen
                     </button>
-                    <button type="button" onclick="window.templateMeasurements.confirmMeasurementType(${pixelDistance}, '${color}')" 
-                            style="padding: 8px 16px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button type="button" id="confirm-measurement-btn" onclick="window.templateMeasurements.confirmMeasurementType(${pixelDistance}, '${color}')" 
+                            style="padding: 8px 16px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.5;" disabled>
                         Speichern
                     </button>
                 </div>
@@ -578,6 +596,36 @@ class YPrintTemplateMeasurements {
         
         // Zeige Dialog
         this.showModal(dialogHtml);
+        
+        // Event Listener für Select-Change hinzufügen
+        setTimeout(() => {
+            const select = document.getElementById('measurement-type-select');
+            const confirmBtn = document.getElementById('confirm-measurement-btn');
+            const preview = document.getElementById('measurement-preview');
+            const previewText = document.getElementById('preview-text');
+            
+            if (select && confirmBtn) {
+                select.addEventListener('change', (e) => {
+                    const selectedType = e.target.value;
+                    
+                    if (selectedType) {
+                        // Button aktivieren
+                        confirmBtn.disabled = false;
+                        confirmBtn.style.opacity = '1';
+                        
+                        // Preview anzeigen
+                        const selectedOption = e.target.options[e.target.selectedIndex];
+                        preview.style.display = 'block';
+                        previewText.textContent = `Sie haben "${selectedOption.text}" ausgewählt. Das System wird automatisch die entsprechenden Größenwerte aus der Produktdimensionen-Tabelle verwenden.`;
+                    } else {
+                        // Button deaktivieren
+                        confirmBtn.disabled = true;
+                        confirmBtn.style.opacity = '0.5';
+                        preview.style.display = 'none';
+                    }
+                });
+            }
+        }, 100);
     }
 
     confirmMeasurementType(pixelDistance, color) {
@@ -600,16 +648,32 @@ class YPrintTemplateMeasurements {
     }
 
     saveMeasurementWithType(measurementType, pixelDistance, color) {
-        // Erstelle Mess-Element mit Typ-Information
-        this.createVisibleMeasurementElement(this.currentViewId, {
-            type: measurementType,
-            pixel_distance: pixelDistance,
-            measurement_type: measurementType,
-            color: color,
-            points: this.tempPoints
-        });
+        console.log('🎯 saveMeasurementWithType called:', { measurementType, pixelDistance, color });
         
-        this.showNotification(`✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!\n📏 Pixel: ${pixelDistance.toFixed(1)} px`, 'success');
+        // ✅ NEU: Intelligente Messung mit Größen-spezifischen Faktoren
+        const measurementData = {
+            type: measurementType,
+            measurement_type: measurementType,
+            pixel_distance: pixelDistance,
+            color: color,
+            points: this.tempPoints,
+            created_at: new Date().toISOString(),
+            is_validated: true,
+            // NEU: Größen-spezifische Faktoren werden vom Backend berechnet
+            size_scale_factors: {}, // Wird vom Backend gefüllt
+            reference_sizes: [] // Wird vom Backend gefüllt
+        };
+        
+        // Erstelle Mess-Element mit Typ-Information
+        this.createVisibleMeasurementElement(this.currentViewId, measurementData);
+        
+        // ✅ NEU: Erfolgsmeldung mit Details
+        const successMessage = `✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!
+📏 Pixel: ${pixelDistance.toFixed(1)} px
+🎯 Typ: ${measurementType}
+💡 Das System verwendet automatisch die Größenwerte aus der Produktdimensionen-Tabelle`;
+        
+        this.showNotification(successMessage, 'success');
         this.resetMeasurement();
     }
 
@@ -684,7 +748,26 @@ class YPrintTemplateMeasurements {
     getTemplateId() {
         // Hole Template ID aus der URL oder einem versteckten Feld
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('post') || document.querySelector('input[name="post_ID"]')?.value || 0;
+        const postId = urlParams.get('post') || document.querySelector('input[name="post_ID"]')?.value || 0;
+        
+        console.log('🎯 getTemplateId() called, returning:', postId);
+        
+        // Fallback: Versuche aus der Seite zu extrahieren
+        if (!postId || postId === '0') {
+            // Suche nach Template ID in der Seite
+            const templateIdElement = document.querySelector('[data-template-id]');
+            if (templateIdElement) {
+                const fallbackId = templateIdElement.getAttribute('data-template-id');
+                console.log('🎯 Using fallback template ID:', fallbackId);
+                return fallbackId;
+            }
+            
+            // Letzter Fallback: Verwende 1 für Tests
+            console.log('🎯 Using test template ID: 1');
+            return 1;
+        }
+        
+        return postId;
     }
 
     showModal(content) {

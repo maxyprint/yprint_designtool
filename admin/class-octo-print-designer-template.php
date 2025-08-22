@@ -1515,20 +1515,75 @@ class Octo_Print_Designer_Template {
      * Static AJAX Handler für bessere Kompatibilität
      */
     public static function ajax_get_available_measurement_types_static() {
+        // Debug-Logging
+        error_log("YPrint: AJAX handler called - " . json_encode($_POST));
+        
         if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            error_log("YPrint: Nonce validation failed");
             wp_send_json_error(array('message' => 'Invalid nonce'));
         }
         
         $template_id = intval($_POST['template_id']);
         if (!$template_id) {
+            error_log("YPrint: Invalid template ID: " . $_POST['template_id']);
             wp_send_json_error(array('message' => 'Invalid template ID'));
         }
         
-        // **SOFORTIGER FALLBACK** für Tests
+        error_log("YPrint: Processing template ID: " . $template_id);
+        
+        // Hole Produktdimensionen aus der Datenbank
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        
+        // **INTELLIGENTE MESSUNGSTYPEN** basierend auf verfügbaren Daten
+        if (!empty($product_dimensions) && is_array($product_dimensions)) {
+            $available_types = array();
+            $measurement_labels = self::get_measurement_labels_static();
+            
+            foreach ($measurement_labels as $type_key => $type_label) {
+                $has_values = false;
+                
+                // Prüfe, ob dieser Typ in mindestens einer Größe Werte hat
+                foreach ($product_dimensions as $size_id => $size_config) {
+                    if (isset($size_config[$type_key]) && floatval($size_config[$type_key]) > 0) {
+                        $has_values = true;
+                        break;
+                    }
+                }
+                
+                if ($has_values) {
+                    $available_types[] = array(
+                        'key' => $type_key,
+                        'label' => $type_label
+                    );
+                }
+            }
+            
+            if (!empty($available_types)) {
+                error_log("YPrint: Found " . count($available_types) . " measurement types from product dimensions");
+                wp_send_json_success(array(
+                    'measurement_types' => $available_types,
+                    'total_available' => count($available_types),
+                    'is_fallback' => false,
+                    'debug_info' => array(
+                        'template_id' => $template_id,
+                        'nonce_valid' => true,
+                        'timestamp' => current_time('mysql'),
+                        'source' => 'product_dimensions'
+                    )
+                ));
+                return;
+            }
+        }
+        
+        // **FALLBACK**: Wenn keine Produktdimensionen vorhanden, verwende Standard-Messungstypen
+        error_log("YPrint: Using fallback measurement types for template " . $template_id);
+        
         $fallback_types = array(
             array('key' => 'chest', 'label' => 'Chest / Brustumfang'),
             array('key' => 'height_from_shoulder', 'label' => 'Height from Shoulder'),
-            array('key' => 'length', 'label' => 'Total Length')
+            array('key' => 'length', 'label' => 'Total Length'),
+            array('key' => 'sleeve_length', 'label' => 'Sleeve Length'),
+            array('key' => 'shoulder_to_shoulder', 'label' => 'Shoulder to Shoulder')
         );
         
         wp_send_json_success(array(
@@ -1538,9 +1593,27 @@ class Octo_Print_Designer_Template {
             'debug_info' => array(
                 'template_id' => $template_id,
                 'nonce_valid' => true,
-                'timestamp' => current_time('mysql')
+                'timestamp' => current_time('mysql'),
+                'source' => 'fallback'
             )
         ));
+    }
+    
+    /**
+     * Static method to get measurement labels
+     */
+    private static function get_measurement_labels_static() {
+        return array(
+            'chest' => __('Chest / Brustumfang', 'octo-print-designer'),
+            'height_from_shoulder' => __('Height from Shoulder', 'octo-print-designer'),
+            'sleeve_length' => __('Sleeve Length', 'octo-print-designer'),
+            'biceps' => __('Biceps', 'octo-print-designer'),
+            'shoulder_to_shoulder' => __('Shoulder to Shoulder', 'octo-print-designer'),
+            'hem_width' => __('Hem Width', 'octo-print-designer'),
+            'waist' => __('Waist', 'octo-print-designer'),
+            'hip' => __('Hip', 'octo-print-designer'),
+            'length' => __('Total Length', 'octo-print-designer')
+        );
     }
 
 }
