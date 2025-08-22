@@ -397,6 +397,9 @@ class YPrintTemplateMeasurements {
         console.log('🎨 Farbe gewählt:', color);
         this.colorIndex++;
         
+        // Setze aktuellen Messungs-Index für visuelle Elemente
+        this.currentMeasurementIndex = Date.now(); // Temporärer Index
+        
         // Zeichne finale Linie
         console.log('🎯 Versuche drawMeasurementLine aufzurufen...');
         try {
@@ -470,6 +473,8 @@ class YPrintTemplateMeasurements {
             // Erstelle Linie als div-Element
             const lineElement = document.createElement('div');
             lineElement.className = 'measurement-line-div';
+            lineElement.setAttribute('data-measurement-index', this.currentMeasurementIndex || 'temp');
+            lineElement.setAttribute('data-measurement-overlay', 'true');
             
             // Berechne Linien-Position und -Größe
             const dx = displayPoint2.x - displayPoint1.x;
@@ -755,6 +760,9 @@ class YPrintTemplateMeasurements {
             if (success) {
                 // Erstelle Mess-Element mit Typ-Information
                 this.createVisibleMeasurementElement(this.currentViewId, measurementData);
+                
+                // Aktualisiere visuelle Elemente mit dem richtigen Index
+                this.updateVisualElementsIndex(this.currentMeasurementIndex, measurementData.index || this.currentMeasurementIndex);
                 
                 // ✅ NEU: Erfolgsmeldung mit Details
                 const successMessage = `✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!
@@ -1161,24 +1169,13 @@ class YPrintTemplateMeasurements {
                 return;
             }
             
-            // 2. Finde den Container (measurement-image-wrapper oder ähnlich)
-            const container = measurementItem.closest('.measurement-image-wrapper') || 
-                             measurementItem.closest('.visual-measurement-container') ||
-                             measurementItem.closest('.existing-measurements') ||
-                             measurementItem.parentElement;
-            
-            if (!container) {
-                console.error('❌ Container not found for measurement item');
-                return;
-            }
+            // 2. Entferne zugehörige visuelle Elemente (Linien, Punkte) VOR dem Löschen des Items
+            this.removeVisualElements(index);
             
             // 3. Entferne das Measurement-Item
             measurementItem.remove();
             
-            // 4. Entferne zugehörige visuelle Elemente (Linien, Punkte)
-            this.removeVisualElements(index);
-            
-            // 5. Zeige Bestätigung
+            // 4. Zeige Bestätigung
             this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
             
             console.log('✅ Measurement deleted successfully');
@@ -1190,13 +1187,57 @@ class YPrintTemplateMeasurements {
     }
     
     removeVisualElements(index) {
-        // Entferne Linien und Punkte für diese Messung
-        const lines = document.querySelectorAll(`[data-measurement-index="${index}"]`);
-        lines.forEach(line => line.remove());
-        
-        // Entferne Punkte (falls vorhanden)
-        const points = document.querySelectorAll(`[data-measurement-index="${index}"]`);
-        points.forEach(point => point.remove());
+        try {
+            // Entferne Linien für diese Messung
+            const lines = document.querySelectorAll(`[data-measurement-index="${index}"]`);
+            lines.forEach(line => {
+                if (line && line.parentNode) {
+                    line.remove();
+                }
+            });
+            
+            // Entferne Punkte für diese Messung
+            const points = document.querySelectorAll(`[data-measurement-point="${index}"]`);
+            points.forEach(point => {
+                if (point && point.parentNode) {
+                    point.remove();
+                }
+            });
+            
+            // Entferne Overlay-Linien für diese Messung
+            const overlayLines = document.querySelectorAll(`[data-measurement-overlay="${index}"]`);
+            overlayLines.forEach(line => {
+                if (line && line.parentNode) {
+                    line.remove();
+                }
+            });
+            
+        } catch (error) {
+            console.warn('⚠️ Error removing visual elements for measurement', index, ':', error);
+        }
+    }
+    
+    updateVisualElementsIndex(oldIndex, newIndex) {
+        try {
+            // Aktualisiere alle visuellen Elemente mit dem neuen Index
+            const elements = document.querySelectorAll(`[data-measurement-index="${oldIndex}"]`);
+            elements.forEach(element => {
+                element.setAttribute('data-measurement-index', newIndex);
+            });
+            
+            const pointElements = document.querySelectorAll(`[data-measurement-point="${oldIndex}"]`);
+            pointElements.forEach(element => {
+                element.setAttribute('data-measurement-point', newIndex);
+            });
+            
+            const overlayElements = document.querySelectorAll(`[data-measurement-overlay="${oldIndex}"]`);
+            overlayElements.forEach(element => {
+                element.setAttribute('data-measurement-overlay', newIndex);
+            });
+            
+        } catch (error) {
+            console.warn('⚠️ Error updating visual elements index:', error);
+        }
     }
 
 } // ✅ KLASSE RICHTIG GESCHLOSSEN
