@@ -66,11 +66,31 @@ class Octo_Print_Designer_Admin {
         wp_add_inline_script('octo-template-measurements', '
             console.log("🎯 YPrint Template Measurements Script loaded");
             console.log("DOM ready state:", document.readyState);
+            console.log("templateMeasurementsAjax available:", typeof templateMeasurementsAjax !== "undefined");
             
-            // Verbessertes DOM-Ready-Handling ohne Konflikt
-            function checkYPrintMeasurements() {
-                if (typeof window.YPrintTemplateMeasurements !== "undefined") {
+            // Debug-Info über verfügbare Variablen
+            if (typeof templateMeasurementsAjax !== "undefined") {
+                console.log("✅ AJAX variables loaded:", templateMeasurementsAjax);
+            } else {
+                console.error("❌ templateMeasurementsAjax not available");
+            }
+            
+            // Verbessertes DOM-Ready-Handling
+            function checkAndInitializeMeasurements() {
+                console.log("🔍 Checking measurement system availability...");
+                
+                if (typeof YPrintTemplateMeasurements !== "undefined") {
                     console.log("✅ YPrintTemplateMeasurements class available");
+                    
+                    // Versuche Initialisierung
+                    if (!window.templateMeasurements) {
+                        try {
+                            window.templateMeasurements = new YPrintTemplateMeasurements();
+                            console.log("✅ Template Measurements successfully initialized");
+                        } catch(error) {
+                            console.error("❌ Error initializing template measurements:", error);
+                        }
+                    }
                 } else {
                     console.error("❌ YPrintTemplateMeasurements class not available");
                 }
@@ -78,13 +98,24 @@ class Octo_Print_Designer_Admin {
             
             if (document.readyState === "loading") {
                 document.addEventListener("DOMContentLoaded", function() {
-                    console.log("🎯 DOM Content Loaded - initializing measurements");
-                    setTimeout(checkYPrintMeasurements, 500);
+                    console.log("🎯 DOM Content Loaded - checking measurements");
+                    setTimeout(checkAndInitializeMeasurements, 300);
                 });
             } else {
                 console.log("🎯 DOM already ready - checking measurements immediately");
-                setTimeout(checkYPrintMeasurements, 100);
+                setTimeout(checkAndInitializeMeasurements, 100);
             }
+            
+            // Additional fallback check after page fully loaded
+            window.addEventListener("load", function() {
+                console.log("🎯 Window fully loaded - final measurement check");
+                setTimeout(function() {
+                    if (!window.templateMeasurements) {
+                        console.log("🔄 Attempting final initialization...");
+                        checkAndInitializeMeasurements();
+                    }
+                }, 500);
+            });
         ', 'after');
 
         // Initialize AJAX handlers

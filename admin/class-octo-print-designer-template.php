@@ -1026,8 +1026,24 @@ class Octo_Print_Designer_Template {
         // Hole Produktdimensionen
         $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
         
+        // **FALLBACK**: Wenn keine Produktdimensionen vorhanden, verwende Standard-Messungstypen
         if (empty($product_dimensions) || !is_array($product_dimensions)) {
-            wp_send_json_error(array('message' => 'No product dimensions found'));
+            error_log("YPrint: No product dimensions found for template {$template_id}, using fallback");
+            
+            // Fallback: Basis-Messungstypen zurückgeben
+            $fallback_types = array(
+                array('key' => 'chest', 'label' => 'Chest / Brustumfang'),
+                array('key' => 'height_from_shoulder', 'label' => 'Height from Shoulder'),
+                array('key' => 'length', 'label' => 'Total Length')
+            );
+            
+            wp_send_json_success(array(
+                'measurement_types' => $fallback_types,
+                'total_available' => count($fallback_types),
+                'is_fallback' => true,
+                'message' => 'Using fallback measurement types. Please add product dimensions to this template.'
+            ));
+            return;
         }
         
         // Ermittle verfügbare Messungstypen (die in mindestens einer Größe Werte haben)

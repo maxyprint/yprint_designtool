@@ -320,6 +320,13 @@ class YPrintTemplateMeasurements {
     }
 
     getAvailableMeasurementTypes(callback) {
+        // Prüfe erst, ob AJAX-Variablen verfügbar sind
+        if (typeof templateMeasurementsAjax === 'undefined') {
+            console.error('templateMeasurementsAjax not defined, using fallback');
+            this.showLegacyCMDialog();
+            return;
+        }
+        
         const formData = new FormData();
         formData.append('action', 'get_available_measurement_types');
         formData.append('nonce', templateMeasurementsAjax.nonce);
@@ -335,13 +342,41 @@ class YPrintTemplateMeasurements {
                 callback(data.data.measurement_types || []);
             } else {
                 console.error('Error loading measurement types:', data.data);
-                callback([]);
+                // Fallback zu CM-Eingabe
+                this.showLegacyCMDialog();
             }
         })
         .catch(error => {
             console.error('AJAX error:', error);
-            callback([]);
+            // Fallback zu CM-Eingabe
+            this.showLegacyCMDialog();
         });
+    }
+
+    // **NEU**: Fallback-Funktion für CM-Eingabe
+    showLegacyCMDialog() {
+        const realDistance = prompt('FALLBACK: Geben Sie die reale Distanz in cm ein:');
+        
+        if (isFinite(realDistance) && parseFloat(realDistance) > 0) {
+            // Simuliere "custom" Messungstyp
+            const pixelDistance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
+            const scaleFactor = parseFloat(realDistance) / (pixelDistance / 10);
+            
+            this.createVisibleMeasurementElement(this.currentViewId, {
+                type: 'custom',
+                pixel_distance: pixelDistance,
+                real_distance_cm: parseFloat(realDistance),
+                scale_factor: scaleFactor,
+                color: this.colors[this.colorIndex % this.colors.length],
+                points: this.tempPoints
+            });
+            
+            this.showNotification(`✅ Messung gespeichert (Fallback-Modus)!\n📏 ${pixelDistance.toFixed(1)} px = ${realDistance} cm`, 'success');
+            this.resetMeasurement();
+        } else {
+            this.showNotification('❌ Messung abgebrochen - ungültige Eingabe', 'error');
+            this.resetMeasurement();
+        }
     }
 
     showMeasurementTypeDialog(availableTypes, pixelDistance, color) {
@@ -864,23 +899,37 @@ class YPrintTemplateMeasurements {
 // Globale Instanz erstellen
 window.YPrintTemplateMeasurements = YPrintTemplateMeasurements;
 
-// Initialisierung mit verbessertem DOM-Ready-Handling
-function initializeYPrintMeasurements() {
-    if (window.yprintMeasurementsInstance) {
-        console.log('⚠️ YPrint Measurements bereits initialisiert');
-        return;
-    }
+// Globale Initialisierung
+window.templateMeasurements = null;
+
+// DOM-Ready-Handler
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 Template Measurements DOM Ready');
     
-    console.log('🎯 Initializing YPrint Template Measurements');
-    window.yprintMeasurementsInstance = new YPrintTemplateMeasurements();
-}
+    // Warte kurz, bis alle Skripte geladen sind
+    setTimeout(function() {
+        if (typeof YPrintTemplateMeasurements !== 'undefined') {
+            window.templateMeasurements = new YPrintTemplateMeasurements();
+            console.log('✅ Template Measurements initialized:', window.templateMeasurements);
+        } else {
+            console.error('❌ YPrintTemplateMeasurements class not found');
+        }
+    }, 100);
+});
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeYPrintMeasurements);
+// Fallback für spätere Initialisierung
+window.initTemplateMinitsIfNeeded = function() {
+    if (!window.templateMeasurements && typeof YPrintTemplateMeasurements !== 'undefined') {
+        window.templateMeasurements = new YPrintTemplateMeasurements();
+        console.log('✅ Template Measurements initialized (fallback)');
+    }
+};
+
+// Initialisierung mit verbessertem DOM-Ready-Handling
+if (typeof window.YPrintTemplateMeasurements !== 'undefined') {
+    // Klasse bereits definiert, initialisiere sofort
+    window.templateMeasurements = new YPrintTemplateMeasurements();
+    console.log('✅ Template Measurements initialized immediately');
 } else {
-    initializeYPrintMeasurements();
-}
-
-} // Ende der if-Überprüfung für bereits geladene Klasse
-
-console.log('🎯 YPrint Template Measurements Script Ende erreicht'); 
+    console.log('🎯 YPrint Template Measurements Script Ende erreicht'); 
+} 
