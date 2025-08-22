@@ -297,14 +297,30 @@ class YPrintTemplateMeasurements {
     }
     
     completeMeasurement() {
-        if (this.tempPoints.length !== 2) return;
+        console.log('🎯 completeMeasurement() aufgerufen');
+        console.log('🎯 this.tempPoints:', this.tempPoints);
+        console.log('🎯 this.drawMeasurementLine verfügbar:', typeof this.drawMeasurementLine);
+        
+        if (this.tempPoints.length !== 2) {
+            console.log('❌ Nicht genug Punkte:', this.tempPoints.length);
+            return;
+        }
         
         const distance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
         const color = this.colors[this.colorIndex % this.colors.length];
         this.colorIndex++;
         
+        console.log('🎯 Distanz berechnet:', distance);
+        console.log('🎯 Farbe gewählt:', color);
+        console.log('🎯 Versuche drawMeasurementLine aufzurufen...');
+        
         // Zeichne finale Linie
-        this.drawMeasurementLine(this.currentViewId, this.tempPoints, color);
+        try {
+            this.drawMeasurementLine(this.currentViewId, this.tempPoints, color);
+            console.log('✅ drawMeasurementLine erfolgreich aufgerufen');
+        } catch (error) {
+            console.error('❌ Fehler in drawMeasurementLine:', error);
+        }
         
         // Hole verfügbare Messungstypen aus Template-Tabelle
         this.getAvailableMeasurementTypes((availableTypes) => {
