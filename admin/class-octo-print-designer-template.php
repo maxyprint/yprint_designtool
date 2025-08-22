@@ -1693,4 +1693,131 @@ class Octo_Print_Designer_Template {
         );
     }
 
+    /**
+     * ✅ NEU: Static AJAX Handler für das Speichern von Messungen in der Datenbank
+     */
+    public static function ajax_save_measurement_to_database_static() {
+        // Debug-Logging
+        error_log("YPrint: Save measurement AJAX handler called - " . json_encode($_POST));
+        
+        // Prüfe ob Nonce überhaupt gesendet wurde
+        if (!isset($_POST['nonce'])) {
+            error_log("YPrint: No nonce provided in save measurement request");
+            wp_send_json_error(array('message' => 'No nonce provided'));
+            return;
+        }
+        
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            error_log("YPrint: Nonce validation failed in save measurement - nonce: " . $_POST['nonce']);
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+        
+        if (!isset($_POST['template_id']) || !isset($_POST['view_id']) || !isset($_POST['measurement_data'])) {
+            error_log("YPrint: Missing required parameters in save measurement request");
+            wp_send_json_error(array('message' => 'Missing required parameters'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+        $measurement_data = json_decode(stripslashes($_POST['measurement_data']), true);
+        
+        if (!$template_id || !$view_id || !$measurement_data) {
+            error_log("YPrint: Invalid parameters in save measurement request");
+            wp_send_json_error(array('message' => 'Invalid parameters'));
+            return;
+        }
+        
+        error_log("YPrint: Processing save measurement for template {$template_id}, view {$view_id}");
+        
+        try {
+            // Hole bestehende View-Print-Areas
+            $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            if (!is_array($view_print_areas)) {
+                $view_print_areas = array();
+            }
+            
+            // Hole Produktdimensionen für Skalierungsfaktor-Berechnung
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+            
+            // Berechne nächsten Index für diese View
+            $next_index = 0;
+            if (isset($view_print_areas[$view_id]['measurements'])) {
+                $existing_measurements = $view_print_areas[$view_id]['measurements'];
+                if (is_array($existing_measurements)) {
+                    $max_index = -1;
+                    foreach ($existing_measurements as $index => $measurement) {
+                        $index_int = intval($index);
+                        if ($index_int > $max_index) {
+                            $max_index = $index_int;
+                        }
+                    }
+                    $next_index = $max_index + 1;
+                }
+            }
+            
+            // Berechne Größen-spezifische Skalierungsfaktoren
+            $size_scale_factors = array();
+            $reference_sizes = array();
+            
+            if (is_array($product_dimensions)) {
+                $measurement_type = $measurement_data['measurement_type'] ?? $measurement_data['type'];
+                $pixel_distance = floatval($measurement_data['pixel_distance']);
+                
+                foreach ($product_dimensions as $size_id => $size_config) {
+                    if (isset($size_config[$measurement_type]) && $size_config[$measurement_type] > 0) {
+                        $real_distance_cm = floatval($size_config[$measurement_type]);
+                        $scale_factor = $real_distance_cm / ($pixel_distance / 10);
+                        $size_scale_factors[$size_id] = round($scale_factor, 4);
+                        $reference_sizes[] = $size_id;
+                    }
+                }
+            }
+            
+            // Erstelle vollständige Messungsdaten
+            $complete_measurement_data = array(
+                'type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
+                'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
+                'pixel_distance' => floatval($measurement_data['pixel_distance']),
+                'color' => sanitize_hex_color($measurement_data['color'] ?? '#ff4444'),
+                'points' => $measurement_data['points'] ?? array(),
+                'created_at' => current_time('mysql'),
+                'is_validated' => true,
+                'size_scale_factors' => $size_scale_factors,
+                'reference_sizes' => $reference_sizes
+            );
+            
+            // Füge Messung zu View-Print-Areas hinzu
+            if (!isset($view_print_areas[$view_id])) {
+                $view_print_areas[$view_id] = array();
+            }
+            if (!isset($view_print_areas[$view_id]['measurements'])) {
+                $view_print_areas[$view_id]['measurements'] = array();
+            }
+            
+            $view_print_areas[$view_id]['measurements'][$next_index] = $complete_measurement_data;
+            
+            // Speichere in Datenbank
+            $update_result = update_post_meta($template_id, '_template_view_print_areas', $view_print_areas);
+            
+            if ($update_result !== false) {
+                error_log("YPrint: Measurement saved successfully to database");
+                wp_send_json_success(array(
+                    'message' => 'Measurement saved successfully',
+                    'measurement_index' => $next_index,
+                    'size_scale_factors' => $size_scale_factors,
+                    'reference_sizes' => $reference_sizes
+                ));
+            } else {
+                error_log("YPrint: Failed to save measurement to database");
+                wp_send_json_error(array('message' => 'Failed to save measurement to database'));
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint: Exception in save measurement: " . $e->getMessage());
+            wp_send_json_error(array('message' => 'Exception occurred: ' . $e->getMessage()));
+        }
+    }
+
 }

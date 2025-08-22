@@ -38,6 +38,10 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
         add_action('wp_ajax_nopriv_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
         
+        // ✅ NEU: AJAX handler für das Speichern von Messungen in der Datenbank
+        add_action('wp_ajax_save_measurement_to_database', array('Octo_Print_Designer_Template', 'ajax_save_measurement_to_database_static'));
+        add_action('wp_ajax_nopriv_save_measurement_to_database', array('Octo_Print_Designer_Template', 'ajax_save_measurement_to_database_static'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         

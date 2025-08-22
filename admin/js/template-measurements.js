@@ -679,17 +679,63 @@ class YPrintTemplateMeasurements {
             reference_sizes: [] // Wird vom Backend gefüllt
         };
         
-        // Erstelle Mess-Element mit Typ-Information
-        this.createVisibleMeasurementElement(this.currentViewId, measurementData);
-        
-        // ✅ NEU: Erfolgsmeldung mit Details
-        const successMessage = `✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!
+        // ✅ NEU: Speichere Messung in der Datenbank über AJAX
+        this.saveMeasurementToDatabase(this.currentViewId, measurementData, (success) => {
+            if (success) {
+                // Erstelle Mess-Element mit Typ-Information
+                this.createVisibleMeasurementElement(this.currentViewId, measurementData);
+                
+                // ✅ NEU: Erfolgsmeldung mit Details
+                const successMessage = `✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!
 📏 Pixel: ${pixelDistance.toFixed(1)} px
 🎯 Typ: ${measurementType}
 💡 Das System verwendet automatisch die Größenwerte aus der Produktdimensionen-Tabelle`;
+                
+                this.showNotification(successMessage, 'success');
+            } else {
+                this.showNotification('❌ Fehler beim Speichern der Messung in der Datenbank', 'error');
+            }
+            this.resetMeasurement();
+        });
+    }
+    
+    // ✅ NEU: AJAX-Funktion zum Speichern in der Datenbank
+    saveMeasurementToDatabase(viewId, measurementData, callback) {
+        console.log('🎯 saveMeasurementToDatabase called:', { viewId, measurementData });
         
-        this.showNotification(successMessage, 'success');
-        this.resetMeasurement();
+        const templateId = this.getTemplateId();
+        const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+        const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+        
+        const formData = new FormData();
+        formData.append('action', 'save_measurement_to_database');
+        formData.append('nonce', nonce);
+        formData.append('template_id', templateId);
+        formData.append('view_id', viewId);
+        formData.append('measurement_data', JSON.stringify(measurementData));
+        
+        fetch(ajaxUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('🎯 Save measurement response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('🎯 Save measurement response data:', data);
+            if (data.success) {
+                console.log('✅ Measurement saved to database successfully');
+                callback(true);
+            } else {
+                console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
+                callback(false);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error saving measurement to database:', error);
+            callback(false);
+        });
     }
 
     createVisibleMeasurementElement(viewId, measurement) {
