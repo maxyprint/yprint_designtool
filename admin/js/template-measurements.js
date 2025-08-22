@@ -67,6 +67,21 @@ class YPrintTemplateMeasurements {
             return;
         }
         
+        // Check für Delete Measurement Button
+        const isDeleteButton = this.isDeleteMeasurementButton(e.target);
+        
+        if (isDeleteButton) {
+            console.log('🎯 Delete Measurement Button clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const index = this.findMeasurementIndex(e.target);
+            if (index !== null) {
+                this.deleteMeasurement(index);
+            }
+            return;
+        }
+        
         // Bild-Klick für Punkt-Platzierung
         if (e.target.tagName === 'IMG' && this.measurementMode) {
             console.log('🎯 Image clicked in measurement mode!', e.target.src);
@@ -817,6 +832,108 @@ class YPrintTemplateMeasurements {
         });
         
         console.log('🎯 Measurement reset complete');
+    }
+
+    // ✅ NEUE FUNKTIONEN FÜR DAS LÖSCHEN VON MESSUNGEN
+    
+    isDeleteMeasurementButton(element) {
+        if (!element) return false;
+        
+        // 1. Direkte CSS-Klasse prüfen
+        if (element.classList && element.classList.contains('delete-measurement-btn')) {
+            return true;
+        }
+        
+        // 2. Parent-Element prüfen
+        if (element.parentElement && element.parentElement.classList && 
+            element.parentElement.classList.contains('delete-measurement-btn')) {
+            return true;
+        }
+        
+        // 3. Icon-Prüfung (dashicons-trash)
+        if (element.classList && element.classList.contains('dashicons-trash')) {
+            return true;
+        }
+        
+        // 4. Text-Inhalt prüfen
+        if (element.textContent && element.textContent.includes('trash')) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    findMeasurementIndex(element) {
+        let current = element;
+        let attempts = 0;
+        
+        while (current && attempts < 10) {
+            // 1. Direkte data-index Attribute
+            if (current.dataset && current.dataset.index) {
+                return current.dataset.index;
+            }
+            
+            // 2. Standard data-index Attribute
+            const index = current.getAttribute('data-index');
+            if (index) {
+                return index;
+            }
+            
+            // 3. Suche in Parent-Elementen
+            current = current.parentElement;
+            attempts++;
+        }
+        
+        return null;
+    }
+    
+    deleteMeasurement(index) {
+        console.log('🎯 deleteMeasurement called with index:', index);
+        
+        try {
+            // 1. Finde das Measurement-Item
+            const measurementItem = document.querySelector(`[data-index="${index}"]`);
+            if (!measurementItem) {
+                console.error('❌ Measurement item not found for index:', index);
+                return;
+            }
+            
+            // 2. Finde den Container (measurement-image-wrapper oder ähnlich)
+            const container = measurementItem.closest('.measurement-image-wrapper') || 
+                             measurementItem.closest('.visual-measurement-container') ||
+                             measurementItem.closest('.existing-measurements') ||
+                             measurementItem.parentElement;
+            
+            if (!container) {
+                console.error('❌ Container not found for measurement item');
+                return;
+            }
+            
+            // 3. Entferne das Measurement-Item
+            measurementItem.remove();
+            
+            // 4. Entferne zugehörige visuelle Elemente (Linien, Punkte)
+            this.removeVisualElements(index);
+            
+            // 5. Zeige Bestätigung
+            this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
+            
+            console.log('✅ Measurement deleted successfully');
+            
+        } catch (error) {
+            console.error('❌ Error deleting measurement:', error);
+            this.showNotification('❌ Fehler beim Löschen der Messung', 'error');
+        }
+    }
+    
+    removeVisualElements(index) {
+        // Entferne Linien und Punkte für diese Messung
+        const lines = document.querySelectorAll(`[data-measurement-index="${index}"]`);
+        lines.forEach(line => line.remove());
+        
+        // Entferne Punkte (falls vorhanden)
+        const points = document.querySelectorAll(`[data-measurement-index="${index}"]`);
+        points.forEach(point => point.remove());
     }
 
 } // ✅ KLASSE RICHTIG GESCHLOSSEN
