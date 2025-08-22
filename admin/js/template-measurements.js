@@ -297,37 +297,173 @@ class YPrintTemplateMeasurements {
     }
     
     completeMeasurement() {
-        console.log('🎯 Completing measurement with points:', this.tempPoints);
+        if (this.tempPoints.length !== 2) return;
         
         const distance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
         const color = this.colors[this.colorIndex % this.colors.length];
         this.colorIndex++;
         
-        console.log('🎯 Calculated distance:', distance, 'px');
+        // Zeichne finale Linie
+        this.drawMeasurementLine(this.currentViewId, this.tempPoints, color);
         
-        // Zeige Ergebnis-Dialog
-        const realDistance = prompt(`✅ Messung erfolgreich erstellt!\n\n📏 Pixel-Distanz: ${distance.toFixed(1)} px\n\n📐 Geben Sie die echte Distanz dieser Messung in Zentimetern ein:`, '50.0');
+        // Hole verfügbare Messungstypen aus Template-Tabelle
+        this.getAvailableMeasurementTypes((availableTypes) => {
+            if (availableTypes.length === 0) {
+                this.showNotification('❌ Keine Messungstypen in der Produktdimensionen-Tabelle gefunden', 'error');
+                this.resetMeasurement();
+                return;
+            }
+            
+            // Erstelle Messungstyp-Auswahl Dialog
+            this.showMeasurementTypeDialog(availableTypes, distance, color);
+        });
+    }
+
+    getAvailableMeasurementTypes(callback) {
+        const formData = new FormData();
+        formData.append('action', 'get_available_measurement_types');
+        formData.append('nonce', templateMeasurementsAjax.nonce);
+        formData.append('template_id', this.getTemplateId());
         
-        if (realDistance && !isNaN(realDistance) && parseFloat(realDistance) > 0) {
-            const scaleFactor = parseFloat(realDistance) / (distance / 10);
-            
-            this.showNotification(`✅ Messung erfolgreich gespeichert!\n\n📏 Pixel: ${distance.toFixed(1)} px\n📐 Echt: ${realDistance} cm\n⚖️ Skalierung: ${scaleFactor.toFixed(3)} mm/px`, 'success');
-            
-            // Erstelle sichtbares Mess-Element
-            this.createVisibleMeasurementElement(this.currentViewId, {
-                type: 'chest',
-                pixel_distance: distance,
-                real_distance_cm: parseFloat(realDistance),
-                scale_factor: scaleFactor,
-                color: color,
-                points: this.tempPoints
-            });
-        } else {
-            this.showNotification('❌ Messung abgebrochen - ungültige Eingabe', 'error');
+        fetch(templateMeasurementsAjax.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                callback(data.data.measurement_types || []);
+            } else {
+                console.error('Error loading measurement types:', data.data);
+                callback([]);
+            }
+        })
+        .catch(error => {
+            console.error('AJAX error:', error);
+            callback([]);
+        });
+    }
+
+    showMeasurementTypeDialog(availableTypes, pixelDistance, color) {
+        // Prüfe bestehende Messungen dieses Views
+        const existingTypes = this.getExistingMeasurementTypes(this.currentViewId);
+        const availableForSelection = availableTypes.filter(type => !existingTypes.includes(type.key));
+        
+        if (availableForSelection.length === 0) {
+            this.showNotification('❌ Alle verfügbaren Messungstypen wurden bereits für diese Ansicht verwendet', 'error');
+            this.resetMeasurement();
+            return;
         }
         
-        // Cleanup
+        // Erstelle Dialog HTML
+        const dialogHtml = `
+            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 400px;">
+                <h3 style="margin-top: 0; color: #2271b1;">Messungstyp auswählen</h3>
+                <p style="margin-bottom: 15px; color: #666;">
+                    Gemessene Distanz: <strong>${pixelDistance.toFixed(1)} Pixel</strong><br>
+                    Was haben Sie gemessen?
+                </p>
+                <select id="measurement-type-select" style="width: 100%; padding: 8px; margin-bottom: 15px;">
+                    <option value="">-- Messungstyp wählen --</option>
+                    ${availableForSelection.map(type => 
+                        `<option value="${type.key}">${type.label}</option>`
+                    ).join('')}
+                </select>
+                <div style="text-align: right;">
+                    <button type="button" onclick="window.YPrintTemplateMeasurements.cancelMeasurementTypeDialog()" 
+                            style="margin-right: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Abbrechen
+                    </button>
+                    <button type="button" onclick="window.YPrintTemplateMeasurements.confirmMeasurementType(${pixelDistance}, '${color}')" 
+                            style="padding: 8px 16px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Speichern
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Zeige Dialog
+        this.showModal(dialogHtml);
+    }
+
+    confirmMeasurementType(pixelDistance, color) {
+        const select = document.getElementById('measurement-type-select');
+        const selectedType = select.value;
+        
+        if (!selectedType) {
+            alert('Bitte wählen Sie einen Messungstyp aus.');
+            return;
+        }
+        
+        // Speichere Messung mit Typ statt CM-Wert
+        this.saveMeasurementWithType(selectedType, pixelDistance, color);
+        this.hideModal();
+    }
+
+    cancelMeasurementTypeDialog() {
+        this.hideModal();
         this.resetMeasurement();
+    }
+
+    saveMeasurementWithType(measurementType, pixelDistance, color) {
+        // Erstelle Mess-Element mit Typ-Information
+        this.createVisibleMeasurementElement(this.currentViewId, {
+            type: measurementType,
+            pixel_distance: pixelDistance,
+            measurement_type: measurementType, // Neu: Typ statt CM-Wert
+            color: color,
+            points: this.tempPoints
+        });
+        
+        this.showNotification(`✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!\n📏 Pixel: ${pixelDistance.toFixed(1)} px`, 'success');
+        this.resetMeasurement();
+    }
+
+    getExistingMeasurementTypes(viewId) {
+        const container = document.querySelector(`[data-view-id="${viewId}"] .measurements-list`);
+        if (!container) return [];
+        
+        const measurements = container.querySelectorAll('.measurement-item');
+        return Array.from(measurements).map(item => item.dataset.measurementType).filter(Boolean);
+    }
+
+    getTemplateId() {
+        // Hole Template ID aus der URL oder einem versteckten Feld
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('post') || document.querySelector('input[name="post_ID"]')?.value || 0;
+    }
+
+    showModal(content) {
+        // Entferne bestehende Modal
+        const existingModal = document.getElementById('measurement-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Erstelle neues Modal
+        const modal = document.createElement('div');
+        modal.id = 'measurement-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        `;
+        modal.innerHTML = content;
+        document.body.appendChild(modal);
+    }
+
+    hideModal() {
+        const modal = document.getElementById('measurement-modal');
+        if (modal) {
+            modal.remove();
+        }
     }
     
     resetMeasurement() {
@@ -366,6 +502,7 @@ class YPrintTemplateMeasurements {
         measurementElement.className = 'yprint-measurement-result measurement-item';
         measurementElement.dataset.index = nextIndex;
         measurementElement.dataset.viewId = viewId;
+        measurementElement.dataset.measurementType = measurement.type; // Neu: Typ speichern
         measurementElement.style.cssText = `
             background: linear-gradient(135deg, #e8f4f8 0%, #d4edda 100%);
             padding: 20px;
@@ -379,7 +516,7 @@ class YPrintTemplateMeasurements {
         measurementElement.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                 <h4 style="margin: 0; color: #155724; font-size: 16px;">
-                    ✅ Messung ${nextIndex + 1} (${this.getViewNameFromId(viewId)})
+                    ✅ ${measurement.type.toUpperCase()}-Messung ${nextIndex + 1} (${this.getViewNameFromId(viewId)})
                 </h4>
                 <button type="button" onclick="this.closest('.measurement-item').remove()" 
                         style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
@@ -387,49 +524,37 @@ class YPrintTemplateMeasurements {
                 </button>
             </div>
             
-            <!-- WordPress-Formularfelder -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">📏 Messungstyp:</label>
-                    <select name="view_print_areas[${viewId}][measurements][${nextIndex}][type]" 
-                            class="measurement-type-select" 
-                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="chest" ${measurement.type === 'chest' ? 'selected' : ''}>Brustweite</option>
-                        <option value="shoulder_to_shoulder" ${measurement.type === 'shoulder_to_shoulder' ? 'selected' : ''}>Schulter zu Schulter</option>
-                        <option value="height_from_shoulder" ${measurement.type === 'height_from_shoulder' ? 'selected' : ''}>Höhe ab Schulter</option>
-                        <option value="sleeve_length" ${measurement.type === 'sleeve_length' ? 'selected' : ''}>Ärmellänge</option>
-                        <option value="biceps" ${measurement.type === 'biceps' ? 'selected' : ''}>Bizeps</option>
-                        <option value="hem_width" ${measurement.type === 'hem_width' ? 'selected' : ''}>Saumweite</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">📐 Echte Größe (cm):</label>
-                    <input type="number" 
-                           name="view_print_areas[${viewId}][measurements][${nextIndex}][real_distance_cm]"
-                           value="${measurement.real_distance_cm}"
-                           step="0.1" min="0.1" max="200"
-                           class="real-distance-input"
-                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
-                           placeholder="z.B. 62.0" />
-                </div>
-            </div>
-            
-            <!-- Größen-spezifische Skalierungsfaktoren -->
-            <div style="background: rgba(255,255,255,0.8); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-                <h5 style="margin: 0 0 10px 0; color: #0066cc;">⚖️ Größen-spezifische Skalierungsfaktoren</h5>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; font-size: 13px;">
+            <!-- Automatisch berechnete Größen-Skalierungen -->
+            <div style="background: rgba(255,255,255,0.9); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <h5 style="margin: 0 0 12px 0; color: #0066cc; display: flex; align-items: center;">
+                    <span class="dashicons dashicons-calculator" style="margin-right: 8px;"></span>
+                    Automatische Größen-Berechnung
+                </h5>
+                <div class="size-scale-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;">
                     ${availableSizes.map(size => {
                         const sizeScaleFactor = this.calculateSizeSpecificScale(measurement, size.id);
                         return `
-                            <div style="text-align: center; padding: 8px; background: #f8f9fa; border-radius: 4px;">
-                                <div style="font-weight: 600; color: #007cba; margin-bottom: 3px;">Größe ${size.name}</div>
-                                <div style="font-size: 11px; color: #666;">
+                            <div style="text-align: center; padding: 12px; background: linear-gradient(135deg, #f0f8ff 0%, #e8f4f8 100%); border-radius: 6px; border: 1px solid #007cba;">
+                                <div style="font-weight: 600; color: #007cba; margin-bottom: 6px; font-size: 14px;">
+                                    ${size.name}
+                                </div>
+                                <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
+                                    ${sizeScaleFactor ? (sizeScaleFactor * (measurement.pixel_distance / 10)).toFixed(1) + ' cm' : 'Nicht verfügbar'}
+                                </div>
+                                <div style="font-size: 12px; font-weight: 600; color: #28a745;">
                                     ${sizeScaleFactor ? sizeScaleFactor.toFixed(3) + ' mm/px' : 'Nicht verfügbar'}
+                                </div>
+                                <div style="font-size: 9px; color: #999; margin-top: 2px;">
+                                    Auto-berechnet
                                 </div>
                             </div>
                         `;
                     }).join('')}
+                </div>
+                <div class="calculation-info" style="margin-top: 10px; padding: 8px; background: #d4edda; border-radius: 4px; font-size: 12px; color: #155724;">
+                    <strong>✅ Automatische Berechnung erfolgreich!</strong> 
+                    Skalierungsfaktoren wurden basierend auf den "${measurement.type}" Werten 
+                    aus der Product Dimensions Tabelle berechnet (${measurement.pixel_distance.toFixed(1)}px gemessen).
                 </div>
             </div>
             
@@ -441,14 +566,16 @@ class YPrintTemplateMeasurements {
             </div>
             
             <!-- Hidden WordPress-Formularfelder -->
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][type]" 
+                   value="${measurement.type}" class="measurement-type-input" />
+            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][measurement_type]" 
+                   value="${measurement.type}" class="measurement-type-input" />
             <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][pixel_distance]" 
                    value="${measurement.pixel_distance}" class="pixel-distance-input" />
             <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][color]" 
                    value="${measurement.color}" class="measurement-color-input" />
             <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][points]" 
                    value='${JSON.stringify(measurement.points)}' class="measurement-points-input" />
-            <input type="hidden" name="view_print_areas[${viewId}][measurements][${nextIndex}][scale_factor]" 
-                   value="${measurement.scale_factor}" class="scale-factor-input" />
         `;
         
         // Event-Listener für Live-Updates

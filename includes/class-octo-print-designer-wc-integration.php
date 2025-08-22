@@ -2156,8 +2156,8 @@ private function build_print_provider_email_content($order, $design_items, $note
             ));
         }
         
-        // Send to API with enhanced error handling
-        $result = $api_integration->send_order_to_api($order);
+        // Enhanced API sending with size-specific calculations
+        $result = $api_integration->send_order_to_api_with_size_context($order);
         
         if (is_wp_error($result)) {
             // Enhanced error response with specific guidance
@@ -2243,5 +2243,55 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'sent_date' => date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $result['timestamp'])
             )
         ));
+    }
+
+    /**
+     * Enhanced method to send order with size context
+     */
+    public function send_order_to_api_with_size_context($order) {
+        // Log size information for debugging
+        $order_sizes = array();
+        foreach ($order->get_items() as $item) {
+            $size = $this->extract_item_size($item);
+            if ($size) {
+                $order_sizes[] = $size;
+            }
+        }
+        
+        error_log("AllesKlarDruck API: Order #{$order->get_order_number()} sizes: " . implode(', ', $order_sizes));
+        
+        // Call enhanced API method
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        return $api_integration->send_order_to_api($order);
+    }
+
+    /**
+     * Extract size information from order item
+     */
+    private function extract_item_size($item) {
+        // Prüfe verschiedene Größenfelder
+        $size_fields = ['size_name', 'product_size', 'variation_size', 'pa_size'];
+        
+        foreach ($size_fields as $field) {
+            $size = $this->get_design_meta($item, $field);
+            if (!empty($size)) {
+                return trim($size);
+            }
+        }
+        
+        // Prüfe Variation-Attribute
+        if ($item instanceof WC_Order_Item_Product) {
+            $product = $item->get_product();
+            if ($product && $product->is_type('variation')) {
+                $attributes = $product->get_variation_attributes();
+                foreach ($attributes as $key => $value) {
+                    if (strpos(strtolower($key), 'size') !== false && !empty($value)) {
+                        return trim($value);
+                    }
+                }
+            }
+        }
+        
+        return null;
     }
 }

@@ -2260,5 +2260,145 @@ class Octo_Print_API_Integration {
         return $summary;
     }
 
+    /**
+     * Get order-specific size from WooCommerce order
+     */
+    private function get_order_size_from_woocommerce($order) {
+        foreach ($order->get_items() as $item) {
+            // Prüfe verschiedene Größenfelder
+            $size_fields = ['size_name', 'product_size', 'variation_size', 'pa_size'];
+            
+            foreach ($size_fields as $field) {
+                $size = $this->get_design_meta($item, $field);
+                if (!empty($size)) {
+                    return strtolower(trim($size));
+                }
+            }
+            
+            // Prüfe Variation-Attribute
+            if ($item instanceof WC_Order_Item_Product) {
+                $product = $item->get_product();
+                if ($product && $product->is_type('variation')) {
+                    $attributes = $product->get_variation_attributes();
+                    foreach ($attributes as $key => $value) {
+                        if (strpos(strtolower($key), 'size') !== false && !empty($value)) {
+                            return strtolower(trim($value));
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null; // Keine Größe gefunden
+    }
+
+    /**
+     * Get size-specific measurements with order context
+     */
+    private function get_size_specific_measurements($template_id, $order_size) {
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        
+        if (empty($product_dimensions)) {
+            return array(); // Legacy fallback
+        }
+        
+        // Normalisiere Größenbezeichnung
+        $normalized_size = $this->normalize_size_designation($order_size);
+        
+        // Direkte Größe verfügbar
+        if (isset($product_dimensions[$normalized_size])) {
+            return $product_dimensions[$normalized_size];
+        }
+        
+        // Größen-Mapping versuchen
+        $size_mappings = array(
+            'xs' => 'xs',
+            'extra-small' => 'xs', 
+            's' => 's',
+            'small' => 's',
+            'm' => 'm',
+            'medium' => 'm',
+            'l' => 'l',
+            'large' => 'l',
+            'xl' => 'xl',
+            'extra-large' => 'xl',
+            'xxl' => 'xxl'
+        );
+        
+        $mapped_size = $size_mappings[$normalized_size] ?? null;
+        if ($mapped_size && isset($product_dimensions[$mapped_size])) {
+            return $product_dimensions[$mapped_size];
+        }
+        
+        // Fallback: Erste verfügbare Größe verwenden
+        return reset($product_dimensions) ?: array();
+    }
+
+    /**
+     * Calculate print dimensions using order-specific size
+     */
+    private function calculate_print_dimensions_for_order($design, $order) {
+        $template_id = $design->template_id;
+        
+        // Hole Bestellgröße aus WooCommerce Order
+        $order_size = $this->get_order_size_from_woocommerce($order);
+        
+        // Hole größenspezifische Messungen
+        $size_measurements = $this->get_size_specific_measurements($template_id, $order_size);
+        
+        // Hole Template-Messungen (mit größenspezifischen Faktoren)
+        $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        $physical_width_cm = 30;  // Fallback
+        $physical_height_cm = 40; // Fallback
+        
+        if (!empty($size_measurements)) {
+            $physical_width_cm = $size_measurements['chest'] ?? 30;
+            $physical_height_cm = $size_measurements['height_from_shoulder'] ?? 40;
+        }
+        
+        // Berechne mit größenspezifischem Skalierungsfaktor
+        $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $order_size);
+        
+        return array(
+            'physical_width_cm' => $physical_width_cm,
+            'physical_height_cm' => $physical_height_cm,
+            'scale_factor' => $scale_factor,
+            'order_size' => $order_size,
+            'size_measurements' => $size_measurements
+        );
+    }
+
+    /**
+     * Get scale factor for specific order size
+     */
+    private function get_size_specific_scale_factor($template_measurements, $order_size) {
+        if (empty($template_measurements) || empty($order_size)) {
+            return 1.0; // Fallback
+        }
+        
+        // Suche nach Messungen mit size_scale_factors
+        foreach ($template_measurements as $view_id => $view_data) {
+            if (!isset($view_data['measurements'])) continue;
+            
+            foreach ($view_data['measurements'] as $measurement) {
+                if (!isset($measurement['size_scale_factors'])) continue;
+                
+                $normalized_size = $this->normalize_size_designation($order_size);
+                
+                // Direkte Größe verfügbar
+                if (isset($measurement['size_scale_factors'][$normalized_size])) {
+                    return floatval($measurement['size_scale_factors'][$normalized_size]);
+                }
+            }
+        }
+        
+        return 1.0; // Fallback
+    }
+
+    private function normalize_size_designation($size) {
+        if (empty($size)) return '';
+        return strtolower(trim($size));
+    }
 
 }

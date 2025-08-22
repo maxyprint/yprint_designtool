@@ -943,10 +943,18 @@ class Octo_Print_Designer_Template {
     }
 
     /**
-     * Verbesserte Mess-Daten Validierung und Verarbeitung
+     * Verbesserte Mess-Daten Validierung und Verarbeitung mit größenspezifischen Faktoren
      */
     private function process_measurement_data($config, $view_id) {
         $view_print_areas = array();
+        $template_id = get_the_ID();
+        
+        // Hole Produktdimensionen für alle Größen
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        
+        if (empty($product_dimensions)) {
+            return $view_print_areas; // Keine Berechnungen möglich ohne Dimensionen
+        }
         
         if (isset($config['measurements']) && is_array($config['measurements'])) {
             $measurements = array();
@@ -959,21 +967,37 @@ class Octo_Print_Designer_Template {
                 
                 // Berechne präzise Pixel-Distanz aus Punkten
                 $pixel_distance = $this->calculate_pixel_distance($points);
-                $real_distance_cm = floatval($measurement['real_distance_cm'] ?? 0);
+                $measurement_type = $measurement['measurement_type'] ?? $measurement['type'] ?? '';
                 
                 // Validiere Mindestanforderungen
-                if ($pixel_distance < 5 || $real_distance_cm <= 0) {
+                if ($pixel_distance < 5 || empty($measurement_type)) {
                     continue;
                 }
                 
-                // Berechne Skalierungsfaktor
-                $scale_factor = $real_distance_cm / ($pixel_distance / 10); // cm pro mm
+                // Berechne größenspezifische Skalierungsfaktoren
+                $size_scale_factors = array();
+                $has_valid_references = false;
+                
+                foreach ($product_dimensions as $size_id => $size_config) {
+                    $real_distance_cm = floatval($size_config[$measurement_type] ?? 0);
+                    
+                    if ($real_distance_cm > 0) {
+                        $scale_factor = $real_distance_cm / ($pixel_distance / 10);
+                        $size_scale_factors[$size_id] = round($scale_factor, 4);
+                        $has_valid_references = true;
+                    }
+                }
+                
+                if (!$has_valid_references) {
+                    continue; // Keine gültigen Referenzwerte für diesen Messungstyp
+                }
                 
                 $measurements[intval($index)] = array(
-                    'type' => sanitize_text_field($measurement['type'] ?? ''),
+                    'type' => $measurement_type,
+                    'measurement_type' => $measurement_type,
                     'pixel_distance' => $pixel_distance,
-                    'real_distance_cm' => $real_distance_cm,
-                    'scale_factor' => $scale_factor,
+                    'size_scale_factors' => $size_scale_factors, // NEU: Größenspezifische Faktoren
+                    'reference_sizes' => array_keys($size_scale_factors),
                     'color' => sanitize_hex_color($measurement['color'] ?? '#ff4444'),
                     'points' => $points,
                     'created_at' => current_time('mysql'),
@@ -984,6 +1008,62 @@ class Octo_Print_Designer_Template {
         }
         
         return $view_print_areas;
+    }
+
+    /**
+     * AJAX Handler: Get available measurement types for template
+     */
+    public function ajax_get_available_measurement_types() {
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error(array('message' => 'Invalid template ID'));
+        }
+        
+        // Hole Produktdimensionen
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            wp_send_json_error(array('message' => 'No product dimensions found'));
+        }
+        
+        // Ermittle verfügbare Messungstypen (die in mindestens einer Größe Werte haben)
+        $available_types = array();
+        $measurement_labels = $this->get_measurement_labels();
+        
+        foreach ($measurement_labels as $type_key => $type_label) {
+            $has_values = false;
+            
+            // Prüfe, ob dieser Typ in mindestens einer Größe Werte hat
+            foreach ($product_dimensions as $size_id => $size_config) {
+                if (isset($size_config[$type_key]) && $size_config[$type_key] > 0) {
+                    $has_values = true;
+                    break;
+                }
+            }
+            
+            if ($has_values) {
+                $available_types[] = array(
+                    'key' => $type_key,
+                    'label' => $type_label
+                );
+            }
+        }
+        
+        wp_send_json_success(array(
+            'measurement_types' => $available_types,
+            'total_available' => count($available_types)
+        ));
+    }
+
+    /**
+     * Initialize AJAX handlers
+     */
+    public function init_ajax_handlers() {
+        add_action('wp_ajax_get_available_measurement_types', array($this, 'ajax_get_available_measurement_types'));
     }
 
     /**
@@ -1391,6 +1471,28 @@ class Octo_Print_Designer_Template {
         <!-- Enhanced Template Measurements JavaScript -->
         <script src="<?php echo esc_url(plugins_url('js/template-measurements.js', __FILE__)); ?>"></script>
         <?php
+    }
+
+    /**
+     * Get size-specific scale factor for measurement
+     */
+    public function get_scale_factor_for_size($measurement, $size_id) {
+        if (!isset($measurement['size_scale_factors'])) {
+            return null; // Legacy measurement without size factors
+        }
+        
+        // Direkte Größe verfügbar
+        if (isset($measurement['size_scale_factors'][$size_id])) {
+            return $measurement['size_scale_factors'][$size_id];
+        }
+        
+        // Fallback: Verwende erste verfügbare Größe
+        $available_factors = $measurement['size_scale_factors'];
+        if (!empty($available_factors)) {
+            return reset($available_factors);
+        }
+        
+        return null;
     }
 
 }

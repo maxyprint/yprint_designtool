@@ -47,14 +47,14 @@ class Octo_Print_Designer_Admin {
             true
         );
         
-        // *** WICHTIG: Template Measurements JavaScript hinzufügen ***
-        wp_enqueue_script(
-            'octo-template-measurements',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/template-measurements.js',
-            ['octo-print-designer-admin'], // Laden nach dem Admin-Bundle
-            rand(),
-            true
-        );
+        // Template Measurements JavaScript
+        wp_enqueue_script('octo-template-measurements', plugins_url('js/template-measurements.js', __FILE__), array('jquery'), '1.0.0', true);
+        
+        // AJAX Localization für Template Measurements
+        wp_localize_script('octo-template-measurements', 'templateMeasurementsAjax', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('template_measurements_nonce')
+        ));
         
         wp_localize_script('octo-print-designer-admin', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -86,6 +86,10 @@ class Octo_Print_Designer_Admin {
                 setTimeout(checkYPrintMeasurements, 100);
             }
         ', 'after');
+
+        // Initialize AJAX handlers
+        $template_class = new Octo_Print_Designer_Template();
+        $template_class->init_ajax_handlers();
     }
 
     public function enqueue_styles($hook) {
