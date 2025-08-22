@@ -1820,4 +1820,76 @@ class Octo_Print_Designer_Template {
         }
     }
 
+    /**
+     * ✅ NEU: Static AJAX Handler für das Laden von gespeicherten Messungen
+     */
+    public static function ajax_load_saved_measurements_static() {
+        // Debug-Logging
+        error_log("YPrint: Load measurements AJAX handler called - " . json_encode($_POST));
+        
+        // Prüfe ob Nonce überhaupt gesendet wurde
+        if (!isset($_POST['nonce'])) {
+            error_log("YPrint: No nonce provided in load measurements request");
+            wp_send_json_error(array('message' => 'No nonce provided'));
+            return;
+        }
+        
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            error_log("YPrint: Nonce validation failed in load measurements - nonce: " . $_POST['nonce']);
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+        
+        if (!isset($_POST['template_id'])) {
+            error_log("YPrint: No template_id provided in load measurements request");
+            wp_send_json_error(array('message' => 'No template ID provided'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            error_log("YPrint: Invalid template ID in load measurements request");
+            wp_send_json_error(array('message' => 'Invalid template ID'));
+            return;
+        }
+        
+        error_log("YPrint: Loading measurements for template {$template_id}");
+        
+        try {
+            // Hole View-Print-Areas aus der Datenbank
+            $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            
+            if (empty($view_print_areas) || !is_array($view_print_areas)) {
+                error_log("YPrint: No view print areas found for template {$template_id}");
+                wp_send_json_success(array(
+                    'measurements' => array(),
+                    'message' => 'No measurements found'
+                ));
+                return;
+            }
+            
+            // Filtere nur die Messungsdaten
+            $measurements_data = array();
+            foreach ($view_print_areas as $view_id => $view_config) {
+                if (isset($view_config['measurements']) && is_array($view_config['measurements'])) {
+                    $measurements_data[$view_id] = array(
+                        'measurements' => $view_config['measurements']
+                    );
+                }
+            }
+            
+            error_log("YPrint: Found measurements for " . count($measurements_data) . " views");
+            
+            wp_send_json_success(array(
+                'measurements' => $measurements_data,
+                'total_views' => count($measurements_data),
+                'message' => 'Measurements loaded successfully'
+            ));
+            
+        } catch (Exception $e) {
+            error_log("YPrint: Exception in load measurements: " . $e->getMessage());
+            wp_send_json_error(array('message' => 'Exception occurred: ' . $e->getMessage()));
+        }
+    }
+
 }

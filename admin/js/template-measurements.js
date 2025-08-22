@@ -35,12 +35,83 @@ class YPrintTemplateMeasurements {
         // Sofortiger DOM-Check
         this.checkDOM();
         
+        // ✅ NEU: Lade gespeicherte Messungen aus der Datenbank
+        this.loadSavedMeasurementsFromDatabase();
+        
         // Event-Listeners mit Namespace
         document.addEventListener('click', (e) => {
             this.handleClick(e);
         }, { passive: false });
         
         console.log('🎯 Event listeners attached');
+    }
+    
+    // ✅ NEU: Lade gespeicherte Messungen aus der Datenbank
+    loadSavedMeasurementsFromDatabase() {
+        console.log('🎯 Loading saved measurements from database...');
+        
+        const templateId = this.getTemplateId();
+        const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+        const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+        
+        const formData = new FormData();
+        formData.append('action', 'load_saved_measurements');
+        formData.append('nonce', nonce);
+        formData.append('template_id', templateId);
+        
+        fetch(ajaxUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('🎯 Load measurements response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('🎯 Load measurements response data:', data);
+            if (data.success && data.data && data.data.measurements) {
+                console.log('✅ Successfully loaded measurements from database');
+                this.displaySavedMeasurements(data.data.measurements);
+            } else {
+                console.log('ℹ️ No saved measurements found or error loading');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error loading measurements from database:', error);
+        });
+    }
+    
+    // ✅ NEU: Zeige gespeicherte Messungen im Frontend an
+    displaySavedMeasurements(measurementsData) {
+        console.log('🎯 Displaying saved measurements:', measurementsData);
+        
+        if (!measurementsData || typeof measurementsData !== 'object') {
+            console.log('ℹ️ No measurements data to display');
+            return;
+        }
+        
+        // Iteriere durch alle Views und ihre Messungen
+        Object.keys(measurementsData).forEach(viewId => {
+            const viewMeasurements = measurementsData[viewId];
+            
+            if (viewMeasurements && viewMeasurements.measurements) {
+                console.log(`🎯 Processing measurements for view ${viewId}:`, viewMeasurements.measurements);
+                
+                // Zeige jede Messung an
+                Object.keys(viewMeasurements.measurements).forEach(index => {
+                    const measurement = viewMeasurements.measurements[index];
+                    console.log(`🎯 Displaying measurement ${index}:`, measurement);
+                    
+                    // Erstelle das Messungs-Element im Frontend
+                    this.createVisibleMeasurementElement(viewId, measurement);
+                    
+                    // Zeichne die visuellen Elemente (Linien, Punkte)
+                    if (measurement.points && measurement.points.length === 2) {
+                        this.drawMeasurementLine(viewId, measurement.points, measurement.color || '#ff4444');
+                    }
+                });
+            }
+        });
     }
     
     handleClick(e) {
