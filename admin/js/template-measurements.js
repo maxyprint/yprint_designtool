@@ -480,12 +480,21 @@ class YPrintTemplateMeasurements {
         formData.append('nonce', templateMeasurementsAjax.nonce);
         formData.append('template_id', this.getTemplateId());
         
+        console.log('🎯 Sending AJAX request for measurement types...');
+        
         fetch(templateMeasurementsAjax.ajax_url, {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('🎯 AJAX response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('🎯 AJAX response data:', data);
             if (data.success) {
                 callback(data.data.measurement_types || []);
             } else {
@@ -496,9 +505,37 @@ class YPrintTemplateMeasurements {
         })
         .catch(error => {
             console.error('AJAX error:', error);
+            console.log('🔄 Using fallback due to AJAX error');
             // Fallback zu CM-Eingabe
             this.showLegacyCMDialog();
         });
+    }
+
+    // ✅ NEU: Sofortiger Fallback für AJAX-Probleme
+    showLegacyCMDialog() {
+        console.log('🔄 Showing legacy CM dialog as fallback');
+        const realDistance = prompt('FALLBACK: Geben Sie die reale Distanz in cm ein:');
+        
+        if (isFinite(realDistance) && parseFloat(realDistance) > 0) {
+            // Simuliere "custom" Messungstyp
+            const pixelDistance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
+            const scaleFactor = parseFloat(realDistance) / (pixelDistance / 10);
+            
+            this.createVisibleMeasurementElement(this.currentViewId, {
+                type: 'custom',
+                pixel_distance: pixelDistance,
+                real_distance_cm: parseFloat(realDistance),
+                scale_factor: scaleFactor,
+                color: this.colors[this.colorIndex % this.colors.length],
+                points: this.tempPoints
+            });
+            
+            this.showNotification(`✅ Messung gespeichert (Fallback-Modus)!\n📏 ${pixelDistance.toFixed(1)} px = ${realDistance} cm`, 'success');
+            this.resetMeasurement();
+        } else {
+            this.showNotification('❌ Messung abgebrochen - ungültige Eingabe', 'error');
+            this.resetMeasurement();
+        }
     }
 
     showMeasurementTypeDialog(availableTypes, pixelDistance, color) {
@@ -611,31 +648,6 @@ class YPrintTemplateMeasurements {
         
         const measurements = container.querySelectorAll('.measurement-item');
         return Array.from(measurements).map(item => item.dataset.measurementType).filter(Boolean);
-    }
-
-    showLegacyCMDialog() {
-        const realDistance = prompt('FALLBACK: Geben Sie die reale Distanz in cm ein:');
-        
-        if (isFinite(realDistance) && parseFloat(realDistance) > 0) {
-            // Simuliere "custom" Messungstyp
-            const pixelDistance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
-            const scaleFactor = parseFloat(realDistance) / (pixelDistance / 10);
-            
-            this.createVisibleMeasurementElement(this.currentViewId, {
-                type: 'custom',
-                pixel_distance: pixelDistance,
-                real_distance_cm: parseFloat(realDistance),
-                scale_factor: scaleFactor,
-                color: this.colors[this.colorIndex % this.colors.length],
-                points: this.tempPoints
-            });
-            
-            this.showNotification(`✅ Messung gespeichert (Fallback-Modus)!\n📏 ${pixelDistance.toFixed(1)} px = ${realDistance} cm`, 'success');
-            this.resetMeasurement();
-        } else {
-            this.showNotification('❌ Messung abgebrochen - ungültige Eingabe', 'error');
-            this.resetMeasurement();
-        }
     }
 
     showNotification(message, type = 'info') {
