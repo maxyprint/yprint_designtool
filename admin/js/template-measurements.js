@@ -888,6 +888,7 @@ class YPrintTemplateMeasurements {
         const element = document.createElement('div');
         element.className = 'measurement-item';
         element.setAttribute('data-index', index);
+        element.setAttribute('data-view-id', viewId);
         element.setAttribute('data-measurement-type', measurementType);
         element.style.cssText = `
             background: #fff; 
@@ -1169,16 +1170,32 @@ class YPrintTemplateMeasurements {
                 return;
             }
             
-            // 2. Entferne zugehörige visuelle Elemente (Linien, Punkte) VOR dem Löschen des Items
-            this.removeVisualElements(index);
+            // 2. Hole View-ID aus dem Measurement-Item
+            const viewId = measurementItem.getAttribute('data-view-id') || 
+                          measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
             
-            // 3. Entferne das Measurement-Item
-            measurementItem.remove();
+            if (!viewId) {
+                console.error('❌ View ID not found for measurement');
+                return;
+            }
             
-            // 4. Zeige Bestätigung
-            this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
-            
-            console.log('✅ Measurement deleted successfully');
+            // 3. Lösche aus der Datenbank VOR dem visuellen Löschen
+            this.deleteMeasurementFromDatabase(viewId, index, (success) => {
+                if (success) {
+                    // 4. Entferne zugehörige visuelle Elemente
+                    this.removeVisualElements(index);
+                    
+                    // 5. Entferne das Measurement-Item
+                    measurementItem.remove();
+                    
+                    // 6. Zeige Bestätigung
+                    this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
+                    
+                    console.log('✅ Measurement deleted successfully');
+                } else {
+                    this.showNotification('❌ Fehler beim Löschen der Messung aus der Datenbank', 'error');
+                }
+            });
             
         } catch (error) {
             console.error('❌ Error deleting measurement:', error);
@@ -1238,6 +1255,44 @@ class YPrintTemplateMeasurements {
         } catch (error) {
             console.warn('⚠️ Error updating visual elements index:', error);
         }
+    }
+    
+    deleteMeasurementFromDatabase(viewId, index, callback) {
+        console.log('🎯 deleteMeasurementFromDatabase called:', { viewId, index });
+        
+        const templateId = this.getTemplateId();
+        const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+        const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+        
+        const formData = new FormData();
+        formData.append('action', 'delete_measurement_from_database');
+        formData.append('nonce', nonce);
+        formData.append('template_id', templateId);
+        formData.append('view_id', viewId);
+        formData.append('measurement_index', index);
+        
+        fetch(ajaxUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('🎯 Delete measurement response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('🎯 Delete measurement response data:', data);
+            if (data.success) {
+                console.log('✅ Measurement deleted from database successfully');
+                callback(true);
+            } else {
+                console.error('❌ Failed to delete measurement from database:', data.data?.message || 'Unknown error');
+                callback(false);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error deleting measurement from database:', error);
+            callback(false);
+        });
     }
 
 } // ✅ KLASSE RICHTIG GESCHLOSSEN

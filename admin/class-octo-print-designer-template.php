@@ -1694,6 +1694,99 @@ class Octo_Print_Designer_Template {
     }
 
     /**
+     * ✅ NEU: Static AJAX Handler für das Löschen von Messungen aus der Datenbank
+     */
+    public static function ajax_delete_measurement_from_database_static() {
+        // Debug-Logging
+        error_log("YPrint: Delete measurement AJAX handler called - " . json_encode($_POST));
+        
+        // Prüfe ob Nonce überhaupt gesendet wurde
+        if (!isset($_POST['nonce'])) {
+            error_log("YPrint: No nonce provided in delete measurement request");
+            wp_send_json_error(array('message' => 'No nonce provided'));
+            return;
+        }
+        
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            error_log("YPrint: Nonce validation failed in delete measurement - nonce: " . $_POST['nonce']);
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+        
+        if (!isset($_POST['template_id']) || !isset($_POST['view_id']) || !isset($_POST['measurement_index'])) {
+            error_log("YPrint: Missing required parameters in delete measurement request");
+            wp_send_json_error(array('message' => 'Missing required parameters'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+        $measurement_index = intval($_POST['measurement_index']);
+        
+        if (!$template_id || !$view_id || $measurement_index < 0) {
+            error_log("YPrint: Invalid parameters in delete measurement request");
+            wp_send_json_error(array('message' => 'Invalid parameters'));
+            return;
+        }
+        
+        error_log("YPrint: Processing delete measurement for template {$template_id}, view {$view_id}, index {$measurement_index}");
+        
+        try {
+            // Hole bestehende View-Print-Areas
+            $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            if (!is_array($view_print_areas)) {
+                error_log("YPrint: No view print areas found for template {$template_id}");
+                wp_send_json_error(array('message' => 'No measurements found'));
+                return;
+            }
+            
+            // Prüfe ob View existiert
+            if (!isset($view_print_areas[$view_id])) {
+                error_log("YPrint: View {$view_id} not found in template {$template_id}");
+                wp_send_json_error(array('message' => 'View not found'));
+                return;
+            }
+            
+            // Prüfe ob Messungen existieren
+            if (!isset($view_print_areas[$view_id]['measurements']) || !is_array($view_print_areas[$view_id]['measurements'])) {
+                error_log("YPrint: No measurements found for view {$view_id} in template {$template_id}");
+                wp_send_json_error(array('message' => 'No measurements found'));
+                return;
+            }
+            
+            // Prüfe ob spezifische Messung existiert
+            if (!isset($view_print_areas[$view_id]['measurements'][$measurement_index])) {
+                error_log("YPrint: Measurement index {$measurement_index} not found for view {$view_id} in template {$template_id}");
+                wp_send_json_error(array('message' => 'Measurement not found'));
+                return;
+            }
+            
+            // Lösche die spezifische Messung
+            unset($view_print_areas[$view_id]['measurements'][$measurement_index]);
+            
+            // Speichere aktualisierte View-Print-Areas
+            $update_result = update_post_meta($template_id, '_template_view_print_areas', $view_print_areas);
+            
+            if ($update_result) {
+                error_log("YPrint: Successfully deleted measurement index {$measurement_index} for view {$view_id} in template {$template_id}");
+                wp_send_json_success(array(
+                    'message' => 'Measurement deleted successfully',
+                    'template_id' => $template_id,
+                    'view_id' => $view_id,
+                    'measurement_index' => $measurement_index
+                ));
+            } else {
+                error_log("YPrint: Failed to update post meta for template {$template_id}");
+                wp_send_json_error(array('message' => 'Failed to save changes'));
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint: Exception in delete measurement: " . $e->getMessage());
+            wp_send_json_error(array('message' => 'Internal server error'));
+        }
+    }
+
+    /**
      * ✅ NEU: Static AJAX Handler für das Speichern von Messungen in der Datenbank
      */
     public static function ajax_save_measurement_to_database_static() {

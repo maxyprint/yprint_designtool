@@ -46,6 +46,10 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_load_saved_measurements', array('Octo_Print_Designer_Template', 'ajax_load_saved_measurements_static'));
         add_action('wp_ajax_nopriv_load_saved_measurements', array('Octo_Print_Designer_Template', 'ajax_load_saved_measurements_static'));
         
+        // ✅ NEU: AJAX handler für das Löschen von Messungen aus der Datenbank
+        add_action('wp_ajax_delete_measurement_from_database', array('Octo_Print_Designer_Template', 'ajax_delete_measurement_from_database_static'));
+        add_action('wp_ajax_nopriv_delete_measurement_from_database', array('Octo_Print_Designer_Template', 'ajax_delete_measurement_from_database_static'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         
