@@ -1088,7 +1088,8 @@ class Octo_Print_Designer_Template {
      * Initialize AJAX handlers
      */
     public function init_ajax_handlers() {
-        add_action('wp_ajax_get_available_measurement_types', array($this, 'ajax_get_available_measurement_types'));
+        // Die statische Version wird bereits in Admin::define_hooks() registriert
+        // add_action('wp_ajax_get_available_measurement_types', array($this, 'ajax_get_available_measurement_types'));
     }
 
     /**
@@ -1526,16 +1527,33 @@ class Octo_Print_Designer_Template {
     public static function ajax_get_available_measurement_types_static() {
         // Debug-Logging
         error_log("YPrint: AJAX handler called - " . json_encode($_POST));
+        error_log("YPrint: Request method: " . $_SERVER['REQUEST_METHOD']);
+        error_log("YPrint: Content type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+        
+        // Prüfe ob Nonce überhaupt gesendet wurde
+        if (!isset($_POST['nonce'])) {
+            error_log("YPrint: No nonce provided in request");
+            wp_send_json_error(array('message' => 'No nonce provided'));
+            return;
+        }
         
         if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
-            error_log("YPrint: Nonce validation failed");
+            error_log("YPrint: Nonce validation failed - nonce: " . $_POST['nonce']);
             wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+        
+        if (!isset($_POST['template_id'])) {
+            error_log("YPrint: No template_id provided in request");
+            wp_send_json_error(array('message' => 'No template ID provided'));
+            return;
         }
         
         $template_id = intval($_POST['template_id']);
         if (!$template_id) {
             error_log("YPrint: Invalid template ID: " . $_POST['template_id']);
             wp_send_json_error(array('message' => 'Invalid template ID'));
+            return;
         }
         
         error_log("YPrint: Processing template ID: " . $template_id);

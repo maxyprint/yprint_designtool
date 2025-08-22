@@ -22,7 +22,26 @@ class Octo_Print_Designer_Admin {
         Octo_Print_Designer_Loader::$instance->add_action('save_post_design_template', $this->template_manager, 'save_post');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_template_variations', $this->template_manager, 'get_variations');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_template_sizes', $this->template_manager, 'get_sizes');
+        
+        // ✅ AJAX handlers for measurement types - frühe Registrierung über init Hook
+        Octo_Print_Designer_Loader::$instance->add_action('init', $this, 'register_measurement_ajax_handlers');
     
+    }
+    
+    /**
+     * Registriert AJAX handlers für Messungstypen
+     */
+    public function register_measurement_ajax_handlers() {
+        // Debug: Bestätige dass Handler registriert wird
+        error_log("YPrint: Registering AJAX handlers for measurement types");
+        
+        add_action('wp_ajax_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
+        add_action('wp_ajax_nopriv_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
+        
+        // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
+        $this->template_manager->init_ajax_handlers();
+        
+        error_log("YPrint: AJAX handlers registered successfully");
     }
 
     public function enqueue_scripts($hook) {
@@ -118,13 +137,7 @@ class Octo_Print_Designer_Admin {
             });
         ', 'after');
 
-        // Initialize AJAX handlers - Sicherstellen dass sie früh genug registriert werden
-        add_action('wp_ajax_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
-        add_action('wp_ajax_nopriv_get_available_measurement_types', array('Octo_Print_Designer_Template', 'ajax_get_available_measurement_types_static'));
-
-        // Zusätzlich: Instanz-basierte Registrierung
-        $template_class = new Octo_Print_Designer_Template();
-        $template_class->init_ajax_handlers();
+        // AJAX handlers werden jetzt im Konstruktor registriert
     }
 
     public function enqueue_styles($hook) {
