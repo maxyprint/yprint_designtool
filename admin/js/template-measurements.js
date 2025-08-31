@@ -782,9 +782,18 @@ class YPrintTemplateMeasurements {
                 const successMessage = `✅ ${measurementType.toUpperCase()}-Messung erfolgreich gespeichert!
 📏 Pixel: ${pixelDistance.toFixed(1)} px
 🎯 Typ: ${measurementType}
-💡 Das System verwendet automatisch die Größenwerte aus der Produktdimensionen-Tabelle`;
+💡 Das System verwendet automatisch die Größenwerte aus der Produktdimensionen-Tabelle
+🔄 Seite wird in 2 Sekunden neu geladen...`;
                 
                 this.showNotification(successMessage, 'success');
+                
+                // **QUICK-FIX: Seite nach 2 Sekunden neu laden um DOM-Duplikate zu vermeiden**
+                setTimeout(() => {
+                    console.log('🔄 Reloading page to sync measurements and avoid DOM duplicates...');
+                    this.showNotification('🔄 Seite wird neu geladen...', 'info');
+                    window.location.reload();
+                }, 2000);
+                
             } else {
                 this.showNotification('❌ Fehler beim Speichern der Messung in der Datenbank', 'error');
             }
@@ -855,6 +864,9 @@ class YPrintTemplateMeasurements {
             this.updateNoMeasurementsMessage(container);
             
             console.log('✅ Measurement element successfully added to DOM');
+            
+            // **HINWEIS: Page-Refresh wird automatisch nach 2 Sekunden ausgeführt**
+            console.log('💡 DOM element added - page will refresh in 2 seconds to sync with database');
             
         } catch (error) {
             console.error('❌ Error creating visible measurement element:', error);
