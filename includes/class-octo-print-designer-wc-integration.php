@@ -1599,7 +1599,7 @@ private function check_yprint_dependency() {
                 $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
                 if ($template_measurements) {
                     // Teste Skalierungsfaktor-Berechnung
-                    $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $size_name);
+                    $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $size_name);
                     if ($scale_factor) {
                         $result[] = "     ✅ Skalierungsfaktor gefunden: {$scale_factor}";
                         
@@ -1682,7 +1682,7 @@ private function check_yprint_dependency() {
         $result[] = "Bestellung: #" . $order->get_order_number();
         $result[] = "Design-Items: {$design_items_count}";
         $result[] = "Templates gefunden: " . count($template_data);
-        $result[] = "Größenextraktion: " . ($this->get_order_size_from_woocommerce($order) ? '✅ Erfolgreich' : '⚠️ Fallback');
+        $result[] = "Größenextraktion: " . ($api_integration->get_order_size_from_woocommerce($order) ? '✅ Erfolgreich' : '⚠️ Fallback');
         $result[] = "Koordinaten-Umrechnung: ✅ Verfügbar";
         $result[] = "API-Datenaufbereitung: ✅ Verfügbar";
         $result[] = "";
