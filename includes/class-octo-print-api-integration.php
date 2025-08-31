@@ -2282,7 +2282,7 @@ class Octo_Print_API_Integration {
     /**
      * Get order-specific size from WooCommerce order - ERWEITERTE VERSION
      */
-    private function get_order_size_from_woocommerce($order) {
+    public function get_order_size_from_woocommerce($order) {
         error_log("YPrint: Extracting size from WooCommerce order " . $order->get_id());
         
         foreach ($order->get_items() as $item) {
