@@ -2480,7 +2480,7 @@ class Octo_Print_API_Integration {
     /**
      * Get scale factor for specific order size - VERBESSERTE VERSION
      */
-    private function get_size_specific_scale_factor($template_measurements, $order_size) {
+    public function get_size_specific_scale_factor($template_measurements, $order_size) {
         error_log("YPrint: Getting scale factor for order size: " . ($order_size ?: 'null'));
         
         if (empty($template_measurements) || empty($order_size)) {
