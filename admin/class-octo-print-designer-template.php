@@ -1547,6 +1547,111 @@ class Octo_Print_Designer_Template {
 
         <!-- Enhanced Template Measurements JavaScript -->
         <script src="<?php echo esc_url(plugins_url('js/template-measurements.js', __FILE__)); ?>"></script>
+        
+        <!-- ✅ NEU: Design-Größenberechnung Test Button -->
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border: 2px solid #007cba; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #007cba;">
+                <span class="dashicons dashicons-admin-tools" style="margin-right: 8px;"></span>
+                <?php esc_html_e('🧪 Design-Größenberechnung Test', 'octo-print-designer'); ?>
+            </h3>
+            <p style="margin-bottom: 20px; color: #6c757d;">
+                <?php esc_html_e('Testen Sie die Design-Größenberechnung mit verschiedenen Größen und Positionen. Das System zeigt Ihnen genau, was passiert und was das Ergebnis ist.', 'octo-print-designer'); ?>
+            </p>
+            
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">
+                        <?php esc_html_e('Test Größe:', 'octo-print-designer'); ?>
+                    </label>
+                    <select id="test-size-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <?php if (is_array($template_sizes)): ?>
+                            <?php foreach ($template_sizes as $size): ?>
+                                <option value="<?php echo esc_attr($size['id']); ?>"><?php echo esc_html($size['name']); ?></option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="s">Small</option>
+                            <option value="m" selected>Medium</option>
+                            <option value="l">Large</option>
+                            <option value="xl">XL</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                
+                <div style="flex: 1;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">
+                        <?php esc_html_e('Test Position:', 'octo-print-designer'); ?>
+                    </label>
+                    <select id="test-position-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="front">Front</option>
+                        <option value="back">Back</option>
+                        <option value="left">Left Sleeve</option>
+                        <option value="right">Right Sleeve</option>
+                    </select>
+                </div>
+                
+                <div style="flex: 0 0 auto;">
+                    <button type="button" id="test-design-calculation-btn" class="button button-primary" style="padding: 10px 20px; height: auto;">
+                        <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
+                        <?php esc_html_e('Test Berechnung', 'octo-print-designer'); ?>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="test-result-container" style="display: none; margin-top: 20px;">
+                <h4 style="margin-bottom: 15px; color: #007cba;">
+                    <span class="dashicons dashicons-clipboard" style="margin-right: 5px;"></span>
+                    <?php esc_html_e('Test Ergebnis:', 'octo-print-designer'); ?>
+                </h4>
+                <div id="test-result-content" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; max-height: 400px; overflow-y: auto; white-space: pre-wrap;"></div>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            $('#test-design-calculation-btn').on('click', function() {
+                const button = $(this);
+                const resultContainer = $('#test-result-container');
+                const resultContent = $('#test-result-content');
+                const testSize = $('#test-size-select').val();
+                const testPosition = $('#test-position-select').val();
+                const templateId = <?php echo $post->ID; ?>;
+                
+                // Button deaktivieren und Loading anzeigen
+                button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>Teste...');
+                resultContainer.hide();
+                
+                // AJAX Request
+                $.ajax({
+                    url: templateMeasurementsAjax.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'test_design_size_calculation',
+                        nonce: templateMeasurementsAjax.nonce,
+                        template_id: templateId,
+                        test_size: testSize,
+                        test_position: testPosition
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            resultContent.text(response.data.test_result);
+                            resultContainer.show();
+                        } else {
+                            resultContent.text('❌ Fehler: ' + (response.data.message || 'Unbekannter Fehler'));
+                            resultContainer.show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        resultContent.text('❌ AJAX Fehler: ' + error);
+                        resultContainer.show();
+                    },
+                    complete: function() {
+                        // Button wieder aktivieren
+                        button.prop('disabled', false).html('<span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span><?php esc_html_e('Test Berechnung', 'octo-print-designer'); ?>');
+                    }
+                });
+            });
+        });
+        </script>
         <?php
     }
 
