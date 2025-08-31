@@ -401,11 +401,12 @@ class Octo_Print_API_Integration {
                     $image['transform_data'] ?? array()
                 );
                 
-                // Convert canvas coordinates to print area coordinates
+                // Convert canvas coordinates to print area coordinates with size-specific scaling
                 $print_coordinates = $this->convert_canvas_to_print_coordinates(
                     $image['transform_data'] ?? array(),
                     $design_item['template_id'],
-                    $position
+                    $position,
+                    $design_item['size_name'] // Größenspezifischer Skalierungsfaktor
                 );
                 
                 // Get print specifications configuration
@@ -668,9 +669,9 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Convert canvas coordinates to print area coordinates for AllesKlarDruck API
+     * Convert canvas coordinates to print area coordinates for AllesKlarDruck API - VERBESSERTE VERSION
      */
-    private function convert_canvas_to_print_coordinates($transform_data, $template_id = null, $position = 'front') {
+    private function convert_canvas_to_print_coordinates($transform_data, $template_id = null, $position = 'front', $order_size = null) {
         // Canvas-Dimensionen (template-spezifisch konfigurierbar)
         $canvas_config = $this->get_canvas_config($template_id, $position);
         
@@ -683,24 +684,42 @@ class Octo_Print_API_Integration {
         $left_px = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
         $top_px = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
         
-        // Canvas-Koordinaten zu Millimeter umrechnen
+        // **SCHRITT 1: Basis-Koordinaten-Umrechnung**
         $pixel_to_mm_x = $print_area_width_mm / $canvas_width;
         $pixel_to_mm_y = $print_area_height_mm / $canvas_height;
         
-        // Berechne Position in mm (von top-left des Druckbereichs)
-        $offset_x_mm = round($left_px * $pixel_to_mm_x, 1);
-        $offset_y_mm = round($top_px * $pixel_to_mm_y, 1);
+        // **SCHRITT 2: Größenspezifischen Skalierungsfaktor anwenden**
+        $size_scale_factor = 1.0; // Fallback
         
-        // Validierung: Position muss im Druckbereich bleiben
+        if ($template_id && $order_size) {
+            // Hole Template-Messungen mit größenspezifischen Faktoren
+            $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+            $size_scale_factor = $this->get_size_specific_scale_factor($template_measurements, $order_size);
+            
+            error_log("YPrint: Using size-specific scale factor for coordinate conversion: {$size_scale_factor}");
+        }
+        
+        // **SCHRITT 3: Präzise Koordinaten-Umrechnung mit Skalierungsfaktor**
+        $offset_x_mm = round($left_px * $pixel_to_mm_x * $size_scale_factor, 1);
+        $offset_y_mm = round($top_px * $pixel_to_mm_y * $size_scale_factor, 1);
+        
+        // **SCHRITT 4: Validierung: Position muss im Druckbereich bleiben**
         $offset_x_mm = max(0, min($offset_x_mm, $print_area_width_mm));
         $offset_y_mm = max(0, min($offset_y_mm, $print_area_height_mm));
         
-        return array(
+        $result = array(
             'offset_x_mm' => $offset_x_mm,
             'offset_y_mm' => $offset_y_mm,
             'canvas_left_px' => $left_px,
-            'canvas_top_px' => $top_px
+            'canvas_top_px' => $top_px,
+            'size_scale_factor' => $size_scale_factor,
+            'pixel_to_mm_x' => $pixel_to_mm_x,
+            'pixel_to_mm_y' => $pixel_to_mm_y
         );
+        
+        error_log("YPrint: Coordinate conversion - Canvas: ({$left_px}, {$top_px})px -> Print: ({$offset_x_mm}, {$offset_y_mm})mm (scale: {$size_scale_factor})");
+        
+        return $result;
     }
 
     /**
@@ -2261,34 +2280,107 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Get order-specific size from WooCommerce order
+     * Get order-specific size from WooCommerce order - ERWEITERTE VERSION
      */
     private function get_order_size_from_woocommerce($order) {
+        error_log("YPrint: Extracting size from WooCommerce order " . $order->get_id());
+        
         foreach ($order->get_items() as $item) {
-            // Prüfe verschiedene Größenfelder
-            $size_fields = ['size_name', 'product_size', 'variation_size', 'pa_size'];
+            // **ERWEITERTE GRÖSSENFELDER-SUCHE**
+            $size_fields = [
+                // Standard WooCommerce Felder
+                'size_name', 'product_size', 'variation_size', 'pa_size',
+                // YPrint-spezifische Felder
+                'yp_size', 'yp_product_size', 'yp_variation_size',
+                // Deutsche Größenbezeichnungen
+                'groesse', 'groessen', 'size', 'sizes',
+                // Weitere Variationen
+                'attribute_size', 'attribute_groesse', 'attribute_pa_size',
+                // Custom Fields
+                'custom_size', 'custom_groesse'
+            ];
             
+            // **METHODE 1: Direkte Meta-Feld-Suche**
             foreach ($size_fields as $field) {
                 $size = $this->get_design_meta($item, $field);
                 if (!empty($size)) {
+                    error_log("YPrint: Found size in meta field '{$field}': {$size}");
                     return strtolower(trim($size));
                 }
             }
             
-            // Prüfe Variation-Attribute
+            // **METHODE 2: Erweiterte Variation-Attribute-Suche**
             if ($item instanceof WC_Order_Item_Product) {
                 $product = $item->get_product();
                 if ($product && $product->is_type('variation')) {
                     $attributes = $product->get_variation_attributes();
+                    error_log("YPrint: Checking variation attributes: " . json_encode($attributes));
+                    
                     foreach ($attributes as $key => $value) {
-                        if (strpos(strtolower($key), 'size') !== false && !empty($value)) {
+                        // Erweiterte Größen-Schlüsselwörter
+                        $size_keywords = ['size', 'groesse', 'groessen', 'sizes'];
+                        $is_size_attribute = false;
+                        
+                        foreach ($size_keywords as $keyword) {
+                            if (strpos(strtolower($key), $keyword) !== false) {
+                                $is_size_attribute = true;
+                                break;
+                            }
+                        }
+                        
+                        if ($is_size_attribute && !empty($value)) {
+                            error_log("YPrint: Found size in variation attribute '{$key}': {$value}");
                             return strtolower(trim($value));
+                        }
+                    }
+                }
+            }
+            
+            // **METHODE 3: Item Meta durchsuchen**
+            $item_meta = $item->get_meta_data();
+            foreach ($item_meta as $meta) {
+                $meta_key = strtolower($meta->key);
+                $meta_value = $meta->value;
+                
+                // Prüfe ob Meta-Key Größe enthält
+                $size_keywords = ['size', 'groesse', 'groessen'];
+                foreach ($size_keywords as $keyword) {
+                    if (strpos($meta_key, $keyword) !== false && !empty($meta_value)) {
+                        error_log("YPrint: Found size in item meta '{$meta_key}': {$meta_value}");
+                        return strtolower(trim($meta_value));
+                    }
+                }
+            }
+            
+            // **METHODE 4: Produkt-Attribute durchsuchen**
+            if ($item instanceof WC_Order_Item_Product) {
+                $product = $item->get_product();
+                if ($product) {
+                    $product_attributes = $product->get_attributes();
+                    foreach ($product_attributes as $attribute) {
+                        if ($attribute->is_taxonomy()) {
+                            $taxonomy = $attribute->get_name();
+                            $terms = wp_get_post_terms($product->get_id(), $taxonomy);
+                            
+                            if (!is_wp_error($terms) && !empty($terms)) {
+                                $taxonomy_name = strtolower($taxonomy);
+                                $size_keywords = ['size', 'groesse', 'groessen'];
+                                
+                                foreach ($size_keywords as $keyword) {
+                                    if (strpos($taxonomy_name, $keyword) !== false) {
+                                        $size_value = $terms[0]->name;
+                                        error_log("YPrint: Found size in product taxonomy '{$taxonomy}': {$size_value}");
+                                        return strtolower(trim($size_value));
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         
+        error_log("YPrint: No size found in WooCommerce order " . $order->get_id());
         return null; // Keine Größe gefunden
     }
 
@@ -2335,64 +2427,125 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Calculate print dimensions using order-specific size
+     * Calculate print dimensions using order-specific size - VERBESSERTE VERSION
      */
     private function calculate_print_dimensions_for_order($design, $order) {
         $template_id = $design->template_id;
+        error_log("YPrint: Calculating print dimensions for template {$template_id}");
         
-        // Hole Bestellgröße aus WooCommerce Order
+        // **SCHRITT 1: Hole Bestellgröße aus WooCommerce Order**
         $order_size = $this->get_order_size_from_woocommerce($order);
+        error_log("YPrint: Extracted order size: " . ($order_size ?: 'null'));
         
-        // Hole größenspezifische Messungen
+        // **SCHRITT 2: Hole größenspezifische Messungen**
         $size_measurements = $this->get_size_specific_measurements($template_id, $order_size);
+        error_log("YPrint: Size measurements: " . json_encode($size_measurements));
         
-        // Hole Template-Messungen (mit größenspezifischen Faktoren)
+        // **SCHRITT 3: Hole Template-Messungen (mit größenspezifischen Faktoren)**
         $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        error_log("YPrint: Template measurements found: " . (!empty($template_measurements) ? 'yes' : 'no'));
         
+        // **SCHRITT 4: Berechne präzise physische Dimensionen**
         $physical_width_cm = 30;  // Fallback
         $physical_height_cm = 40; // Fallback
         
         if (!empty($size_measurements)) {
-            $physical_width_cm = $size_measurements['chest'] ?? 30;
-            $physical_height_cm = $size_measurements['height_from_shoulder'] ?? 40;
+            // **PRIORITÄT 1: Größenspezifische Messungen verwenden**
+            $physical_width_cm = $size_measurements['chest'] ?? $size_measurements['width'] ?? 30;
+            $physical_height_cm = $size_measurements['height_from_shoulder'] ?? $size_measurements['height'] ?? 40;
+            
+            error_log("YPrint: Using size-specific measurements - width: {$physical_width_cm}cm, height: {$physical_height_cm}cm");
+        } else {
+            error_log("YPrint: No size-specific measurements found, using fallback values");
         }
         
-        // Berechne mit größenspezifischem Skalierungsfaktor
+        // **SCHRITT 5: Berechne größenspezifischen Skalierungsfaktor**
         $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $order_size);
+        error_log("YPrint: Calculated scale factor: {$scale_factor}");
         
-        return array(
+        // **SCHRITT 6: Validiere und logge Ergebnisse**
+        $result = array(
             'physical_width_cm' => $physical_width_cm,
             'physical_height_cm' => $physical_height_cm,
             'scale_factor' => $scale_factor,
             'order_size' => $order_size,
-            'size_measurements' => $size_measurements
+            'has_size_measurements' => !empty($size_measurements),
+            'has_template_measurements' => !empty($template_measurements)
         );
+        
+        error_log("YPrint: Final print dimensions: " . json_encode($result));
+        return $result;
     }
 
     /**
-     * Get scale factor for specific order size
+     * Get scale factor for specific order size - VERBESSERTE VERSION
      */
     private function get_size_specific_scale_factor($template_measurements, $order_size) {
+        error_log("YPrint: Getting scale factor for order size: " . ($order_size ?: 'null'));
+        
         if (empty($template_measurements) || empty($order_size)) {
+            error_log("YPrint: No template measurements or order size, using fallback 1.0");
             return 1.0; // Fallback
         }
         
-        // Suche nach Messungen mit size_scale_factors
+        // **SCHRITT 1: Normalisiere Größenbezeichnung**
+        $normalized_size = $this->normalize_size_designation($order_size);
+        error_log("YPrint: Normalized size: '{$normalized_size}'");
+        
+        // **SCHRITT 2: Suche nach Messungen mit size_scale_factors**
+        $found_scale_factors = array();
+        
         foreach ($template_measurements as $view_id => $view_data) {
-            if (!isset($view_data['measurements'])) continue;
+            if (!isset($view_data['measurements'])) {
+                continue;
+            }
             
             foreach ($view_data['measurements'] as $measurement) {
-                if (!isset($measurement['size_scale_factors'])) continue;
-                
-                $normalized_size = $this->normalize_size_designation($order_size);
-                
-                // Direkte Größe verfügbar
-                if (isset($measurement['size_scale_factors'][$normalized_size])) {
-                    return floatval($measurement['size_scale_factors'][$normalized_size]);
+                if (!isset($measurement['size_scale_factors'])) {
+                    continue;
                 }
+                
+                $scale_factors = $measurement['size_scale_factors'];
+                error_log("YPrint: Found measurement with scale factors: " . json_encode($scale_factors));
+                
+                // **METHODE 1: Direkte Größe verfügbar**
+                if (isset($scale_factors[$normalized_size])) {
+                    $scale_factor = floatval($scale_factors[$normalized_size]);
+                    error_log("YPrint: Found direct scale factor for '{$normalized_size}': {$scale_factor}");
+                    return $scale_factor;
+                }
+                
+                // **METHODE 2: Größen-Mapping versuchen**
+                $size_mappings = array(
+                    'xs' => ['xs', 'extra-small', 'x-small'],
+                    's' => ['s', 'small'],
+                    'm' => ['m', 'medium'],
+                    'l' => ['l', 'large'],
+                    'xl' => ['xl', 'extra-large', 'x-large'],
+                    'xxl' => ['xxl', 'extra-extra-large', '2xl']
+                );
+                
+                foreach ($size_mappings as $standard_size => $variations) {
+                    if (in_array($normalized_size, $variations) && isset($scale_factors[$standard_size])) {
+                        $scale_factor = floatval($scale_factors[$standard_size]);
+                        error_log("YPrint: Found mapped scale factor for '{$normalized_size}' -> '{$standard_size}': {$scale_factor}");
+                        return $scale_factor;
+                    }
+                }
+                
+                // Sammle alle verfügbaren Faktoren für Fallback
+                $found_scale_factors = array_merge($found_scale_factors, $scale_factors);
             }
         }
         
+        // **METHODE 3: Fallback - Durchschnitt aller verfügbaren Faktoren**
+        if (!empty($found_scale_factors)) {
+            $average_factor = array_sum($found_scale_factors) / count($found_scale_factors);
+            error_log("YPrint: Using average scale factor from available factors: {$average_factor}");
+            return $average_factor;
+        }
+        
+        error_log("YPrint: No scale factors found, using fallback 1.0");
         return 1.0; // Fallback
     }
 
