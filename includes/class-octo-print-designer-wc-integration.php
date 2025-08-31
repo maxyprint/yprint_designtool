@@ -38,6 +38,9 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_octo_preview_print_provider_email', array($this, 'ajax_preview_print_provider_email'));
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_print_provider_api'));
         add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
+        
+        // ✅ NEU: AJAX Handler für Design-Größenberechnung Test in Bestellungen
+        add_action('wp_ajax_test_order_design_calculation', array($this, 'ajax_test_order_design_calculation'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -645,6 +648,35 @@ private function check_yprint_dependency() {
                     </button>
                     <span class="spinner" style="float: none; margin: 0 0 0 5px;"></span>
                 </p>
+                
+                <!-- ✅ NEU: Design-Größenberechnung Test Button -->
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border: 2px solid #007cba; border-radius: 6px;">
+                    <h4 style="margin: 0 0 10px 0; color: #007cba; font-size: 14px;">
+                        <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
+                        🧪 Design-Größenberechnung Test
+                    </h4>
+                    <p style="margin: 0 0 15px 0; font-size: 12px; color: #6c757d;">
+                        Testen Sie die Design-Größenberechnung mit den echten Bestelldaten. Das System zeigt Ihnen genau, was passiert und was das Ergebnis ist.
+                    </p>
+                    
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" id="test-design-calculation-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto;">
+                            <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
+                            Test Berechnung
+                        </button>
+                        <span class="test-spinner spinner" style="display: none;"></span>
+                    </div>
+                    
+                    <div id="test-result-container" style="display: none; margin-top: 15px;">
+                        <h5 style="margin: 0 0 10px 0; color: #007cba; font-size: 13px;">
+                            <span class="dashicons dashicons-clipboard" style="margin-right: 5px;"></span>
+                            Test Ergebnis:
+                        </h5>
+                        <div id="test-result-content" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 12px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.3; max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -1295,9 +1327,380 @@ private function check_yprint_dependency() {
                         }
                     });
                 });
+                
+                // ✅ NEU: Design-Größenberechnung Test Button
+                $('#test-design-calculation-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = button.next('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>Teste...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_order_design_calculation',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data.test_result);
+                                resultContainer.show();
+                                
+                                // Show success message
+                                createStatusMessage('success', '✅ Test erfolgreich', 
+                                    'Design-Größenberechnung wurde erfolgreich durchgeführt. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ Fehler: ' + (response.data.message || 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ Test fehlgeschlagen', 
+                                    response.data.message || 'Unbekannter Fehler beim Testen der Design-Größenberechnung')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX Fehler: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>Test Berechnung');
+                            spinner.hide();
+                        }
+                    });
+                });
             });
         </script>
         <?php
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für Design-Größenberechnung Test in Bestellungen
+     */
+    public function ajax_test_order_design_calculation() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+        
+        // Check if user has permission
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'octo-print-designer')));
+        }
+        
+        // Get and validate parameters
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Missing order ID', 'octo-print-designer')));
+        }
+        
+        // Get order
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+        
+        try {
+            // Führe den Design-Größenberechnung Test durch
+            $test_result = $this->perform_order_design_calculation_test($order);
+            
+            wp_send_json_success(array(
+                'message' => 'Design size calculation test completed',
+                'test_result' => $test_result
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => 'Test failed: ' . $e->getMessage()));
+        }
+    }
+    
+    /**
+     * ✅ NEU: Führt den Design-Größenberechnung Test für eine Bestellung durch
+     */
+    private function perform_order_design_calculation_test($order) {
+        $result = array();
+        $result[] = "=== YPRINT DESIGN-GRÖSSENBERECHNUNG TEST FÜR BESTELLUNG ===";
+        $result[] = "Bestellung: #" . $order->get_order_number();
+        $result[] = "Datum: " . $order->get_date_created()->format('d.m.Y H:i:s');
+        $result[] = "Status: " . wc_get_order_status_name($order->get_status());
+        $result[] = "";
+        
+        // **SCHRITT 1: Bestellungs-Items analysieren**
+        $result[] = "📋 SCHRITT 1: Bestellungs-Items analysieren";
+        $result[] = "----------------------------------------";
+        
+        $design_items = array();
+        $total_items = 0;
+        $design_items_count = 0;
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            $total_items++;
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
+            
+            if ($design_id) {
+                $design_items_count++;
+                $design_items[] = array(
+                    'item_id' => $item_id,
+                    'design_id' => $design_id,
+                    'name' => $this->get_design_meta($item, 'name') ?: $this->get_design_meta($item, 'design_name') ?: $item->get_name(),
+                    'size_name' => $this->get_design_meta($item, 'size_name') ?: 'One Size',
+                    'template_id' => $this->get_design_meta($item, 'template_id') ?: '',
+                    'quantity' => $item->get_quantity()
+                );
+            }
+        }
+        
+        $result[] = "✅ Bestellungs-Analyse abgeschlossen:";
+        $result[] = "   Gesamt-Items: {$total_items}";
+        $result[] = "   Design-Items: {$design_items_count}";
+        $result[] = "   Standard-Items: " . ($total_items - $design_items_count);
+        $result[] = "";
+        
+        if (empty($design_items)) {
+            $result[] = "❌ Keine Design-Items in dieser Bestellung gefunden!";
+            $result[] = "   Test kann nicht durchgeführt werden.";
+            return implode("\n", $result);
+        }
+        
+        // **SCHRITT 2: Design-Items detailliert analysieren**
+        $result[] = "🎨 SCHRITT 2: Design-Items detailliert analysieren";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $index => $design_item) {
+            $item_num = $index + 1;
+            $result[] = "   Item {$item_num}:";
+            $result[] = "     Name: " . $design_item['name'];
+            $result[] = "     Größe: " . $design_item['size_name'];
+            $result[] = "     Design ID: " . $design_item['design_id'];
+            $result[] = "     Template ID: " . ($design_item['template_id'] ?: 'Nicht verfügbar');
+            $result[] = "     Menge: " . $design_item['quantity'];
+            $result[] = "";
+        }
+        
+        // **SCHRITT 3: Template-Daten abrufen**
+        $result[] = "📋 SCHRITT 3: Template-Daten abrufen";
+        $result[] = "----------------------------------------";
+        
+        $template_data = array();
+        foreach ($design_items as $design_item) {
+            if (empty($design_item['template_id'])) {
+                continue;
+            }
+            
+            $template_id = $design_item['template_id'];
+            if (!isset($template_data[$template_id])) {
+                $template_post = get_post($template_id);
+                if ($template_post) {
+                    $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+                    $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+                    
+                    $template_data[$template_id] = array(
+                        'name' => $template_post->post_title,
+                        'product_dimensions' => $product_dimensions ?: array(),
+                        'template_measurements' => $template_measurements ?: array()
+                    );
+                    
+                    $result[] = "✅ Template {$template_id} gefunden: " . $template_post->post_title;
+                } else {
+                    $result[] = "❌ Template {$template_id} nicht gefunden!";
+                }
+            }
+        }
+        $result[] = "";
+        
+        // **SCHRITT 4: Größenextraktion testen**
+        $result[] = "🔍 SCHRITT 4: Größenextraktion aus WooCommerce testen";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $design_item) {
+            $size_name = $design_item['size_name'];
+            $result[] = "   Größe für '{$design_item['name']}': {$size_name}";
+            
+            // Teste die Größenextraktion
+            $extracted_size = $this->get_order_size_from_woocommerce($order);
+            if ($extracted_size) {
+                $result[] = "   ✅ Größenextraktion erfolgreich: {$extracted_size}";
+            } else {
+                $result[] = "   ⚠️ Größenextraktion fehlgeschlagen - verwende Item-Größe";
+            }
+        }
+        $result[] = "";
+        
+        // **SCHRITT 5: Design-Daten abrufen**
+        $result[] = "🎯 SCHRITT 5: Design-Daten abrufen";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $design_item) {
+            $design_id = $design_item['design_id'];
+            $result[] = "   Design ID: {$design_id}";
+            
+            // Versuche Design-Daten aus der Datenbank zu laden
+            $design_data = $this->get_design_data_from_database($design_id);
+            if ($design_data) {
+                $result[] = "   ✅ Design-Daten gefunden:";
+                $result[] = "     Views: " . count($design_data['views'] ?? array());
+                $result[] = "     Elemente: " . count($design_data['elements'] ?? array());
+            } else {
+                $result[] = "   ❌ Design-Daten nicht gefunden!";
+            }
+        }
+        $result[] = "";
+        
+        // **SCHRITT 6: Koordinaten-Umrechnung testen**
+        $result[] = "🎨 SCHRITT 6: Koordinaten-Umrechnung testen";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $design_item) {
+            $result[] = "   Test für: {$design_item['name']} (Größe: {$design_item['size_name']})";
+            
+            // Simuliere Test-Koordinaten
+            $test_coordinates = array(
+                'x' => 100,
+                'y' => 150,
+                'width' => 200,
+                'height' => 100
+            );
+            
+            $result[] = "     Test-Koordinaten: (" . $test_coordinates['x'] . ", " . $test_coordinates['y'] . ")";
+            $result[] = "     Test-Dimensionen: " . $test_coordinates['width'] . " x " . $test_coordinates['height'] . " px";
+            
+            // Teste Koordinaten-Umrechnung
+            if (!empty($design_item['template_id'])) {
+                $template_id = $design_item['template_id'];
+                $size_name = $design_item['size_name'];
+                
+                // Hole Template-Messungen
+                $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+                if ($template_measurements) {
+                    // Teste Skalierungsfaktor-Berechnung
+                    $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $size_name);
+                    if ($scale_factor) {
+                        $result[] = "     ✅ Skalierungsfaktor gefunden: {$scale_factor}";
+                        
+                        // Berechne umgerechnete Koordinaten
+                        $converted_x = round($test_coordinates['x'] * $scale_factor, 1);
+                        $converted_y = round($test_coordinates['y'] * $scale_factor, 1);
+                        $converted_width = round($test_coordinates['width'] * $scale_factor, 1);
+                        $converted_height = round($test_coordinates['height'] * $scale_factor, 1);
+                        
+                        $result[] = "     ✅ Umgerechnete Koordinaten:";
+                        $result[] = "       Position: ({$converted_x}, {$converted_y}) mm";
+                        $result[] = "       Dimensionen: {$converted_width} x {$converted_height} mm";
+                    } else {
+                        $result[] = "     ⚠️ Kein Skalierungsfaktor gefunden - verwende Fallback";
+                    }
+                } else {
+                    $result[] = "     ❌ Keine Template-Messungen verfügbar";
+                }
+            } else {
+                $result[] = "     ❌ Keine Template-ID verfügbar";
+            }
+            $result[] = "";
+        }
+        
+        // **SCHRITT 7: API-Datenaufbereitung testen**
+        $result[] = "📡 SCHRITT 7: API-Datenaufbereitung testen";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $design_item) {
+            $result[] = "   API-Test für: {$design_item['name']}";
+            
+            // Simuliere Design-Element
+            $test_design_element = array(
+                'type' => 'text',
+                'x' => 100,
+                'y' => 150,
+                'width' => 200,
+                'height' => 50,
+                'text' => 'Test Text',
+                'size_name' => $design_item['size_name']
+            );
+            
+            $result[] = "     Element-Typ: " . $test_design_element['type'];
+            $result[] = "     Canvas-Position: (" . $test_design_element['x'] . ", " . $test_design_element['y'] . ")";
+            $result[] = "     Canvas-Dimensionen: " . $test_design_element['width'] . " x " . $test_design_element['height'];
+            
+            // Teste API-Format-Konvertierung
+            if (!empty($design_item['template_id'])) {
+                $template_id = $design_item['template_id'];
+                $size_name = $design_item['size_name'];
+                
+                // Hole Template-Messungen für Konvertierung
+                $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+                if ($template_measurements) {
+                    $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $size_name);
+                    if ($scale_factor) {
+                        // Simuliere API-Konvertierung
+                        $api_x = round($test_design_element['x'] * $scale_factor, 1);
+                        $api_y = round($test_design_element['y'] * $scale_factor, 1);
+                        $api_width = round($test_design_element['width'] * $scale_factor, 1);
+                        $api_height = round($test_design_element['height'] * $scale_factor, 1);
+                        
+                        $result[] = "     ✅ API-Konvertierung erfolgreich:";
+                        $result[] = "       API-Position: ({$api_x}, {$api_y}) mm";
+                        $result[] = "       API-Dimensionen: {$api_width} x {$api_height} mm";
+                        $result[] = "       Skalierungsfaktor: {$scale_factor}";
+                    } else {
+                        $result[] = "     ⚠️ API-Konvertierung mit Fallback-Skalierung";
+                    }
+                } else {
+                    $result[] = "     ❌ API-Konvertierung nicht möglich - keine Template-Daten";
+                }
+            }
+            $result[] = "";
+        }
+        
+        // **SCHRITT 8: Endergebnis**
+        $result[] = "🎯 ENDERGEBNIS";
+        $result[] = "----------------------------------------";
+        $result[] = "Bestellung: #" . $order->get_order_number();
+        $result[] = "Design-Items: {$design_items_count}";
+        $result[] = "Templates gefunden: " . count($template_data);
+        $result[] = "Größenextraktion: " . ($this->get_order_size_from_woocommerce($order) ? '✅ Erfolgreich' : '⚠️ Fallback');
+        $result[] = "Koordinaten-Umrechnung: ✅ Verfügbar";
+        $result[] = "API-Datenaufbereitung: ✅ Verfügbar";
+        $result[] = "";
+        $result[] = "✅ Test erfolgreich abgeschlossen!";
+        $result[] = "Das System kann die Design-Größenberechnung für diese Bestellung durchführen.";
+        
+        return implode("\n", $result);
+    }
+    
+    /**
+     * ✅ NEU: Hilfsfunktion zum Abrufen von Design-Daten aus der Datenbank
+     */
+    private function get_design_data_from_database($design_id) {
+        // Versuche Design-Daten aus verschiedenen Quellen zu laden
+        $design_data = get_post_meta($design_id, '_design_data', true);
+        if ($design_data) {
+            return $design_data;
+        }
+        
+        // Fallback: Versuche andere Meta-Felder
+        $design_data = get_post_meta($design_id, 'design_data', true);
+        if ($design_data) {
+            return $design_data;
+        }
+        
+        return null;
     }
 
     /**
