@@ -1400,32 +1400,44 @@ private function check_yprint_dependency() {
      * ✅ NEU: AJAX Handler für Design-Größenberechnung Test in Bestellungen
      */
     public function ajax_test_order_design_calculation() {
-        // Security check
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
-            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
-        }
-        
-        // Check if user has permission
-        if (!current_user_can('edit_shop_orders')) {
-            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'octo-print-designer')));
-        }
-        
-        // Get and validate parameters
-        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
-        
-        if (!$order_id) {
-            wp_send_json_error(array('message' => __('Missing order ID', 'octo-print-designer')));
-        }
-        
-        // Get order
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
-        }
+        // Enable error logging for debugging
+        error_log("🔍 AJAX Test Order Design Calculation started");
         
         try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                error_log("❌ Security check failed in AJAX test");
+                wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+            }
+            
+            // Check if user has permission
+            if (!current_user_can('edit_shop_orders')) {
+                error_log("❌ Permission check failed in AJAX test");
+                wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'octo-print-designer')));
+            }
+            
+            // Get and validate parameters
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            error_log("🔍 Order ID from AJAX: " . $order_id);
+            
+            if (!$order_id) {
+                error_log("❌ Missing order ID in AJAX test");
+                wp_send_json_error(array('message' => __('Missing order ID', 'octo-print-designer')));
+            }
+            
+            // Get order
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                error_log("❌ Order not found: " . $order_id);
+                wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+            }
+            
+            error_log("✅ Order found: #" . $order->get_order_number());
+            
             // Führe den Design-Größenberechnung Test durch
+            error_log("🔍 Starting perform_order_design_calculation_test");
             $test_result = $this->perform_order_design_calculation_test($order);
+            error_log("✅ Test completed successfully");
             
             wp_send_json_success(array(
                 'message' => 'Design size calculation test completed',
@@ -1433,7 +1445,13 @@ private function check_yprint_dependency() {
             ));
             
         } catch (Exception $e) {
+            error_log("❌ Exception in AJAX test: " . $e->getMessage());
+            error_log("❌ Exception trace: " . $e->getTraceAsString());
             wp_send_json_error(array('message' => 'Test failed: ' . $e->getMessage()));
+        } catch (Error $e) {
+            error_log("❌ Fatal error in AJAX test: " . $e->getMessage());
+            error_log("❌ Error trace: " . $e->getTraceAsString());
+            wp_send_json_error(array('message' => 'Fatal error: ' . $e->getMessage()));
         }
     }
     
@@ -1441,6 +1459,8 @@ private function check_yprint_dependency() {
      * ✅ NEU: Führt den Design-Größenberechnung Test für eine Bestellung durch
      */
     private function perform_order_design_calculation_test($order) {
+        error_log("🔍 Starting perform_order_design_calculation_test for order #" . $order->get_order_number());
+        
         $result = array();
         $result[] = "=== YPRINT DESIGN-GRÖSSENBERECHNUNG TEST FÜR BESTELLUNG ===";
         $result[] = "Bestellung: #" . $order->get_order_number();
@@ -1535,8 +1555,10 @@ private function check_yprint_dependency() {
         $result[] = "🔍 SCHRITT 4: Größenextraktion aus WooCommerce testen";
         $result[] = "----------------------------------------";
         
+        error_log("🔍 Getting API Integration instance");
         // Hole API-Integration Instanz für Größenextraktion
         $api_integration = Octo_Print_API_Integration::get_instance();
+        error_log("✅ API Integration instance obtained");
         
         foreach ($design_items as $design_item) {
             $size_name = $design_item['size_name'];
@@ -1654,7 +1676,7 @@ private function check_yprint_dependency() {
                 // Hole Template-Messungen für Konvertierung
                 $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
                 if ($template_measurements) {
-                    $scale_factor = $this->get_size_specific_scale_factor($template_measurements, $size_name);
+                    $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $size_name);
                     if ($scale_factor) {
                         // Simuliere API-Konvertierung
                         $api_x = round($test_design_element['x'] * $scale_factor, 1);
