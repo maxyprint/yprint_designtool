@@ -1198,57 +1198,110 @@ class YPrintTemplateMeasurements {
         console.log('🎯 Instance ID:', this.instanceId || 'no-id');
         
         try {
-            // 1. Finde das Measurement-Item
-            const measurementItem = document.querySelector(`[data-index="${index}"]`);
-            console.log('🎯 Found measurement item:', measurementItem);
+            // **ROBUSTE MESSUNG-SUCHE - MEHRERE METHODEN**
+            let measurementItem = null;
+            let viewId = null;
+            
+            // Methode 1: Direkte Suche nach data-index
+            measurementItem = document.querySelector(`[data-index="${index}"]`);
+            console.log('🎯 Method 1 - Direct data-index search:', measurementItem);
+            
+            // Methode 2: Suche nach measurement-item mit data-index
+            if (!measurementItem) {
+                measurementItem = document.querySelector(`.measurement-item[data-index="${index}"]`);
+                console.log('🎯 Method 2 - measurement-item with data-index:', measurementItem);
+            }
+            
+            // Methode 3: Suche nach Delete-Button und finde Parent
+            if (!measurementItem) {
+                const deleteButton = document.querySelector(`button[data-index="${index}"]`);
+                console.log('🎯 Method 3 - Delete button search:', deleteButton);
+                if (deleteButton) {
+                    measurementItem = deleteButton.closest('.measurement-item') || deleteButton.closest('[data-index]');
+                    console.log('🎯 Method 3 - Found parent from delete button:', measurementItem);
+                }
+            }
+            
+            // Methode 4: Suche nach beliebigem Element mit data-index
+            if (!measurementItem) {
+                measurementItem = document.querySelector(`*[data-index="${index}"]`);
+                console.log('🎯 Method 4 - Any element with data-index:', measurementItem);
+            }
             
             if (!measurementItem) {
                 console.error('❌ Measurement item not found for index:', index);
+                this.showNotification('❌ Messung nicht gefunden', 'error');
                 return;
             }
             
-            // 2. Hole View-ID aus dem Measurement-Item oder dem Delete-Button
-            let viewId = measurementItem.getAttribute('data-view-id');
-            console.log('🎯 View ID from measurement item:', viewId);
+            console.log('🎯 Final measurement item found:', measurementItem);
+            console.log('🎯 Measurement item classes:', measurementItem.className);
+            console.log('🎯 Measurement item attributes:', measurementItem.attributes);
             
+            // **ROBUSTE VIEW-ID-SUCHE**
+            // Methode 1: Direkt vom measurement item
+            viewId = measurementItem.getAttribute('data-view-id');
+            console.log('🎯 Method 1 - View ID from measurement item:', viewId);
+            
+            // Methode 2: Von Parent-Elementen
             if (!viewId) {
-                viewId = measurementItem.closest('[data-view-id]')?.getAttribute('data-view-id');
-                console.log('🎯 View ID from closest element:', viewId);
+                let parent = measurementItem.parentElement;
+                let depth = 0;
+                while (parent && !viewId && depth < 5) {
+                    viewId = parent.getAttribute('data-view-id');
+                    console.log(`🎯 Method 2 - View ID from parent level ${depth}:`, viewId);
+                    parent = parent.parentElement;
+                    depth++;
+                }
             }
             
-            // Fallback: Suche nach dem Delete-Button für diese Messung
+            // Methode 3: Von Delete-Button
             if (!viewId) {
                 const deleteButton = document.querySelector(`button[data-index="${index}"][data-view-id]`);
-                console.log('🎯 Found delete button:', deleteButton);
                 if (deleteButton) {
                     viewId = deleteButton.getAttribute('data-view-id');
-                    console.log('🎯 View ID from delete button:', viewId);
+                    console.log('🎯 Method 3 - View ID from delete button:', viewId);
+                }
+            }
+            
+            // Methode 4: Von beliebigem Element mit data-view-id
+            if (!viewId) {
+                const anyElementWithViewId = document.querySelector(`[data-view-id]`);
+                if (anyElementWithViewId) {
+                    viewId = anyElementWithViewId.getAttribute('data-view-id');
+                    console.log('🎯 Method 4 - View ID from any element:', viewId);
                 }
             }
             
             if (!viewId) {
                 console.error('❌ View ID not found for measurement');
+                this.showNotification('❌ View-ID nicht gefunden', 'error');
                 return;
             }
             
             console.log('🎯 Final view ID:', viewId);
             console.log('🎯 Final index:', index);
             
-            // 3. Lösche aus der Datenbank VOR dem visuellen Löschen
+            // **DATENBANK-LÖSCHUNG**
             this.deleteMeasurementFromDatabase(viewId, index, (success) => {
                 console.log('🎯 Database deletion callback:', success);
                 if (success) {
-                    // 4. Entferne zugehörige visuelle Elemente
+                    // **VISUELLE ELEMENTE ENTFERNEN**
                     this.removeVisualElements(index);
                     
-                    // 5. Entferne das Measurement-Item
+                    // **DOM-ELEMENT ENTFERNEN**
                     if (measurementItem && measurementItem.parentNode) {
                         measurementItem.remove();
                         console.log('✅ Measurement item removed from DOM');
                     }
                     
-                    // 6. Zeige Bestätigung
+                    // **BENACHRICHTIGUNG**
                     this.showNotification('✅ Messung erfolgreich gelöscht', 'success');
+                    
+                    // **BEREICHNUNGEN AKTUALISIEREN**
+                    if (typeof this.updateCalculations === 'function') {
+                        this.updateCalculations();
+                    }
                     
                     console.log('✅ Measurement deleted successfully');
                 } else {
@@ -1265,32 +1318,75 @@ class YPrintTemplateMeasurements {
     
     removeVisualElements(index) {
         try {
-            // Entferne Linien für diese Messung
+            console.log('🎯 Removing visual elements for measurement index:', index);
+            
+            // **ROBUSTE ENTFERNUNG ALLER VISUELLEN ELEMENTE**
+            
+            // 1. Entferne Linien für diese Messung
             const lines = document.querySelectorAll(`[data-measurement-index="${index}"]`);
-            lines.forEach(line => {
+            console.log('🎯 Found lines to remove:', lines.length);
+            lines.forEach((line, i) => {
                 if (line && line.parentNode) {
                     line.remove();
+                    console.log(`✅ Removed line ${i + 1}`);
                 }
             });
             
-            // Entferne Punkte für diese Messung
+            // 2. Entferne Punkte für diese Messung
             const points = document.querySelectorAll(`[data-measurement-point="${index}"]`);
-            points.forEach(point => {
+            console.log('🎯 Found points to remove:', points.length);
+            points.forEach((point, i) => {
                 if (point && point.parentNode) {
                     point.remove();
+                    console.log(`✅ Removed point ${i + 1}`);
                 }
             });
             
-            // Entferne Overlay-Linien für diese Messung
+            // 3. Entferne Overlay-Linien für diese Messung
             const overlayLines = document.querySelectorAll(`[data-measurement-overlay="${index}"]`);
-            overlayLines.forEach(line => {
+            console.log('🎯 Found overlay lines to remove:', overlayLines.length);
+            overlayLines.forEach((line, i) => {
                 if (line && line.parentNode) {
                     line.remove();
+                    console.log(`✅ Removed overlay line ${i + 1}`);
                 }
             });
+            
+            // 4. Entferne beliebige Elemente mit diesem Index
+            const anyElements = document.querySelectorAll(`[data-index="${index}"]`);
+            console.log('🎯 Found any elements with data-index to remove:', anyElements.length);
+            anyElements.forEach((element, i) => {
+                if (element && element.parentNode && element.classList.contains('measurement-visual')) {
+                    element.remove();
+                    console.log(`✅ Removed visual element ${i + 1}`);
+                }
+            });
+            
+            // 5. Entferne Linien mit class-basierten Selektoren
+            const classLines = document.querySelectorAll(`.measurement-line[data-index="${index}"]`);
+            console.log('🎯 Found class-based lines to remove:', classLines.length);
+            classLines.forEach((line, i) => {
+                if (line && line.parentNode) {
+                    line.remove();
+                    console.log(`✅ Removed class-based line ${i + 1}`);
+                }
+            });
+            
+            // 6. Entferne Punkte mit class-basierten Selektoren
+            const classPoints = document.querySelectorAll(`.measurement-point[data-index="${index}"]`);
+            console.log('🎯 Found class-based points to remove:', classPoints.length);
+            classPoints.forEach((point, i) => {
+                if (point && point.parentNode) {
+                    point.remove();
+                    console.log(`✅ Removed class-based point ${i + 1}`);
+                }
+            });
+            
+            console.log('✅ All visual elements removed for measurement index:', index);
             
         } catch (error) {
             console.warn('⚠️ Error removing visual elements for measurement', index, ':', error);
+            console.warn('⚠️ Error stack:', error.stack);
         }
     }
     
@@ -1323,6 +1419,10 @@ class YPrintTemplateMeasurements {
         const templateId = this.getTemplateId();
         const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
         const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+        
+        console.log('🎯 Using AJAX URL:', ajaxUrl);
+        console.log('🎯 Using nonce:', nonce);
+        console.log('🎯 Using template ID:', templateId);
         
         const formData = new FormData();
         formData.append('action', 'delete_measurement_from_database');
