@@ -682,6 +682,11 @@ private function check_yprint_dependency() {
         
         <script>
             jQuery(document).ready(function($) {
+                // Ensure ajaxurl is available
+                if (typeof ajaxurl === 'undefined') {
+                    window.ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+                }
+                
                 // Helper function to create detailed status messages
                 function createStatusMessage(type, title, message, details = null) {
                     var className = type === 'success' ? 'notice-success' : type === 'error' ? 'notice-error' : 'notice-info';
@@ -1530,12 +1535,15 @@ private function check_yprint_dependency() {
         $result[] = "🔍 SCHRITT 4: Größenextraktion aus WooCommerce testen";
         $result[] = "----------------------------------------";
         
+        // Hole API-Integration Instanz für Größenextraktion
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        
         foreach ($design_items as $design_item) {
             $size_name = $design_item['size_name'];
             $result[] = "   Größe für '{$design_item['name']}': {$size_name}";
             
             // Teste die Größenextraktion
-            $extracted_size = $this->get_order_size_from_woocommerce($order);
+            $extracted_size = $api_integration->get_order_size_from_woocommerce($order);
             if ($extracted_size) {
                 $result[] = "   ✅ Größenextraktion erfolgreich: {$extracted_size}";
             } else {
