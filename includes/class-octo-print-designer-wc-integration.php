@@ -2247,7 +2247,7 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * AJAX handler to refresh print data from database
+     * AJAX handler to refresh print data from database with size-specific processing
      */
     public function ajax_refresh_print_data() {
         // Security check
@@ -2270,7 +2270,10 @@ private function build_print_provider_email_content($order, $design_items, $note
             wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
         }
         
-        // Refresh print data from database
+        // Get API integration for size-specific processing
+        $api_integration = Octo_Print_API_Integration::get_instance();
+        
+        // Refresh print data from database with size-specific processing
         $refreshed_items = 0;
         $debug_info = array();
         global $wpdb;
@@ -2285,6 +2288,47 @@ private function build_print_provider_email_content($order, $design_items, $note
             }
             
             $debug_info[] = "Item {$item_id}: Found design_id = {$design_id}";
+            
+            // Get template ID for size-specific processing
+            $template_id = $item->get_meta('_template_id') ?: $item->get_meta('template_id');
+            if ($template_id) {
+                $debug_info[] = "Item {$item_id}: Found template_id = {$template_id}";
+            } else {
+                $debug_info[] = "Item {$item_id}: No template_id found - size-specific processing not possible";
+            }
+            
+            // Get order size for size-specific processing
+            $order_size = $api_integration->get_order_size_from_woocommerce($order);
+            if ($order_size) {
+                $debug_info[] = "Order size detected: {$order_size}";
+            } else {
+                $debug_info[] = "No order size detected - using fallback processing";
+            }
+            
+            // Get template measurements for size-specific scale factors
+            $template_measurements = null;
+            if ($template_id) {
+                $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+                if ($template_measurements) {
+                    $debug_info[] = "Template measurements found for template {$template_id}";
+                    
+                    // Debug: Check for size_scale_factors
+                    if (!empty($template_measurements)) {
+                        $first_view = array_keys($template_measurements)[0];
+                        $first_view_data = $template_measurements[$first_view];
+                        if (isset($first_view_data['measurements']) && !empty($first_view_data['measurements'])) {
+                            $first_measurement = array_values($first_view_data['measurements'])[0];
+                            if (isset($first_measurement['size_scale_factors'])) {
+                                $debug_info[] = "✅ Size scale factors found: " . json_encode($first_measurement['size_scale_factors']);
+                            } else {
+                                $debug_info[] = "❌ Size scale factors NOT found in template measurements";
+                            }
+                        }
+                    }
+                } else {
+                    $debug_info[] = "No template measurements found for template {$template_id}";
+                }
+            }
             
             // Get complete design record from database
             $design = $wpdb->get_row(
@@ -2332,7 +2376,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 continue;
             }
             
-            // Convert variationImages to processed_views format
+            // Convert variationImages to processed_views format with size-specific processing
             // Structure is: "167359_189542" => [image1, image2, ...]
             $processed_views = array();
             
@@ -2360,13 +2404,56 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }
                 
                 if (is_array($images_array) && !empty($images_array)) {
+                    // Process images with size-specific scale factors
+                    $processed_images = array();
+                    foreach ($images_array as $image_data) {
+                        $processed_image = $image_data;
+                        
+                        // Apply size-specific processing if we have template measurements and order size
+                        if ($template_measurements && $order_size) {
+                            // Get size-specific scale factor
+                            $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $order_size);
+                            $debug_info[] = "Design {$design_id}: Using scale factor {$scale_factor} for size {$order_size}";
+                            
+                            // Convert canvas coordinates to print coordinates
+                            if (isset($image_data['transform'])) {
+                                $transform = $image_data['transform'];
+                                
+                                // Convert canvas coordinates to print coordinates using scale factor
+                                $print_x = isset($transform['left']) ? $transform['left'] * $scale_factor : 0;
+                                $print_y = isset($transform['top']) ? $transform['top'] * $scale_factor : 0;
+                                $print_width = isset($transform['width']) ? $transform['width'] * $scale_factor : 0;
+                                $print_height = isset($transform['height']) ? $transform['height'] * $scale_factor : 0;
+                                
+                                // Add print coordinates to processed image
+                                $processed_image['print_coordinates'] = array(
+                                    'x_mm' => round($print_x, 2),
+                                    'y_mm' => round($print_y, 2),
+                                    'width_mm' => round($print_width, 2),
+                                    'height_mm' => round($print_height, 2),
+                                    'scale_factor' => $scale_factor,
+                                    'order_size' => $order_size
+                                );
+                                
+                                $debug_info[] = "Design {$design_id}: Converted canvas coordinates to print coordinates - X: {$print_x}mm, Y: {$print_y}mm, W: {$print_width}mm, H: {$print_height}mm";
+                            }
+                        } else {
+                            $debug_info[] = "Design {$design_id}: No size-specific processing - missing template measurements or order size";
+                        }
+                        
+                        $processed_images[] = $processed_image;
+                    }
+                    
                     $processed_views[$combined_key] = array(
                         'view_name' => $view_name,
                         'system_id' => $view_id,
                         'variation_id' => $variation_id,
-                        'images' => $images_array
+                        'images' => $processed_images,
+                        'size_specific_processing' => ($template_measurements && $order_size),
+                        'order_size' => $order_size,
+                        'template_id' => $template_id
                     );
-                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$variation_id} with " . count($images_array) . " images";
+                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$variation_id} with " . count($processed_images) . " processed images";
                 } else {
                     $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid images array";
                 }
@@ -2377,7 +2464,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $item->update_meta_data('_db_processed_views', wp_json_encode($processed_views));
                 $item->save_meta_data();
                 $refreshed_items++;
-                $debug_info[] = "Design {$design_id}: Updated order item with " . count($processed_views) . " views";
+                $debug_info[] = "Design {$design_id}: Updated order item with " . count($processed_views) . " size-specific processed views";
             } else {
                 $debug_info[] = "Design {$design_id}: No processed views to save";
             }
@@ -2392,13 +2479,13 @@ private function build_print_provider_email_content($order, $design_items, $note
         
         // Add order note
         $order->add_order_note(
-            sprintf(__('Print data refreshed from database (%d items)', 'octo-print-designer'), $refreshed_items),
+            sprintf(__('Print data refreshed from database with size-specific processing (%d items)', 'octo-print-designer'), $refreshed_items),
             false,
             true
         );
         
         wp_send_json_success(array(
-            'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
+            'message' => sprintf(__('Print data refreshed for %d items with size-specific processing', 'octo-print-designer'), $refreshed_items),
             'debug' => $debug_info
         ));
     }
