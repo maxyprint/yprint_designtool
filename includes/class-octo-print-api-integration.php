@@ -2482,6 +2482,7 @@ class Octo_Print_API_Integration {
      */
     public function get_size_specific_scale_factor($template_measurements, $order_size) {
         error_log("YPrint: Getting scale factor for order size: " . ($order_size ?: 'null'));
+        error_log("YPrint: Template measurements structure: " . json_encode(array_keys($template_measurements)));
         
         if (empty($template_measurements) || empty($order_size)) {
             error_log("YPrint: No template measurements or order size, using fallback 1.0");
@@ -2501,7 +2502,9 @@ class Octo_Print_API_Integration {
             }
             
             foreach ($view_data['measurements'] as $measurement) {
+                error_log("YPrint: Checking measurement: " . json_encode(array_keys($measurement)));
                 if (!isset($measurement['size_scale_factors'])) {
+                    error_log("YPrint: Measurement has no size_scale_factors, skipping");
                     continue;
                 }
                 

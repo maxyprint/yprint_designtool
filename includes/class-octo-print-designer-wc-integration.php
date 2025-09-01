@@ -1620,6 +1620,27 @@ private function check_yprint_dependency() {
                 // Hole Template-Messungen
                 $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
                 if ($template_measurements) {
+                    $result[] = "     📊 Template-Messungen gefunden für Template {$template_id}";
+                    $result[] = "     📊 Messungen-Struktur: " . json_encode(array_keys($template_measurements));
+                    
+                    // Debug: Zeige erste Messung
+                    if (!empty($template_measurements)) {
+                        $first_view = array_keys($template_measurements)[0];
+                        $first_view_data = $template_measurements[$first_view];
+                        $result[] = "     📊 Erste View ({$first_view}) Struktur: " . json_encode(array_keys($first_view_data));
+                        
+                        if (isset($first_view_data['measurements']) && !empty($first_view_data['measurements'])) {
+                            $first_measurement = array_values($first_view_data['measurements'])[0];
+                            $result[] = "     📊 Erste Messung Struktur: " . json_encode(array_keys($first_measurement));
+                            
+                            if (isset($first_measurement['size_scale_factors'])) {
+                                $result[] = "     ✅ Size Scale Factors gefunden: " . json_encode($first_measurement['size_scale_factors']);
+                            } else {
+                                $result[] = "     ❌ Size Scale Factors NICHT gefunden in Messung";
+                            }
+                        }
+                    }
+                    
                     // Teste Skalierungsfaktor-Berechnung
                     $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $size_name);
                     if ($scale_factor) {
@@ -1718,18 +1739,40 @@ private function check_yprint_dependency() {
      * ✅ NEU: Hilfsfunktion zum Abrufen von Design-Daten aus der Datenbank
      */
     private function get_design_data_from_database($design_id) {
-        // Versuche Design-Daten aus verschiedenen Quellen zu laden
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'octo_user_designs';
+        
+        // Versuche Design-Daten aus der octo_user_designs Tabelle zu laden
+        $design = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT design_data FROM {$table_name} WHERE id = %d",
+                $design_id
+            ),
+            ARRAY_A
+        );
+        
+        if ($design && !empty($design['design_data'])) {
+            error_log("YPrint: Design data found for ID {$design_id} in octo_user_designs table");
+            return $design['design_data'];
+        }
+        
+        error_log("YPrint: Design data NOT found for ID {$design_id} in octo_user_designs table");
+        
+        // Fallback: Versuche Design-Daten aus verschiedenen Post-Meta Quellen zu laden
         $design_data = get_post_meta($design_id, '_design_data', true);
         if ($design_data) {
+            error_log("YPrint: Design data found for ID {$design_id} in post meta _design_data");
             return $design_data;
         }
         
         // Fallback: Versuche andere Meta-Felder
         $design_data = get_post_meta($design_id, 'design_data', true);
         if ($design_data) {
+            error_log("YPrint: Design data found for ID {$design_id} in post meta design_data");
             return $design_data;
         }
         
+        error_log("YPrint: No design data found for ID {$design_id} in any source");
         return null;
     }
 
