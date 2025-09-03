@@ -573,24 +573,40 @@ class YPrintTemplateMeasurements {
     }
 
     getAvailableMeasurementTypes(callback) {
-        // Prüfe erst, ob AJAX-Variablen verfügbar sind
-        if (typeof templateMeasurementsAjax === 'undefined') {
-            console.error('templateMeasurementsAjax not defined, using fallback');
-            this.showLegacyCMDialog();
-            return;
-        }
+        // ✅ VERBESSERTE PRÜFUNG: Warte auf AJAX-Objekt und DOM
+        const checkAjaxAvailability = () => {
+            if (typeof templateMeasurementsAjax === 'undefined' && typeof window.templateMeasurementsAjax === 'undefined') {
+                console.error('templateMeasurementsAjax not defined, using fallback');
+                this.showLegacyCMDialog();
+                return false;
+            }
+            
+            // DOM-Sicherheitsprüfung hinzugefügt
+            if (!document.body) {
+                console.warn('DOM not ready, retrying in 100ms...');
+                setTimeout(() => this.getAvailableMeasurementTypes(callback), 100);
+                return false;
+            }
+            
+            return true;
+        };
+        
+        if (!checkAjaxAvailability()) return;
+        
+        // Verwende window-Objekt als Fallback
+        const ajaxVars = window.templateMeasurementsAjax || templateMeasurementsAjax;
         
         const formData = new FormData();
         formData.append('action', 'get_available_measurement_types');
-        formData.append('nonce', templateMeasurementsAjax.nonce);
+        formData.append('nonce', ajaxVars.nonce);
         formData.append('template_id', this.getTemplateId());
         
         console.log('🎯 Sending AJAX request for measurement types...');
         console.log('🎯 Template ID:', this.getTemplateId());
-        console.log('🎯 Nonce:', templateMeasurementsAjax.nonce);
-        console.log('🎯 AJAX URL:', templateMeasurementsAjax.ajax_url);
+        console.log('🎯 Nonce:', ajaxVars.nonce);
+        console.log('🎯 AJAX URL:', ajaxVars.ajax_url);
         
-        fetch(templateMeasurementsAjax.ajax_url, {
+        fetch(ajaxVars.ajax_url, {
             method: 'POST',
             body: formData
         })
@@ -1498,15 +1514,40 @@ window.initTemplateMinitsIfNeeded = function() {
     }
 };
 
-// Initialisierung - Nur wenn noch keine Instanz existiert
+// ✅ VERBESSERTE INITIALISIERUNG mit DOM und AJAX-Checks
 console.log('🎯 Initializing YPrint Template Measurements');
-if (!window.templateMeasurements && typeof window.YPrintTemplateMeasurements !== 'undefined') {
-    window.templateMeasurements = new YPrintTemplateMeasurements();
-    console.log('✅ Template Measurements initialized immediately');
-} else if (window.templateMeasurements) {
-    console.log('⚠️ Template Measurements already exists, skipping immediate initialization');
-} else {
-    console.log('🎯 YPrint Template Measurements Script Ende erreicht'); 
+
+function safeInitialization() {
+    // Prüfe DOM-Bereitschaft
+    if (!document.body) {
+        console.warn('DOM not ready, retrying initialization in 100ms...');
+        setTimeout(safeInitialization, 100);
+        return;
+    }
+    
+    // Prüfe AJAX-Verfügbarkeit
+    if (typeof templateMeasurementsAjax === 'undefined' && typeof window.templateMeasurementsAjax === 'undefined') {
+        console.warn('AJAX object not ready, retrying in 100ms...');
+        setTimeout(safeInitialization, 100);
+        return;
+    }
+    
+    // Sichere Initialisierung
+    if (!window.templateMeasurements && typeof YPrintTemplateMeasurements !== 'undefined') {
+        try {
+            window.templateMeasurements = new YPrintTemplateMeasurements();
+            console.log('✅ Template Measurements initialized successfully');
+        } catch(error) {
+            console.error('❌ Error during initialization:', error);
+        }
+    } else if (window.templateMeasurements) {
+        console.log('⚠️ Template Measurements already exists');
+    } else {
+        console.error('❌ YPrintTemplateMeasurements class not available');
+    }
 }
+
+// Starte sichere Initialisierung
+safeInitialization();
 
 } // Ende der if-Überprüfung für bereits geladene Klasse 

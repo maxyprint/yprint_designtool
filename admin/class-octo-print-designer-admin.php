@@ -286,11 +286,20 @@ class Octo_Print_Designer_Admin {
         // Template Measurements JavaScript - Cache Busting
         wp_enqueue_script('octo-template-measurements', plugins_url('js/template-measurements.js', __FILE__), array('jquery'), time(), true);
         
-        // AJAX Localization für Template Measurements
+        // AJAX Localization für Template Measurements - SOFORTIGE Ausgabe
         wp_localize_script('octo-template-measurements', 'templateMeasurementsAjax', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('template_measurements_nonce')
         ));
+        
+        // ✅ ZUSÄTZLICHER FIX: Inline-Script um AJAX-Verfügbarkeit sicherzustellen
+        wp_add_inline_script('octo-template-measurements', '
+        window.templateMeasurementsAjax = window.templateMeasurementsAjax || {
+            ajax_url: "' . admin_url('admin-ajax.php') . '",
+            nonce: "' . wp_create_nonce('template_measurements_nonce') . '"
+        };
+        console.log("🔧 AJAX object ensured:", window.templateMeasurementsAjax);
+        ', 'before');
         
         wp_localize_script('octo-print-designer-admin', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
