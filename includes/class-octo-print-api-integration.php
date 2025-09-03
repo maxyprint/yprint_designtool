@@ -2557,4 +2557,364 @@ class Octo_Print_API_Integration {
         return strtolower(trim($size));
     }
 
+    /**
+     * ✅ NEU: Repariert das View-Zuordnungs-Chaos und stabilisiert die Messungs-Speicherung
+     * 
+     * @param int $template_id Template ID
+     * @param string $view_id View ID
+     * @param array $measurement_data Messungsdaten
+     * @return array|false Reparierte Messungsdaten oder false bei Fehler
+     */
+    private function repair_view_measurement_assignment($template_id, $view_id, $measurement_data) {
+        error_log("YPrint Debug: 🔧 Repairing view measurement assignment for template {$template_id}, view {$view_id}");
+        
+        // 1. Validiere View-Existenz im Template
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
+        $view_exists = false;
+        $valid_view_data = null;
+        
+        if (!empty($template_variations) && is_array($template_variations)) {
+            foreach ($template_variations as $variation_id => $variation) {
+                if (isset($variation['views']) && is_array($variation['views'])) {
+                    if (isset($variation['views'][$view_id])) {
+                        $view_exists = true;
+                        $valid_view_data = $variation['views'][$view_id];
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!$view_exists) {
+            error_log("YPrint Debug: ❌ View {$view_id} not found in template {$template_id}");
+            return false;
+        }
+        
+        error_log("YPrint Debug: ✅ View {$view_id} validated in template {$template_id}");
+        
+        // 2. Repariere Messungsdaten-Struktur
+        $repaired_measurement = array(
+            'id' => uniqid('measurement_'),
+            'view_id' => $view_id,
+            'template_id' => $template_id,
+            'measurement_type' => $measurement_data['measurement_type'] ?? 'custom',
+            'pixel_distance' => floatval($measurement_data['pixel_distance'] ?? 0),
+            'real_distance_cm' => floatval($measurement_data['real_distance_cm'] ?? 0),
+            'scale_factor' => floatval($measurement_data['scale_factor'] ?? 1.0),
+            'color' => sanitize_hex_color($measurement_data['color'] ?? '#ff0000'),
+            'points' => $this->sanitize_measurement_points($measurement_data['points'] ?? array()),
+            'created_at' => current_time('mysql'),
+            'is_repaired' => true,
+            'repair_timestamp' => current_time('mysql')
+        );
+        
+        // 3. Generiere sofort größenspezifische Skalierungsfaktoren
+        if (isset($measurement_data['size_name'])) {
+            $size_scale_factors = $this->generate_size_scale_factors($template_id, $measurement_data['size_name']);
+            if (!empty($size_scale_factors)) {
+                $repaired_measurement['size_scale_factors'] = $size_scale_factors;
+                $repaired_measurement['size_name'] = $measurement_data['size_name'];
+                
+                // Berechne den spezifischen Skalierungsfaktor für diesen Messungstyp
+                $measurement_type = $repaired_measurement['measurement_type'];
+                if (isset($size_scale_factors[$measurement_type])) {
+                    $repaired_measurement['size_specific_scale_factor'] = $size_scale_factors[$measurement_type]['size_specific_factor'];
+                    error_log("YPrint Debug: 🎯 Generated size-specific scale factor: {$repaired_measurement['size_specific_scale_factor']} for {$measurement_type}");
+                }
+            }
+        }
+        
+        return $repaired_measurement;
+    }
+
+    /**
+     * ✅ NEU: Systematisiert das Array-Index Management und verhindert Lücken
+     * 
+     * @param array $measurements_array Bestehendes Messungs-Array
+     * @param string $action Aktion (add, update, delete)
+     * @param array $measurement_data Neue/zu aktualisierende Messungsdaten
+     * @param int|null $index Zu aktualisierender Index (bei update/delete)
+     * @return array Repariertes Array mit kontinuierlicher Indizierung
+     */
+    private function repair_array_index_management($measurements_array, $action, $measurement_data = null, $index = null) {
+        error_log("YPrint Debug: 🔧 Repairing array index management for action: {$action}");
+        
+        if (!is_array($measurements_array)) {
+            $measurements_array = array();
+        }
+        
+        switch ($action) {
+            case 'add':
+                // Füge neue Messung am Ende hinzu
+                $measurements_array[] = $measurement_data;
+                error_log("YPrint Debug: ✅ Added measurement at index " . (count($measurements_array) - 1));
+                break;
+                
+            case 'update':
+                // Aktualisiere bestehende Messung
+                if ($index !== null && isset($measurements_array[$index])) {
+                    $measurements_array[$index] = $measurement_data;
+                    error_log("YPrint Debug: ✅ Updated measurement at index {$index}");
+                } else {
+                    error_log("YPrint Debug: ⚠️ Index {$index} not found, adding as new measurement");
+                    $measurements_array[] = $measurement_data;
+                }
+                break;
+                
+            case 'delete':
+                // Lösche Messung und repariere Indizierung
+                if ($index !== null && isset($measurements_array[$index])) {
+                    unset($measurements_array[$index]);
+                    // Repariere Indizierung durch array_values()
+                    $measurements_array = array_values($measurements_array);
+                    error_log("YPrint Debug: ✅ Deleted measurement at index {$index} and repaired indexing");
+                } else {
+                    error_log("YPrint Debug: ⚠️ Index {$index} not found for deletion");
+                }
+                break;
+                
+            case 'repair':
+                // Repariere alle Lücken und Inkonsistenzen
+                $original_count = count($measurements_array);
+                $measurements_array = array_values($measurements_array);
+                $repaired_count = count($measurements_array);
+                
+                if ($original_count !== $repaired_count) {
+                    error_log("YPrint Debug: 🔧 Repaired array indexing: {$original_count} → {$repaired_count} elements");
+                }
+                break;
+        }
+        
+        return $measurements_array;
+    }
+
+    /**
+     * ✅ NEU: Repariert die defekte Skalierungsfaktor-Generation und lädt Produktdimensionen zur Laufzeit
+     * 
+     * @param int $template_id Template ID
+     * @param string $size_name Größenname
+     * @param string $measurement_type Messungstyp
+     * @return array|false Skalierungsfaktoren oder false bei Fehler
+     */
+    private function repair_size_scale_factor_generation($template_id, $size_name, $measurement_type = null) {
+        error_log("YPrint Debug: 🔧 Repairing size scale factor generation for template {$template_id}, size {$size_name}");
+        
+        // 1. Lade Produktdimensionen zur Laufzeit (nicht zur Initialisierungszeit)
+        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            error_log("YPrint Debug: ❌ No product dimensions found for template {$template_id}");
+            return false;
+        }
+        
+        if (!isset($product_dimensions[$size_name])) {
+            error_log("YPrint Debug: ❌ Size {$size_name} not found in product dimensions");
+            return false;
+        }
+        
+        error_log("YPrint Debug: ✅ Product dimensions loaded for size {$size_name}");
+        
+        // 2. Lade Template-Messungen aus der Datenbank
+        global $wpdb;
+        $measurements = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}octo_template_measurements 
+             WHERE template_id = %d AND measurement_type != 'custom'",
+            $template_id
+        ), ARRAY_A);
+        
+        if (empty($measurements)) {
+            error_log("YPrint Debug: ⚠️ No template measurements found, using fallback calculation");
+            // Fallback: Verwende Standard-Skalierung basierend auf Produktdimensionen
+            return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
+        }
+        
+        error_log("YPrint Debug: ✅ Found " . count($measurements) . " template measurements");
+        
+        // 3. Generiere Skalierungsfaktoren mit verbesserter Logik
+        $scale_factors = array();
+        foreach ($measurements as $measurement) {
+            $current_measurement_type = $measurement['measurement_type'];
+            
+            // Wenn ein spezifischer Messungstyp angefordert wird, überspringe andere
+            if ($measurement_type !== null && $current_measurement_type !== $measurement_type) {
+                continue;
+            }
+            
+            $template_pixel_distance = floatval($measurement['pixel_distance']);
+            $template_real_distance_cm = floatval($measurement['real_distance_cm']);
+            
+            if ($template_pixel_distance <= 0 || $template_real_distance_cm <= 0) {
+                continue; // Überspringe ungültige Messungen
+            }
+            
+            // Verbesserte Skalierungsfaktor-Berechnung
+            $size_specific_factor = $this->calculate_enhanced_size_scale_factor(
+                $current_measurement_type,
+                $template_real_distance_cm,
+                $product_dimensions,
+                $size_name
+            );
+            
+            if ($size_specific_factor > 0) {
+                $scale_factors[$current_measurement_type] = array(
+                    'template_pixel_distance' => $template_pixel_distance,
+                    'template_real_distance_cm' => $template_real_distance_cm,
+                    'size_specific_factor' => $size_specific_factor,
+                    'size_name' => $size_name,
+                    'measurement_id' => $measurement['id'],
+                    'calculation_method' => 'enhanced_template_measurements'
+                );
+                
+                error_log("YPrint Debug: 🎯 Generated scale factor for {$current_measurement_type}: {$size_specific_factor}x");
+            }
+        }
+        
+        if (empty($scale_factors)) {
+            error_log("YPrint Debug: ⚠️ No valid scale factors generated, using fallback");
+            return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
+        }
+        
+        error_log("YPrint Debug: ✅ Successfully generated " . count($scale_factors) . " scale factors");
+        return $scale_factors;
+    }
+
+    /**
+     * ✅ NEU: Generiert Fallback-Skalierungsfaktoren basierend auf Produktdimensionen
+     * 
+     * @param array $product_dimensions Produktdimensionen
+     * @param string $size_name Größenname
+     * @return array Fallback-Skalierungsfaktoren
+     */
+    private function generate_fallback_scale_factors($product_dimensions, $size_name) {
+        error_log("YPrint Debug: 🔧 Generating fallback scale factors for size {$size_name}");
+        
+        $fallback_factors = array();
+        $size_data = $product_dimensions[$size_name];
+        
+        // Standard-Skalierungsfaktoren basierend auf Größenverhältnissen
+        $standard_sizes = array('S', 'M', 'L', 'XL');
+        $current_size_index = array_search($size_name, $standard_sizes);
+        
+        if ($current_size_index !== false) {
+            // Berechne Skalierungsfaktor basierend auf Größenposition
+            $base_factor = 1.0;
+            $size_increment = 0.1; // 10% Zuwachs pro Größe
+            
+            if ($current_size_index > 1) { // L oder größer
+                $base_factor = 1.0 + ($current_size_index - 1) * $size_increment;
+            } elseif ($current_size_index < 1) { // S
+                $base_factor = 1.0 - (1 - $current_size_index) * $size_increment;
+            }
+            
+            // Begrenze den Faktor auf sinnvolle Werte
+            $base_factor = max(0.8, min(1.3, $base_factor));
+            
+            $fallback_factors['fallback'] = array(
+                'size_specific_factor' => $base_factor,
+                'size_name' => $size_name,
+                'calculation_method' => 'fallback_size_progression',
+                'fallback_reason' => 'No template measurements available'
+            );
+            
+            error_log("YPrint Debug: 🎯 Generated fallback scale factor: {$base_factor}x for size {$size_name}");
+        }
+        
+        return $fallback_factors;
+    }
+
+    /**
+     * ✅ NEU: Verbesserte Skalierungsfaktor-Berechnung mit erweitertem Mapping
+     * 
+     * @param string $measurement_type Messungstyp
+     * @param float $template_real_distance_cm Template-Real-Distanz
+     * @param array $product_dimensions Produktdimensionen
+     * @param string $size_name Größenname
+     * @return float Skalierungsfaktor
+     */
+    private function calculate_enhanced_size_scale_factor($measurement_type, $template_real_distance_cm, $product_dimensions, $size_name) {
+        // Erweitertes Mapping von Messungstypen zu Produktdimensionen
+        $measurement_dimension_mapping = array(
+            'chest' => array('chest_circumference', 'chest_width', 'chest'),
+            'waist' => array('waist_circumference', 'waist_width', 'waist'),
+            'length' => array('length', 'body_length', 'shirt_length'),
+            'shoulder' => array('shoulder_width', 'shoulder', 'shoulder_to_shoulder'),
+            'sleeve' => array('sleeve_length', 'arm_length', 'sleeve'),
+            'neck' => array('neck_circumference', 'neck', 'collar_size'),
+            'hip' => array('hip_circumference', 'hip_width', 'hip'),
+            'bicep' => array('bicep_circumference', 'bicep', 'arm_circumference')
+        );
+        
+        $dimension_keys = $measurement_dimension_mapping[$measurement_type] ?? array();
+        $size_data = $product_dimensions[$size_name] ?? array();
+        
+        // Versuche alle möglichen Dimension-Schlüssel
+        foreach ($dimension_keys as $dimension_key) {
+            if (isset($size_data[$dimension_key])) {
+                $size_specific_dimension = floatval($size_data[$dimension_key]);
+                
+                if ($size_specific_dimension > 0) {
+                    // Berechne Skalierungsfaktor: Neue Größe / Template-Größe
+                    $scale_factor = $size_specific_dimension / $template_real_distance_cm;
+                    
+                    // Begrenze den Skalierungsfaktor auf sinnvolle Werte (0.7 bis 1.5)
+                    $scale_factor = max(0.7, min(1.5, $scale_factor));
+                    
+                    error_log("YPrint Debug: 📏 Enhanced scale factor for {$measurement_type}: {$template_real_distance_cm}cm → {$size_specific_dimension}cm = {$scale_factor}x");
+                    
+                    return $scale_factor;
+                }
+            }
+        }
+        
+        // Fallback: Verwende Größen-basierte Schätzung
+        error_log("YPrint Debug: ⚠️ No exact dimension match found for {$measurement_type}, using size-based estimation");
+        return $this->estimate_scale_factor_from_size($size_name);
+    }
+
+    /**
+     * ✅ NEU: Schätzt Skalierungsfaktor basierend auf Größenposition
+     * 
+     * @param string $size_name Größenname
+     * @return float Geschätzter Skalierungsfaktor
+     */
+    private function estimate_scale_factor_from_size($size_name) {
+        $size_scale_map = array(
+            'XS' => 0.85,
+            'S' => 0.90,
+            'M' => 1.00,
+            'L' => 1.10,
+            'XL' => 1.20,
+            'XXL' => 1.30
+        );
+        
+        $estimated_factor = $size_scale_map[$size_name] ?? 1.0;
+        error_log("YPrint Debug: 📏 Estimated scale factor for size {$size_name}: {$estimated_factor}x");
+        
+        return $estimated_factor;
+    }
+
+    /**
+     * ✅ NEU: Sanitized Messungs-Punkte für sichere Speicherung
+     * 
+     * @param array $points Rohe Punktdaten
+     * @return array Sanitized Punktdaten
+     */
+    private function sanitize_measurement_points($points) {
+        if (!is_array($points)) {
+            return array();
+        }
+        
+        $sanitized_points = array();
+        foreach ($points as $point) {
+            if (is_array($point) && isset($point['x']) && isset($point['y'])) {
+                $sanitized_points[] = array(
+                    'x' => floatval($point['x']),
+                    'y' => floatval($point['y']),
+                    'timestamp' => isset($point['timestamp']) ? intval($point['timestamp']) : time()
+                );
+            }
+        }
+        
+        return $sanitized_points;
+    }
+
 }
