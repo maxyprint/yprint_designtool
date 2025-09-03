@@ -979,17 +979,29 @@ class Octo_Print_Designer_Template {
      * Verbesserte Mess-Daten Validierung und Verarbeitung mit größenspezifischen Faktoren
      */
     private function process_measurement_data($view_print_areas, $product_dimensions) {
+        error_log("YPrint: process_measurement_data called with:");
+        error_log("YPrint: - view_print_areas: " . json_encode($view_print_areas));
+        error_log("YPrint: - product_dimensions: " . json_encode($product_dimensions));
+        
         if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            error_log("YPrint: ❌ No product dimensions available for scale factor calculation");
             return $view_print_areas; // Keine Berechnungen möglich ohne Dimensionen
         }
         
+        error_log("YPrint: ✅ Product dimensions available, processing measurements...");
+        
         foreach ($view_print_areas as $view_id => $view_config) {
+            error_log("YPrint: Processing view: {$view_id}");
+            
             if (isset($view_config['measurements']) && is_array($view_config['measurements'])) {
                 $measurements = array();
                 foreach ($view_config['measurements'] as $index => $measurement) {
+                    error_log("YPrint: Processing measurement {$index}: " . json_encode($measurement));
+                    
                     // Validiere Mess-Punkte
                     $points = isset($measurement['points']) ? (is_array($measurement['points']) ? $measurement['points'] : json_decode(stripslashes($measurement['points']), true)) : array();
                     if (!$this->validate_measurement_points($points)) {
+                        error_log("YPrint: ❌ Invalid measurement points for measurement {$index}");
                         continue; // Springe ungültige Messungen
                     }
                     
@@ -997,8 +1009,11 @@ class Octo_Print_Designer_Template {
                     $pixel_distance = $this->calculate_pixel_distance($points);
                     $measurement_type = $measurement['measurement_type'] ?? $measurement['type'] ?? '';
                     
+                    error_log("YPrint: Measurement {$index} - Type: {$measurement_type}, Pixel Distance: {$pixel_distance}");
+                    
                     // Validiere Mindestanforderungen
                     if ($pixel_distance < 5 || empty($measurement_type)) {
+                        error_log("YPrint: ❌ Measurement {$index} failed validation - distance: {$pixel_distance}, type: {$measurement_type}");
                         continue;
                     }
                     
@@ -1006,19 +1021,30 @@ class Octo_Print_Designer_Template {
                     $size_scale_factors = array();
                     $has_valid_references = false;
                     
+                    error_log("YPrint: Calculating scale factors for measurement type: {$measurement_type}");
+                    
                     foreach ($product_dimensions as $size_id => $size_config) {
+                        error_log("YPrint: Checking size: {$size_id}, config: " . json_encode($size_config));
+                        
                         $real_distance_cm = floatval($size_config[$measurement_type] ?? 0);
                         
                         if ($real_distance_cm > 0) {
                             $scale_factor = $real_distance_cm / ($pixel_distance / 10);
                             $size_scale_factors[$size_id] = round($scale_factor, 4);
                             $has_valid_references = true;
+                            
+                            error_log("YPrint: ✅ Size {$size_id} - Real: {$real_distance_cm}cm, Scale: {$scale_factor}");
+                        } else {
+                            error_log("YPrint: ❌ Size {$size_id} - No valid measurement for type '{$measurement_type}'");
                         }
                     }
                     
                     if (!$has_valid_references) {
+                        error_log("YPrint: ❌ Measurement {$index} - No valid references found for type '{$measurement_type}'");
                         continue; // Keine gültigen Referenzwerte für diesen Messungstyp
                     }
+                    
+                    error_log("YPrint: ✅ Measurement {$index} - Final size_scale_factors: " . json_encode($size_scale_factors));
                     
                     $measurements[intval($index)] = array(
                         'type' => $measurement_type,
@@ -1033,9 +1059,11 @@ class Octo_Print_Designer_Template {
                     );
                 }
                 $view_print_areas[sanitize_text_field($view_id)]['measurements'] = $measurements;
+                error_log("YPrint: ✅ Updated view {$view_id} with " . count($measurements) . " processed measurements");
             }
         }
         
+        error_log("YPrint: ✅ process_measurement_data completed successfully");
         return $view_print_areas;
     }
 
@@ -1937,8 +1965,9 @@ class Octo_Print_Designer_Template {
                 $view_print_areas = array();
             }
             
-            // Hole Produktdimensionen für Skalierungsfaktor-Berechnung
-            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+                    // Hole Produktdimensionen für Skalierungsfaktor-Berechnung
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        error_log("YPrint: Product dimensions loaded: " . json_encode($product_dimensions));
             
             // Berechne nächsten Index für diese View
             $next_index = 0;
