@@ -2917,4 +2917,189 @@ class Octo_Print_API_Integration {
         return $sanitized_points;
     }
 
+    /**
+     * ✅ REPARIERT: Generiert größenspezifische Skalierungsfaktoren mit Real-time Produktdimensionen-Ladung
+     * 
+     * @param int $template_id Template ID
+     * @param string $size_name Größenname (S, M, L, XL)
+     * @return array Skalierungsfaktoren für alle verfügbaren Messungstypen
+     */
+    private function generate_size_scale_factors($template_id, $size_name) {
+        error_log("YPrint Debug: 🎯 generate_size_scale_factors() aufgerufen - Template: {$template_id}, Größe: {$size_name}");
+        
+        // ✅ NEU: Real-time Produktdimensionen-Ladung zur Laufzeit
+        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
+        error_log("YPrint Debug: 📏 Produktdimensionen geladen: " . (is_array($product_dimensions) ? count($product_dimensions) : 'Nicht-Array'));
+        
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            error_log("YPrint Debug: ❌ Keine Produktdimensionen gefunden für Template {$template_id}");
+            // ✅ NEU: Versuche alternative Meta-Key
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+            if (empty($product_dimensions) || !is_array($product_dimensions)) {
+                error_log("YPrint Debug: ❌ Auch _template_product_dimensions nicht gefunden");
+                return array();
+            } else {
+                error_log("YPrint Debug: ✅ Produktdimensionen aus _template_product_dimensions geladen");
+            }
+        }
+        
+        // ✅ NEU: Validiere Größen-Verfügbarkeit
+        if (!isset($product_dimensions[$size_name])) {
+            error_log("YPrint Debug: ❌ Größe {$size_name} nicht in Produktdimensionen gefunden");
+            error_log("YPrint Debug: 📊 Verfügbare Größen: " . implode(', ', array_keys($product_dimensions)));
+            return array();
+        }
+        
+        error_log("YPrint Debug: ✅ Produktdimensionen für Größe {$size_name} gefunden");
+        $size_dimensions = $product_dimensions[$size_name];
+        error_log("YPrint Debug: 📏 Dimensionen für {$size_name}: " . json_encode($size_dimensions));
+        
+        // ✅ NEU: Lade Template-Messungen aus der Datenbank
+        global $wpdb;
+        $measurements = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}octo_template_measurements 
+             WHERE template_id = %d AND measurement_type != 'custom'",
+            $template_id
+        ), ARRAY_A);
+        
+        error_log("YPrint Debug: 🎯 Template-Messungen aus DB geladen: " . count($measurements));
+        
+        if (empty($measurements)) {
+            error_log("YPrint Debug: ⚠️ Keine Template-Messungen gefunden, verwende Fallback");
+            // ✅ NEU: Fallback-Skalierungsfaktoren basierend auf Produktdimensionen
+            return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
+        }
+        
+        // ✅ NEU: Generiere Skalierungsfaktoren mit verbesserter Logik
+        $scale_factors = array();
+        foreach ($measurements as $measurement) {
+            $measurement_type = $measurement['measurement_type'];
+            $template_pixel_distance = floatval($measurement['pixel_distance']);
+            $template_real_distance_cm = floatval($measurement['real_distance_cm']);
+            
+            error_log("YPrint Debug: 🔍 Verarbeite Messung: {$measurement_type} - {$template_pixel_distance}px = {$template_real_distance_cm}cm");
+            
+            if ($template_pixel_distance <= 0 || $template_real_distance_cm <= 0) {
+                error_log("YPrint Debug: ⚠️ Überspringe ungültige Messung: {$measurement_type}");
+                continue;
+            }
+            
+            // ✅ NEU: Verbesserte Skalierungsfaktor-Berechnung
+            $size_specific_factor = $this->calculate_enhanced_size_scale_factor(
+                $measurement_type,
+                $template_real_distance_cm,
+                $product_dimensions,
+                $size_name
+            );
+            
+            if ($size_specific_factor > 0) {
+                $scale_factors[$measurement_type] = array(
+                    'template_pixel_distance' => $template_pixel_distance,
+                    'template_real_distance_cm' => $template_real_distance_cm,
+                    'size_specific_factor' => $size_specific_factor,
+                    'size_name' => $size_name,
+                    'measurement_id' => $measurement['id'],
+                    'calculation_method' => 'enhanced_template_measurements',
+                    'debug_info' => array(
+                        'measurement_type' => $measurement_type,
+                        'size_dimensions_available' => array_keys($size_dimensions),
+                        'calculation_timestamp' => current_time('mysql')
+                    )
+                );
+                
+                error_log("YPrint Debug: 🎯 Skalierungsfaktor für {$measurement_type}: {$size_specific_factor}x");
+            } else {
+                error_log("YPrint Debug: ⚠️ Kein gültiger Skalierungsfaktor für {$measurement_type}");
+            }
+        }
+        
+        error_log("YPrint Debug: ✅ Erfolgreich " . count($scale_factors) . " Skalierungsfaktoren generiert");
+        error_log("YPrint Debug: 📊 Verfügbare Faktoren: " . implode(', ', array_keys($scale_factors)));
+        
+        if (empty($scale_factors)) {
+            error_log("YPrint Debug: ⚠️ Keine gültigen Skalierungsfaktoren generiert, verwende Fallback");
+            return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
+        }
+        
+        return $scale_factors;
+    }
+
+    /**
+     * ✅ NEU: Debug-Funktion für Skalierungsfaktor-Generation
+     * 
+     * @param int $template_id Template ID
+     * @param string $size_name Größenname
+     * @return array Debug-Informationen
+     */
+    public function debug_size_scale_factor_generation($template_id, $size_name) {
+        error_log("YPrint Debug: 🔍 DEBUG: Size Scale Factor Generation für Template {$template_id}, Größe {$size_name}");
+        
+        $debug_info = array(
+            'template_id' => $template_id,
+            'size_name' => $size_name,
+            'timestamp' => current_time('mysql'),
+            'checks' => array()
+        );
+        
+        // 1. Prüfe Template-Existenz
+        $template = get_post($template_id);
+        if (!$template || $template->post_type !== 'design_template') {
+            $debug_info['checks']['template_exists'] = false;
+            $debug_info['checks']['template_error'] = 'Template nicht gefunden oder falscher Post-Type';
+        } else {
+            $debug_info['checks']['template_exists'] = true;
+            $debug_info['checks']['template_title'] = $template->post_title;
+        }
+        
+        // 2. Prüfe Produktdimensionen
+        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            $debug_info['checks']['product_dimensions'] = false;
+            $debug_info['checks']['product_dimensions_error'] = 'Keine Produktdimensionen in _product_dimensions';
+            
+            // Versuche alternativen Meta-Key
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+            if (empty($product_dimensions) || !is_array($product_dimensions)) {
+                $debug_info['checks']['alternative_product_dimensions'] = false;
+                $debug_info['checks']['alternative_error'] = 'Auch _template_product_dimensions nicht gefunden';
+            } else {
+                $debug_info['checks']['alternative_product_dimensions'] = true;
+                $debug_info['checks']['product_dimensions_source'] = '_template_product_dimensions';
+            }
+        } else {
+            $debug_info['checks']['product_dimensions'] = true;
+            $debug_info['checks']['product_dimensions_source'] = '_product_dimensions';
+        }
+        
+        if (!empty($product_dimensions) && is_array($product_dimensions)) {
+            $debug_info['checks']['available_sizes'] = array_keys($product_dimensions);
+            $debug_info['checks']['size_exists'] = isset($product_dimensions[$size_name]);
+            
+            if (isset($product_dimensions[$size_name])) {
+                $debug_info['checks']['size_dimensions'] = $product_dimensions[$size_name];
+            }
+        }
+        
+        // 3. Prüfe Template-Messungen
+        global $wpdb;
+        $measurements = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}octo_template_measurements 
+             WHERE template_id = %d AND measurement_type != 'custom'",
+            $template_id
+        ), ARRAY_A);
+        
+        $debug_info['checks']['measurements_count'] = count($measurements);
+        $debug_info['checks']['measurements'] = $measurements;
+        
+        // 4. Teste Skalierungsfaktor-Generierung
+        $scale_factors = $this->generate_size_scale_factors($template_id, $size_name);
+        $debug_info['checks']['scale_factors_generated'] = !empty($scale_factors);
+        $debug_info['checks']['scale_factors_count'] = count($scale_factors);
+        $debug_info['checks']['scale_factors'] = $scale_factors;
+        
+        error_log("YPrint Debug: 🔍 DEBUG-Info: " . json_encode($debug_info, JSON_PRETTY_PRINT));
+        
+        return $debug_info;
+    }
+
 }

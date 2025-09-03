@@ -1991,7 +1991,7 @@ class Octo_Print_Designer_Template {
                 }
             }
             
-            // Berechne Größen-spezifische Skalierungsfaktoren
+            // ✅ REPARIERT: Verwende die neue reparierte Skalierungsfaktor-Generation
             $size_scale_factors = array();
             $reference_sizes = array();
             
@@ -1999,12 +1999,38 @@ class Octo_Print_Designer_Template {
                 $measurement_type = $measurement_data['measurement_type'] ?? $measurement_data['type'];
                 $pixel_distance = floatval($measurement_data['pixel_distance']);
                 
-                foreach ($product_dimensions as $size_id => $size_config) {
-                    if (isset($size_config[$measurement_type]) && $size_config[$measurement_type] > 0) {
-                        $real_distance_cm = floatval($size_config[$measurement_type]);
-                        $scale_factor = $real_distance_cm / ($pixel_distance / 10);
-                        $size_scale_factors[$size_id] = round($scale_factor, 4);
-                        $reference_sizes[] = $size_id;
+                // ✅ NEU: Verwende die reparierte generate_size_scale_factors Funktion
+                if (isset($measurement_data['size_name'])) {
+                    $size_name = $measurement_data['size_name'];
+                    error_log("YPrint Debug: 🎯 Verwende reparierte Skalierungsfaktor-Generation für Größe: {$size_name}");
+                    
+                    // Hole API-Integration Instanz für Skalierungsfaktor-Berechnung
+                    global $octo_print_api_integration;
+                    if (isset($octo_print_api_integration) && method_exists($octo_print_api_integration, 'generate_size_scale_factors')) {
+                        $size_scale_factors = $octo_print_api_integration->generate_size_scale_factors($template_id, $size_name);
+                        error_log("YPrint Debug: 🎯 Reparierte Skalierungsfaktoren generiert: " . json_encode($size_scale_factors));
+                        
+                        if (!empty($size_scale_factors)) {
+                            // Extrahiere Referenz-Größen aus den generierten Faktoren
+                            $reference_sizes = array_keys($size_scale_factors);
+                            error_log("YPrint Debug: 📊 Referenz-Größen: " . implode(', ', $reference_sizes));
+                        }
+                    } else {
+                        error_log("YPrint Debug: ⚠️ API-Integration nicht verfügbar, verwende Fallback");
+                    }
+                }
+                
+                // Fallback: Alte Berechnung falls neue Funktion fehlschlägt
+                if (empty($size_scale_factors)) {
+                    error_log("YPrint Debug: 🔄 Fallback auf alte Skalierungsfaktor-Berechnung");
+                    
+                    foreach ($product_dimensions as $size_id => $size_config) {
+                        if (isset($size_config[$measurement_type]) && $size_config[$measurement_type] > 0) {
+                            $real_distance_cm = floatval($size_config[$measurement_type]);
+                            $scale_factor = $real_distance_cm / ($pixel_distance / 10);
+                            $size_scale_factors[$size_id] = round($scale_factor, 4);
+                            $reference_sizes[] = $size_id;
+                        }
                     }
                 }
             }
@@ -2037,12 +2063,27 @@ class Octo_Print_Designer_Template {
             
             if ($update_result !== false) {
                 error_log("YPrint: Measurement saved successfully to database");
-                wp_send_json_success(array(
+                
+                // ✅ NEU: Erweiterte Response mit Debug-Informationen
+                $response_data = array(
                     'message' => 'Measurement saved successfully',
                     'measurement_index' => $next_index,
                     'size_scale_factors' => $size_scale_factors,
-                    'reference_sizes' => $reference_sizes
-                ));
+                    'reference_sizes' => $reference_sizes,
+                    'debug_info' => array(
+                        'template_id' => $template_id,
+                        'view_id' => $view_id,
+                        'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
+                        'size_name' => $measurement_data['size_name'] ?? 'Nicht angegeben',
+                        'product_dimensions_loaded' => !empty($product_dimensions),
+                        'product_dimensions_count' => is_array($product_dimensions) ? count($product_dimensions) : 0,
+                        'calculation_method' => !empty($size_scale_factors) ? 'reparierte_funktion' : 'fallback_berechnung',
+                        'timestamp' => current_time('mysql')
+                    )
+                );
+                
+                error_log("YPrint Debug: 🎯 Response-Daten: " . json_encode($response_data));
+                wp_send_json_success($response_data);
             } else {
                 error_log("YPrint: Failed to save measurement to database");
                 wp_send_json_error(array('message' => 'Failed to save measurement to database'));
