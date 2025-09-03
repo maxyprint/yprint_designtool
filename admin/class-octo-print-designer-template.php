@@ -348,7 +348,13 @@ class Octo_Print_Designer_Template {
                      }
                  }
                  
-                 update_post_meta($post_id, '_template_view_print_areas', $view_print_areas);
+                 // ✅ NEU: Verarbeite Messungen mit size_scale_factors
+                 if (!empty($view_print_areas) && !empty($product_dimensions)) {
+                     $processed_view_print_areas = $this->process_measurement_data($view_print_areas, $product_dimensions);
+                     update_post_meta($post_id, '_template_view_print_areas', $processed_view_print_areas);
+                 } else {
+                     update_post_meta($post_id, '_template_view_print_areas', $view_print_areas);
+                 }
              }
         }
         
@@ -975,10 +981,10 @@ class Octo_Print_Designer_Template {
         );
     }
 
-    /**
-     * Verbesserte Mess-Daten Validierung und Verarbeitung mit größenspezifischen Faktoren
-     */
-    private function process_measurement_data($view_print_areas, $product_dimensions) {
+         /**
+      * Verbesserte Mess-Daten Validierung und Verarbeitung mit größenspezifischen Faktoren
+      */
+     public function process_measurement_data($view_print_areas, $product_dimensions) {
         error_log("YPrint: process_measurement_data called with:");
         error_log("YPrint: - view_print_areas: " . json_encode($view_print_areas));
         error_log("YPrint: - product_dimensions: " . json_encode($product_dimensions));
