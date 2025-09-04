@@ -480,29 +480,50 @@ class Octo_Print_Designer_Admin {
                             
                             $result[] = "🔍 Verarbeite Messung: {$measurement_type} - {$template_pixel_distance}px = {$template_real_distance_cm}cm";
                             
-                            if ($template_pixel_distance <= 0 || $template_real_distance_cm <= 0) {
-                                $result[] = "⚠️ Überspringe ungültige Messung: {$measurement_type}";
+                            if ($template_pixel_distance <= 0) {
+                                $result[] = "⚠️ Überspringe ungültige Messung: {$measurement_type} (Pixel-Distanz <= 0)";
                                 continue;
+                            }
+                            
+                            // ✅ NEU: Verwende Produktdimensionen als Referenz wenn real_distance_cm fehlt
+                            $reference_distance_cm = $template_real_distance_cm;
+                            $calculation_method = 'template_measurement';
+                            
+                            if ($template_real_distance_cm <= 0) {
+                                if (isset($product_dimensions[$test_size][$measurement_type])) {
+                                    $reference_distance_cm = $product_dimensions[$test_size][$measurement_type];
+                                    $calculation_method = 'product_dimension_fallback';
+                                    $result[] = "   💡 Verwende Produktdimension als Referenz: {$reference_distance_cm}cm";
+                                } else {
+                                    $result[] = "⚠️ Überspringe Messung: {$measurement_type} (keine Referenz-Distanz verfügbar)";
+                                    continue;
+                                }
                             }
                             
                             // Berechne Skalierungsfaktor basierend auf Produktdimensionen
                             if (isset($product_dimensions[$test_size][$measurement_type])) {
-                                $size_specific_factor = 1.0; // Vereinfachte Berechnung für den Test
+                                // ✅ NEU: Berechne echten Skalierungsfaktor basierend auf Pixel-zu-CM-Verhältnis
+                                $pixels_per_cm = $template_pixel_distance / $reference_distance_cm;
+                                $size_specific_factor = $pixels_per_cm;
                                 
                                 $generated_scale_factors[$measurement_type] = array(
                                     'template_pixel_distance' => $template_pixel_distance,
-                                    'template_real_distance_cm' => $template_real_distance_cm,
+                                    'template_real_distance_cm' => $reference_distance_cm,
                                     'size_specific_factor' => $size_specific_factor,
                                     'size_name' => $test_size,
                                     'calculation_method' => 'direct_admin_implementation',
+                                    'reference_source' => $calculation_method,
+                                    'pixels_per_cm' => $pixels_per_cm,
                                     'debug_info' => array(
                                         'measurement_type' => $measurement_type,
                                         'parsing_method' => 'wordpress_auto_deserialize',
-                                        'calculation_timestamp' => current_time('mysql')
+                                        'calculation_timestamp' => current_time('mysql'),
+                                        'original_real_distance_cm' => $template_real_distance_cm,
+                                        'used_reference_distance_cm' => $reference_distance_cm
                                     )
                                 );
                                 
-                                $result[] = "🎯 Skalierungsfaktor für {$measurement_type}: {$size_specific_factor}x";
+                                $result[] = "🎯 Skalierungsfaktor für {$measurement_type}: {$size_specific_factor}x (Pixel/CM: {$pixels_per_cm})";
                             } else {
                                 $result[] = "⚠️ Keine Produktdimensionen für {$measurement_type} in Größe {$test_size}";
                             }
