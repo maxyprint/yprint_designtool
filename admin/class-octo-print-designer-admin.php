@@ -227,20 +227,38 @@ class Octo_Print_Designer_Admin {
         
         // Versuche verschiedene mögliche Meta-Keys
         $possible_meta_keys = array(
+            '_template_product_dimensions', // ✅ NEU: Primärer Key nach Recovery
             '_product_dimensions',
-            '_template_product_dimensions', 
             '_product_dimensions_template',
-            '_template_sizes',
-            '_variation_dimensions'
+            '_variation_dimensions',
+            '_size_dimensions',
+            '_physical_dimensions'
         );
         
         foreach ($possible_meta_keys as $meta_key) {
             $temp_dimensions = get_post_meta($template_id, $meta_key, true);
             if (!empty($temp_dimensions) && is_array($temp_dimensions)) {
-                $product_dimensions = $temp_dimensions;
-                $used_meta_key = $meta_key;
-                $result[] = "✅ Produktdimensionen gefunden in Meta-Key: {$meta_key}";
-                break;
+                // ✅ NEU: Validiere dass es echte physische Dimensionen sind
+                $has_physical_dimensions = false;
+                foreach ($temp_dimensions as $size => $dimensions) {
+                    if (is_array($dimensions)) {
+                        foreach ($dimensions as $measurement_type => $value) {
+                            if (is_numeric($value) && $value > 0) {
+                                $has_physical_dimensions = true;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+                
+                if ($has_physical_dimensions) {
+                    $product_dimensions = $temp_dimensions;
+                    $used_meta_key = $meta_key;
+                    $result[] = "✅ Produktdimensionen gefunden in Meta-Key: {$meta_key}";
+                    break;
+                } else {
+                    $result[] = "⚠️ Meta-Key {$meta_key} gefunden, aber keine physischen Dimensionen enthalten";
+                }
             }
         }
         
@@ -248,12 +266,36 @@ class Octo_Print_Designer_Admin {
             $result[] = "❌ Keine Produktdimensionen in bekannten Meta-Keys gefunden!";
             $result[] = "   Versuchte Keys: " . implode(', ', $possible_meta_keys);
             $result[] = "   Fallback: Verwende Standard-Dimensionen";
+            
+            // ✅ NEU: Verwende die wiederhergestellten Standard-Dimensionen
             $product_dimensions = array(
-                's' => array('chest' => 90, 'height_from_shoulder' => 60),
-                'm' => array('chest' => 96, 'height_from_shoulder' => 64),
-                'l' => array('chest' => 102, 'height_from_shoulder' => 68),
-                'xl' => array('chest' => 108, 'height_from_shoulder' => 72)
+                's' => array(
+                    'chest' => 90, 
+                    'height_from_shoulder' => 60,
+                    'unit' => 'cm',
+                    'source' => 'fallback_standard'
+                ),
+                'm' => array(
+                    'chest' => 96, 
+                    'height_from_shoulder' => 64,
+                    'unit' => 'cm',
+                    'source' => 'fallback_standard'
+                ),
+                'l' => array(
+                    'chest' => 102, 
+                    'height_from_shoulder' => 68,
+                    'unit' => 'cm',
+                    'source' => 'fallback_standard'
+                ),
+                'xl' => array(
+                    'chest' => 108, 
+                    'height_from_shoulder' => 72,
+                    'unit' => 'cm',
+                    'source' => 'fallback_standard'
+                )
             );
+            
+            $result[] = "   💡 Standard-Dimensionen geladen (Quelle: fallback_standard)";
         }
         
         $result[] = "✅ Produktdimensionen gefunden:";
