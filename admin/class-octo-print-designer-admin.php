@@ -195,6 +195,17 @@ class Octo_Print_Designer_Admin {
         
         // ✅ NEU: Verwende die reparierte generate_size_scale_factors Funktion
         global $octo_print_api_integration;
+        
+        // ✅ NEU: Lade API-Integration falls nicht verfügbar
+        if (!isset($octo_print_api_integration)) {
+            if (class_exists('Octo_Print_API_Integration')) {
+                $octo_print_api_integration = Octo_Print_API_Integration::get_instance();
+                $result[] = "🔧 API-Integration geladen: " . get_class($octo_print_api_integration);
+            } else {
+                $result[] = "❌ Octo_Print_API_Integration Klasse nicht verfügbar";
+            }
+        }
+        
         if (isset($octo_print_api_integration) && method_exists($octo_print_api_integration, 'generate_size_scale_factors')) {
             $result[] = "🧮 Verwende reparierte generate_size_scale_factors Funktion...";
             
