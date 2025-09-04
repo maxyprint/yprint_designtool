@@ -1980,9 +1980,16 @@ class Octo_Print_Designer_Template {
                 $view_print_areas = array();
             }
             
-                    // Hole Produktdimensionen für Skalierungsfaktor-Berechnung
-        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
-        error_log("YPrint: Product dimensions loaded: " . json_encode($product_dimensions));
+                    // ✅ REPARIERT: Verwende Standard-Produktdimensionen statt Database-Lookup
+                    global $octo_print_api_integration;
+                    if (isset($octo_print_api_integration) && method_exists($octo_print_api_integration, 'get_standard_product_dimensions')) {
+                        $product_dimensions = $octo_print_api_integration->get_standard_product_dimensions();
+                        error_log("YPrint: Standard-Produktdimensionen geladen: " . count($product_dimensions) . " Größen verfügbar");
+                    } else {
+                        // Fallback auf alte Methode
+                        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+                        error_log("YPrint: Fallback - Produktdimensionen aus Database: " . json_encode($product_dimensions));
+                    }
             
             // Berechne nächsten Index für diese View
             $next_index = 0;

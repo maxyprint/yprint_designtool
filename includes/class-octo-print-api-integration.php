@@ -2478,83 +2478,97 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Get scale factor for specific order size - VERBESSERTE VERSION
+     * ✅ NEU: Dynamische Größenberechnung zur API-Übertragungszeit
      */
     public function get_size_specific_scale_factor($template_measurements, $order_size) {
-        error_log("YPrint: Getting scale factor for order size: " . ($order_size ?: 'null'));
-        error_log("YPrint: Template measurements structure: " . json_encode(array_keys($template_measurements)));
+        error_log("YPrint: 🎯 Neue dynamische Größenberechnung für Bestellgröße: " . ($order_size ?: 'null'));
         
         if (empty($template_measurements) || empty($order_size)) {
-            error_log("YPrint: No template measurements or order size, using fallback 1.0");
+            error_log("YPrint: ⚠️ Keine Template-Messungen oder Bestellgröße, verwende Fallback 1.0");
             return 1.0; // Fallback
         }
         
-        // **SCHRITT 1: Normalisiere Größenbezeichnung**
+        // **NEUE LOGIK: Verwende Standard-Produktdimensionen für dynamische Berechnung**
         $normalized_size = $this->normalize_size_designation($order_size);
-        error_log("YPrint: Normalized size: '{$normalized_size}'");
+        error_log("YPrint: 📏 Normalisierte Größe: '{$normalized_size}'");
         
-        // **SCHRITT 2: Suche nach Messungen mit size_scale_factors**
-        $found_scale_factors = array();
+        // Hole Standard-Produktdimensionen
+        $product_dimensions = $this->get_standard_product_dimensions();
+        if (!isset($product_dimensions[$normalized_size])) {
+            error_log("YPrint: ❌ Größe '{$normalized_size}' nicht in Standard-Dimensionen gefunden");
+            return 1.0;
+        }
         
+        $size_dimensions = $product_dimensions[$normalized_size];
+        error_log("YPrint: ✅ Produktdimensionen für Größe '{$normalized_size}' geladen");
+        
+        // Suche nach Referenzmessungen in Template
         foreach ($template_measurements as $view_id => $view_data) {
             if (!isset($view_data['measurements'])) {
                 continue;
             }
             
             foreach ($view_data['measurements'] as $measurement) {
-                error_log("YPrint: Checking measurement: " . json_encode(array_keys($measurement)));
-                if (!isset($measurement['size_scale_factors'])) {
-                    error_log("YPrint: Measurement has no size_scale_factors, skipping");
-                    continue;
-                }
-                
-                $scale_factors = $measurement['size_scale_factors'];
-                error_log("YPrint: Found measurement with scale factors: " . json_encode($scale_factors));
-                
-                // **METHODE 1: Direkte Größe verfügbar**
-                if (isset($scale_factors[$normalized_size])) {
-                    $scale_factor = floatval($scale_factors[$normalized_size]);
-                    error_log("YPrint: Found direct scale factor for '{$normalized_size}': {$scale_factor}");
-                    return $scale_factor;
-                }
-                
-                // **METHODE 2: Größen-Mapping versuchen**
-                $size_mappings = array(
-                    'xs' => ['xs', 'extra-small', 'x-small'],
-                    's' => ['s', 'small'],
-                    'm' => ['m', 'medium'],
-                    'l' => ['l', 'large'],
-                    'xl' => ['xl', 'extra-large', 'x-large'],
-                    'xxl' => ['xxl', 'extra-extra-large', '2xl']
-                );
-                
-                foreach ($size_mappings as $standard_size => $variations) {
-                    if (in_array($normalized_size, $variations) && isset($scale_factors[$standard_size])) {
-                        $scale_factor = floatval($scale_factors[$standard_size]);
-                        error_log("YPrint: Found mapped scale factor for '{$normalized_size}' -> '{$standard_size}': {$scale_factor}");
+                // Suche nach Referenzmessungen (neue Struktur)
+                if (isset($measurement['is_reference']) && $measurement['is_reference']) {
+                    $measurement_type = $measurement['measurement_type'];
+                    $reference_pixel_distance = $measurement['pixel_distance'];
+                    
+                    // Hole physische Dimension für die Messung
+                    $physical_dimension_cm = $size_dimensions[$measurement_type] ?? 0;
+                    if ($physical_dimension_cm > 0) {
+                        // Berechne Skalierungsfaktor
+                        $scale_factor = $physical_dimension_cm / ($reference_pixel_distance / 10);
+                        error_log("YPrint: 🎯 Dynamischer Skalierungsfaktor berechnet: {$scale_factor}x (Referenz: {$measurement_type}, Pixel: {$reference_pixel_distance}, Physisch: {$physical_dimension_cm}cm)");
                         return $scale_factor;
                     }
                 }
                 
-                // Sammle alle verfügbaren Faktoren für Fallback
-                $found_scale_factors = array_merge($found_scale_factors, $scale_factors);
+                // Fallback: Alte size_scale_factors Logik
+                if (isset($measurement['size_scale_factors'])) {
+                    $scale_factors = $measurement['size_scale_factors'];
+                    if (isset($scale_factors[$normalized_size])) {
+                        $scale_factor = floatval($scale_factors[$normalized_size]);
+                        error_log("YPrint: 🔄 Fallback auf alte size_scale_factors: {$scale_factor}x");
+                        return $scale_factor;
+                    }
+                }
             }
         }
         
-        // **METHODE 3: Fallback - Durchschnitt aller verfügbaren Faktoren**
-        if (!empty($found_scale_factors)) {
-            $average_factor = array_sum($found_scale_factors) / count($found_scale_factors);
-            error_log("YPrint: Using average scale factor from available factors: {$average_factor}");
-            return $average_factor;
-        }
-        
-        error_log("YPrint: No scale factors found, using fallback 1.0");
+        error_log("YPrint: ⚠️ Keine Referenzmessungen gefunden, verwende Fallback 1.0");
         return 1.0; // Fallback
     }
 
     private function normalize_size_designation($size) {
         if (empty($size)) return '';
         return strtolower(trim($size));
+    }
+
+    /**
+     * ✅ NEU: Dynamische Größenberechnung zur API-Übertragungszeit
+     * 
+     * @param int $design_id Design ID
+     * @param string $order_size Bestellgröße
+     * @return float|false Skalierungsfaktor oder false bei Fehler
+     */
+    public function calculate_dynamic_scale_factor_for_order($design_id, $order_size) {
+        error_log("YPrint API: 🎯 Berechne dynamischen Skalierungsfaktor für Bestellung - Design: {$design_id}, Größe: {$order_size}");
+        
+        // Verwende die neue dynamische Berechnung
+        $calculated_coordinates = $this->calculate_design_coordinates_for_size($design_id, $order_size);
+        
+        if (!$calculated_coordinates) {
+            error_log("YPrint API: ❌ Keine Koordinaten berechnet, verwende Fallback");
+            return 1.0;
+        }
+        
+        // Extrahiere Skalierungsfaktor aus den ersten berechneten Koordinaten
+        $first_element = reset($calculated_coordinates);
+        $scale_factor = $first_element['scale_factor'] ?? 1.0;
+        
+        error_log("YPrint API: ✅ Dynamischer Skalierungsfaktor berechnet: {$scale_factor}x");
+        return $scale_factor;
     }
 
     /**
@@ -3598,7 +3612,7 @@ class Octo_Print_API_Integration {
      * 
      * @return array Standard product dimensions for all sizes
      */
-    private function get_standard_product_dimensions() {
+    public function get_standard_product_dimensions() {
         return array(
             'xs' => array(
                 'chest' => 44, 'hem_width' => 40, 'height_from_shoulder' => 62, 

@@ -1758,6 +1758,27 @@ private function check_yprint_dependency() {
         
         error_log("YPrint: Design data NOT found for ID {$design_id} in octo_user_designs table");
         
+        // ✅ NEU: Versuche neue Design-Struktur zuerst
+        $design_elements = get_post_meta($design_id, '_design_elements', true);
+        $design_views = get_post_meta($design_id, '_design_views', true);
+        $template_id = get_post_meta($design_id, '_design_template_id', true);
+        
+        if (!empty($design_elements) && !empty($design_views) && $template_id) {
+            error_log("YPrint: Neue Design-Struktur gefunden für ID {$design_id}");
+            
+            // Konvertiere neue Struktur zu kompatibler Form
+            $converted_design_data = array(
+                'templateId' => $template_id,
+                'views' => $design_views,
+                'elements' => $design_elements,
+                'structure_version' => '2.0',
+                'converted_from_new_structure' => true
+            );
+            
+            error_log("YPrint: Design-Struktur konvertiert: " . json_encode($converted_design_data));
+            return $converted_design_data;
+        }
+        
         // Fallback: Versuche Design-Daten aus verschiedenen Post-Meta Quellen zu laden
         $design_data = get_post_meta($design_id, '_design_data', true);
         if ($design_data) {
