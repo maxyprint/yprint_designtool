@@ -2032,13 +2032,13 @@ class Octo_Print_Designer_Template {
                 // Fallback: Alte Berechnung falls neue Funktion fehlschlägt
                 if (empty($size_scale_factors)) {
                     error_log("YPrint Debug: 🔄 Fallback auf alte Skalierungsfaktor-Berechnung");
-                    
-                    foreach ($product_dimensions as $size_id => $size_config) {
-                        if (isset($size_config[$measurement_type]) && $size_config[$measurement_type] > 0) {
-                            $real_distance_cm = floatval($size_config[$measurement_type]);
-                            $scale_factor = $real_distance_cm / ($pixel_distance / 10);
-                            $size_scale_factors[$size_id] = round($scale_factor, 4);
-                            $reference_sizes[] = $size_id;
+                
+                foreach ($product_dimensions as $size_id => $size_config) {
+                    if (isset($size_config[$measurement_type]) && $size_config[$measurement_type] > 0) {
+                        $real_distance_cm = floatval($size_config[$measurement_type]);
+                        $scale_factor = $real_distance_cm / ($pixel_distance / 10);
+                        $size_scale_factors[$size_id] = round($scale_factor, 4);
+                        $reference_sizes[] = $size_id;
                         }
                     }
                 }

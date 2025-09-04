@@ -2954,28 +2954,40 @@ class Octo_Print_API_Integration {
         $size_dimensions = $product_dimensions[$size_name];
         error_log("YPrint Debug: 📏 Dimensionen für {$size_name}: " . json_encode($size_dimensions));
         
-        // ✅ NEU: Lade Template-Messungen aus der Datenbank
-        global $wpdb;
-        $measurements = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}octo_template_measurements 
-             WHERE template_id = %d AND measurement_type != 'custom'",
-            $template_id
-        ), ARRAY_A);
+        // ✅ REPARIERT: Lade Template-Messungen aus der korrekten Datenquelle (wp_postmeta)
+        $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        error_log("YPrint Debug: 🎯 Template-Messungen aus _template_view_print_areas geladen: " . (is_array($template_measurements) ? count($template_measurements) : 'Nicht-Array'));
         
-        error_log("YPrint Debug: 🎯 Template-Messungen aus DB geladen: " . count($measurements));
-        
-        if (empty($measurements)) {
-            error_log("YPrint Debug: ⚠️ Keine Template-Messungen gefunden, verwende Fallback");
+        if (empty($template_measurements) || !is_array($template_measurements)) {
+            error_log("YPrint Debug: ❌ Keine Template-Messungen in _template_view_print_areas gefunden");
             // ✅ NEU: Fallback-Skalierungsfaktoren basierend auf Produktdimensionen
             return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
         }
         
-        // ✅ NEU: Generiere Skalierungsfaktoren mit verbesserter Logik
+        // ✅ NEU: Extrahiere alle Messungen aus allen Views
+        $measurements = array();
+        foreach ($template_measurements as $view_id => $view_data) {
+            if (isset($view_data['measurements']) && is_array($view_data['measurements'])) {
+                foreach ($view_data['measurements'] as $measurement) {
+                    $measurements[] = $measurement;
+                }
+            }
+        }
+        
+        error_log("YPrint Debug: 🎯 Messungen aus Views extrahiert: " . count($measurements));
+        
+        if (empty($measurements)) {
+            error_log("YPrint Debug: ⚠️ Keine Messungen in Views gefunden, verwende Fallback");
+            return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
+        }
+        
+        // ✅ REPARIERT: Generiere Skalierungsfaktoren mit korrigierter Datenstruktur
         $scale_factors = array();
         foreach ($measurements as $measurement) {
-            $measurement_type = $measurement['measurement_type'];
-            $template_pixel_distance = floatval($measurement['pixel_distance']);
-            $template_real_distance_cm = floatval($measurement['real_distance_cm']);
+            // ✅ NEU: Korrekte Datenstruktur aus _template_view_print_areas
+            $measurement_type = $measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown';
+            $template_pixel_distance = floatval($measurement['pixel_distance'] ?? 0);
+            $template_real_distance_cm = floatval($measurement['real_distance_cm'] ?? 0);
             
             error_log("YPrint Debug: 🔍 Verarbeite Messung: {$measurement_type} - {$template_pixel_distance}px = {$template_real_distance_cm}cm");
             
@@ -2998,7 +3010,6 @@ class Octo_Print_API_Integration {
                     'template_real_distance_cm' => $template_real_distance_cm,
                     'size_specific_factor' => $size_specific_factor,
                     'size_name' => $size_name,
-                    'measurement_id' => $measurement['id'],
                     'calculation_method' => 'enhanced_template_measurements',
                     'debug_info' => array(
                         'measurement_type' => $measurement_type,
