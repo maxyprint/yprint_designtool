@@ -191,13 +191,49 @@ class Octo_Print_Designer_Admin {
         $result[] = "----------------------------------------";
         
         $scale_factor = 1.0; // Fallback
-        if (!empty($template_measurements)) {
+        $scale_factors_generated = false;
+        
+        // ✅ NEU: Verwende die reparierte generate_size_scale_factors Funktion
+        global $octo_print_api_integration;
+        if (isset($octo_print_api_integration) && method_exists($octo_print_api_integration, 'generate_size_scale_factors')) {
+            $result[] = "🧮 Verwende reparierte generate_size_scale_factors Funktion...";
+            
+            try {
+                $generated_scale_factors = $octo_print_api_integration->generate_size_scale_factors($template_id, $test_size);
+                
+                if (!empty($generated_scale_factors)) {
+                    $result[] = "✅ Skalierungsfaktoren erfolgreich generiert:";
+                    foreach ($generated_scale_factors as $measurement_type => $factor_data) {
+                        $result[] = "   {$measurement_type}: {$factor_data['size_specific_factor']}x";
+                    }
+                    
+                    // Verwende den ersten verfügbaren Skalierungsfaktor
+                    $first_factor = reset($generated_scale_factors);
+                    $scale_factor = $first_factor['size_specific_factor'];
+                    $scale_factors_generated = true;
+                    
+                    $result[] = "✅ Aktiver Skalierungsfaktor: {$scale_factor}x";
+                    $result[] = "   Quelle: Reparierte Funktion (Messung: {$first_factor['measurement_type']})";
+                } else {
+                    $result[] = "⚠️ Reparierte Funktion generierte keine Skalierungsfaktoren";
+                }
+            } catch (Exception $e) {
+                $result[] = "❌ Fehler in reparierter Funktion: " . $e->getMessage();
+            }
+        } else {
+            $result[] = "⚠️ Reparierte Funktion nicht verfügbar";
+        }
+        
+        // Fallback: Versuche gespeicherte Skalierungsfaktoren zu lesen
+        if (!$scale_factors_generated && !empty($template_measurements)) {
+            $result[] = "🔄 Fallback: Versuche gespeicherte Skalierungsfaktoren zu lesen...";
+            
             foreach ($template_measurements as $view_id => $view_data) {
                 if (isset($view_data['measurements'])) {
                     foreach ($view_data['measurements'] as $measurement) {
                         if (isset($measurement['size_scale_factors']) && isset($measurement['size_scale_factors'][$test_size])) {
                             $scale_factor = floatval($measurement['size_scale_factors'][$test_size]);
-                            $result[] = "✅ Skalierungsfaktor gefunden: {$scale_factor}";
+                            $result[] = "✅ Skalierungsfaktor aus gespeicherten Daten: {$scale_factor}";
                             $result[] = "   Quelle: Messung '{$measurement['measurement_type']}' in View '{$view_id}'";
                             break 2;
                         }
@@ -206,7 +242,7 @@ class Octo_Print_Designer_Admin {
             }
         }
         
-        if ($scale_factor == 1.0) {
+        if ($scale_factor == 1.0 && !$scale_factors_generated) {
             $result[] = "⚠️ Kein spezifischer Skalierungsfaktor gefunden, verwende Fallback: {$scale_factor}";
         }
         
