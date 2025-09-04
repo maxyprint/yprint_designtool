@@ -10,7 +10,36 @@ class Octo_Print_Designer_Admin {
         
         $this->template_manager = new Octo_Print_Designer_Template();
 
+        // ✅ NEU: Lade die Octo_Print_API_Integration Klasse
+        $this->load_api_integration();
+
         $this->define_hooks();
+    }
+    
+    /**
+     * ✅ NEU: Lädt die API-Integration Klasse
+     */
+    private function load_api_integration() {
+        // Prüfe ob die Klasse bereits geladen ist
+        if (!class_exists('Octo_Print_API_Integration')) {
+            // Versuche die Klasse aus dem includes Verzeichnis zu laden
+            $api_integration_file = plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
+            if (file_exists($api_integration_file)) {
+                require_once $api_integration_file;
+                error_log("YPrint: Octo_Print_API_Integration Klasse geladen aus: " . $api_integration_file);
+            } else {
+                error_log("YPrint: Octo_Print_API_Integration Datei nicht gefunden: " . $api_integration_file);
+            }
+        }
+        
+        // Erstelle eine globale Instanz falls verfügbar
+        if (class_exists('Octo_Print_API_Integration')) {
+            global $octo_print_api_integration;
+            if (!isset($octo_print_api_integration)) {
+                $octo_print_api_integration = Octo_Print_API_Integration::get_instance();
+                error_log("YPrint: Globale Octo_Print_API_Integration Instanz erstellt");
+            }
+        }
     }
 
     private function define_hooks() {
@@ -158,13 +187,170 @@ class Octo_Print_Designer_Admin {
                 if (isset($view_data['measurements'])) {
                     $result[] = "   View {$view_id}: " . count($view_data['measurements']) . " Messungen";
                     foreach ($view_data['measurements'] as $index => $measurement) {
-                        $result[] = "     Messung {$index}: " . $measurement['measurement_type'];
+                        $result[] = "     Messung {$index}: " . ($measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown');
                         if (isset($measurement['size_scale_factors'])) {
                             $result[] = "       Skalierungsfaktoren: " . json_encode($measurement['size_scale_factors']);
                         }
                     }
                 }
             }
+        }
+        
+        // **SCHRITT 3.5: ECHTE DATENBANK-ABFRAGE - SQL-Debug**
+        $result[] = "";
+        $result[] = "🗄️ SCHRITT 3.5: ECHTE DATENBANK-ABFRAGE - SQL-Debug";
+        $result[] = "----------------------------------------";
+        
+        global $wpdb;
+        
+        // 1. Prüfe alle Meta-Daten für Template 3657
+        $result[] = "📊 Alle Meta-Daten für Template {$template_id}:";
+        $all_meta = $wpdb->get_results($wpdb->prepare(
+            "SELECT meta_key, meta_value, LENGTH(meta_value) as value_length 
+             FROM {$wpdb->postmeta} 
+             WHERE post_id = %d 
+             ORDER BY meta_key",
+            $template_id
+        ), ARRAY_A);
+        
+        if (!empty($all_meta)) {
+            foreach ($all_meta as $meta) {
+                $meta_key = $meta['meta_key'];
+                $meta_value = $meta['meta_value'];
+                $value_length = $meta['value_length'];
+                
+                $result[] = "   Meta-Key: {$meta_key}";
+                $result[] = "     Länge: {$value_length} Zeichen";
+                
+                // Zeige Preview für wichtige Meta-Keys
+                if (in_array($meta_key, array('_product_dimensions', '_template_product_dimensions', '_template_view_print_areas'))) {
+                    if (!empty($meta_value)) {
+                        $preview = substr($meta_value, 0, 200);
+                        $result[] = "     Preview: {$preview}...";
+                        
+                        // Prüfe JSON-Validität
+                        if (function_exists('json_decode')) {
+                            $json_data = json_decode($meta_value, true);
+                            if (json_last_error() === JSON_ERROR_NONE) {
+                                $result[] = "     JSON: ✅ Gültig";
+                                if (is_array($json_data)) {
+                                    $result[] = "     Typ: Array mit " . count($json_data) . " Elementen";
+                                }
+                            } else {
+                                $result[] = "     JSON: ❌ Fehler: " . json_last_error_msg();
+                            }
+                        }
+                    } else {
+                        $result[] = "     Wert: Leer";
+                    }
+                }
+                $result[] = "";
+            }
+        } else {
+            $result[] = "   ❌ Keine Meta-Daten in der Datenbank gefunden!";
+        }
+        
+        // 2. Spezifische Analyse der kritischen Meta-Keys
+        $result[] = "🔍 Spezifische Analyse der kritischen Meta-Keys:";
+        
+        // Produktdimensionen
+        $product_dimensions_meta = $wpdb->get_var($wpdb->prepare(
+            "SELECT meta_value FROM {$wpdb->postmeta} 
+             WHERE post_id = %d AND meta_key = %s",
+            $template_id, '_product_dimensions'
+        ));
+        
+        if ($product_dimensions_meta) {
+            $result[] = "   ✅ _product_dimensions gefunden";
+            $result[] = "     Länge: " . strlen($product_dimensions_meta) . " Zeichen";
+            $result[] = "     Preview: " . substr($product_dimensions_meta, 0, 150) . "...";
+        } else {
+            $result[] = "   ❌ _product_dimensions NICHT gefunden";
+        }
+        
+        // Template View Print Areas
+        $template_measurements_meta = $wpdb->get_var($wpdb->prepare(
+            "SELECT meta_value FROM {$wpdb->postmeta} 
+             WHERE post_id = %d AND meta_key = %s",
+            $template_id, '_template_view_print_areas'
+        ));
+        
+        if ($template_measurements_meta) {
+            $result[] = "   ✅ _template_view_print_areas gefunden";
+            $result[] = "     Länge: " . strlen($template_measurements_meta) . " Zeichen";
+            $result[] = "     Preview: " . substr($template_measurements_meta, 0, 150) . "...";
+            
+            // Prüfe JSON-Struktur
+            if (function_exists('json_decode')) {
+                $json_data = json_decode($template_measurements_meta, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                    $result[] = "     JSON-Struktur: ✅ Gültig";
+                    $result[] = "     Anzahl Views: " . count($json_data);
+                    
+                    foreach ($json_data as $view_id => $view_data) {
+                        if (is_array($view_data) && isset($view_data['measurements'])) {
+                            $result[] = "       View {$view_id}: " . count($view_data['measurements']) . " Messungen";
+                        } else {
+                            $result[] = "       View {$view_id}: ❌ Keine Messungen";
+                        }
+                    }
+                } else {
+                    $result[] = "     JSON-Struktur: ❌ Fehler: " . json_last_error_msg();
+                }
+            }
+        } else {
+            $result[] = "   ❌ _template_view_print_areas NICHT gefunden";
+        }
+        
+        // 3. Prüfe ob die Daten mit der reparierten Funktion kompatibel sind
+        $result[] = "";
+        $result[] = "🧪 Kompatibilitäts-Test mit reparierter Funktion:";
+        
+        if ($template_measurements_meta && function_exists('json_decode')) {
+            $json_data = json_decode($template_measurements_meta, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                $result[] = "   ✅ JSON-Daten sind gültig";
+                
+                // Extrahiere alle Messungen
+                $all_measurements = array();
+                foreach ($json_data as $view_id => $view_data) {
+                    if (is_array($view_data) && isset($view_data['measurements']) && is_array($view_data['measurements'])) {
+                        foreach ($view_data['measurements'] as $measurement) {
+                            $all_measurements[] = $measurement;
+                        }
+                    }
+                }
+                
+                $result[] = "   📊 Gesamtanzahl Messungen: " . count($all_measurements);
+                
+                if (!empty($all_measurements)) {
+                    foreach ($all_measurements as $index => $measurement) {
+                        $result[] = "     Messung {$index}:";
+                        $result[] = "       Verfügbare Felder: " . implode(', ', array_keys($measurement));
+                        
+                        // Prüfe kritische Felder
+                        $type = isset($measurement['type']) ? $measurement['type'] : 'NULL';
+                        $pixel_distance = isset($measurement['pixel_distance']) ? $measurement['pixel_distance'] : 'NULL';
+                        $real_distance_cm = isset($measurement['real_distance_cm']) ? $measurement['real_distance_cm'] : 'NULL';
+                        
+                        $result[] = "       type: {$type}";
+                        $result[] = "       pixel_distance: {$pixel_distance}";
+                        $result[] = "       real_distance_cm: {$real_distance_cm}";
+                        
+                        // Prüfe ob die Messung für die reparierte Funktion gültig ist
+                        $is_valid = ($type !== 'NULL' && $pixel_distance !== 'NULL' && $real_distance_cm !== 'NULL' && 
+                                   floatval($pixel_distance) > 0 && floatval($real_distance_cm) > 0);
+                        
+                        $result[] = "       Gültig für reparierte Funktion: " . ($is_valid ? '✅ Ja' : '❌ Nein');
+                    }
+                } else {
+                    $result[] = "   ❌ Keine Messungen in der JSON-Struktur gefunden";
+                }
+            } else {
+                $result[] = "   ❌ JSON-Daten sind ungültig: " . json_last_error_msg();
+            }
+        } else {
+            $result[] = "   ❌ Kann JSON-Daten nicht analysieren";
         }
         
         // **SCHRITT 4: Größenspezifische Messungen berechnen**
@@ -202,7 +388,22 @@ class Octo_Print_Designer_Admin {
                 $octo_print_api_integration = Octo_Print_API_Integration::get_instance();
                 $result[] = "🔧 API-Integration geladen: " . get_class($octo_print_api_integration);
             } else {
-                $result[] = "❌ Octo_Print_API_Integration Klasse nicht verfügbar";
+                $result[] = "⚠️ Reparierte Funktion nicht verfügbar";
+                $result[] = "🔍 Versuche manuelles Laden der Klasse...";
+                
+                // Manueller Versuch die Klasse zu laden
+                $api_integration_file = plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
+                if (file_exists($api_integration_file)) {
+                    require_once $api_integration_file;
+                    if (class_exists('Octo_Print_API_Integration')) {
+                        $octo_print_api_integration = Octo_Print_API_Integration::get_instance();
+                        $result[] = "🔧 API-Integration manuell geladen: " . get_class($octo_print_api_integration);
+                    } else {
+                        $result[] = "❌ Klasse konnte nicht geladen werden";
+                    }
+                } else {
+                    $result[] = "❌ API-Integration Datei nicht gefunden: " . $api_integration_file;
+                }
             }
         }
         
@@ -227,12 +428,20 @@ class Octo_Print_Designer_Admin {
                     $result[] = "   Quelle: Reparierte Funktion (Messung: {$first_factor['measurement_type']})";
                 } else {
                     $result[] = "⚠️ Reparierte Funktion generierte keine Skalierungsfaktoren";
+                    $result[] = "🔍 Debug: Leere Rückgabe von generate_size_scale_factors";
                 }
             } catch (Exception $e) {
                 $result[] = "❌ Fehler in reparierter Funktion: " . $e->getMessage();
+                $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
             }
         } else {
             $result[] = "⚠️ Reparierte Funktion nicht verfügbar";
+            if (isset($octo_print_api_integration)) {
+                $result[] = "   API-Integration Klasse: " . get_class($octo_print_api_integration);
+                $result[] = "   Verfügbare Methoden: " . implode(', ', get_class_methods($octo_print_api_integration));
+            } else {
+                $result[] = "   Keine API-Integration Instanz verfügbar";
+            }
         }
         
         // Fallback: Versuche gespeicherte Skalierungsfaktoren zu lesen
