@@ -2367,4 +2367,86 @@ class Octo_Print_Designer_Template {
             wp_send_json_error(array('message' => 'Exception: ' . $e->getMessage()));
         }
     }
+
+    /**
+     * Save reference measurement for a view (only one per view)
+     * 
+     * @param int $template_id Template ID
+     * @param string $view_id View ID
+     * @param array $measurement_data Measurement data
+     * @return bool Success status
+     */
+    public static function save_reference_measurement($template_id, $view_id, $measurement_data) {
+        error_log("YPrint: 🎯 Speichere Referenzmaß für View {$view_id}");
+        
+        // Hole bestehende View-Print-Areas
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        if (!is_array($view_print_areas)) {
+            $view_print_areas = array();
+        }
+        
+        // Stelle sicher, dass der View existiert
+        if (!isset($view_print_areas[$view_id])) {
+            $view_print_areas[$view_id] = array(
+                'canvas_width' => 800,
+                'canvas_height' => 600,
+                'measurements' => array()
+            );
+        }
+        
+        // Erstelle das Referenzmaß
+        $reference_measurement = array(
+            'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
+            'pixel_distance' => floatval($measurement_data['pixel_distance']),
+            'reference_points' => array(
+                array(
+                    'x' => intval($measurement_data['points'][0]['x']),
+                    'y' => intval($measurement_data['points'][0]['y'])
+                ),
+                array(
+                    'x' => intval($measurement_data['points'][1]['x']),
+                    'y' => intval($measurement_data['points'][1]['y'])
+                )
+            ),
+            'created_at' => current_time('mysql'),
+            'is_reference' => true
+        );
+        
+        // Speichere nur das Referenzmaß (überschreibe alle vorherigen)
+        $view_print_areas[$view_id]['measurements'] = array(
+            'reference_measurement' => $reference_measurement
+        );
+        
+        // Speichere in der Datenbank
+        $result = update_post_meta($template_id, '_template_view_print_areas', $view_print_areas);
+        
+        if ($result) {
+            error_log("YPrint: ✅ Referenzmaß erfolgreich gespeichert");
+            return true;
+        } else {
+            error_log("YPrint: ❌ Fehler beim Speichern des Referenzmaßes");
+            return false;
+        }
+    }
+    
+    /**
+     * Get reference measurement for a view
+     * 
+     * @param int $template_id Template ID
+     * @param string $view_id View ID
+     * @return array|false Reference measurement or false if not found
+     */
+    public static function get_reference_measurement($template_id, $view_id) {
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if (!is_array($view_print_areas) || !isset($view_print_areas[$view_id])) {
+            return false;
+        }
+        
+        if (!isset($view_print_areas[$view_id]['measurements']['reference_measurement'])) {
+            return false;
+        }
+        
+        return $view_print_areas[$view_id]['measurements']['reference_measurement'];
+    }
 }

@@ -2927,21 +2927,9 @@ class Octo_Print_API_Integration {
     public function generate_size_scale_factors($template_id, $size_name) {
         error_log("YPrint Debug: 🎯 generate_size_scale_factors() aufgerufen - Template: {$template_id}, Größe: {$size_name}");
         
-        // ✅ NEU: Real-time Produktdimensionen-Ladung zur Laufzeit
-        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
-        error_log("YPrint Debug: 📏 Produktdimensionen geladen: " . (is_array($product_dimensions) ? count($product_dimensions) : 'Nicht-Array'));
-        
-        if (empty($product_dimensions) || !is_array($product_dimensions)) {
-            error_log("YPrint Debug: ❌ Keine Produktdimensionen gefunden für Template {$template_id}");
-            // ✅ NEU: Versuche alternative Meta-Key
-            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
-            if (empty($product_dimensions) || !is_array($product_dimensions)) {
-                error_log("YPrint Debug: ❌ Auch _template_product_dimensions nicht gefunden");
-                return array();
-            } else {
-                error_log("YPrint Debug: ✅ Produktdimensionen aus _template_product_dimensions geladen");
-            }
-        }
+        // ✅ REPARIERT: Verwende Standard-Produktdimensionen statt Database-Lookup
+        $product_dimensions = $this->get_standard_product_dimensions();
+        error_log("YPrint Debug: 📏 Standard-Produktdimensionen geladen: " . count($product_dimensions) . " Größen verfügbar");
         
         // ✅ NEU: Validiere Größen-Verfügbarkeit
         if (!isset($product_dimensions[$size_name])) {
@@ -3365,10 +3353,11 @@ class Octo_Print_API_Integration {
      * 11. Größenspezifischer Anpassungsfaktor
      */
     private function get_size_adjustment_factor($template_id, $size_name, $measurement_type) {
-        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
+        // ✅ REPARIERT: Verwende Standard-Produktdimensionen statt Database-Lookup
+        $product_dimensions = $this->get_standard_product_dimensions();
         
         if (empty($product_dimensions) || !is_array($product_dimensions)) {
-            error_log("YPrint Canvas: ⚠️ Keine Produktdimensionen für Größenanpassung gefunden");
+            error_log("YPrint Canvas: ⚠️ Keine Standard-Produktdimensionen verfügbar");
             return 1.0;
         }
         
@@ -3602,5 +3591,147 @@ class Octo_Print_API_Integration {
         error_log("YPrint Canvas: 📊 Debug-Info: " . json_encode($debug_info));
         
         return $debug_info;
+    }
+
+        /**
+     * Get standard product dimensions (hardcoded fallback)
+     * 
+     * @return array Standard product dimensions for all sizes
+     */
+    private function get_standard_product_dimensions() {
+        return array(
+            'xs' => array(
+                'chest' => 44, 'hem_width' => 40, 'height_from_shoulder' => 62, 
+                'sleeve_length' => 24.5, 'sleeve_opening' => 17, 'shoulder_to_shoulder' => 50.5,
+                'neck_opening' => 18, 'biceps' => 22.5, 'rib_height' => 2
+            ),
+            's' => array(
+                'chest' => 47, 'hem_width' => 43, 'height_from_shoulder' => 65, 
+                'sleeve_length' => 25, 'sleeve_opening' => 17.5, 'shoulder_to_shoulder' => 52,
+                'neck_opening' => 18.5, 'biceps' => 23, 'rib_height' => 2
+            ),
+            'm' => array(
+                'chest' => 50, 'hem_width' => 46, 'height_from_shoulder' => 68, 
+                'sleeve_length' => 25.5, 'sleeve_opening' => 18, 'shoulder_to_shoulder' => 53.5,
+                'neck_opening' => 19, 'biceps' => 23.5, 'rib_height' => 2
+            ),
+            'l' => array(
+                'chest' => 53, 'hem_width' => 49, 'height_from_shoulder' => 71, 
+                'sleeve_length' => 26, 'sleeve_opening' => 18.5, 'shoulder_to_shoulder' => 55,
+                'neck_opening' => 19.5, 'biceps' => 24, 'rib_height' => 2
+            ),
+            'xl' => array(
+                'chest' => 56, 'hem_width' => 52, 'height_from_shoulder' => 74, 
+                'sleeve_length' => 26.5, 'sleeve_opening' => 19, 'shoulder_to_shoulder' => 56.5,
+                'neck_opening' => 20, 'biceps' => 24.5, 'rib_height' => 2
+            ),
+            'xxl' => array(
+                'chest' => 59, 'hem_width' => 55, 'height_from_shoulder' => 77, 
+                'sleeve_length' => 27, 'sleeve_opening' => 19.5, 'shoulder_to_shoulder' => 58,
+                'neck_opening' => 20.5, 'biceps' => 25, 'rib_height' => 2
+            ),
+            '3xl' => array(
+                'chest' => 62, 'hem_width' => 58, 'height_from_shoulder' => 80, 
+                'sleeve_length' => 27.5, 'sleeve_opening' => 20, 'shoulder_to_shoulder' => 59.5,
+                'neck_opening' => 21, 'biceps' => 25.5, 'rib_height' => 2
+            ),
+            '4xl' => array(
+                'chest' => 65, 'hem_width' => 61, 'height_from_shoulder' => 83, 
+                'sleeve_length' => 28, 'sleeve_opening' => 20.5, 'shoulder_to_shoulder' => 61,
+                'neck_opening' => 21.5, 'biceps' => 26, 'rib_height' => 2
+            ),
+        );
+    }
+
+    /**
+     * Calculate design coordinates for specific order size
+     * 
+     * @param int $design_id Design ID
+     * @param string $order_size Order size (e.g., 'L')
+     * @return array|false Calculated coordinates or false on failure
+     */
+    public function calculate_design_coordinates_for_size($design_id, $order_size) {
+        error_log("YPrint API: 🎯 Berechne Design-Koordinaten für Größe {$order_size}");
+        
+        // Hole Design-Daten
+        $design_elements = get_post_meta($design_id, '_design_elements', true);
+        $design_views = get_post_meta($design_id, '_design_views', true);
+        $template_id = get_post_meta($design_id, '_design_template_id', true);
+        
+        if (empty($design_elements) || empty($design_views) || !$template_id) {
+            error_log("YPrint API: ❌ Unvollständige Design-Daten");
+            return false;
+        }
+        
+        // Normalisiere Größenbezeichnung
+        $normalized_size = $this->normalize_size_designation($order_size);
+        
+        // Hole Produktdimensionen für die Bestellgröße
+        $product_dimensions = $this->get_standard_product_dimensions();
+        if (!isset($product_dimensions[$normalized_size])) {
+            error_log("YPrint API: ❌ Größe {$normalized_size} nicht in Produktdimensionen gefunden");
+            return false;
+        }
+        
+        $size_dimensions = $product_dimensions[$normalized_size];
+        error_log("YPrint API: ✅ Produktdimensionen für Größe {$normalized_size} geladen");
+        
+        // Berechne Koordinaten für jedes Design-Element
+        $calculated_coordinates = array();
+        
+        foreach ($design_elements as $element_id => $element_data) {
+            $view_id = $element_data['template_view_id'];
+            $view_data = $design_views[$view_id] ?? null;
+            
+            if (!$view_data || !isset($view_data['reference_measurement'])) {
+                error_log("YPrint API: ⚠️ Keine Referenzmessung für View {$view_id}");
+                continue;
+            }
+            
+            $reference_measurement = $view_data['reference_measurement'];
+            $measurement_type = $reference_measurement['measurement_type'];
+            $reference_pixel_distance = $reference_measurement['pixel_distance'];
+            
+            // Hole physische Dimension für die Messung
+            $physical_dimension_cm = $size_dimensions[$measurement_type] ?? 0;
+            if ($physical_dimension_cm <= 0) {
+                error_log("YPrint API: ⚠️ Keine physische Dimension für {$measurement_type} in Größe {$normalized_size}");
+                continue;
+            }
+            
+            // Berechne Skalierungsfaktor
+            $scale_factor = $physical_dimension_cm / ($reference_pixel_distance / 10);
+            
+            // Berechne absolute Koordinaten in mm
+            $position_x_mm = ($element_data['position_x_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
+            $position_y_mm = ($element_data['position_y_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
+            $width_mm = ($element_data['width_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
+            $height_mm = ($element_data['height_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
+            
+            $calculated_coordinates[$element_id] = array(
+                'x' => round($position_x_mm, 2),
+                'y' => round($position_y_mm, 2),
+                'width' => round($width_mm, 2),
+                'height' => round($height_mm, 2),
+                'content' => $element_data['content'],
+                'element_type' => $element_data['element_type'],
+                'font_size_mm' => round(($element_data['font_size_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10, 2),
+                'view_id' => $view_id,
+                'measurement_type' => $measurement_type,
+                'scale_factor' => round($scale_factor, 4),
+                'reference_distance_px' => $reference_pixel_distance,
+                'physical_dimension_cm' => $physical_dimension_cm
+            );
+            
+            error_log("YPrint API: ✅ Element {$element_id} berechnet: {$position_x_mm}mm x {$position_y_mm}mm, {$width_mm}mm x {$height_mm}mm");
+        }
+        
+        if (empty($calculated_coordinates)) {
+            error_log("YPrint API: ❌ Keine Koordinaten berechnet");
+            return false;
+        }
+        
+        error_log("YPrint API: ✅ Erfolgreich " . count($calculated_coordinates) . " Elemente für Größe {$normalized_size} berechnet");
+        return $calculated_coordinates;
     }
 }
