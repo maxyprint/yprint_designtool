@@ -2924,7 +2924,7 @@ class Octo_Print_API_Integration {
      * @param string $size_name Größenname (S, M, L, XL)
      * @return array Skalierungsfaktoren für alle verfügbaren Messungstypen
      */
-    private function generate_size_scale_factors($template_id, $size_name) {
+    public function generate_size_scale_factors($template_id, $size_name) {
         error_log("YPrint Debug: 🎯 generate_size_scale_factors() aufgerufen - Template: {$template_id}, Größe: {$size_name}");
         
         // ✅ NEU: Real-time Produktdimensionen-Ladung zur Laufzeit
