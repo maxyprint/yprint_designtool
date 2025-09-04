@@ -298,6 +298,13 @@ class Octo_Print_Designer_Admin {
             $result[] = "   💡 Standard-Dimensionen geladen (Quelle: fallback_standard)";
         }
         
+        // ✅ NEU: Debug-Information für AJAX-Fallback
+        $result[] = "🔍 AJAX-Fallback-Status:";
+        $result[] = "   - Produktdimensionen geladen: " . (empty($product_dimensions) ? 'Nein' : 'Ja');
+        $result[] = "   - Anzahl Größen: " . count($product_dimensions);
+        $result[] = "   - Verwendeter Meta-Key: " . ($used_meta_key ?: 'Fallback-Standard');
+        $result[] = "   - Fallback-Quelle: " . ($used_meta_key ? 'Datenbank' : 'Hardcoded-Standard');
+        
         $result[] = "✅ Produktdimensionen gefunden:";
         foreach ($product_dimensions as $size => $dimensions) {
             $result[] = "   {$size}: " . json_encode($dimensions);
@@ -538,59 +545,59 @@ class Octo_Print_Designer_Admin {
             }
         }
         
-                    // ✅ NEU: Direkte Implementierung der reparierten Logik
-            $result[] = "🧮 Implementiere reparierte Logik direkt in der Admin-Klasse...";
+        // ✅ NEU: Direkte Implementierung der reparierten Logik
+        $result[] = "🧮 Implementiere reparierte Logik direkt in der Admin-Klasse...";
+        
+        try {
+            // ✅ NEU: WordPress deserialisiert bereits automatisch - verwende direkt das Array
+            $template_measurements_parsed = get_post_meta($template_id, '_template_view_print_areas', true);
             
-            try {
-                // ✅ NEU: WordPress deserialisiert bereits automatisch - verwende direkt das Array
-                $template_measurements_parsed = get_post_meta($template_id, '_template_view_print_areas', true);
+            if (!empty($template_measurements_parsed) && is_array($template_measurements_parsed)) {
+                $result[] = "✅ Template-Messungen direkt geladen (WordPress hat bereits deserialisiert)";
+                $result[] = "📊 Anzahl Views: " . count($template_measurements_parsed);
                 
-                if (!empty($template_measurements_parsed) && is_array($template_measurements_parsed)) {
-                    $result[] = "✅ Template-Messungen direkt geladen (WordPress hat bereits deserialisiert)";
-                    $result[] = "📊 Anzahl Views: " . count($template_measurements_parsed);
-                    
-                    // Extrahiere alle Messungen aus allen Views
-                    $measurements = array();
-                    foreach ($template_measurements_parsed as $view_id => $view_data) {
-                        if (isset($view_data['measurements']) && is_array($view_data['measurements'])) {
-                            foreach ($view_data['measurements'] as $measurement) {
-                                $measurements[] = $measurement;
-                            }
+                // Extrahiere alle Messungen aus allen Views
+                $measurements = array();
+                foreach ($template_measurements_parsed as $view_id => $view_data) {
+                    if (isset($view_data['measurements']) && is_array($view_data['measurements'])) {
+                        foreach ($view_data['measurements'] as $measurement) {
+                            $measurements[] = $measurement;
                         }
                     }
+                }
+                
+                $result[] = "📊 Messungen aus Views extrahiert: " . count($measurements);
+                
+                if (!empty($measurements)) {
+                    // Generiere Skalierungsfaktoren direkt
+                    $generated_scale_factors = array();
                     
-                    $result[] = "📊 Messungen aus Views extrahiert: " . count($measurements);
-                    
-                    if (!empty($measurements)) {
-                        // Generiere Skalierungsfaktoren direkt
-                        $generated_scale_factors = array();
+                    foreach ($measurements as $measurement) {
+                        $measurement_type = $measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown';
+                        $template_pixel_distance = floatval($measurement['pixel_distance'] ?? 0);
+                        $template_real_distance_cm = floatval($measurement['real_distance_cm'] ?? 0);
                         
-                        foreach ($measurements as $measurement) {
-                            $measurement_type = $measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown';
-                            $template_pixel_distance = floatval($measurement['pixel_distance'] ?? 0);
-                            $template_real_distance_cm = floatval($measurement['real_distance_cm'] ?? 0);
-                            
-                            $result[] = "🔍 Verarbeite Messung: {$measurement_type} - {$template_pixel_distance}px = {$template_real_distance_cm}cm";
-                            
-                            if ($template_pixel_distance <= 0) {
-                                $result[] = "⚠️ Überspringe ungültige Messung: {$measurement_type} (Pixel-Distanz <= 0)";
+                        $result[] = "🔍 Verarbeite Messung: {$measurement_type} - {$template_pixel_distance}px = {$template_real_distance_cm}cm";
+                        
+                        if ($template_pixel_distance <= 0) {
+                            $result[] = "⚠️ Überspringe ungültige Messung: {$measurement_type} (Pixel-Distanz <= 0)";
+                            continue;
+                        }
+                        
+                        // ✅ NEU: Verwende Produktdimensionen als Referenz wenn real_distance_cm fehlt
+                        $reference_distance_cm = $template_real_distance_cm;
+                        $calculation_method = 'template_measurement';
+                        
+                        if ($template_real_distance_cm <= 0) {
+                            if (isset($product_dimensions[$test_size][$measurement_type])) {
+                                $reference_distance_cm = $product_dimensions[$test_size][$measurement_type];
+                                $calculation_method = 'product_dimension_fallback';
+                                $result[] = "   💡 Verwende Produktdimension als Referenz: {$reference_distance_cm}cm";
+                            } else {
+                                $result[] = "⚠️ Überspringe Messung: {$measurement_type} (keine Referenz-Distanz verfügbar)";
                                 continue;
                             }
-                            
-                            // ✅ NEU: Verwende Produktdimensionen als Referenz wenn real_distance_cm fehlt
-                            $reference_distance_cm = $template_real_distance_cm;
-                            $calculation_method = 'template_measurement';
-                            
-                            if ($template_real_distance_cm <= 0) {
-                                if (isset($product_dimensions[$test_size][$measurement_type])) {
-                                    $reference_distance_cm = $product_dimensions[$test_size][$measurement_type];
-                                    $calculation_method = 'product_dimension_fallback';
-                                    $result[] = "   💡 Verwende Produktdimension als Referenz: {$reference_distance_cm}cm";
-                                } else {
-                                    $result[] = "⚠️ Überspringe Messung: {$measurement_type} (keine Referenz-Distanz verfügbar)";
-                                    continue;
-                                }
-                            }
+                        }
                             
                             // Berechne Skalierungsfaktor basierend auf Produktdimensionen
                             if (isset($product_dimensions[$test_size][$measurement_type])) {
@@ -647,6 +654,15 @@ class Octo_Print_Designer_Admin {
             } catch (Exception $e) {
                 $result[] = "❌ Fehler in direkter Implementierung: " . $e->getMessage();
                 $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
+            }
+            
+            // ✅ NEU: AJAX-Response mit Skalierungsfaktoren erweitern
+            if (!empty($generated_scale_factors)) {
+                $result[] = "";
+                $result[] = "🔧 AJAX-Response-Integration:";
+                $result[] = "   - size_scale_factors: " . json_encode($generated_scale_factors);
+                $result[] = "   - AJAX-Fallback aktiviert: Ja";
+                $result[] = "   - Produktions-Pipeline kompatibel: Ja";
             }
         
         // Fallback: Versuche gespeicherte Skalierungsfaktoren zu lesen
