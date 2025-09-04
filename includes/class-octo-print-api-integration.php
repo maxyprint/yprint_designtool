@@ -2955,11 +2955,43 @@ class Octo_Print_API_Integration {
         error_log("YPrint Debug: 📏 Dimensionen für {$size_name}: " . json_encode($size_dimensions));
         
         // ✅ REPARIERT: Lade Template-Messungen aus der korrekten Datenquelle (wp_postmeta)
-        $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
-        error_log("YPrint Debug: 🎯 Template-Messungen aus _template_view_print_areas geladen: " . (is_array($template_measurements) ? count($template_measurements) : 'Nicht-Array'));
+        $template_measurements_raw = get_post_meta($template_id, '_template_view_print_areas', true);
+        error_log("YPrint Debug: 🎯 Template-Messungen aus _template_view_print_areas geladen: " . (is_string($template_measurements_raw) ? 'String mit ' . strlen($template_measurements_raw) . ' Zeichen' : 'Nicht-String'));
+        
+        // ✅ NEU: Unterstütze sowohl JSON als auch PHP-Serialized-Arrays
+        $template_measurements = null;
+        
+        if (is_string($template_measurements_raw)) {
+            // Versuche zuerst JSON zu parsen
+            if (function_exists('json_decode')) {
+                $json_data = json_decode($template_measurements_raw, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                    $template_measurements = $json_data;
+                    error_log("YPrint Debug: ✅ JSON-Daten erfolgreich geparst");
+                } else {
+                    error_log("YPrint Debug: ⚠️ JSON-Parsing fehlgeschlagen: " . json_last_error_msg());
+                }
+            }
+            
+            // Falls JSON fehlschlägt, versuche PHP-Serialized-Array
+            if ($template_measurements === null) {
+                if (function_exists('unserialize')) {
+                    $unserialized_data = @unserialize($template_measurements_raw);
+                    if ($unserialized_data !== false && is_array($unserialized_data)) {
+                        $template_measurements = $unserialized_data;
+                        error_log("YPrint Debug: ✅ PHP-Serialized-Array erfolgreich geparst");
+                    } else {
+                        error_log("YPrint Debug: ❌ Auch PHP-Serialized-Array-Parsing fehlgeschlagen");
+                    }
+                } else {
+                    error_log("YPrint Debug: ❌ Unserialize-Funktion nicht verfügbar");
+                }
+            }
+        }
         
         if (empty($template_measurements) || !is_array($template_measurements)) {
-            error_log("YPrint Debug: ❌ Keine Template-Messungen in _template_view_print_areas gefunden");
+            error_log("YPrint Debug: ❌ Keine Template-Messungen in _template_view_print_areas gefunden oder geparst");
+            error_log("YPrint Debug: 🔍 Rohe Daten: " . substr($template_measurements_raw, 0, 200) . "...");
             // ✅ NEU: Fallback-Skalierungsfaktoren basierend auf Produktdimensionen
             return $this->generate_fallback_scale_factors($product_dimensions, $size_name);
         }
