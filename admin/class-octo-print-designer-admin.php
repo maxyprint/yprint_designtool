@@ -133,6 +133,16 @@ class Octo_Print_Designer_Admin {
             
             error_log("YPrint: Template gefunden: " . $template_post->post_title);
             
+            // ✅ NEU: Debug-Logging für verfügbare Meta-Keys
+            $available_meta_keys = array();
+            $all_meta = get_post_meta($template_id);
+            foreach ($all_meta as $key => $values) {
+                if (strpos($key, 'product') !== false || strpos($key, 'dimension') !== false || strpos($key, 'size') !== false) {
+                    $available_meta_keys[$key] = is_array($values) ? count($values) : strlen(implode('', $values));
+                }
+            }
+            error_log("YPrint: Verfügbare Meta-Keys für Produktdimensionen: " . json_encode($available_meta_keys));
+            
             // Erstelle Test-Daten für die Berechnung
             $test_result = $this->perform_design_size_calculation_test($template_id, $test_size, $test_position);
             
@@ -144,9 +154,26 @@ class Octo_Print_Designer_Admin {
             
             error_log("YPrint: Test erfolgreich abgeschlossen, Ergebnis-Länge: " . strlen($test_result));
             
+            // ✅ NEU: Extrahiere Skalierungsfaktoren aus dem Test-Ergebnis
+            $scale_factors = array();
+            if (preg_match_all('/🎯 Skalierungsfaktor für ([^:]+): ([0-9.]+)x/', $test_result, $matches)) {
+                for ($i = 0; $i < count($matches[1]); $i++) {
+                    $scale_factors[$matches[1][$i]] = floatval($matches[2][$i]);
+                }
+            }
+            
+            // ✅ NEU: Extrahiere aktiven Skalierungsfaktor
+            $active_scale_factor = 1.0;
+            if (preg_match('/✅ Aktiver Skalierungsfaktor: ([0-9.]+)x/', $test_result, $match)) {
+                $active_scale_factor = floatval($match[1]);
+            }
+            
             wp_send_json_success(array(
                 'message' => 'Design size calculation test completed',
-                'test_result' => $test_result
+                'test_result' => $test_result,
+                'scale_factors' => $scale_factors,
+                'active_scale_factor' => $active_scale_factor,
+                'used_meta_key' => $used_meta_key ?? 'unknown'
             ));
             
         } catch (Exception $e) {
@@ -194,9 +221,32 @@ class Octo_Print_Designer_Admin {
         $result[] = "📏 SCHRITT 2: Produktdimensionen abrufen";
         $result[] = "----------------------------------------";
         
-        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        // ✅ NEU: Multiple Meta-Keys für Produktdimensionen ausprobieren
+        $product_dimensions = null;
+        $used_meta_key = '';
+        
+        // Versuche verschiedene mögliche Meta-Keys
+        $possible_meta_keys = array(
+            '_product_dimensions',
+            '_template_product_dimensions', 
+            '_product_dimensions_template',
+            '_template_sizes',
+            '_variation_dimensions'
+        );
+        
+        foreach ($possible_meta_keys as $meta_key) {
+            $temp_dimensions = get_post_meta($template_id, $meta_key, true);
+            if (!empty($temp_dimensions) && is_array($temp_dimensions)) {
+                $product_dimensions = $temp_dimensions;
+                $used_meta_key = $meta_key;
+                $result[] = "✅ Produktdimensionen gefunden in Meta-Key: {$meta_key}";
+                break;
+            }
+        }
+        
         if (empty($product_dimensions)) {
-            $result[] = "❌ Keine Produktdimensionen gefunden!";
+            $result[] = "❌ Keine Produktdimensionen in bekannten Meta-Keys gefunden!";
+            $result[] = "   Versuchte Keys: " . implode(', ', $possible_meta_keys);
             $result[] = "   Fallback: Verwende Standard-Dimensionen";
             $product_dimensions = array(
                 's' => array('chest' => 90, 'height_from_shoulder' => 60),
@@ -591,7 +641,7 @@ class Octo_Print_Designer_Admin {
         $result[] = "   Breite: {$physical_width_cm} cm";
         $result[] = "   Höhe: {$physical_height_cm} cm";
         
-        // **SCHRITT 7: Test-Koordinaten umrechnen**
+        // **SCHRITT 7: Test-Koordinaten umrechnen (MIT CANVAS-INTEGRATION)**
         $result[] = "";
         $result[] = "🎨 SCHRITT 7: Test-Koordinaten umrechnen";
         $result[] = "----------------------------------------";
@@ -600,13 +650,30 @@ class Octo_Print_Designer_Admin {
         $test_canvas_x = 100;
         $test_canvas_y = 150;
         
+        // ✅ NEU: Verwende echte Canvas-Größe aus Template-Daten
+        $template_canvas_width = 800; // Standard-Fallback
+        $template_canvas_height = 600; // Standard-Fallback
+        
+        if (!empty($template_measurements_parsed)) {
+            $first_view = reset($template_measurements_parsed);
+            if (isset($first_view['canvas_width']) && isset($first_view['canvas_height'])) {
+                $template_canvas_width = intval($first_view['canvas_width']);
+                $template_canvas_height = intval($first_view['canvas_height']);
+                $result[] = "🎨 Template-Canvas-Größe: {$template_canvas_width}x{$template_canvas_height}px";
+            }
+        }
+        
         // Canvas-Konfiguration
         $canvas_config = array(
-            'width' => 800,
-            'height' => 600,
+            'width' => $template_canvas_width,
+            'height' => $template_canvas_height,
             'print_area_width_mm' => 200,
             'print_area_height_mm' => 250
         );
+        
+        // ✅ NEU: Berechne relative Koordinaten (0.0-1.0) für Device-Unabhängigkeit
+        $relative_x = $test_canvas_x / $template_canvas_width;
+        $relative_y = $test_canvas_y / $template_canvas_height;
         
         // Basis-Umrechnung
         $pixel_to_mm_x = $canvas_config['print_area_width_mm'] / $canvas_config['width'];
@@ -618,8 +685,10 @@ class Octo_Print_Designer_Admin {
         
         $result[] = "✅ Koordinaten-Umrechnung:";
         $result[] = "   Canvas: ({$test_canvas_x}, {$test_canvas_y}) px";
+        $result[] = "   Relative: ({$relative_x}, {$relative_y}) [0.0-1.0]";
         $result[] = "   Print: ({$offset_x_mm}, {$offset_y_mm}) mm";
         $result[] = "   Skalierungsfaktor: {$scale_factor}";
+        $result[] = "   Canvas-Referenz: {$template_canvas_width}x{$template_canvas_height}px";
         
         // **SCHRITT 8: Endergebnis**
         $result[] = "";
