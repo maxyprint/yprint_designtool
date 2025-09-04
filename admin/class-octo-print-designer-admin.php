@@ -100,22 +100,49 @@ class Octo_Print_Designer_Admin {
      * ✅ NEU: AJAX Handler für Design-Größenberechnung Test
      */
     public function ajax_test_design_size_calculation() {
-        // Security check
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
-            wp_send_json_error(array('message' => 'Security check failed'));
-        }
-        
-        $template_id = isset($_POST['template_id']) ? intval($_POST['template_id']) : 0;
-        $test_size = isset($_POST['test_size']) ? sanitize_text_field($_POST['test_size']) : 'm';
-        $test_position = isset($_POST['test_position']) ? sanitize_text_field($_POST['test_position']) : 'front';
-        
-        if (!$template_id) {
-            wp_send_json_error(array('message' => 'Invalid template ID'));
-        }
+        // ✅ NEU: Verbesserte Fehlerbehandlung und Logging
+        error_log("YPrint: AJAX test_design_size_calculation aufgerufen");
         
         try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+                error_log("YPrint: Security check failed in test_design_size_calculation");
+                wp_send_json_error(array('message' => 'Security check failed'));
+                return;
+            }
+            
+            $template_id = isset($_POST['template_id']) ? intval($_POST['template_id']) : 0;
+            $test_size = isset($_POST['test_size']) ? sanitize_text_field($_POST['test_size']) : 'm';
+            $test_position = isset($_POST['test_position']) ? sanitize_text_field($_POST['test_position']) : 'front';
+            
+            error_log("YPrint: Test-Parameter - Template ID: {$template_id}, Größe: {$test_size}, Position: {$test_position}");
+            
+            if (!$template_id) {
+                error_log("YPrint: Invalid template ID: {$template_id}");
+                wp_send_json_error(array('message' => 'Invalid template ID'));
+                return;
+            }
+            
+            // ✅ NEU: Prüfe ob Template existiert
+            $template_post = get_post($template_id);
+            if (!$template_post) {
+                error_log("YPrint: Template {$template_id} nicht gefunden");
+                wp_send_json_error(array('message' => 'Template not found'));
+                return;
+            }
+            
+            error_log("YPrint: Template gefunden: " . $template_post->post_title);
+            
             // Erstelle Test-Daten für die Berechnung
             $test_result = $this->perform_design_size_calculation_test($template_id, $test_size, $test_position);
+            
+            if (empty($test_result)) {
+                error_log("YPrint: Test-Ergebnis ist leer");
+                wp_send_json_error(array('message' => 'Test result is empty'));
+                return;
+            }
+            
+            error_log("YPrint: Test erfolgreich abgeschlossen, Ergebnis-Länge: " . strlen($test_result));
             
             wp_send_json_success(array(
                 'message' => 'Design size calculation test completed',
@@ -123,7 +150,14 @@ class Octo_Print_Designer_Admin {
             ));
             
         } catch (Exception $e) {
+            error_log("YPrint: Exception in test_design_size_calculation: " . $e->getMessage());
+            error_log("YPrint: Stack trace: " . $e->getTraceAsString());
             wp_send_json_error(array('message' => 'Test failed: ' . $e->getMessage()));
+        } catch (Error $e) {
+            // ✅ NEU: Fange auch PHP 7+ Errors ab
+            error_log("YPrint: Error in test_design_size_calculation: " . $e->getMessage());
+            error_log("YPrint: Stack trace: " . $e->getTraceAsString());
+            wp_send_json_error(array('message' => 'Test failed with error: ' . $e->getMessage()));
         }
     }
     
@@ -131,24 +165,29 @@ class Octo_Print_Designer_Admin {
      * ✅ NEU: Führt den Design-Größenberechnung Test durch
      */
     private function perform_design_size_calculation_test($template_id, $test_size, $test_position) {
-        $result = array();
-        $result[] = "=== YPRINT DESIGN-GRÖSSENBERECHNUNG TEST ===";
-        $result[] = "Template ID: {$template_id}";
-        $result[] = "Test Größe: {$test_size}";
-        $result[] = "Test Position: {$test_position}";
-        $result[] = "";
-        
-        // **SCHRITT 1: Template-Daten abrufen**
-        $result[] = "📋 SCHRITT 1: Template-Daten abrufen";
-        $result[] = "----------------------------------------";
-        
-        $template_post = get_post($template_id);
-        if (!$template_post) {
-            $result[] = "❌ Template nicht gefunden!";
-            return implode("\n", $result);
-        }
-        
-        $result[] = "✅ Template gefunden: " . $template_post->post_title;
+        // ✅ NEU: Verbesserte Fehlerbehandlung
+        try {
+            error_log("YPrint: perform_design_size_calculation_test aufgerufen - Template: {$template_id}, Größe: {$test_size}");
+            
+            $result = array();
+            $result[] = "=== YPRINT DESIGN-GRÖSSENBERECHNUNG TEST ===";
+            $result[] = "Template ID: {$template_id}";
+            $result[] = "Test Größe: {$test_size}";
+            $result[] = "Test Position: {$test_position}";
+            $result[] = "";
+            
+            // **SCHRITT 1: Template-Daten abrufen**
+            $result[] = "📋 SCHRITT 1: Template-Daten abrufen";
+            $result[] = "----------------------------------------";
+            
+            $template_post = get_post($template_id);
+            if (!$template_post) {
+                $result[] = "❌ Template nicht gefunden!";
+                error_log("YPrint: Template {$template_id} nicht gefunden in perform_design_size_calculation_test");
+                return implode("\n", $result);
+            }
+            
+            $result[] = "✅ Template gefunden: " . $template_post->post_title;
         
         // **SCHRITT 2: Produktdimensionen abrufen**
         $result[] = "";
@@ -612,6 +651,26 @@ class Octo_Print_Designer_Admin {
         $result[] = "✅ Test erfolgreich abgeschlossen!";
         
         return implode("\n", $result);
+        
+        } catch (Exception $e) {
+            error_log("YPrint: Exception in perform_design_size_calculation_test: " . $e->getMessage());
+            error_log("YPrint: Stack trace: " . $e->getTraceAsString());
+            
+            $result[] = "";
+            $result[] = "❌ FEHLER IM TEST: " . $e->getMessage();
+            $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
+            
+            return implode("\n", $result);
+        } catch (Error $e) {
+            error_log("YPrint: Error in perform_design_size_calculation_test: " . $e->getMessage());
+            error_log("YPrint: Stack trace: " . $e->getTraceAsString());
+            
+            $result[] = "";
+            $result[] = "❌ PHP-FEHLER IM TEST: " . $e->getMessage();
+            $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
+            
+            return implode("\n", $result);
+        }
     }
 
     public function enqueue_scripts($hook) {
