@@ -821,6 +821,10 @@ class YPrintTemplateMeasurements {
     saveMeasurementToDatabase(viewId, measurementData, callback) {
         console.log('🎯 saveMeasurementToDatabase called:', { viewId, measurementData });
         
+        // ✅ NEUE CANVAS-KONTEXTUALISIERUNG: Erweitere Messung mit Canvas-Kontext
+        const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+        console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
+        
         const templateId = this.getTemplateId();
         const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
         const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
@@ -830,7 +834,12 @@ class YPrintTemplateMeasurements {
         formData.append('nonce', nonce);
         formData.append('template_id', templateId);
         formData.append('view_id', viewId);
-        formData.append('measurement_data', JSON.stringify(measurementData));
+        formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
+        
+        // ✅ NEU: Füge Canvas-Kontext als separate Parameter hinzu
+        formData.append('canvas_width', enrichedMeasurementData.canvas_width);
+        formData.append('canvas_height', enrichedMeasurementData.canvas_height);
+        formData.append('device_type', enrichedMeasurementData.device_type);
         
         fetch(ajaxUrl, {
             method: 'POST',
@@ -844,6 +853,12 @@ class YPrintTemplateMeasurements {
             console.log('🎯 Save measurement response data:', data);
             if (data.success) {
                 console.log('✅ Measurement saved to database successfully');
+                
+                // ✅ NEU: Verarbeite Canvas-System Debug-Info aus der Response
+                if (data.data && data.data.debug_info) {
+                    console.log('YPrint Canvas: 📊 Canvas-System Response-Info:', data.data.debug_info);
+                }
+                
                 callback(true);
             } else {
                 console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
@@ -1480,6 +1495,272 @@ class YPrintTemplateMeasurements {
         .catch(error => {
             console.error('❌ Error deleting measurement from database:', error);
             callback(false);
+        });
+    }
+
+    /**
+     * ===========================
+     * NEUE CANVAS-NORMALISIERUNG FRONTEND
+     * Implementiert relative Koordinaten und Canvas-Kontextualisierung
+     * ===========================
+     */
+
+    /**
+     * 1. Canvas-Dimensionen erfassen
+     */
+    getCurrentCanvasDimensions() {
+        const canvas = document.querySelector('.fabric-canvas-wrapper canvas') || 
+                      document.querySelector('canvas') ||
+                      document.querySelector('.design-canvas');
+        
+        if (canvas) {
+            const width = canvas.offsetWidth || canvas.width || 800;
+            const height = canvas.offsetHeight || canvas.height || 600;
+            
+            console.log(`YPrint Canvas: 🎯 Canvas-Dimensionen erfasst: ${width}x${height}`);
+            
+            return { width, height, element: canvas };
+        }
+        
+        console.warn('YPrint Canvas: ⚠️ Canvas-Element nicht gefunden, verwende Fallback-Dimensionen');
+        return { width: 800, height: 600, element: null };
+    }
+
+    /**
+     * 2. Pixel-Koordinaten zu relativen Koordinaten
+     */
+    pixelToRelativeCoordinates(pixelX, pixelY, canvasWidth, canvasHeight) {
+        if (canvasWidth <= 0 || canvasHeight <= 0) {
+            console.error('YPrint Canvas: ❌ Ungültige Canvas-Dimensionen für Normalisierung');
+            return { x: 0.0, y: 0.0 };
+        }
+        
+        const relativeX = Math.round((pixelX / canvasWidth) * 1000000) / 1000000; // 6 Dezimalstellen
+        const relativeY = Math.round((pixelY / canvasHeight) * 1000000) / 1000000;
+        
+        // Clipping auf 0.0-1.0
+        const clippedX = Math.max(0.0, Math.min(1.0, relativeX));
+        const clippedY = Math.max(0.0, Math.min(1.0, relativeY));
+        
+        console.log(`YPrint Canvas: 🎯 Pixel→Relativ: (${pixelX},${pixelY}) → (${clippedX},${clippedY})`);
+        
+        return { x: clippedX, y: clippedY };
+    }
+
+    /**
+     * 3. Relative Koordinaten zu Pixel-Koordinaten
+     */
+    relativeToPixelCoordinates(relativeX, relativeY, canvasWidth, canvasHeight) {
+        const pixelX = Math.round(relativeX * canvasWidth * 100) / 100; // 2 Dezimalstellen
+        const pixelY = Math.round(relativeY * canvasHeight * 100) / 100;
+        
+        console.log(`YPrint Canvas: 🎯 Relativ→Pixel: (${relativeX},${relativeY}) → (${pixelX},${pixelY})`);
+        
+        return { x: pixelX, y: pixelY };
+    }
+
+    /**
+     * 4. Messungs-Daten mit Canvas-Kontext erweitern
+     */
+    enrichMeasurementWithCanvasContext(measurementData) {
+        const canvasInfo = this.getCurrentCanvasDimensions();
+        
+        // Füge Canvas-Kontext hinzu
+        measurementData.canvas_width = canvasInfo.width;
+        measurementData.canvas_height = canvasInfo.height;
+        measurementData.device_type = this.detectDeviceType(canvasInfo.width);
+        measurementData.timestamp = new Date().toISOString();
+        
+        // Normalisiere Koordinaten zu relativen Werten
+        if (measurementData.start_point && measurementData.end_point) {
+            measurementData.relative_start_point = this.pixelToRelativeCoordinates(
+                measurementData.start_point.x,
+                measurementData.start_point.y,
+                canvasInfo.width,
+                canvasInfo.height
+            );
+            
+            measurementData.relative_end_point = this.pixelToRelativeCoordinates(
+                measurementData.end_point.x,
+                measurementData.end_point.y,
+                canvasInfo.width,
+                canvasInfo.height
+            );
+            
+            // Berechne relative Distanz
+            const dx = measurementData.relative_end_point.x - measurementData.relative_start_point.x;
+            const dy = measurementData.relative_end_point.y - measurementData.relative_start_point.y;
+            measurementData.relative_distance = Math.sqrt(dx * dx + dy * dy);
+            
+            console.log(`YPrint Canvas: ✅ Messung mit Canvas-Kontext angereichert - Relative Distanz: ${measurementData.relative_distance}`);
+        }
+        
+        return measurementData;
+    }
+
+    /**
+     * 5. Device-Type Detection (Frontend)
+     */
+    detectDeviceType(canvasWidth) {
+        if (canvasWidth >= 1200) return 'desktop';
+        if (canvasWidth >= 768) return 'tablet';
+        return 'mobile';
+    }
+
+    /**
+     * 6. Canvas-Skalierung für Display berechnen
+     */
+    calculateDisplayScaling(originalCanvasWidth, originalCanvasHeight) {
+        const currentCanvas = this.getCurrentCanvasDimensions();
+        
+        const widthRatio = currentCanvas.width / originalCanvasWidth;
+        const heightRatio = currentCanvas.height / originalCanvasHeight;
+        
+        console.log(`YPrint Canvas: 🎯 Display-Skalierung - Original: ${originalCanvasWidth}x${originalCanvasHeight}, Aktuell: ${currentCanvas.width}x${currentCanvas.height}, Ratio: ${widthRatio}x${heightRatio}`);
+        
+        return {
+            widthRatio,
+            heightRatio,
+            originalCanvas: { width: originalCanvasWidth, height: originalCanvasHeight },
+            currentCanvas: { width: currentCanvas.width, height: currentCanvas.height }
+        };
+    }
+
+    /**
+     * 7. Gespeicherte Messungen für aktuellen Canvas laden
+     */
+    loadMeasurementsForCurrentCanvas(savedMeasurements) {
+        console.log('YPrint Canvas: 🎯 Lade Messungen für aktuellen Canvas');
+        
+        const currentCanvas = this.getCurrentCanvasDimensions();
+        const displayMeasurements = {};
+        
+        if (!savedMeasurements || typeof savedMeasurements !== 'object') {
+            return displayMeasurements;
+        }
+        
+        Object.keys(savedMeasurements).forEach(viewId => {
+            const viewData = savedMeasurements[viewId];
+            if (!viewData.measurements || !Array.isArray(viewData.measurements)) {
+                return;
+            }
+            
+            displayMeasurements[viewId] = { measurements: [] };
+            
+            viewData.measurements.forEach(measurement => {
+                const displayMeasurement = { ...measurement };
+                
+                // Konvertiere relative Koordinaten zu aktuellen Pixel-Koordinaten
+                if (measurement.relative_start_point && measurement.relative_end_point) {
+                    displayMeasurement.display_start_point = this.relativeToPixelCoordinates(
+                        measurement.relative_start_point.x,
+                        measurement.relative_start_point.y,
+                        currentCanvas.width,
+                        currentCanvas.height
+                    );
+                    
+                    displayMeasurement.display_end_point = this.relativeToPixelCoordinates(
+                        measurement.relative_end_point.x,
+                        measurement.relative_end_point.y,
+                        currentCanvas.width,
+                        currentCanvas.height
+                    );
+                    
+                    displayMeasurement.current_canvas_context = {
+                        width: currentCanvas.width,
+                        height: currentCanvas.height,
+                        device_type: this.detectDeviceType(currentCanvas.width)
+                    };
+                    
+                    console.log(`YPrint Canvas: ✅ Messung für Display konvertiert - View: ${viewId}`);
+                }
+                
+                displayMeasurements[viewId].measurements.push(displayMeasurement);
+            });
+        });
+        
+        return displayMeasurements;
+    }
+
+    /**
+     * 8. Master-Measurement setzen (Frontend-Interface)
+     */
+    setMasterMeasurement(measurementData) {
+        console.log('YPrint Canvas: 🎯 Setze Master-Measurement im Frontend');
+        
+        const templateId = this.getTemplateId();
+        const ajaxVars = window.templateMeasurementsAjax || templateMeasurementsAjax;
+        
+        const formData = new FormData();
+        formData.append('action', 'set_master_measurement');
+        formData.append('nonce', ajaxVars.nonce);
+        formData.append('template_id', templateId);
+        formData.append('measurement_type', measurementData.measurement_type);
+        formData.append('relative_distance', measurementData.relative_distance);
+        formData.append('physical_distance_cm', measurementData.real_distance_cm);
+        
+        fetch(ajaxVars.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('YPrint Canvas: ✅ Master-Measurement erfolgreich gesetzt');
+                this.showToast('Master-Measurement gesetzt: ' + measurementData.measurement_type, 'success');
+            } else {
+                console.error('YPrint Canvas: ❌ Fehler beim Setzen der Master-Measurement');
+                this.showToast('Fehler beim Setzen der Master-Measurement', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('YPrint Canvas: ❌ AJAX-Fehler beim Setzen der Master-Measurement:', error);
+        });
+    }
+
+    /**
+     * 9. Canvas-System Debug (Frontend)
+     */
+    debugCanvasSystem() {
+        console.log('YPrint Canvas: 🔍 Debug Canvas-System (Frontend)');
+        
+        const templateId = this.getTemplateId();
+        const currentCanvas = this.getCurrentCanvasDimensions();
+        const ajaxVars = window.templateMeasurementsAjax || templateMeasurementsAjax;
+        
+        const formData = new FormData();
+        formData.append('action', 'debug_canvas_system');
+        formData.append('nonce', ajaxVars.nonce);
+        formData.append('template_id', templateId);
+        formData.append('current_canvas_width', currentCanvas.width);
+        formData.append('current_canvas_height', currentCanvas.height);
+        
+        fetch(ajaxVars.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('YPrint Canvas: 📊 Canvas-System Debug-Info:', data.data);
+                
+                // Debug-Info in Console ausgeben
+                const debugInfo = data.data;
+                console.table({
+                    'Template ID': debugInfo.template_id,
+                    'Canvas Context Valid': debugInfo.canvas_context?.is_valid ? 'Ja' : 'Nein',
+                    'Master Measurement': debugInfo.master_measurement?.exists ? 'Ja' : 'Nein',
+                    'Total Views': debugInfo.measurements?.total_views || 0,
+                    'Canvas Scaling': debugInfo.canvas_scaling ? `${debugInfo.canvas_scaling.width_ratio}x${debugInfo.canvas_scaling.height_ratio}` : 'Nicht verfügbar'
+                });
+                
+                this.showToast('Canvas-System Debug-Info in Console ausgegeben', 'info');
+            } else {
+                console.error('YPrint Canvas: ❌ Debug-Fehler:', data.data?.message);
+            }
+        })
+        .catch(error => {
+            console.error('YPrint Canvas: ❌ AJAX-Fehler beim Debug:', error);
         });
     }
 

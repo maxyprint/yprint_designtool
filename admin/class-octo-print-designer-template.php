@@ -1956,11 +1956,20 @@ class Octo_Print_Designer_Template {
         $view_id = sanitize_text_field($_POST['view_id']);
         $measurement_data = json_decode(stripslashes($_POST['measurement_data']), true);
         
+        // ✅ NEU: Canvas-Kontext-Parameter
+        $canvas_width = isset($_POST['canvas_width']) ? floatval($_POST['canvas_width']) : null;
+        $canvas_height = isset($_POST['canvas_height']) ? floatval($_POST['canvas_height']) : null;
+        $device_type = isset($_POST['device_type']) ? sanitize_text_field($_POST['device_type']) : null;
+        
         if (!$template_id || !$view_id || !$measurement_data) {
             error_log("YPrint: Invalid parameters in save measurement request");
             wp_send_json_error(array('message' => 'Invalid parameters'));
             return;
         }
+        
+        // ✅ NEU: Canvas-Kontextualisierung aktivieren falls Canvas-Daten verfügbar
+        $use_canvas_context = ($canvas_width && $canvas_height);
+        error_log("YPrint Canvas: 🎯 Canvas-Kontextualisierung " . ($use_canvas_context ? "AKTIVIERT" : "DEAKTIVIERT") . " - Canvas: {$canvas_width}x{$canvas_height}");
         
         error_log("YPrint: Processing save measurement for template {$template_id}, view {$view_id}");
         
@@ -2035,6 +2044,59 @@ class Octo_Print_Designer_Template {
                 }
             }
             
+            // ✅ NEU: Canvas-Kontextualisierung verwenden falls verfügbar
+            if ($use_canvas_context) {
+                error_log("YPrint Canvas: 🎯 Verwende neue Canvas-Kontextualisierung für Speicherung");
+                
+                // Verwende die neue Canvas-kontextualisierte Speicherung
+                global $octo_print_api_integration;
+                if (isset($octo_print_api_integration) && method_exists($octo_print_api_integration, 'save_measurement_with_canvas_context')) {
+                    $save_result = $octo_print_api_integration->save_measurement_with_canvas_context(
+                        $template_id, 
+                        $view_id, 
+                        $measurement_data, 
+                        $canvas_width, 
+                        $canvas_height
+                    );
+                    
+                    if ($save_result) {
+                        error_log("YPrint Canvas: ✅ Messung mit Canvas-Kontextualisierung gespeichert");
+                        
+                        // Erweiterte Response mit Canvas-Info
+                        $response_data = array(
+                            'message' => 'Measurement saved with canvas context',
+                            'measurement_index' => $next_index,
+                            'canvas_context' => array(
+                                'width' => $canvas_width,
+                                'height' => $canvas_height,
+                                'device_type' => $device_type
+                            ),
+                            'scaling_method' => 'canvas_contextualized',
+                            'debug_info' => array(
+                                'template_id' => $template_id,
+                                'view_id' => $view_id,
+                                'canvas_width' => $canvas_width,
+                                'canvas_height' => $canvas_height,
+                                'device_type' => $device_type,
+                                'has_relative_coordinates' => isset($measurement_data['relative_start_point']),
+                                'timestamp' => current_time('mysql')
+                            )
+                        );
+                        
+                        error_log("YPrint Canvas: 🎯 Canvas-kontextualisierte Response: " . json_encode($response_data));
+                        wp_send_json_success($response_data);
+                        return;
+                    } else {
+                        error_log("YPrint Canvas: ⚠️ Canvas-Kontextualisierung fehlgeschlagen, verwende Fallback");
+                    }
+                } else {
+                    error_log("YPrint Canvas: ⚠️ API-Integration nicht verfügbar für Canvas-Kontextualisierung");
+                }
+            }
+            
+            // ✅ FALLBACK: Traditionelle Speicherung (erweitert)
+            error_log("YPrint Canvas: 🔄 Verwende traditionelle Speicherung mit Canvas-Metadaten");
+            
             // Erstelle vollständige Messungsdaten
             $complete_measurement_data = array(
                 'type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
@@ -2047,6 +2109,29 @@ class Octo_Print_Designer_Template {
                 'size_scale_factors' => $size_scale_factors,
                 'reference_sizes' => $reference_sizes
             );
+            
+            // ✅ NEU: Füge Canvas-Kontext hinzu falls verfügbar
+            if ($use_canvas_context) {
+                $complete_measurement_data['canvas_context'] = array(
+                    'canvas_width' => $canvas_width,
+                    'canvas_height' => $canvas_height,
+                    'device_type' => $device_type,
+                    'timestamp' => current_time('mysql')
+                );
+                
+                // Füge relative Koordinaten hinzu falls im Frontend berechnet
+                if (isset($measurement_data['relative_start_point'])) {
+                    $complete_measurement_data['relative_start_point'] = $measurement_data['relative_start_point'];
+                }
+                if (isset($measurement_data['relative_end_point'])) {
+                    $complete_measurement_data['relative_end_point'] = $measurement_data['relative_end_point'];
+                }
+                if (isset($measurement_data['relative_distance'])) {
+                    $complete_measurement_data['relative_distance'] = $measurement_data['relative_distance'];
+                }
+                
+                error_log("YPrint Canvas: ✅ Canvas-Metadaten zu traditioneller Speicherung hinzugefügt");
+            }
             
             // Füge Messung zu View-Print-Areas hinzu
             if (!isset($view_print_areas[$view_id])) {
@@ -2064,12 +2149,18 @@ class Octo_Print_Designer_Template {
             if ($update_result !== false) {
                 error_log("YPrint: Measurement saved successfully to database");
                 
-                // ✅ NEU: Erweiterte Response mit Debug-Informationen
+                // ✅ NEU: Erweiterte Response mit Canvas-Kontextualisierung
                 $response_data = array(
-                    'message' => 'Measurement saved successfully',
+                    'message' => $use_canvas_context ? 'Measurement saved with canvas context (fallback)' : 'Measurement saved successfully',
                     'measurement_index' => $next_index,
                     'size_scale_factors' => $size_scale_factors,
                     'reference_sizes' => $reference_sizes,
+                    'canvas_context' => $use_canvas_context ? array(
+                        'width' => $canvas_width,
+                        'height' => $canvas_height,
+                        'device_type' => $device_type
+                    ) : null,
+                    'scaling_method' => $use_canvas_context ? 'canvas_contextualized_fallback' : 'traditional',
                     'debug_info' => array(
                         'template_id' => $template_id,
                         'view_id' => $view_id,
@@ -2078,6 +2169,11 @@ class Octo_Print_Designer_Template {
                         'product_dimensions_loaded' => !empty($product_dimensions),
                         'product_dimensions_count' => is_array($product_dimensions) ? count($product_dimensions) : 0,
                         'calculation_method' => !empty($size_scale_factors) ? 'reparierte_funktion' : 'fallback_berechnung',
+                        'canvas_contextualized' => $use_canvas_context,
+                        'canvas_width' => $canvas_width,
+                        'canvas_height' => $canvas_height,
+                        'device_type' => $device_type,
+                        'has_relative_coordinates' => isset($measurement_data['relative_start_point']),
                         'timestamp' => current_time('mysql')
                     )
                 );
@@ -2167,4 +2263,108 @@ class Octo_Print_Designer_Template {
         }
     }
 
+    /**
+     * ===========================
+     * NEUE CANVAS-SYSTEM AJAX HANDLERS
+     * ===========================
+     */
+
+    /**
+     * AJAX Handler für Master-Measurement setzen
+     */
+    public static function ajax_set_master_measurement_static() {
+        error_log("YPrint Canvas: 🎯 Set Master-Measurement AJAX handler called");
+        
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+            return;
+        }
+        
+        // Parameter validation
+        if (!isset($_POST['template_id']) || !isset($_POST['measurement_type']) || 
+            !isset($_POST['relative_distance']) || !isset($_POST['physical_distance_cm'])) {
+            wp_send_json_error(array('message' => 'Missing required parameters'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        $measurement_type = sanitize_text_field($_POST['measurement_type']);
+        $relative_distance = floatval($_POST['relative_distance']);
+        $physical_distance_cm = floatval($_POST['physical_distance_cm']);
+        
+        try {
+            // Verwende API-Integration für Master-Measurement
+            global $octo_print_api_integration;
+            if (isset($octo_print_api_integration)) {
+                $result = $octo_print_api_integration->set_master_measurement(
+                    $template_id, 
+                    $measurement_type, 
+                    $relative_distance, 
+                    $physical_distance_cm
+                );
+                
+                if ($result) {
+                    wp_send_json_success(array(
+                        'message' => 'Master-Measurement erfolgreich gesetzt',
+                        'template_id' => $template_id,
+                        'measurement_type' => $measurement_type,
+                        'relative_distance' => $relative_distance,
+                        'physical_distance_cm' => $physical_distance_cm
+                    ));
+                } else {
+                    wp_send_json_error(array('message' => 'Fehler beim Speichern der Master-Measurement'));
+                }
+            } else {
+                wp_send_json_error(array('message' => 'API-Integration nicht verfügbar'));
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint Canvas: ❌ Exception in set master measurement: " . $e->getMessage());
+            wp_send_json_error(array('message' => 'Exception: ' . $e->getMessage()));
+        }
+    }
+
+    /**
+     * AJAX Handler für Canvas-System Debug
+     */
+    public static function ajax_debug_canvas_system_static() {
+        error_log("YPrint Canvas: 🔍 Debug Canvas-System AJAX handler called");
+        
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+            return;
+        }
+        
+        // Parameter validation
+        if (!isset($_POST['template_id'])) {
+            wp_send_json_error(array('message' => 'Template ID required'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        $current_canvas_width = isset($_POST['current_canvas_width']) ? floatval($_POST['current_canvas_width']) : null;
+        $current_canvas_height = isset($_POST['current_canvas_height']) ? floatval($_POST['current_canvas_height']) : null;
+        
+        try {
+            // Verwende API-Integration für Debug
+            global $octo_print_api_integration;
+            if (isset($octo_print_api_integration)) {
+                $debug_info = $octo_print_api_integration->debug_canvas_system(
+                    $template_id, 
+                    $current_canvas_width, 
+                    $current_canvas_height
+                );
+                
+                wp_send_json_success($debug_info);
+            } else {
+                wp_send_json_error(array('message' => 'API-Integration nicht verfügbar'));
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint Canvas: ❌ Exception in debug canvas system: " . $e->getMessage());
+            wp_send_json_error(array('message' => 'Exception: ' . $e->getMessage()));
+        }
+    }
 }

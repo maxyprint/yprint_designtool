@@ -54,6 +54,13 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_test_design_size_calculation', array($this, 'ajax_test_design_size_calculation'));
         add_action('wp_ajax_nopriv_test_design_size_calculation', array($this, 'ajax_test_design_size_calculation'));
         
+        // ✅ NEU: AJAX handler für Canvas-System
+        add_action('wp_ajax_set_master_measurement', array('Octo_Print_Designer_Template', 'ajax_set_master_measurement_static'));
+        add_action('wp_ajax_nopriv_set_master_measurement', array('Octo_Print_Designer_Template', 'ajax_set_master_measurement_static'));
+        
+        add_action('wp_ajax_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
+        add_action('wp_ajax_nopriv_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         

@@ -3102,4 +3102,462 @@ class Octo_Print_API_Integration {
         return $debug_info;
     }
 
+    /**
+     * ===========================
+     * NEUE CANVAS-KONTEXTUALISIERUNG ARCHITEKTUR
+     * Löst das fundamentale Canvas/Responsiveness Problem
+     * ===========================
+     */
+
+    /**
+     * 1. Canvas-Kontextualisierung: Speichere Design-Zeit Canvas-Größe
+     */
+    public function store_design_canvas_context($template_id, $canvas_width, $canvas_height) {
+        error_log("YPrint Canvas: 🎯 Speichere Canvas-Kontext - Template: {$template_id}, Canvas: {$canvas_width}x{$canvas_height}");
+        
+        $canvas_context = array(
+            'design_canvas_width' => $canvas_width,
+            'design_canvas_height' => $canvas_height,
+            'timestamp' => current_time('mysql'),
+            'device_type' => $this->detect_device_type($canvas_width, $canvas_height)
+        );
+        
+        $result = update_post_meta($template_id, '_design_canvas_context', $canvas_context);
+        error_log("YPrint Canvas: " . ($result ? "✅" : "❌") . " Canvas-Kontext gespeichert");
+        
+        return $result;
+    }
+
+    /**
+     * 2. Device-Type Detection basierend auf Canvas-Größe
+     */
+    private function detect_device_type($canvas_width, $canvas_height) {
+        if ($canvas_width >= 1200) return 'desktop';
+        if ($canvas_width >= 768) return 'tablet';
+        return 'mobile';
+    }
+
+    /**
+     * 3. Relative Koordinaten-Normalisierung
+     */
+    public function normalize_coordinates_to_relative($pixel_x, $pixel_y, $canvas_width, $canvas_height) {
+        if ($canvas_width <= 0 || $canvas_height <= 0) {
+            error_log("YPrint Canvas: ❌ Ungültige Canvas-Dimensionen: {$canvas_width}x{$canvas_height}");
+            return array('x' => 0.0, 'y' => 0.0);
+        }
+        
+        $relative_x = round($pixel_x / $canvas_width, 6);
+        $relative_y = round($pixel_y / $canvas_height, 6);
+        
+        // Sicherheitsclipping auf 0.0-1.0 Bereich
+        $relative_x = max(0.0, min(1.0, $relative_x));
+        $relative_y = max(0.0, min(1.0, $relative_y));
+        
+        error_log("YPrint Canvas: 🎯 Koordinaten normalisiert - Pixel: ({$pixel_x},{$pixel_y}) → Relativ: ({$relative_x},{$relative_y})");
+        
+        return array(
+            'x' => $relative_x,
+            'y' => $relative_y,
+            'canvas_context' => array(
+                'width' => $canvas_width,
+                'height' => $canvas_height
+            )
+        );
+    }
+
+    /**
+     * 4. Relative Koordinaten zu Pixel-Koordinaten (für Display)
+     */
+    public function denormalize_coordinates_to_pixels($relative_x, $relative_y, $current_canvas_width, $current_canvas_height) {
+        $pixel_x = round($relative_x * $current_canvas_width, 2);
+        $pixel_y = round($relative_y * $current_canvas_height, 2);
+        
+        error_log("YPrint Canvas: 🎯 Koordinaten denormalisiert - Relativ: ({$relative_x},{$relative_y}) → Pixel: ({$pixel_x},{$pixel_y})");
+        
+        return array('x' => $pixel_x, 'y' => $pixel_y);
+    }
+
+    /**
+     * 5. Master-Measurement System: Eine Referenz-Messung pro Template
+     */
+    public function set_master_measurement($template_id, $measurement_type, $relative_distance, $physical_distance_cm) {
+        error_log("YPrint Canvas: 🎯 Setze Master-Measurement - Template: {$template_id}, Type: {$measurement_type}");
+        
+        $master_measurement = array(
+            'measurement_type' => $measurement_type,
+            'relative_distance' => $relative_distance,
+            'physical_distance_cm' => $physical_distance_cm,
+            'pixels_per_cm_ratio' => $relative_distance > 0 ? ($physical_distance_cm / $relative_distance) : 0,
+            'timestamp' => current_time('mysql'),
+            'status' => 'active'
+        );
+        
+        $result = update_post_meta($template_id, '_master_measurement', $master_measurement);
+        error_log("YPrint Canvas: " . ($result ? "✅" : "❌") . " Master-Measurement gespeichert");
+        
+        return $result;
+    }
+
+    /**
+     * 6. Canvas-Skalierung berechnen (Design-Canvas vs. Runtime-Canvas)
+     */
+    public function calculate_canvas_scaling_ratio($template_id, $current_canvas_width, $current_canvas_height) {
+        $canvas_context = get_post_meta($template_id, '_design_canvas_context', true);
+        
+        if (empty($canvas_context) || !is_array($canvas_context)) {
+            error_log("YPrint Canvas: ⚠️ Kein Canvas-Kontext gefunden, verwende 1:1 Ratio");
+            return array('width_ratio' => 1.0, 'height_ratio' => 1.0);
+        }
+        
+        $design_width = $canvas_context['design_canvas_width'];
+        $design_height = $canvas_context['design_canvas_height'];
+        
+        $width_ratio = $current_canvas_width / $design_width;
+        $height_ratio = $current_canvas_height / $design_height;
+        
+        error_log("YPrint Canvas: 🎯 Canvas-Skalierung berechnet - Design: {$design_width}x{$design_height}, Aktuell: {$current_canvas_width}x{$current_canvas_height}, Ratio: {$width_ratio}x{$height_ratio}");
+        
+        return array(
+            'width_ratio' => $width_ratio,
+            'height_ratio' => $height_ratio,
+            'design_canvas' => array('width' => $design_width, 'height' => $design_height),
+            'current_canvas' => array('width' => $current_canvas_width, 'height' => $current_canvas_height)
+        );
+    }
+
+    /**
+     * 7. Zweistufige Skalierung: Canvas-Normalisierung + Physische Skalierung
+     */
+    public function convert_measurement_with_two_stage_scaling($measurement_data, $template_id, $size_name) {
+        error_log("YPrint Canvas: 🎯 Zweistufige Skalierung - Template: {$template_id}, Größe: {$size_name}");
+        
+        // Stufe 1: Canvas-Normalisierung (falls noch nicht geschehen)
+        $relative_coords = $this->normalize_measurement_coordinates($measurement_data);
+        
+        // Stufe 2: Physische Skalierung
+        $physical_coords = $this->apply_physical_scaling($relative_coords, $template_id, $size_name);
+        
+        return $physical_coords;
+    }
+
+    /**
+     * 8. Messungs-Koordinaten normalisieren
+     */
+    private function normalize_measurement_coordinates($measurement_data) {
+        // Prüfe ob bereits relative Koordinaten vorliegen
+        if (isset($measurement_data['relative_start_point']) && isset($measurement_data['relative_end_point'])) {
+            error_log("YPrint Canvas: ✅ Relative Koordinaten bereits vorhanden");
+            return $measurement_data;
+        }
+        
+        // Konvertiere absolute Pixel zu relativen Koordinaten
+        $canvas_width = $measurement_data['canvas_width'] ?? 800; // Fallback
+        $canvas_height = $measurement_data['canvas_height'] ?? 600; // Fallback
+        
+        if (isset($measurement_data['start_point']) && isset($measurement_data['end_point'])) {
+            $start_relative = $this->normalize_coordinates_to_relative(
+                $measurement_data['start_point']['x'],
+                $measurement_data['start_point']['y'],
+                $canvas_width,
+                $canvas_height
+            );
+            
+            $end_relative = $this->normalize_coordinates_to_relative(
+                $measurement_data['end_point']['x'],
+                $measurement_data['end_point']['y'],
+                $canvas_width,
+                $canvas_height
+            );
+            
+            $measurement_data['relative_start_point'] = $start_relative;
+            $measurement_data['relative_end_point'] = $end_relative;
+            $measurement_data['relative_distance'] = $this->calculate_relative_distance($start_relative, $end_relative);
+            
+            error_log("YPrint Canvas: ✅ Koordinaten zu relativ konvertiert");
+        }
+        
+        return $measurement_data;
+    }
+
+    /**
+     * 9. Relative Distanz berechnen
+     */
+    private function calculate_relative_distance($start_relative, $end_relative) {
+        $dx = $end_relative['x'] - $start_relative['x'];
+        $dy = $end_relative['y'] - $start_relative['y'];
+        return sqrt($dx * $dx + $dy * $dy);
+    }
+
+    /**
+     * 10. Physische Skalierung anwenden
+     */
+    private function apply_physical_scaling($measurement_data, $template_id, $size_name) {
+        // Hole Master-Measurement für Referenz
+        $master_measurement = get_post_meta($template_id, '_master_measurement', true);
+        
+        if (empty($master_measurement)) {
+            error_log("YPrint Canvas: ⚠️ Keine Master-Measurement gefunden, verwende Fallback");
+            return $this->apply_fallback_physical_scaling($measurement_data, $template_id, $size_name);
+        }
+        
+        // Berechne physische Distanz basierend auf Master-Measurement
+        $relative_distance = $measurement_data['relative_distance'] ?? 0;
+        $master_ratio = $master_measurement['pixels_per_cm_ratio'] ?? 1;
+        
+        $physical_distance_cm = $relative_distance * $master_ratio;
+        
+        // Größenspezifische Anpassung
+        $size_adjustment = $this->get_size_adjustment_factor($template_id, $size_name, $measurement_data['measurement_type'] ?? 'chest');
+        $adjusted_physical_distance = $physical_distance_cm * $size_adjustment;
+        
+        error_log("YPrint Canvas: 🎯 Physische Skalierung - Relativ: {$relative_distance}, Master-Ratio: {$master_ratio}, Größenanpassung: {$size_adjustment}, Final: {$adjusted_physical_distance}cm");
+        
+        $measurement_data['physical_distance_cm'] = $adjusted_physical_distance;
+        $measurement_data['size_adjustment_factor'] = $size_adjustment;
+        
+        return $measurement_data;
+    }
+
+    /**
+     * 11. Größenspezifischer Anpassungsfaktor
+     */
+    private function get_size_adjustment_factor($template_id, $size_name, $measurement_type) {
+        $product_dimensions = get_post_meta($template_id, '_product_dimensions', true);
+        
+        if (empty($product_dimensions) || !is_array($product_dimensions)) {
+            error_log("YPrint Canvas: ⚠️ Keine Produktdimensionen für Größenanpassung gefunden");
+            return 1.0;
+        }
+        
+        // Hole Basis-Größe (normalerweise 'M' oder erste verfügbare)
+        $base_size = $this->get_base_size($product_dimensions);
+        $base_dimension = $product_dimensions[$base_size][$measurement_type] ?? 100;
+        $target_dimension = $product_dimensions[$size_name][$measurement_type] ?? $base_dimension;
+        
+        $adjustment_factor = $target_dimension / $base_dimension;
+        
+        error_log("YPrint Canvas: 🎯 Größenanpassung - Basis: {$base_size}({$base_dimension}), Ziel: {$size_name}({$target_dimension}), Faktor: {$adjustment_factor}");
+        
+        return $adjustment_factor;
+    }
+
+    /**
+     * 12. Basis-Größe ermitteln
+     */
+    private function get_base_size($product_dimensions) {
+        $preferred_order = array('m', 'M', 'l', 'L', 's', 'S');
+        
+        foreach ($preferred_order as $size) {
+            if (isset($product_dimensions[$size])) {
+                return $size;
+            }
+        }
+        
+        // Fallback: Erste verfügbare Größe
+        return array_keys($product_dimensions)[0] ?? 'm';
+    }
+
+    /**
+     * 13. Fallback physische Skalierung
+     */
+    private function apply_fallback_physical_scaling($measurement_data, $template_id, $size_name) {
+        error_log("YPrint Canvas: 🔄 Verwende Fallback physische Skalierung");
+        
+        // Standard-Annahme: 1 relative Einheit = 10cm (anpassbar)
+        $default_scale = 10.0;
+        $relative_distance = $measurement_data['relative_distance'] ?? 0;
+        $physical_distance_cm = $relative_distance * $default_scale;
+        
+        // Größenspezifische Anpassung auch im Fallback
+        $size_adjustment = $this->get_size_adjustment_factor($template_id, $size_name, $measurement_data['measurement_type'] ?? 'chest');
+        $adjusted_physical_distance = $physical_distance_cm * $size_adjustment;
+        
+        $measurement_data['physical_distance_cm'] = $adjusted_physical_distance;
+        $measurement_data['size_adjustment_factor'] = $size_adjustment;
+        $measurement_data['scaling_method'] = 'fallback';
+        
+        return $measurement_data;
+    }
+
+    /**
+     * 14. Canvas-Kontext validieren
+     */
+    public function validate_canvas_context($template_id) {
+        $canvas_context = get_post_meta($template_id, '_design_canvas_context', true);
+        
+        $validation = array(
+            'has_context' => !empty($canvas_context),
+            'has_dimensions' => false,
+            'is_valid' => false,
+            'context_data' => $canvas_context
+        );
+        
+        if (!empty($canvas_context) && is_array($canvas_context)) {
+            $validation['has_dimensions'] = isset($canvas_context['design_canvas_width']) && isset($canvas_context['design_canvas_height']);
+            $validation['is_valid'] = $validation['has_dimensions'] && 
+                                    $canvas_context['design_canvas_width'] > 0 && 
+                                    $canvas_context['design_canvas_height'] > 0;
+        }
+        
+        error_log("YPrint Canvas: 🔍 Canvas-Kontext Validation - Template: {$template_id}, Valid: " . ($validation['is_valid'] ? 'Ja' : 'Nein'));
+        
+        return $validation;
+    }
+
+    /**
+     * 15. Neue Messungs-Speicherung mit Canvas-Kontext
+     */
+    public function save_measurement_with_canvas_context($template_id, $view_id, $measurement_data, $canvas_width, $canvas_height) {
+        error_log("YPrint Canvas: 🎯 Speichere Messung mit Canvas-Kontext - Template: {$template_id}, View: {$view_id}");
+        
+        // Schritt 1: Canvas-Kontext speichern
+        $this->store_design_canvas_context($template_id, $canvas_width, $canvas_height);
+        
+        // Schritt 2: Koordinaten normalisieren
+        $normalized_data = $this->normalize_measurement_coordinates($measurement_data);
+        
+        // Schritt 3: Canvas-Metadaten hinzufügen
+        $normalized_data['canvas_context'] = array(
+            'design_width' => $canvas_width,
+            'design_height' => $canvas_height,
+            'device_type' => $this->detect_device_type($canvas_width, $canvas_height),
+            'timestamp' => current_time('mysql')
+        );
+        
+        // Schritt 4: Speichere mit normalisiertem Format
+        return $this->save_normalized_measurement($template_id, $view_id, $normalized_data);
+    }
+
+    /**
+     * 16. Normalisierte Messungen speichern
+     */
+    private function save_normalized_measurement($template_id, $view_id, $normalized_data) {
+        // Lade bestehende Messungen
+        $all_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        if (!is_array($all_measurements)) {
+            $all_measurements = array();
+        }
+        
+        // Initialisiere View falls nicht existent
+        if (!isset($all_measurements[$view_id])) {
+            $all_measurements[$view_id] = array('measurements' => array());
+        }
+        if (!isset($all_measurements[$view_id]['measurements'])) {
+            $all_measurements[$view_id]['measurements'] = array();
+        }
+        
+        // Füge normalisierte Messung hinzu
+        $all_measurements[$view_id]['measurements'][] = $normalized_data;
+        
+        // Speichere zurück
+        $result = update_post_meta($template_id, '_template_view_print_areas', $all_measurements);
+        
+        error_log("YPrint Canvas: " . ($result ? "✅" : "❌") . " Normalisierte Messung gespeichert");
+        
+        return $result;
+    }
+
+    /**
+     * 17. Messungen für Display laden und denormalisieren
+     */
+    public function load_measurements_for_display($template_id, $current_canvas_width, $current_canvas_height) {
+        error_log("YPrint Canvas: 🎯 Lade Messungen für Display - Canvas: {$current_canvas_width}x{$current_canvas_height}");
+        
+        $all_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if (empty($all_measurements) || !is_array($all_measurements)) {
+            return array();
+        }
+        
+        $display_measurements = array();
+        
+        foreach ($all_measurements as $view_id => $view_data) {
+            if (!isset($view_data['measurements']) || !is_array($view_data['measurements'])) {
+                continue;
+            }
+            
+            $display_measurements[$view_id] = array('measurements' => array());
+            
+            foreach ($view_data['measurements'] as $measurement) {
+                $display_measurement = $measurement;
+                
+                // Denormalisiere Koordinaten für aktuellen Canvas
+                if (isset($measurement['relative_start_point']) && isset($measurement['relative_end_point'])) {
+                    $start_pixels = $this->denormalize_coordinates_to_pixels(
+                        $measurement['relative_start_point']['x'],
+                        $measurement['relative_start_point']['y'],
+                        $current_canvas_width,
+                        $current_canvas_height
+                    );
+                    
+                    $end_pixels = $this->denormalize_coordinates_to_pixels(
+                        $measurement['relative_end_point']['x'],
+                        $measurement['relative_end_point']['y'],
+                        $current_canvas_width,
+                        $current_canvas_height
+                    );
+                    
+                    $display_measurement['display_start_point'] = $start_pixels;
+                    $display_measurement['display_end_point'] = $end_pixels;
+                    $display_measurement['display_canvas'] = array(
+                        'width' => $current_canvas_width,
+                        'height' => $current_canvas_height
+                    );
+                }
+                
+                $display_measurements[$view_id]['measurements'][] = $display_measurement;
+            }
+        }
+        
+        error_log("YPrint Canvas: ✅ Messungen für Display denormalisiert");
+        
+        return $display_measurements;
+    }
+
+    /**
+     * 18. Debug-Funktion für Canvas-System
+     */
+    public function debug_canvas_system($template_id, $current_canvas_width = null, $current_canvas_height = null) {
+        error_log("YPrint Canvas: 🔍 DEBUG Canvas-System - Template: {$template_id}");
+        
+        $debug_info = array(
+            'template_id' => $template_id,
+            'timestamp' => current_time('mysql')
+        );
+        
+        // Canvas-Kontext prüfen
+        $canvas_validation = $this->validate_canvas_context($template_id);
+        $debug_info['canvas_context'] = $canvas_validation;
+        
+        // Master-Measurement prüfen
+        $master_measurement = get_post_meta($template_id, '_master_measurement', true);
+        $debug_info['master_measurement'] = array(
+            'exists' => !empty($master_measurement),
+            'data' => $master_measurement
+        );
+        
+        // Messungen prüfen
+        $all_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        $debug_info['measurements'] = array(
+            'total_views' => is_array($all_measurements) ? count($all_measurements) : 0,
+            'views' => array()
+        );
+        
+        if (is_array($all_measurements)) {
+            foreach ($all_measurements as $view_id => $view_data) {
+                $measurements_count = isset($view_data['measurements']) ? count($view_data['measurements']) : 0;
+                $debug_info['measurements']['views'][$view_id] = $measurements_count;
+            }
+        }
+        
+        // Canvas-Skalierung prüfen (falls aktuelle Canvas-Größe gegeben)
+        if ($current_canvas_width && $current_canvas_height) {
+            $scaling_ratio = $this->calculate_canvas_scaling_ratio($template_id, $current_canvas_width, $current_canvas_height);
+            $debug_info['canvas_scaling'] = $scaling_ratio;
+        }
+        
+        error_log("YPrint Canvas: 📊 Debug-Info: " . json_encode($debug_info));
+        
+        return $debug_info;
+    }
 }
