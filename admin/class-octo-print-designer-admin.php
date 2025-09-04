@@ -446,49 +446,15 @@ class Octo_Print_Designer_Admin {
             }
         }
         
-        // ✅ NEU: Direkte Implementierung der reparierten Logik
-        $result[] = "🧮 Implementiere reparierte Logik direkt in der Admin-Klasse...";
-        
-        try {
-            // Verwende die bereits geladenen Template-Messungen
-            $template_measurements_raw = get_post_meta($template_id, '_template_view_print_areas', true);
+                    // ✅ NEU: Direkte Implementierung der reparierten Logik
+            $result[] = "🧮 Implementiere reparierte Logik direkt in der Admin-Klasse...";
             
-            if (!empty($template_measurements_raw)) {
-                $result[] = "📊 Rohe Template-Messungen geladen: " . strlen($template_measurements_raw) . " Zeichen";
-                
-                // ✅ NEU: Unterstütze sowohl JSON als auch PHP-Serialized-Arrays
-                $template_measurements_parsed = null;
-                
-                if (is_string($template_measurements_raw)) {
-                    // Versuche zuerst JSON zu parsen
-                    if (function_exists('json_decode')) {
-                        $json_data = json_decode($template_measurements_raw, true);
-                        if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
-                            $template_measurements_parsed = $json_data;
-                            $result[] = "✅ JSON-Daten erfolgreich geparst";
-                        } else {
-                            $result[] = "⚠️ JSON-Parsing fehlgeschlagen: " . json_last_error_msg();
-                        }
-                    }
-                    
-                    // Falls JSON fehlschlägt, versuche PHP-Serialized-Array
-                    if ($template_measurements_parsed === null) {
-                        if (function_exists('unserialize')) {
-                            $unserialized_data = @unserialize($template_measurements_raw);
-                            if ($unserialized_data !== false && is_array($unserialized_data)) {
-                                $template_measurements_parsed = $unserialized_data;
-                                $result[] = "✅ PHP-Serialized-Array erfolgreich geparst";
-                            } else {
-                                $result[] = "❌ Auch PHP-Serialized-Array-Parsing fehlgeschlagen";
-                            }
-                        } else {
-                            $result[] = "❌ Unserialize-Funktion nicht verfügbar";
-                        }
-                    }
-                }
+            try {
+                // ✅ NEU: WordPress deserialisiert bereits automatisch - verwende direkt das Array
+                $template_measurements_parsed = get_post_meta($template_id, '_template_view_print_areas', true);
                 
                 if (!empty($template_measurements_parsed) && is_array($template_measurements_parsed)) {
-                    $result[] = "✅ Template-Messungen erfolgreich geparst";
+                    $result[] = "✅ Template-Messungen direkt geladen (WordPress hat bereits deserialisiert)";
                     $result[] = "📊 Anzahl Views: " . count($template_measurements_parsed);
                     
                     // Extrahiere alle Messungen aus allen Views
@@ -531,7 +497,7 @@ class Octo_Print_Designer_Admin {
                                     'calculation_method' => 'direct_admin_implementation',
                                     'debug_info' => array(
                                         'measurement_type' => $measurement_type,
-                                        'parsing_method' => 'direct',
+                                        'parsing_method' => 'wordpress_auto_deserialize',
                                         'calculation_timestamp' => current_time('mysql')
                                     )
                                 );
@@ -562,16 +528,13 @@ class Octo_Print_Designer_Admin {
                         $result[] = "❌ Keine Messungen in den geparsten Daten gefunden";
                     }
                 } else {
-                    $result[] = "❌ Template-Messungen konnten nicht geparst werden";
+                    $result[] = "❌ Keine Template-Messungen in der Datenbank gefunden oder ungültiges Format";
                 }
-            } else {
-                $result[] = "❌ Keine Template-Messungen in der Datenbank gefunden";
+                
+            } catch (Exception $e) {
+                $result[] = "❌ Fehler in direkter Implementierung: " . $e->getMessage();
+                $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
             }
-            
-        } catch (Exception $e) {
-            $result[] = "❌ Fehler in direkter Implementierung: " . $e->getMessage();
-            $result[] = "🔍 Stack Trace: " . $e->getTraceAsString();
-        }
         
         // Fallback: Versuche gespeicherte Skalierungsfaktoren zu lesen
         if (!$scale_factors_generated && !empty($template_measurements)) {
