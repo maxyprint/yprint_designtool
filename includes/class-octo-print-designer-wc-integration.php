@@ -3168,21 +3168,90 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }
             }
             
-            // YPrint print_design
+            // YPrint print_design - VOLLSTÄNDIGE ANALYSE
             $print_design = wc_get_order_item_meta($item_id, '_print_design', true);
             if (!empty($print_design)) {
                 if (is_string($print_design)) {
                     $print_design = maybe_unserialize($print_design);
                 }
                 if (is_array($print_design)) {
-                    $result[] = "   ✅ Print-Design Daten:";
+                    $result[] = "   ✅ Print-Design Daten (" . count($print_design) . " Eigenschaften):";
                     $result[] = "     Design ID: " . ($print_design['design_id'] ?? 'Unbekannt');
                     $result[] = "     Template ID: " . ($print_design['template_id'] ?? 'Unbekannt');
                     $result[] = "     Name: " . ($print_design['name'] ?? 'Unbekannt');
                     
+                    // Design-Zeit Canvas-Größe
+                    if (isset($print_design['canvas_width']) && isset($print_design['canvas_height'])) {
+                        $result[] = "     🎨 Design-Zeit Canvas: " . $print_design['canvas_width'] . "x" . $print_design['canvas_height'] . "px";
+                    }
+                    
+                    // Design-Bilder mit Transform-Daten
                     if (isset($print_design['design_images']) && is_array($print_design['design_images'])) {
-                        $elements_found += count($print_design['design_images']);
-                        $result[] = "     Design-Bilder: " . count($print_design['design_images']);
+                        $design_images = $print_design['design_images'];
+                        $elements_found += count($design_images);
+                        $result[] = "     🖼️ Design-Bilder: " . count($design_images);
+                        
+                        foreach ($design_images as $idx => $image) {
+                            $result[] = "        Bild " . ($idx + 1) . ":";
+                            $result[] = "           URL: " . (isset($image['url']) ? '...' . substr($image['url'], -40) : 'Nicht verfügbar');
+                            
+                            if (isset($image['transform'])) {
+                                $transform = $image['transform'];
+                                $result[] = "           🎯 Position: x=" . ($transform['left'] ?? 0) . "px, y=" . ($transform['top'] ?? 0) . "px";
+                                $result[] = "           📏 Größe: " . ($transform['width'] ?? 0) . "x" . ($transform['height'] ?? 0) . "px";
+                                $result[] = "           🔄 Transform: scaleX=" . ($transform['scaleX'] ?? 1) . ", scaleY=" . ($transform['scaleY'] ?? 1);
+                                
+                                if (isset($transform['angle'])) {
+                                    $result[] = "           🌀 Rotation: " . $transform['angle'] . "°";
+                                }
+                            } else {
+                                $result[] = "           ❌ Keine Transform-Daten gefunden";
+                            }
+                        }
+                    }
+                    
+                    // Design Objects (falls vorhanden)
+                    if (isset($print_design['design_objects']) && is_array($print_design['design_objects'])) {
+                        $objects = $print_design['design_objects'];
+                        $elements_found += count($objects);
+                        $result[] = "     🎨 Design-Objekte: " . count($objects);
+                        
+                        foreach ($objects as $obj_id => $obj) {
+                            $result[] = "        Objekt: " . $obj_id;
+                            $result[] = "           Typ: " . ($obj['type'] ?? 'Unbekannt');
+                            if (isset($obj['left']) && isset($obj['top'])) {
+                                $result[] = "           Position: x=" . $obj['left'] . "px, y=" . $obj['top'] . "px";
+                            }
+                            if (isset($obj['width']) && isset($obj['height'])) {
+                                $result[] = "           Größe: " . $obj['width'] . "x" . $obj['height'] . "px";
+                            }
+                        }
+                    }
+                    
+                    // Views (Template-spezifische Ansichten)
+                    if (isset($print_design['views']) && is_array($print_design['views'])) {
+                        $views = $print_design['views'];
+                        $result[] = "     👁️ Template-Views: " . count($views);
+                        
+                        foreach ($views as $view_id => $view_data) {
+                            $result[] = "        View: " . $view_id;
+                            if (isset($view_data['name'])) {
+                                $result[] = "           Name: " . $view_data['name'];
+                            }
+                            if (isset($view_data['elements'])) {
+                                $result[] = "           Elemente: " . count($view_data['elements']);
+                            }
+                        }
+                    }
+                    
+                    // Alle anderen Eigenschaften anzeigen
+                    $result[] = "     📋 Alle Print-Design Eigenschaften:";
+                    foreach ($print_design as $key => $value) {
+                        if (!in_array($key, ['design_images', 'design_objects', 'views'])) {
+                            $display_value = is_array($value) ? '[Array mit ' . count($value) . ' Elementen]' : 
+                                            (is_string($value) && strlen($value) > 50 ? substr($value, 0, 50) . '...' : $value);
+                            $result[] = "        {$key}: {$display_value}";
+                        }
                     }
                 }
             }
