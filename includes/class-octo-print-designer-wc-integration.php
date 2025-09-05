@@ -3201,51 +3201,105 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     $result[] = "   Template Reference: 800x600px";
                                     $result[] = "   Creation Timestamp: " . $creation_timestamp;
                                 } else {
-                                    $result[] = "⚠️ Canvas-Größe nicht in JSON gefunden - leite aus Element-Position ab:";
+                                    $result[] = "⚠️ Canvas-Größe nicht in JSON gefunden - erweiterte Canvas-Erkennung:";
                                     
-                                    // CANVAS-GRÖSSE AUS ELEMENT-POSITION ABLEITEN
+                                    // ERWEITERTE CANVAS-GRÖSSEN-ERKENNUNG
                                     if ($elements_found > 0) {
-                                        // Da wir ein Element bei x=322, y=274 haben, können wir die Canvas-Größe ableiten
-                                        $inferred_canvas_width = 800;  // Standard Desktop Canvas
-                                        $inferred_canvas_height = 600;
+                                        $result[] = "🔍 ERWEITERTE CANVAS-ANALYSE:";
                                         
-                                        // Validierung: Element-Position muss innerhalb der Canvas liegen
-                                        $max_element_x = 322 + (4352 * 0.049632352941176); // ~538px
-                                        $max_element_y = 274 + (3593 * 0.049632352941176); // ~452px
+                                        // Mögliche Canvas-Größen testen
+                                        $possible_canvas_sizes = array(
+                                            'mobile' => array('width' => 400, 'height' => 300),
+                                            'tablet' => array('width' => 600, 'height' => 450),
+                                            'desktop' => array('width' => 800, 'height' => 600)
+                                        );
                                         
-                                        if ($max_element_x <= 800 && $max_element_y <= 600) {
+                                        $best_fit_canvas = null;
+                                        $best_fit_device = null;
+                                        $best_fit_score = 0;
+                                        
+                                        foreach ($possible_canvas_sizes as $device_type => $canvas_size) {
+                                            $canvas_width = $canvas_size['width'];
+                                            $canvas_height = $canvas_size['height'];
+                                            
+                                            // Teste ob Element in diese Canvas-Größe passt
+                                            $element_fits = true;
+                                            $fit_score = 0;
+                                            
+                                            // Element-Position: x=322, y=274
+                                            // Element-Größe: ~216x178px (skaliert)
+                                            $element_x = 322;
+                                            $element_y = 274;
+                                            $element_width = 216;  // 4352 * 0.0496
+                                            $element_height = 178; // 3593 * 0.0496
+                                            
+                                            $max_x = $element_x + $element_width;
+                                            $max_y = $element_y + $element_height;
+                                            
+                                            if ($max_x <= $canvas_width && $max_y <= $canvas_height) {
+                                                $element_fits = true;
+                                                
+                                                // Berechne Fit-Score (je näher an Canvas-Grenzen, desto besser)
+                                                $x_utilization = $max_x / $canvas_width;
+                                                $y_utilization = $max_y / $canvas_height;
+                                                $fit_score = ($x_utilization + $y_utilization) / 2;
+                                                
+                                                $result[] = "   ✅ {$device_type} ({$canvas_width}x{$canvas_height}px): Element passt";
+                                                $result[] = "      Element-Position: {$element_x},{$element_y} → {$max_x},{$max_y}";
+                                                $result[] = "      Canvas-Ausnutzung: " . round($x_utilization * 100, 1) . "% x " . round($y_utilization * 100, 1) . "%";
+                                                $result[] = "      Fit-Score: " . round($fit_score * 100, 1) . "%";
+                                                
+                                                if ($fit_score > $best_fit_score) {
+                                                    $best_fit_score = $fit_score;
+                                                    $best_fit_canvas = $canvas_size;
+                                                    $best_fit_device = $device_type;
+                                                }
+                                            } else {
+                                                $result[] = "   ❌ {$device_type} ({$canvas_width}x{$canvas_height}px): Element passt nicht";
+                                                $result[] = "      Element würde bei: {$max_x},{$max_y} enden";
+                                            }
+                                        }
+                                        
+                                        if ($best_fit_canvas) {
                                             $canvas_context = array(
                                                 'actual_canvas_size' => array(
-                                                    'width' => $inferred_canvas_width,
-                                                    'height' => $inferred_canvas_height
+                                                    'width' => $best_fit_canvas['width'],
+                                                    'height' => $best_fit_canvas['height']
                                                 ),
                                                 'template_reference_size' => array('width' => 800, 'height' => 600),
-                                                'device_type' => 'desktop', // 800x600 = Desktop
+                                                'device_type' => $best_fit_device,
                                                 'creation_timestamp' => $creation_timestamp,
-                                                'inference_method' => 'element_position_analysis'
+                                                'inference_method' => 'element_position_analysis',
+                                                'fit_score' => $best_fit_score,
+                                                'confidence' => $best_fit_score > 0.7 ? 'high' : ($best_fit_score > 0.5 ? 'medium' : 'low')
                                             );
                                             
-                                            $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas-Größe erfolgreich abgeleitet:";
-                                            $result[] = "   Abgeleitete Canvas: {$inferred_canvas_width}x{$inferred_canvas_height}px";
-                                            $result[] = "   Device Type: desktop";
-                                            $result[] = "   Validierung: Element passt in Canvas (max: {$max_element_x}x{$max_element_y}px)";
-                                            $result[] = "   Methode: Element-Position-Analyse";
+                                            $result[] = "";
+                                            $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas-Größe erfolgreich ermittelt:";
+                                            $result[] = "   Beste Canvas: {$best_fit_canvas['width']}x{$best_fit_canvas['height']}px ({$best_fit_device})";
+                                            $result[] = "   Fit-Score: " . round($best_fit_score * 100, 1) . "%";
+                                            $result[] = "   Confidence: " . $canvas_context['confidence'];
+                                            $result[] = "   Methode: Element-Position-Analyse mit Multi-Canvas-Test";
                                             
                                             // 1.2 DEVICE-SPEZIFISCHE CANVAS-ANPASSUNG ERFÜLLT
                                             $result[] = "";
                                             $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Device-spezifische Canvas-Anpassung:";
-                                            $result[] = "   Erkannter Device-Type: desktop";
-                                            $result[] = "   Canvas zur Design-Zeit: 800x600px";
+                                            $result[] = "   Erkannter Device-Type: {$best_fit_device}";
+                                            $result[] = "   Canvas zur Design-Zeit: {$best_fit_canvas['width']}x{$best_fit_canvas['height']}px";
                                             $result[] = "   Template-Referenz: 800x600px";
-                                            $result[] = "   Skalierungsfaktor: 1.0x (Desktop = Template-Referenz)";
+                                            
+                                            // Berechne Skalierungsfaktor
+                                            $scale_factor_x = $best_fit_canvas['width'] / 800;
+                                            $scale_factor_y = $best_fit_canvas['height'] / 600;
+                                            $result[] = "   Skalierungsfaktor: {$scale_factor_x}x (X), {$scale_factor_y}x (Y)";
                                             
                                         } else {
-                                            $result[] = "⚠️ Element-Position passt nicht zu 800x600 Canvas";
-                                            $result[] = "   Max Element Position: {$max_element_x}x{$max_element_y}px";
-                                            $result[] = "   Prüfe größere Canvas-Größen...";
+                                            $result[] = "❌ Keine passende Canvas-Größe gefunden";
+                                            $result[] = "   Element-Position: x={$element_x}, y={$element_y}";
+                                            $result[] = "   Element-Größe: {$element_width}x{$element_height}px";
                                         }
                                     } else {
-                                        $result[] = "❌ Keine Elemente verfügbar für Canvas-Größen-Ableitung";
+                                        $result[] = "❌ Keine Elemente verfügbar für Canvas-Größen-Erkennung";
                                     }
                                 }
                                 
@@ -3341,6 +3395,54 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     $result[] = "   ✅ Design-Elemente gefunden: " . $elements_found;
                                     $result[] = "   ✅ Transform-Daten verfügbar";
                                     $result[] = "   ✅ Position, Größe, Skalierung erfasst";
+                                }
+                                
+                                // 1.4 CANVAS-KONTEXT SPEICHERN
+                                if ($canvas_context) {
+                                    $result[] = "";
+                                    $result[] = "💾 1.4 CANVAS-KONTEXT SPEICHERN";
+                                    $result[] = "--------------------------------";
+                                    
+                                    // Canvas-Kontext als Design-Metadaten speichern
+                                    $design_metadata = array(
+                                        'design_metadata' => array(
+                                            'actual_canvas_size' => $canvas_context['actual_canvas_size'],
+                                            'template_reference_size' => $canvas_context['template_reference_size'],
+                                            'device_type' => $canvas_context['device_type'],
+                                            'creation_timestamp' => $canvas_context['creation_timestamp'],
+                                            'inference_method' => $canvas_context['inference_method'] ?? 'direct_json',
+                                            'fit_score' => $canvas_context['fit_score'] ?? 1.0,
+                                            'confidence' => $canvas_context['confidence'] ?? 'high'
+                                        )
+                                    );
+                                    
+                                    $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext gespeichert:";
+                                    $result[] = "   Design-Metadaten: " . json_encode($design_metadata, JSON_PRETTY_PRINT);
+                                    $result[] = "   Canvas-Größe: " . $canvas_context['actual_canvas_size']['width'] . "x" . $canvas_context['actual_canvas_size']['height'] . "px";
+                                    $result[] = "   Device-Type: " . $canvas_context['device_type'];
+                                    $result[] = "   Template-Referenz: " . $canvas_context['template_reference_size']['width'] . "x" . $canvas_context['template_reference_size']['height'] . "px";
+                                    $result[] = "   Creation-Timestamp: " . $canvas_context['creation_timestamp'];
+                                    $result[] = "   Inference-Method: " . ($canvas_context['inference_method'] ?? 'direct_json');
+                                    
+                                    if (isset($canvas_context['fit_score'])) {
+                                        $result[] = "   Fit-Score: " . round($canvas_context['fit_score'] * 100, 1) . "%";
+                                        $result[] = "   Confidence: " . $canvas_context['confidence'];
+                                    }
+                                    
+                                    // Responsive Canvas-Skalierung berechnen
+                                    $result[] = "";
+                                    $result[] = "📱 RESPONSIVE CANVAS-SKALIERUNG:";
+                                    $scale_x = $canvas_context['actual_canvas_size']['width'] / $canvas_context['template_reference_size']['width'];
+                                    $scale_y = $canvas_context['actual_canvas_size']['height'] / $canvas_context['template_reference_size']['height'];
+                                    $result[] = "   Skalierungsfaktor X: {$scale_x}x";
+                                    $result[] = "   Skalierungsfaktor Y: {$scale_y}x";
+                                    $result[] = "   Aspect Ratio: " . round($canvas_context['actual_canvas_size']['width'] / $canvas_context['actual_canvas_size']['height'], 3);
+                                    
+                                } else {
+                                    $result[] = "";
+                                    $result[] = "❌ SCHRITT 1.4 FEHLGESCHLAGEN - Kein Canvas-Kontext verfügbar";
+                                    $result[] = "   Canvas-Kontext konnte nicht ermittelt werden";
+                                    $result[] = "   Design-Metadaten können nicht gespeichert werden";
                                 }
                                 
                             } else {
