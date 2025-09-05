@@ -3101,9 +3101,15 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "   Produkt: " . $design_item['product_name'];
             $result[] = "   System: " . $design_item['used_system'];
             
-            if (isset($design_item['design_data']['objects']) && is_array($design_item['design_data']['objects'])) {
-                $objects = $design_item['design_data']['objects'];
-                $result[] = "   Elemente: " . count($objects);
+            // 🔍 ERWEITERTE DESIGN-ELEMENT-ERFASSUNG
+            $elements_found = 0;
+            $design_data = $design_item['design_data'];
+            
+            // Methode 1: Standard design_data structure (objects)
+            if (isset($design_data['objects']) && is_array($design_data['objects'])) {
+                $objects = $design_data['objects'];
+                $elements_found += count($objects);
+                $result[] = "   ✅ Standard Design-Objekte: " . count($objects);
                 
                 foreach ($objects as $obj_index => $obj) {
                     if (is_array($obj)) {
@@ -3114,8 +3120,91 @@ private function build_print_provider_email_content($order, $design_items, $note
                         $result[] = "       Typ: " . ($obj['type'] ?? 'N/A');
                     }
                 }
+            }
+            
+            // Methode 2: Standard design_data structure (elements)
+            if (isset($design_data['elements']) && is_array($design_data['elements'])) {
+                $elements = $design_data['elements'];
+                $elements_found += count($elements);
+                $result[] = "   ✅ Standard Design-Elemente: " . count($elements);
+                
+                foreach ($elements as $element_id => $element) {
+                    $result[] = "     Element: " . $element_id;
+                    $result[] = "       Typ: " . ($element['type'] ?? 'Unbekannt');
+                    $result[] = "       Position: x=" . ($element['left'] ?? 0) . ", y=" . ($element['top'] ?? 0);
+                    $result[] = "       Transform: scaleX=" . ($element['scaleX'] ?? 1) . ", scaleY=" . ($element['scaleY'] ?? 1) . ", rotation=" . ($element['angle'] ?? 0) . "°";
+                    
+                    if (isset($element['width']) && isset($element['height'])) {
+                        $result[] = "       Größe: " . $element['width'] . "x" . $element['height'] . "px";
+                    }
+                }
+            }
+            
+            // Methode 3: YPrint-spezifische Strukturen aus Order Item Meta
+            $item_id = $design_item['item_id'];
+            
+            // YPrint product_images
+            $product_images = wc_get_order_item_meta($item_id, '_yprint_product_images', true);
+            if (!empty($product_images)) {
+                if (is_string($product_images)) {
+                    $product_images = maybe_unserialize($product_images);
+                }
+                if (is_array($product_images) && !empty($product_images)) {
+                    $elements_found += count($product_images);
+                    $result[] = "   ✅ YPrint Produkt-Bilder: " . count($product_images);
+                    
+                    foreach ($product_images as $idx => $image) {
+                        $result[] = "     Bild " . ($idx + 1) . ":";
+                        $result[] = "       URL: " . (isset($image['url']) ? substr($image['url'], -30) . '...' : 'Nicht verfügbar');
+                        $result[] = "       ID: " . ($image['id'] ?? 'Unbekannt');
+                        
+                        if (isset($image['transform'])) {
+                            $transform = $image['transform'];
+                            $result[] = "       Position: x=" . ($transform['left'] ?? 0) . ", y=" . ($transform['top'] ?? 0);
+                            $result[] = "       Transform: scaleX=" . ($transform['scaleX'] ?? 1) . ", scaleY=" . ($transform['scaleY'] ?? 1);
+                            $result[] = "       Größe: " . ($transform['width'] ?? 0) . "x" . ($transform['height'] ?? 0) . "px";
+                        }
+                    }
+                }
+            }
+            
+            // YPrint print_design
+            $print_design = wc_get_order_item_meta($item_id, '_print_design', true);
+            if (!empty($print_design)) {
+                if (is_string($print_design)) {
+                    $print_design = maybe_unserialize($print_design);
+                }
+                if (is_array($print_design)) {
+                    $result[] = "   ✅ Print-Design Daten:";
+                    $result[] = "     Design ID: " . ($print_design['design_id'] ?? 'Unbekannt');
+                    $result[] = "     Template ID: " . ($print_design['template_id'] ?? 'Unbekannt');
+                    $result[] = "     Name: " . ($print_design['name'] ?? 'Unbekannt');
+                    
+                    if (isset($print_design['design_images']) && is_array($print_design['design_images'])) {
+                        $elements_found += count($print_design['design_images']);
+                        $result[] = "     Design-Bilder: " . count($print_design['design_images']);
+                    }
+                }
+            }
+            
+            // Methode 4: Raw design dimensions from meta
+            $width_cm = wc_get_order_item_meta($item_id, '_yprint_width_cm', true);
+            $height_cm = wc_get_order_item_meta($item_id, '_yprint_height_cm', true);
+            
+            if ($width_cm && $height_cm) {
+                $result[] = "   ✅ Design-Dimensionen:";
+                $result[] = "     Breite: " . $width_cm . "cm";
+                $result[] = "     Höhe: " . $height_cm . "cm";
+                $result[] = "     Druckposition: " . (wc_get_order_item_meta($item_id, '_yprint_variation_name', true) ?: 'Front');
+            }
+            
+            // Zusammenfassung der Element-Erfassung
+            if ($elements_found == 0) {
+                $result[] = "   ⚠️ Keine Design-Objekte in erwarteter Struktur gefunden";
+                $result[] = "     💡 Design-Daten sind vorhanden, aber in anderer Struktur";
+                $result[] = "     📋 Verfügbare Dimensionen: " . ($width_cm ?: 0) . "cm × " . ($height_cm ?: 0) . "cm";
             } else {
-                $result[] = "   ❌ Keine Design-Objekte gefunden";
+                $result[] = "   🎯 Gesamt Design-Elemente erfasst: " . $elements_found;
             }
             $result[] = "";
         }
