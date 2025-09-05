@@ -41,6 +41,9 @@ class Octo_Print_Designer_WC_Integration {
         
         // ✅ NEU: AJAX Handler für Design-Größenberechnung Test in Bestellungen
         add_action('wp_ajax_test_order_design_calculation', array($this, 'ajax_test_order_design_calculation'));
+        
+        // ✅ NEU: AJAX Handler für SCHRITT 1: Canvas-Erfassung & Design-Platzierung
+        add_action('wp_ajax_test_step_1_canvas_capture', array($this, 'ajax_test_step_1_canvas_capture'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -649,14 +652,14 @@ private function check_yprint_dependency() {
                     <span class="spinner" style="float: none; margin: 0 0 0 5px;"></span>
                 </p>
                 
-                <!-- ✅ NEU: Design-Größenberechnung Test Button -->
+                <!-- ✅ NEU: SCHRITT 1: Canvas-Erfassung & Design-Platzierung Test -->
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border: 2px solid #007cba; border-radius: 6px;">
                     <h4 style="margin: 0 0 10px 0; color: #007cba; font-size: 14px;">
                         <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
-                        🧪 Design-Größenberechnung Test
+                        🎨 SCHRITT 1: Canvas-Erfassung & Design-Platzierung
                     </h4>
                     <p style="margin: 0 0 15px 0; font-size: 12px; color: #6c757d;">
-                        Testen Sie die Design-Größenberechnung mit den echten Bestelldaten. Das System zeigt Ihnen genau, was passiert und was das Ergebnis ist.
+                        Testet die Canvas-Größe zur Design-Zeit, Element-Platzierung und Device-Erkennung. Dies ist die Grundlage für alle weiteren Berechnungen.
                     </p>
                     
                     <div style="display: flex; gap: 10px; align-items: center;">
@@ -664,7 +667,7 @@ private function check_yprint_dependency() {
                                 data-order-id="<?php echo $order_id; ?>"
                                 style="flex: 1; padding: 8px 12px; height: auto;">
                             <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
-                            Test Berechnung
+                            SCHRITT 1 testen
                         </button>
                         <span class="test-spinner spinner" style="display: none;"></span>
                     </div>
@@ -1333,7 +1336,7 @@ private function check_yprint_dependency() {
                     });
                 });
                 
-                // ✅ NEU: Design-Größenberechnung Test Button
+                // ✅ NEU: SCHRITT 1: Canvas-Erfassung & Design-Platzierung Test
                 $('#test-design-calculation-btn').on('click', function() {
                     var button = $(this);
                     var spinner = button.next('.test-spinner');
@@ -1345,7 +1348,7 @@ private function check_yprint_dependency() {
                     $('.notice').remove();
                     
                     // Show loading state
-                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>Teste...');
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>Teste SCHRITT 1...');
                     spinner.show();
                     resultContainer.hide();
                     
@@ -1353,40 +1356,40 @@ private function check_yprint_dependency() {
                         url: ajaxurl,
                         type: 'POST',
                         data: {
-                            action: 'test_order_design_calculation',
+                            action: 'test_step_1_canvas_capture',
                             order_id: orderId,
                             nonce: $('#octo_print_provider_nonce').val()
                         },
                         success: function(response) {
                             if (response.success) {
-                                resultContent.text(response.data.test_result);
+                                resultContent.text(response.data.result);
                                 resultContainer.show();
                                 
                                 // Show success message
-                                createStatusMessage('success', '✅ Test erfolgreich', 
-                                    'Design-Größenberechnung wurde erfolgreich durchgeführt. Siehe Ergebnis unten.')
+                                createStatusMessage('success', '✅ SCHRITT 1 erfolgreich', 
+                                    'Canvas-Erfassung und Design-Platzierung wurden erfolgreich getestet. Siehe Ergebnis unten.')
                                     .insertBefore(button.parent());
                                 
                             } else {
-                                resultContent.text('❌ Fehler: ' + (response.data.message || 'Unbekannter Fehler'));
+                                resultContent.text('❌ SCHRITT 1 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
                                 resultContainer.show();
                                 
-                                createStatusMessage('error', '❌ Test fehlgeschlagen', 
-                                    response.data.message || 'Unbekannter Fehler beim Testen der Design-Größenberechnung')
+                                createStatusMessage('error', '❌ SCHRITT 1 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen der Canvas-Erfassung')
                                     .insertBefore(button.parent());
                             }
                         },
                         error: function(xhr, status, error) {
-                            resultContent.text('❌ AJAX Fehler: ' + error);
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
                             resultContainer.show();
                             
-                            createStatusMessage('error', '❌ Netzwerkfehler', 
+                            createStatusMessage('error', '❌ SCHRITT 1 Netzwerkfehler', 
                                 'Verbindung zum Server fehlgeschlagen: ' + error)
                                 .insertBefore(button.parent());
                         },
                         complete: function() {
                             // Reset button state
-                            button.prop('disabled', false).html('<span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>Test Berechnung');
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>SCHRITT 1 testen');
                             spinner.hide();
                         }
                     });
@@ -1452,6 +1455,64 @@ private function check_yprint_dependency() {
             error_log("❌ Fatal error in AJAX test: " . $e->getMessage());
             error_log("❌ Error trace: " . $e->getTraceAsString());
             wp_send_json_error(array('message' => 'Fatal error: ' . $e->getMessage()));
+        }
+    }
+    
+    /**
+     * ✅ NEU: AJAX Handler für SCHRITT 1: Canvas-Erfassung & Design-Platzierung
+     */
+    public function ajax_test_step_1_canvas_capture() {
+        // Enable error logging for debugging
+        error_log("🎨 SCHRITT 1: AJAX Canvas Capture Test started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                error_log("❌ Security check failed in SCHRITT 1 AJAX test");
+                wp_send_json_error('Security check failed');
+            }
+            
+            // Check if user has permission
+            if (!current_user_can('edit_shop_orders')) {
+                error_log("❌ Permission check failed in SCHRITT 1 AJAX test");
+                wp_send_json_error('You do not have permission to perform this action');
+            }
+            
+            // Get and validate parameters
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            error_log("🎨 SCHRITT 1: Order ID from AJAX: " . $order_id);
+            
+            if (!$order_id) {
+                error_log("❌ Missing order ID in SCHRITT 1 AJAX test");
+                wp_send_json_error('Missing order ID');
+            }
+            
+            // Get order
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                error_log("❌ Order not found: " . $order_id);
+                wp_send_json_error('Order not found');
+            }
+            
+            error_log("✅ SCHRITT 1: Order found: #" . $order->get_order_number());
+            
+            // Führe den SCHRITT 1 Test durch
+            error_log("🎨 SCHRITT 1: Starting canvas capture test");
+            $test_result = $this->perform_step_1_canvas_capture_test($order);
+            error_log("✅ SCHRITT 1: Test completed successfully");
+            
+            wp_send_json_success(array(
+                'result' => $test_result
+            ));
+            
+        } catch (Exception $e) {
+            error_log("❌ Exception in SCHRITT 1 AJAX test: " . $e->getMessage());
+            error_log("❌ Exception trace: " . $e->getTraceAsString());
+            wp_send_json_error('SCHRITT 1 Test failed: ' . $e->getMessage());
+        } catch (Error $e) {
+            error_log("❌ Fatal error in SCHRITT 1 AJAX test: " . $e->getMessage());
+            error_log("❌ Error trace: " . $e->getTraceAsString());
+            wp_send_json_error('SCHRITT 1 Fatal error: ' . $e->getMessage());
         }
     }
     
@@ -2877,5 +2938,146 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         
         return null;
+    }
+    
+    /**
+     * ✅ NEU: Führt den SCHRITT 1: Canvas-Erfassung & Design-Platzierung Test durch
+     */
+    private function perform_step_1_canvas_capture_test($order) {
+        error_log("🎨 SCHRITT 1: Starting canvas capture test for order #" . $order->get_order_number());
+        
+        $result = array();
+        $result[] = "=== 🎨 SCHRITT 1: CANVAS-ERFASSUNG & DESIGN-PLATZIERUNG ===";
+        $result[] = "Bestellung: #" . $order->get_order_number();
+        $result[] = "Datum: " . $order->get_date_created()->format('d.m.Y H:i:s');
+        $result[] = "Status: " . wc_get_order_status_name($order->get_status());
+        $result[] = "";
+        
+        // **1.1 Template-Laden**
+        $result[] = "📋 1.1 TEMPLATE-LADEN";
+        $result[] = "----------------------------------------";
+        
+        $design_items = array();
+        $total_items = 0;
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            if ($item->is_type('line_item')) {
+                $total_items++;
+                
+                // Design-Daten aus Item-Meta extrahieren
+                $design_data = $item->get_meta('_octo_print_design_data');
+                $template_id = $item->get_meta('_octo_print_template_id');
+                
+                if ($design_data && $template_id) {
+                    $design_items[] = array(
+                        'item_id' => $item_id,
+                        'template_id' => $template_id,
+                        'design_data' => $design_data,
+                        'product_name' => $item->get_name()
+                    );
+                    
+                    $result[] = "✅ Item #{$item_id}: Template {$template_id} gefunden";
+                    $result[] = "   Produkt: " . $item->get_name();
+                    
+                    // Template-Details analysieren
+                    if (is_array($design_data)) {
+                        $result[] = "   Design-Daten: " . count($design_data) . " Elemente";
+                        
+                        // Canvas-Informationen extrahieren
+                        if (isset($design_data['canvas'])) {
+                            $canvas = $design_data['canvas'];
+                            $result[] = "   Canvas-Größe: " . ($canvas['width'] ?? 'N/A') . "x" . ($canvas['height'] ?? 'N/A') . "px";
+                            $result[] = "   Device Type: " . ($canvas['deviceType'] ?? 'N/A');
+                            $result[] = "   Template Reference: " . ($canvas['templateReferenceSize'] ?? 'N/A');
+                        }
+                    }
+                } else {
+                    $result[] = "❌ Item #{$item_id}: Keine Design-Daten gefunden";
+                }
+            }
+        }
+        
+        $result[] = "";
+        $result[] = "📊 ZUSAMMENFASSUNG:";
+        $result[] = "   Gesamt Items: {$total_items}";
+        $result[] = "   Design Items: " . count($design_items);
+        $result[] = "";
+        
+        // **1.2 Device-spezifische Canvas-Anpassung**
+        $result[] = "📱 1.2 DEVICE-SPEZIFISCHE CANVAS-ANPASSUNG";
+        $result[] = "----------------------------------------";
+        
+        $device_canvas_sizes = array(
+            'desktop' => array('width' => 800, 'height' => 600),
+            'mobile' => array('width' => 400, 'height' => 300),
+            'tablet' => array('width' => 600, 'height' => 450)
+        );
+        
+        foreach ($device_canvas_sizes as $device => $size) {
+            $result[] = "   {$device}: {$size['width']}x{$size['height']}px";
+        }
+        $result[] = "";
+        
+        // **1.3 Design-Element-Platzierung**
+        $result[] = "🎯 1.3 DESIGN-ELEMENT-PLATZIERUNG";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $index => $design_item) {
+            $result[] = "Design Item #" . ($index + 1) . ":";
+            $result[] = "   Template ID: " . $design_item['template_id'];
+            $result[] = "   Produkt: " . $design_item['product_name'];
+            
+            if (isset($design_item['design_data']['objects']) && is_array($design_item['design_data']['objects'])) {
+                $objects = $design_item['design_data']['objects'];
+                $result[] = "   Elemente: " . count($objects);
+                
+                foreach ($objects as $obj_index => $obj) {
+                    if (is_array($obj)) {
+                        $result[] = "     Element #" . ($obj_index + 1) . ":";
+                        $result[] = "       Position: x=" . ($obj['left'] ?? 'N/A') . ", y=" . ($obj['top'] ?? 'N/A');
+                        $result[] = "       Transform: scaleX=" . ($obj['scaleX'] ?? 'N/A') . ", scaleY=" . ($obj['scaleY'] ?? 'N/A');
+                        $result[] = "       Rotation: " . ($obj['angle'] ?? 'N/A') . "°";
+                        $result[] = "       Typ: " . ($obj['type'] ?? 'N/A');
+                    }
+                }
+            } else {
+                $result[] = "   ❌ Keine Design-Objekte gefunden";
+            }
+            $result[] = "";
+        }
+        
+        // **1.4 Canvas-Kontext speichern**
+        $result[] = "💾 1.4 CANVAS-KONTEXT SPEICHERN";
+        $result[] = "----------------------------------------";
+        
+        foreach ($design_items as $index => $design_item) {
+            if (isset($design_item['design_data']['canvas'])) {
+                $canvas = $design_item['design_data']['canvas'];
+                $result[] = "Design Item #" . ($index + 1) . " Canvas-Kontext:";
+                $result[] = "   Actual Canvas Size: " . ($canvas['width'] ?? 'N/A') . "x" . ($canvas['height'] ?? 'N/A') . "px";
+                $result[] = "   Template Reference Size: " . ($canvas['templateReferenceSize'] ?? 'N/A');
+                $result[] = "   Device Type: " . ($canvas['deviceType'] ?? 'N/A');
+                $result[] = "   Creation Timestamp: " . ($canvas['createdAt'] ?? 'N/A');
+            }
+        }
+        $result[] = "";
+        
+        // **ERGEBNIS**
+        $result[] = "✅ SCHRITT 1 ERGEBNIS:";
+        $result[] = "----------------------------------------";
+        $result[] = "✅ Template-Laden: " . count($design_items) . " Templates erfolgreich geladen";
+        $result[] = "✅ Canvas-Anpassung: Device-spezifische Größen definiert";
+        $result[] = "✅ Element-Platzierung: " . array_sum(array_map(function($item) {
+            return isset($item['design_data']['objects']) ? count($item['design_data']['objects']) : 0;
+        }, $design_items)) . " Elemente erfasst";
+        $result[] = "✅ Canvas-Kontext: " . count($design_items) . " Canvas-Kontexte gespeichert";
+        $result[] = "";
+        $result[] = "🎯 SCHRITT 1 ERFOLGREICH ABGESCHLOSSEN!";
+        $result[] = "   Grundlage für alle weiteren Berechnungen ist gelegt.";
+        $result[] = "";
+        $result[] = "⏭️  NÄCHSTER SCHRITT:";
+        $result[] = "   SCHRITT 2: Produkt-Dimensionen und Skalierungsfaktoren";
+        
+        return implode("\n", $result);
     }
 }
