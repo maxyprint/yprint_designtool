@@ -3119,124 +3119,205 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $result[] = "   Verwendetes System: {$used_system}";
                     $result[] = "   Template ID: {$final_template_id}";
                     
-                    // ECHTE DESIGN-DATEN AUS DATENBANK ANALYSIEREN
-                    if (is_array($final_design_data)) {
-                        $result[] = "   Design-Daten: " . count($final_design_data) . " Haupteigenschaften";
-                        $result[] = "   📋 JSON-Eigenschaften: " . implode(', ', array_keys($final_design_data));
+                    // ECHTE DESIGN-DATEN DIREKT AUS OCTO_USER_DESIGNS TABELLE LADEN
+                    $template_id = null;
+                    $design_data = null;
+                    $canvas_context = null;
+
+                    if ($yprint_design_id) {
+                        global $wpdb;
                         
-                        // 1.4 CANVAS-KONTEXT ERMITTELN
-                        $result[] = "";
-                        $result[] = "💾 1.4 CANVAS-KONTEXT ERMITTELN";
-                        $result[] = "-------------------------------";
+                        // DIREKTE DATENBANKABFRAGE für echte Design-Daten
+                        $design_row = $wpdb->get_row($wpdb->prepare(
+                            "SELECT template_id, design_data, created_at, name FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+                            $yprint_design_id
+                        ));
                         
-                        // Canvas-Größe aus Design-Daten
-                        if (isset($final_design_data['canvasWidth']) && isset($final_design_data['canvasHeight'])) {
-                            $canvas_width = $final_design_data['canvasWidth'];
-                            $canvas_height = $final_design_data['canvasHeight'];
-                            $device_type = $canvas_width <= 400 ? 'mobile' : ($canvas_width <= 600 ? 'tablet' : 'desktop');
+                        if ($design_row) {
+                            $template_id = $design_row->template_id;
+                            $design_data_raw = $design_row->design_data;
+                            $creation_timestamp = $design_row->created_at;
+                            $design_name = $design_row->name;
                             
-                            $result[] = "✅ Canvas-Kontext ermittelt:";
-                            $result[] = "   Actual Canvas: {$canvas_width}x{$canvas_height}px";
-                            $result[] = "   Device Type: {$device_type}";
-                            $result[] = "   Template Reference: 800x600px";
-                            $result[] = "   Creation Timestamp: " . ($final_design_data['created_at'] ?? 'Nicht verfügbar');
-                        } else {
-                            $result[] = "⚠️ Canvas-Größe nicht in Design-Daten gefunden";
-                            $result[] = "   Verfügbare Felder: " . implode(', ', array_keys($final_design_data));
-                        }
-                        
-                        // 1.3 DESIGN-ELEMENT-PLATZIERUNG ANALYSIEREN (ECHTE DATEN)
-                        $result[] = "";
-                        $result[] = "🎯 1.3 DESIGN-ELEMENT-PLATZIERUNG (ECHTE DATEN)";
-                        $result[] = "-----------------------------------------------";
-                        
-                        if (isset($final_design_data['variationImages']) && is_array($final_design_data['variationImages'])) {
-                            $variation_images = $final_design_data['variationImages'];
-                            $result[] = "✅ VariationImages gefunden: " . count($variation_images) . " Variationen";
+                            $result[] = "✅ ECHTE Design-Daten aus octo_user_designs Tabelle geladen:";
+                            $result[] = "   Design ID: " . $yprint_design_id;
+                            $result[] = "   Name: " . $design_name;
+                            $result[] = "   Template ID: " . $template_id;
+                            $result[] = "   Creation Time: " . $creation_timestamp;
+                            $result[] = "   Raw Data Size: " . strlen($design_data_raw) . " Zeichen";
                             
-                            $total_elements = 0;
-                            foreach ($variation_images as $combined_key => $images_array) {
+                            // Parse das echte Design-Data JSON
+                            $design_data = json_decode($design_data_raw, true);
+                            if (json_last_error() === JSON_ERROR_NONE) {
+                                $result[] = "✅ Echtes Design-JSON erfolgreich geparst";
+                                $result[] = "   📋 Verfügbare Haupteigenschaften: " . implode(', ', array_keys($design_data));
+                                
+                                // DEBUG: Zeige erste 500 Zeichen der rohen JSON-Daten
+                                $result[] = "   🔍 Raw JSON (erste 500 Zeichen): " . substr($design_data_raw, 0, 500) . "...";
+                                
+                                // 1.4 CANVAS-KONTEXT AUS ECHTEN DATEN
                                 $result[] = "";
-                                $result[] = "   📱 Variation: " . $combined_key;
+                                $result[] = "💾 1.4 CANVAS-KONTEXT AUS ECHTEN DESIGN-DATEN";
+                                $result[] = "----------------------------------------------";
                                 
-                                // Parse combined key "167359_189542"
-                                $parts = explode('_', $combined_key);
-                                $variation_id = $parts[0] ?? 'unknown';
-                                $view_id = $parts[1] ?? 'unknown';
+                                // Verschiedene Canvas-Feld-Namen prüfen
+                                $canvas_width = null;
+                                $canvas_height = null;
                                 
-                                $result[] = "      Variation ID: " . $variation_id;
-                                $result[] = "      View ID: " . $view_id;
-                                $result[] = "      Elemente: " . count($images_array);
+                                $canvas_fields = ['canvasWidth', 'canvas_width', 'width', 'templateWidth'];
+                                $canvas_height_fields = ['canvasHeight', 'canvas_height', 'height', 'templateHeight'];
                                 
-                                foreach ($images_array as $idx => $element) {
-                                    $total_elements++;
-                                    $result[] = "";
-                                    $result[] = "      🖼️ ELEMENT " . ($idx + 1) . " - TRANSFORM-ANALYSE:";
+                                foreach ($canvas_fields as $field) {
+                                    if (isset($design_data[$field])) {
+                                        $canvas_width = $design_data[$field];
+                                        $result[] = "✅ Canvas-Breite gefunden in Feld: {$field} = {$canvas_width}";
+                                        break;
+                                    }
+                                }
+                                
+                                foreach ($canvas_height_fields as $field) {
+                                    if (isset($design_data[$field])) {
+                                        $canvas_height = $design_data[$field];
+                                        $result[] = "✅ Canvas-Höhe gefunden in Feld: {$field} = {$canvas_height}";
+                                        break;
+                                    }
+                                }
+                                
+                                if ($canvas_width && $canvas_height) {
+                                    $canvas_context = array(
+                                        'actual_canvas_size' => array(
+                                            'width' => $canvas_width,
+                                            'height' => $canvas_height
+                                        ),
+                                        'template_reference_size' => array('width' => 800, 'height' => 600),
+                                        'device_type' => $canvas_width <= 400 ? 'mobile' : 
+                                                       ($canvas_width <= 600 ? 'tablet' : 'desktop'),
+                                        'creation_timestamp' => $creation_timestamp
+                                    );
                                     
-                                    // Element-Eigenschaften
-                                    foreach ($element as $prop => $value) {
-                                        if ($prop === 'transform' && is_array($value)) {
-                                            $result[] = "         🎯 TRANSFORM-DATEN GEFUNDEN:";
-                                            foreach ($value as $t_prop => $t_value) {
-                                                $result[] = "            {$t_prop}: {$t_value}";
-                                            }
-                                            
-                                            // 1.3 ANFORDERUNGEN ERFÜLLT
-                                            $position_x = $value['left'] ?? 0;
-                                            $position_y = $value['top'] ?? 0;
-                                            $width = $value['width'] ?? 0;
-                                            $height = $value['height'] ?? 0;
-                                            $scale_x = $value['scaleX'] ?? 1;
-                                            $scale_y = $value['scaleY'] ?? 1;
-                                            $rotation = $value['angle'] ?? 0;
-                                            
-                                            $result[] = "         ✅ SCHRITT 1.3 ANFORDERUNGEN ERFÜLLT:";
-                                            $result[] = "            Position: x={$position_x}, y={$position_y}";
-                                            $result[] = "            Größe: {$width} × {$height} px";
-                                            $result[] = "            Transform: scaleX={$scale_x}, scaleY={$scale_y}";
-                                            $result[] = "            Rotation: {$rotation}°";
-                                            
-                                            // Canvas-relative Position berechnen
-                                            if (isset($final_design_data['canvasWidth']) && isset($final_design_data['canvasHeight'])) {
-                                                $canvas_width = $final_design_data['canvasWidth'];
-                                                $canvas_height = $final_design_data['canvasHeight'];
-                                                
-                                                $rel_x = round(($position_x / $canvas_width) * 100, 2);
-                                                $rel_y = round(($position_y / $canvas_height) * 100, 2);
-                                                
-                                                $result[] = "            Relative Position: {$rel_x}% von links, {$rel_y}% von oben";
-                                            }
-                                            
-                                        } else {
-                                            $display_value = is_array($value) ? '[Array]' : (is_string($value) && strlen($value) > 50 ? substr($value, 0, 50) . '...' : $value);
-                                            $result[] = "         {$prop}: {$display_value}";
+                                    $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext erfolgreich ermittelt:";
+                                    $result[] = "   Actual Canvas: {$canvas_width}x{$canvas_height}px";
+                                    $result[] = "   Device Type: " . $canvas_context['device_type'];
+                                    $result[] = "   Template Reference: 800x600px";
+                                    $result[] = "   Creation Timestamp: " . $creation_timestamp;
+                                } else {
+                                    $result[] = "⚠️ Canvas-Größe nicht gefunden - prüfe alle verfügbaren Felder:";
+                                    foreach ($design_data as $key => $value) {
+                                        if (is_numeric($value) && $value > 100 && $value < 2000) {
+                                            $result[] = "   Mögliches Canvas-Feld: {$key} = {$value}";
                                         }
                                     }
                                 }
+                                
+                                // 1.3 DESIGN-ELEMENT-PLATZIERUNG AUS ECHTEN DATEN
+                                $result[] = "";
+                                $result[] = "🎯 1.3 DESIGN-ELEMENT-PLATZIERUNG AUS ECHTEN DESIGN-DATEN";
+                                $result[] = "--------------------------------------------------------";
+                                
+                                // Prüfe verschiedene mögliche Strukturen für Design-Elemente
+                                $elements_found = 0;
+                                
+                                // Struktur 1: variationImages (erwartet)
+                                if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
+                                    $result[] = "✅ variationImages gefunden: " . count($design_data['variationImages']) . " Variationen";
+                                    
+                                    foreach ($design_data['variationImages'] as $combined_key => $images_array) {
+                                        $result[] = "   📱 Variation: " . $combined_key;
+                                        $result[] = "      Elemente: " . count($images_array);
+                                        
+                                        foreach ($images_array as $idx => $element) {
+                                            $elements_found++;
+                                            $result[] = "      🖼️ ELEMENT " . ($idx + 1) . ":";
+                                            
+                                            foreach ($element as $prop => $value) {
+                                                if ($prop === 'transform' && is_array($value)) {
+                                                    $result[] = "         ✅ TRANSFORM-DATEN GEFUNDEN:";
+                                                    foreach ($value as $t_prop => $t_value) {
+                                                        $result[] = "            {$t_prop}: {$t_value}";
+                                                    }
+                                                    
+                                                    // SCHRITT 1.3 ANFORDERUNGEN VALIDIEREN
+                                                    $position_x = $value['left'] ?? 0;
+                                                    $position_y = $value['top'] ?? 0;
+                                                    $width = $value['width'] ?? 0;
+                                                    $height = $value['height'] ?? 0;
+                                                    $scale_x = $value['scaleX'] ?? 1;
+                                                    $scale_y = $value['scaleY'] ?? 1;
+                                                    $rotation = $value['angle'] ?? 0;
+                                                    
+                                                    $result[] = "         🎯 SCHRITT 1.3 ANFORDERUNGEN ERFÜLLT:";
+                                                    $result[] = "            Position: x={$position_x}, y={$position_y}";
+                                                    $result[] = "            Größe: {$width} × {$height} px";
+                                                    $result[] = "            Transform: scaleX={$scale_x}, scaleY={$scale_y}";
+                                                    $result[] = "            Rotation: {$rotation}°";
+                                                    
+                                                } else {
+                                                    $display_value = is_array($value) ? '[Array mit ' . count($value) . ' Elementen]' : 
+                                                                   (is_string($value) && strlen($value) > 50 ? substr($value, 0, 50) . '...' : $value);
+                                                    $result[] = "         {$prop}: {$display_value}";
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Struktur 2: elements (alternative)
+                                if (isset($design_data['elements']) && is_array($design_data['elements'])) {
+                                    $result[] = "✅ elements-Struktur gefunden: " . count($design_data['elements']) . " Elemente";
+                                    
+                                    foreach ($design_data['elements'] as $element_id => $element) {
+                                        $elements_found++;
+                                        $result[] = "   🎨 Element: " . $element_id;
+                                        foreach ($element as $prop => $value) {
+                                            $display_value = is_array($value) ? '[Array]' : $value;
+                                            $result[] = "      {$prop}: {$display_value}";
+                                        }
+                                    }
+                                }
+                                
+                                // Struktur 3: views (template-basiert)
+                                if (isset($design_data['views']) && is_array($design_data['views'])) {
+                                    $result[] = "✅ views-Struktur gefunden: " . count($design_data['views']) . " Views";
+                                    
+                                    foreach ($design_data['views'] as $view_id => $view_data) {
+                                        $result[] = "   👁️ View: " . $view_id;
+                                        if (isset($view_data['elements'])) {
+                                            $elements_found += count($view_data['elements']);
+                                            $result[] = "      Elemente: " . count($view_data['elements']);
+                                        }
+                                    }
+                                }
+                                
+                                if ($elements_found == 0) {
+                                    $result[] = "❌ Keine Design-Elemente in erwarteten Strukturen gefunden";
+                                    $result[] = "🔍 VOLLSTÄNDIGE JSON-STRUKTUR ANALYSE:";
+                                    
+                                    // Zeige die komplette JSON-Struktur für Debugging
+                                    $result[] = json_encode($design_data, JSON_PRETTY_PRINT);
+                                    
+                                } else {
+                                    $result[] = "";
+                                    $result[] = "🎯 SCHRITT 1.3 ERFOLGREICH:";
+                                    $result[] = "   ✅ Design-Elemente gefunden: " . $elements_found;
+                                    $result[] = "   ✅ Transform-Daten verfügbar";
+                                    $result[] = "   ✅ Position, Größe, Skalierung erfasst";
+                                }
+                                
+                            } else {
+                                $result[] = "❌ JSON Parse-Fehler: " . json_last_error_msg();
+                                $result[] = "   Raw Data (erste 500 Zeichen): " . substr($design_data_raw, 0, 500) . "...";
                             }
-                            
-                            $result[] = "";
-                            $result[] = "🎯 SCHRITT 1.3 ZUSAMMENFASSUNG:";
-                            $result[] = "   ✅ Design-Elemente gefunden: " . $total_elements;
-                            $result[] = "   ✅ Transform-Daten verfügbar: Position, Größe, Skalierung, Rotation";
-                            $result[] = "   ✅ Canvas-relative Positionen berechnet";
-                            
                         } else {
-                            $result[] = "❌ Keine variationImages in Design-Daten gefunden";
-                            $result[] = "   JSON-Struktur: " . json_encode(array_keys($final_design_data), JSON_PRETTY_PRINT);
-                        }
-                        
-                        // Fallback: Canvas-Informationen extrahieren (alte Struktur)
-                        if (isset($final_design_data['canvas'])) {
-                            $canvas = $final_design_data['canvas'];
-                            $result[] = "   Canvas-Größe: " . ($canvas['width'] ?? 'N/A') . "x" . ($canvas['height'] ?? 'N/A') . "px";
-                            $result[] = "   Device Type: " . ($canvas['deviceType'] ?? 'N/A');
-                            $result[] = "   Template Reference: " . ($canvas['templateReferenceSize'] ?? 'N/A');
-                        }
-                        
-                        // Fallback: Design-Objekte analysieren (alte Struktur)
-                        if (isset($final_design_data['objects'])) {
-                            $result[] = "   Design-Objekte: " . count($final_design_data['objects']);
+                            $result[] = "❌ Kein Design-Eintrag in octo_user_designs Tabelle gefunden für ID: " . $yprint_design_id;
+                            
+                            // DEBUG: Prüfe ob die Tabelle existiert
+                            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$wpdb->prefix}octo_user_designs'");
+                            $result[] = "   Tabelle existiert: " . ($table_exists ? "Ja" : "Nein");
+                            
+                            if ($table_exists) {
+                                $count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}octo_user_designs");
+                                $result[] = "   Total Designs in Tabelle: " . $count;
+                            }
                         }
                     }
                 } else {
