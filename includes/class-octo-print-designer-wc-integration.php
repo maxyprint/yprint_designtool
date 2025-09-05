@@ -2989,9 +2989,62 @@ private function build_print_provider_email_content($order, $design_items, $note
                         strpos($meta_key, 'yprint') !== false || 
                         strpos($meta_key, 'octo') !== false ||
                         strpos($meta_key, 'template') !== false) {
-                        $value = is_array($meta_values) ? $meta_values[0] : $meta_values;
-                        $design_related_meta[$meta_key] = $value;
-                        $result[] = "      {$meta_key}: " . (is_string($value) && strlen($value) > 100 ? substr($value, 0, 100) . '...' : $value);
+                        $meta_value = is_array($meta_values) ? $meta_values[0] : $meta_values;
+                        $design_related_meta[$meta_key] = $meta_value;
+                        
+                        // SPEZIELLER FALL: print_design deserialisieren und anzeigen
+                        if ($meta_key === '_print_design' || $meta_key === 'print_design') {
+                            $result[] = "      {$meta_key}: " . substr($meta_value, 0, 100) . "...";
+                            
+                            // Versuche zu deserialisieren
+                            $unserialized_data = maybe_unserialize($meta_value);
+                            if (is_array($unserialized_data)) {
+                                $result[] = "         🔓 DESERIALISIERT: " . count($unserialized_data) . " Eigenschaften gefunden:";
+                                
+                                // Zeige die wichtigsten Felder
+                                $important_fields = ['design_id', 'template_id', 'canvas_width', 'canvas_height', 'design_images', 'design_objects', 'views'];
+                                foreach ($important_fields as $field) {
+                                    if (isset($unserialized_data[$field])) {
+                                        $value = $unserialized_data[$field];
+                                        if (is_array($value)) {
+                                            $result[] = "            {$field}: [Array mit " . count($value) . " Elementen]";
+                                        } else {
+                                            $result[] = "            {$field}: {$value}";
+                                        }
+                                    }
+                                }
+                                
+                                // Zeige design_images Details falls vorhanden
+                                if (isset($unserialized_data['design_images']) && is_array($unserialized_data['design_images'])) {
+                                    $result[] = "         🖼️ DESIGN-BILDER DETAILS:";
+                                    foreach ($unserialized_data['design_images'] as $idx => $image) {
+                                        $result[] = "            Bild " . ($idx + 1) . ":";
+                                        if (isset($image['url'])) {
+                                            $result[] = "               URL: ..." . substr($image['url'], -40);
+                                        }
+                                        if (isset($image['transform'])) {
+                                            $t = $image['transform'];
+                                            $result[] = "               🎯 Position: x=" . ($t['left'] ?? 0) . ", y=" . ($t['top'] ?? 0);
+                                            $result[] = "               📏 Größe: " . ($t['width'] ?? 0) . "x" . ($t['height'] ?? 0) . "px";
+                                            $result[] = "               🔄 Scale: X=" . ($t['scaleX'] ?? 1) . ", Y=" . ($t['scaleY'] ?? 1);
+                                            if (isset($t['angle'])) {
+                                                $result[] = "               🌀 Rotation: " . $t['angle'] . "°";
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Canvas-Größe zur Design-Zeit
+                                if (isset($unserialized_data['canvas_width']) && isset($unserialized_data['canvas_height'])) {
+                                    $result[] = "         🎨 DESIGN-ZEIT CANVAS: " . $unserialized_data['canvas_width'] . "x" . $unserialized_data['canvas_height'] . "px";
+                                }
+                                
+                            } else {
+                                $result[] = "         ❌ Deserialisierung fehlgeschlagen";
+                            }
+                        } else {
+                            $result[] = "      {$meta_key}: " . (strlen($meta_value) > 100 ? substr($meta_value, 0, 100) . "..." : $meta_value);
+                        }
                     }
                 }
                 
@@ -3000,11 +3053,30 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $final_template_id = null;
                 $used_system = '';
                 
-                if ($octo_design_data && $octo_template_id) {
+                // PRIORITÄT 1: print_design (serialized data) - NEU!
+                $print_design_meta = $item->get_meta('_print_design');
+                if (!$print_design_meta) {
+                    $print_design_meta = $item->get_meta('print_design');
+                }
+                
+                if ($print_design_meta) {
+                    $print_design_unserialized = maybe_unserialize($print_design_meta);
+                    if (is_array($print_design_unserialized)) {
+                        $final_template_id = $print_design_unserialized['template_id'] ?? null;
+                        $final_design_data = $print_design_unserialized;
+                        $used_system = 'Print Design (_print_design) - Serialized Data';
+                    }
+                }
+                
+                // PRIORITÄT 2: Octo Print Designer
+                if (!$final_design_data && $octo_design_data && $octo_template_id) {
                     $final_design_data = $octo_design_data;
                     $final_template_id = $octo_template_id;
                     $used_system = 'Octo Print Designer (_octo_print_*)';
-                } elseif ($yprint_design_id) {
+                }
+                
+                // PRIORITÄT 3: YPrint Design ID
+                if (!$final_design_data && $yprint_design_id) {
                     // Fallback: Lade aus octo_user_designs Tabelle
                     global $wpdb;
                     $design_row = $wpdb->get_row($wpdb->prepare(
@@ -3017,12 +3089,18 @@ private function build_print_provider_email_content($order, $design_items, $note
                         $final_design_data = json_decode($design_row->design_data, true);
                         $used_system = 'YPrint Design ID (_yprint_design_id) + octo_user_designs Tabelle';
                     }
-                } elseif ($design_id) {
+                }
+                
+                // PRIORITÄT 4: Design ID
+                if (!$final_design_data && $design_id) {
                     // Fallback: Lade aus WordPress Post Meta
                     $final_design_data = get_post_meta($design_id, '_design_data', true);
                     $final_template_id = get_post_meta($design_id, '_template_id', true);
                     $used_system = 'Design ID (_design_id) + Post Meta';
-                } elseif ($design_data_alt && $template_id_alt) {
+                }
+                
+                // PRIORITÄT 5: Alternative Meta-Keys
+                if (!$final_design_data && $design_data_alt && $template_id_alt) {
                     $final_design_data = $design_data_alt;
                     $final_template_id = $template_id_alt;
                     $used_system = 'Alternative Meta-Keys (_design_data, _template_id)';
