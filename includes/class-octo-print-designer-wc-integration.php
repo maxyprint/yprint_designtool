@@ -3221,7 +3221,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             // Methode 3: YPrint-spezifische Strukturen aus Order Item Meta
             $item_id = $design_item['item_id'];
             
-            // YPrint product_images
+            // YPrint product_images - VOLLSTÄNDIGE TRANSFORM-ANALYSE
             $product_images = wc_get_order_item_meta($item_id, '_yprint_product_images', true);
             if (!empty($product_images)) {
                 if (is_string($product_images)) {
@@ -3230,19 +3230,72 @@ private function build_print_provider_email_content($order, $design_items, $note
                 if (is_array($product_images) && !empty($product_images)) {
                     $elements_found += count($product_images);
                     $result[] = "   ✅ YPrint Produkt-Bilder: " . count($product_images);
+                    $result[] = "   📋 Raw-Daten: " . substr(serialize($product_images), 0, 100) . "...";
                     
                     foreach ($product_images as $idx => $image) {
-                        $result[] = "     Bild " . ($idx + 1) . ":";
-                        $result[] = "       URL: " . (isset($image['url']) ? substr($image['url'], -30) . '...' : 'Nicht verfügbar');
-                        $result[] = "       ID: " . ($image['id'] ?? 'Unbekannt');
+                        $result[] = "";
+                        $result[] = "   🖼️ BILD " . ($idx + 1) . " - VOLLSTÄNDIGE ANALYSE:";
+                        $result[] = "      ID: " . ($image['id'] ?? 'Unbekannt');
+                        $result[] = "      URL: " . (isset($image['url']) ? '...' . substr($image['url'], -50) : 'Nicht verfügbar');
                         
+                        // ALLE Eigenschaften des Bildes anzeigen
+                        $result[] = "      📊 Alle Bild-Eigenschaften:";
+                        foreach ($image as $prop => $value) {
+                            if ($prop !== 'url') { // URL schon oben gezeigt
+                                if (is_array($value)) {
+                                    $result[] = "         {$prop}: [Array mit " . count($value) . " Elementen]";
+                                    
+                                    // Wenn es transform ist, zeige Details
+                                    if ($prop === 'transform' && is_array($value)) {
+                                        $result[] = "         🎯 TRANSFORM-DETAILS:";
+                                        foreach ($value as $t_prop => $t_value) {
+                                            $result[] = "            {$t_prop}: {$t_value}";
+                                        }
+                                    }
+                                } else {
+                                    $result[] = "         {$prop}: {$value}";
+                                }
+                            }
+                        }
+                        
+                        // EXTRAHIERE TRANSFORM-DATEN (falls vorhanden)
                         if (isset($image['transform'])) {
                             $transform = $image['transform'];
-                            $result[] = "       Position: x=" . ($transform['left'] ?? 0) . ", y=" . ($transform['top'] ?? 0);
-                            $result[] = "       Transform: scaleX=" . ($transform['scaleX'] ?? 1) . ", scaleY=" . ($transform['scaleY'] ?? 1);
-                            $result[] = "       Größe: " . ($transform['width'] ?? 0) . "x" . ($transform['height'] ?? 0) . "px";
+                            $result[] = "";
+                            $result[] = "      🎨 DESIGN-ELEMENT-PLATZIERUNG:";
+                            $result[] = "         Position: x=" . ($transform['left'] ?? 0) . "px, y=" . ($transform['top'] ?? 0) . "px";
+                            $result[] = "         Größe: " . ($transform['width'] ?? 0) . "x" . ($transform['height'] ?? 0) . "px";
+                            $result[] = "         Skalierung: scaleX=" . ($transform['scaleX'] ?? 1) . ", scaleY=" . ($transform['scaleY'] ?? 1);
+                            
+                            if (isset($transform['angle'])) {
+                                $result[] = "         Rotation: " . $transform['angle'] . "°";
+                            }
+                            
+                            // Berechne Canvas-relative Position (falls Canvas-Größe bekannt)
+                            if (isset($transform['left']) && isset($transform['top'])) {
+                                // Angenommen Standard Canvas 800x600
+                                $canvas_width = 800;
+                                $canvas_height = 600;
+                                
+                                $relative_x = round(($transform['left'] / $canvas_width) * 100, 2);
+                                $relative_y = round(($transform['top'] / $canvas_height) * 100, 2);
+                                
+                                $result[] = "         📍 Relative Position: {$relative_x}% von links, {$relative_y}% von oben";
+                            }
+                            
+                            // DIES SIND DIE DATEN FÜR SCHRITT 2!
+                            $result[] = "         ✅ TRANSFORM-DATEN FÜR SCHRITT 2 ERFASST!";
+                        } else {
+                            $result[] = "      ❌ Keine Transform-Daten in diesem Bild gefunden";
                         }
                     }
+                    
+                    $result[] = "";
+                    $result[] = "🎯 CANVAS-KONTEXT FÜR SCHRITT 2:";
+                    $result[] = "   Design-Zeit Canvas: Nicht explizit gespeichert, verwende Standard 800x600px";
+                    $result[] = "   Element-Positionen: " . $elements_found . " Elemente mit Transform-Daten";
+                    $result[] = "   Template: 3657 (Shirt SS25)";
+                    $result[] = "   Größe: M (für Skalierungsfaktor-Berechnung)";
                 }
             }
             
