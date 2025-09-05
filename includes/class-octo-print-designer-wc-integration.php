@@ -2964,36 +2964,109 @@ private function build_print_provider_email_content($order, $design_items, $note
             if ($item->is_type('line_item')) {
                 $total_items++;
                 
-                // Design-Daten aus Item-Meta extrahieren
-                $design_data = $item->get_meta('_octo_print_design_data');
-                $template_id = $item->get_meta('_octo_print_template_id');
+                // 🔍 META-SCHLÜSSEL-KONFLIKT BEHEBUNG: Prüfe alle verfügbaren Systeme
+                $result[] = "🔍 Item #{$item_id}: Meta-Schlüssel-Analyse";
+                $result[] = "   Produkt: " . $item->get_name();
                 
-                if ($design_data && $template_id) {
+                // System 1: Octo Print Designer (neueres System)
+                $octo_design_data = $item->get_meta('_octo_print_design_data');
+                $octo_template_id = $item->get_meta('_octo_print_template_id');
+                
+                // System 2: YPrint Design ID (älteres System)
+                $yprint_design_id = $item->get_meta('_yprint_design_id');
+                $design_id = $item->get_meta('_design_id');
+                
+                // System 3: Alternative Meta-Schlüssel
+                $design_data_alt = $item->get_meta('_design_data');
+                $template_id_alt = $item->get_meta('_template_id');
+                
+                // Debug: Alle verfügbaren Meta-Daten anzeigen
+                $all_meta = get_metadata('order_item', $item_id);
+                $result[] = "   Verfügbare Meta-Keys:";
+                $design_related_meta = array();
+                foreach ($all_meta as $meta_key => $meta_values) {
+                    if (strpos($meta_key, 'design') !== false || 
+                        strpos($meta_key, 'yprint') !== false || 
+                        strpos($meta_key, 'octo') !== false ||
+                        strpos($meta_key, 'template') !== false) {
+                        $value = is_array($meta_values) ? $meta_values[0] : $meta_values;
+                        $design_related_meta[$meta_key] = $value;
+                        $result[] = "      {$meta_key}: " . (is_string($value) && strlen($value) > 100 ? substr($value, 0, 100) . '...' : $value);
+                    }
+                }
+                
+                // Bestimme das verwendete System
+                $final_design_data = null;
+                $final_template_id = null;
+                $used_system = '';
+                
+                if ($octo_design_data && $octo_template_id) {
+                    $final_design_data = $octo_design_data;
+                    $final_template_id = $octo_template_id;
+                    $used_system = 'Octo Print Designer (_octo_print_*)';
+                } elseif ($yprint_design_id) {
+                    // Fallback: Lade aus octo_user_designs Tabelle
+                    global $wpdb;
+                    $design_row = $wpdb->get_row($wpdb->prepare(
+                        "SELECT template_id, design_data FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+                        $yprint_design_id
+                    ));
+                    
+                    if ($design_row) {
+                        $final_template_id = $design_row->template_id;
+                        $final_design_data = json_decode($design_row->design_data, true);
+                        $used_system = 'YPrint Design ID (_yprint_design_id) + octo_user_designs Tabelle';
+                    }
+                } elseif ($design_id) {
+                    // Fallback: Lade aus WordPress Post Meta
+                    $final_design_data = get_post_meta($design_id, '_design_data', true);
+                    $final_template_id = get_post_meta($design_id, '_template_id', true);
+                    $used_system = 'Design ID (_design_id) + Post Meta';
+                } elseif ($design_data_alt && $template_id_alt) {
+                    $final_design_data = $design_data_alt;
+                    $final_template_id = $template_id_alt;
+                    $used_system = 'Alternative Meta-Keys (_design_data, _template_id)';
+                }
+                
+                if ($final_design_data && $final_template_id) {
                     $design_items[] = array(
                         'item_id' => $item_id,
-                        'template_id' => $template_id,
-                        'design_data' => $design_data,
-                        'product_name' => $item->get_name()
+                        'template_id' => $final_template_id,
+                        'design_data' => $final_design_data,
+                        'product_name' => $item->get_name(),
+                        'used_system' => $used_system
                     );
                     
-                    $result[] = "✅ Item #{$item_id}: Template {$template_id} gefunden";
-                    $result[] = "   Produkt: " . $item->get_name();
+                    $result[] = "✅ Design gefunden!";
+                    $result[] = "   Verwendetes System: {$used_system}";
+                    $result[] = "   Template ID: {$final_template_id}";
                     
                     // Template-Details analysieren
-                    if (is_array($design_data)) {
-                        $result[] = "   Design-Daten: " . count($design_data) . " Elemente";
+                    if (is_array($final_design_data)) {
+                        $result[] = "   Design-Daten: " . count($final_design_data) . " Elemente";
                         
                         // Canvas-Informationen extrahieren
-                        if (isset($design_data['canvas'])) {
-                            $canvas = $design_data['canvas'];
+                        if (isset($final_design_data['canvas'])) {
+                            $canvas = $final_design_data['canvas'];
                             $result[] = "   Canvas-Größe: " . ($canvas['width'] ?? 'N/A') . "x" . ($canvas['height'] ?? 'N/A') . "px";
                             $result[] = "   Device Type: " . ($canvas['deviceType'] ?? 'N/A');
                             $result[] = "   Template Reference: " . ($canvas['templateReferenceSize'] ?? 'N/A');
                         }
+                        
+                        // Design-Objekte analysieren
+                        if (isset($final_design_data['objects'])) {
+                            $result[] = "   Design-Objekte: " . count($final_design_data['objects']);
+                        }
                     }
                 } else {
-                    $result[] = "❌ Item #{$item_id}: Keine Design-Daten gefunden";
+                    $result[] = "❌ Keine Design-Daten gefunden";
+                    $result[] = "   Geprüfte Systeme:";
+                    $result[] = "      - Octo Print Designer: " . ($octo_design_data ? '✅' : '❌');
+                    $result[] = "      - YPrint Design ID: " . ($yprint_design_id ? '✅' : '❌');
+                    $result[] = "      - Design ID: " . ($design_id ? '✅' : '❌');
+                    $result[] = "      - Alternative Meta-Keys: " . ($design_data_alt ? '✅' : '❌');
                 }
+                $result[] = "";
             }
         }
         
@@ -3026,6 +3099,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "Design Item #" . ($index + 1) . ":";
             $result[] = "   Template ID: " . $design_item['template_id'];
             $result[] = "   Produkt: " . $design_item['product_name'];
+            $result[] = "   System: " . $design_item['used_system'];
             
             if (isset($design_item['design_data']['objects']) && is_array($design_item['design_data']['objects'])) {
                 $objects = $design_item['design_data']['objects'];
