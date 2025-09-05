@@ -354,6 +354,178 @@
         debugLog(`=== ADD IMAGE TO CANVAS END ===`);
     }
     
+    // 🎨 REAL-TIME DESIGN DEBUGGING: Canvas Events überwachen
+    function setupRealTimeDesignDebugging() {
+        debugLog('🎨 Setting up real-time design debugging...');
+        
+        // Warte auf Canvas-Initialisierung
+        const checkCanvas = setInterval(() => {
+            const canvasElement = document.querySelector('#octo-print-designer-canvas');
+            if (canvasElement && window.fabric && window.fabric.Canvas) {
+                clearInterval(checkCanvas);
+                
+                // Finde die Fabric Canvas Instanz
+                const fabricCanvas = window.fabric.Canvas.getInstances ? 
+                    window.fabric.Canvas.getInstances().find(canvas => canvas.wrapperEl === canvasElement) :
+                    null;
+                
+                if (fabricCanvas) {
+                    debugLog('✅ Fabric Canvas gefunden, Events werden überwacht');
+                    setupCanvasEventListeners(fabricCanvas);
+                } else {
+                    debugWarn('⚠️ Fabric Canvas Instanz nicht gefunden');
+                }
+            }
+        }, 500);
+        
+        // Timeout nach 10 Sekunden
+        setTimeout(() => {
+            clearInterval(checkCanvas);
+        }, 10000);
+    }
+    
+    // 🎯 Canvas Event Listeners für Real-Time Debugging
+    function setupCanvasEventListeners(canvas) {
+        debugLog('🎯 Setting up canvas event listeners...');
+        
+        // Object Moving Event
+        canvas.on('object:moving', function(e) {
+            const obj = e.target;
+            if (obj) {
+                console.log('%c🎯 OBJECT MOVING', 'color: #007cba; font-weight: bold;', {
+                    type: obj.type || 'unknown',
+                    position: {
+                        x: Math.round(obj.left || 0),
+                        y: Math.round(obj.top || 0)
+                    },
+                    size: {
+                        width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
+                        height: Math.round((obj.height || 0) * (obj.scaleY || 1))
+                    },
+                    scale: {
+                        scaleX: obj.scaleX || 1,
+                        scaleY: obj.scaleY || 1
+                    },
+                    rotation: obj.angle || 0,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Object Modified Event (nach Skalierung, Rotation, etc.)
+        canvas.on('object:modified', function(e) {
+            const obj = e.target;
+            if (obj) {
+                console.log('%c🔄 OBJECT MODIFIED', 'color: #28a745; font-weight: bold;', {
+                    type: obj.type || 'unknown',
+                    finalPosition: {
+                        x: Math.round(obj.left || 0),
+                        y: Math.round(obj.top || 0)
+                    },
+                    finalSize: {
+                        width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
+                        height: Math.round((obj.height || 0) * (obj.scaleY || 1))
+                    },
+                    finalTransform: {
+                        scaleX: obj.scaleX || 1,
+                        scaleY: obj.scaleY || 1,
+                        rotation: obj.angle || 0
+                    },
+                    canvasSize: {
+                        width: canvas.width || 0,
+                        height: canvas.height || 0
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Object Selected Event
+        canvas.on('object:selected', function(e) {
+            const obj = e.target;
+            if (obj) {
+                console.log('%c👆 OBJECT SELECTED', 'color: #ffc107; font-weight: bold;', {
+                    type: obj.type || 'unknown',
+                    currentState: {
+                        position: { x: Math.round(obj.left || 0), y: Math.round(obj.top || 0) },
+                        size: { 
+                            width: Math.round((obj.width || 0) * (obj.scaleX || 1)), 
+                            height: Math.round((obj.height || 0) * (obj.scaleY || 1)) 
+                        },
+                        transform: { scaleX: obj.scaleX || 1, scaleY: obj.scaleY || 1, rotation: obj.angle || 0 }
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Object Added Event
+        canvas.on('object:added', function(e) {
+            const obj = e.target;
+            if (obj) {
+                console.log('%c➕ OBJECT ADDED', 'color: #17a2b8; font-weight: bold;', {
+                    type: obj.type || 'unknown',
+                    initialPosition: {
+                        x: Math.round(obj.left || 0),
+                        y: Math.round(obj.top || 0)
+                    },
+                    initialSize: {
+                        width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
+                        height: Math.round((obj.height || 0) * (obj.scaleY || 1))
+                    },
+                    initialTransform: {
+                        scaleX: obj.scaleX || 1,
+                        scaleY: obj.scaleY || 1,
+                        rotation: obj.angle || 0
+                    },
+                    totalObjects: canvas.getObjects ? canvas.getObjects().length : 'unknown',
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Object Removed Event
+        canvas.on('object:removed', function(e) {
+            const obj = e.target;
+            if (obj) {
+                console.log('%c➖ OBJECT REMOVED', 'color: #dc3545; font-weight: bold;', {
+                    type: obj.type || 'unknown',
+                    removedObject: {
+                        position: { x: Math.round(obj.left || 0), y: Math.round(obj.top || 0) },
+                        size: { 
+                            width: Math.round((obj.width || 0) * (obj.scaleX || 1)), 
+                            height: Math.round((obj.height || 0) * (obj.scaleY || 1)) 
+                        },
+                        transform: { scaleX: obj.scaleX || 1, scaleY: obj.scaleY || 1, rotation: obj.angle || 0 }
+                    },
+                    remainingObjects: canvas.getObjects ? canvas.getObjects().length : 'unknown',
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Canvas Size Change Event
+        canvas.on('canvas:resized', function(e) {
+            console.log('%c📐 CANVAS RESIZED', 'color: #6f42c1; font-weight: bold;', {
+                newSize: {
+                    width: canvas.width || 0,
+                    height: canvas.height || 0
+                },
+                deviceType: detectDeviceType(canvas.width || 0),
+                timestamp: new Date().toISOString()
+            });
+        });
+        
+        debugLog('✅ Canvas event listeners erfolgreich eingerichtet');
+    }
+    
+    // 📱 Device Type Detection
+    function detectDeviceType(canvasWidth) {
+        if (canvasWidth >= 800) return 'desktop';
+        if (canvasWidth >= 600) return 'tablet';
+        return 'mobile';
+    }
+    
     // Globale Variablen für Retry-Logik
     let retryCount = 0;
     const maxRetries = 20; // 10 Sekunden maximum
@@ -387,6 +559,9 @@
 
     function initializeDesignLoader() {
         debugLog('Initializing design loader...');
+        
+        // 🎨 Starte Real-Time Design Debugging
+        setupRealTimeDesignDebugging();
         
         // Prüfe ob window.fabric bereits verfügbar ist
         if (typeof window.fabric !== 'undefined') {
