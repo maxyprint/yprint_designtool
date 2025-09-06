@@ -3694,15 +3694,33 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "🔍 CANVAS-ABLEITUNG AUS ECHTEN ELEMENT-DATEN:";
             $result[] = "--------------------------------------------";
             
-            // Hole das erste Element mit Transform-Daten
+            // Hole das erste Element mit Transform-Daten DIREKT aus der bereits analysierten JSON
             $first_element_data = null;
+            $result[] = "🔍 Suche Transform-Daten in design_data...";
+            
             if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
+                $result[] = "✅ variationImages gefunden: " . count($design_data['variationImages']) . " Variationen";
+                
                 foreach ($design_data['variationImages'] as $combined_key => $images_array) {
-                    if (!empty($images_array) && isset($images_array[0]['transform'])) {
-                        $first_element_data = $images_array[0];
-                        break;
+                    $result[] = "   Prüfe Variation: " . $combined_key . " (" . count($images_array) . " Elemente)";
+                    
+                    if (!empty($images_array)) {
+                        foreach ($images_array as $idx => $element) {
+                            if (isset($element['transform'])) {
+                                $first_element_data = $element;
+                                $result[] = "   ✅ Transform-Daten gefunden in Element " . ($idx + 1);
+                                break 2; // Beende beide Loops
+                            } else {
+                                $result[] = "   ❌ Element " . ($idx + 1) . " hat keine Transform-Daten";
+                            }
+                        }
                     }
                 }
+            } else {
+                $result[] = "❌ Keine variationImages in design_data gefunden";
+                
+                // Debug: Zeige verfügbare Schlüssel
+                $result[] = "   Verfügbare design_data Schlüssel: " . implode(', ', array_keys($design_data));
             }
             
             if ($first_element_data && isset($first_element_data['transform'])) {
@@ -3724,12 +3742,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                         'confidence' => 'low'
                     );
                 } else {
-                    $element_x = $transform['left'] ?? 0;
-                    $element_y = $transform['top'] ?? 0;
-                    $scale_x = $transform['scaleX'] ?? 1;
-                    $scale_y = $transform['scaleY'] ?? 1;
-                    $original_width = $transform['width'] ?? 100;
-                    $original_height = $transform['height'] ?? 100;
+                    $element_x = floatval($transform['left']);
+                    $element_y = floatval($transform['top']);
+                    $scale_x = floatval($transform['scaleX']);
+                    $scale_y = floatval($transform['scaleY']);
+                    $original_width = floatval($transform['width']);
+                    $original_height = floatval($transform['height']);
+                    
+                    $result[] = "✅ Transform-Daten erfolgreich extrahiert:";
+                    $result[] = "   Element Position: x=" . $element_x . ", y=" . $element_y;
+                    $result[] = "   Element Skalierung: " . $scale_x . "x";
+                    $result[] = "   Original Größe: " . $original_width . "x" . $original_height . "px";
                     
                     // Berechne finale Element-Größe
                     $scaled_width = $original_width * $scale_x;
@@ -3739,19 +3762,13 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $max_element_x = $element_x + $scaled_width;
                     $max_element_y = $element_y + $scaled_height;
                     
+                    $result[] = "";
                     $result[] = "📊 Element-Analyse für Canvas-Ableitung:";
                     $result[] = "   Position: x=" . round($element_x, 1) . "px, y=" . round($element_y, 1) . "px";
                     $result[] = "   Skalierte Größe: " . round($scaled_width, 1) . "x" . round($scaled_height, 1) . "px";
                     $result[] = "   Max Element-Position: x=" . round($max_element_x, 1) . "px, y=" . round($max_element_y, 1) . "px";
                     
-                    // Canvas-Größe ableiten
-                    $inferred_canvas_width = 800;
-                    $inferred_canvas_height = 600;
-                    $device_type = 'desktop';
-                    $fit_score = 1.0;
-                    $confidence = 'high';
-                    
-                    // Prüfe verschiedene Canvas-Größen
+                    // Canvas-Größe ableiten mit verbesserter Logik
                     $canvas_options = array(
                         array('width' => 400, 'height' => 300, 'type' => 'mobile'),
                         array('width' => 600, 'height' => 450, 'type' => 'tablet'),
@@ -3759,27 +3776,57 @@ private function build_print_provider_email_content($order, $design_items, $note
                         array('width' => 1024, 'height' => 768, 'type' => 'large_desktop')
                     );
                     
+                    $best_fit = null;
+                    $best_fit_score = 0;
+                    
+                    $result[] = "";
+                    $result[] = "🎯 Canvas-Größen-Analyse:";
+                    
                     foreach ($canvas_options as $option) {
-                        if ($max_element_x <= $option['width'] && $max_element_y <= $option['height']) {
-                            $inferred_canvas_width = $option['width'];
-                            $inferred_canvas_height = $option['height'];
-                            $device_type = $option['type'];
+                        $fits = ($max_element_x <= $option['width'] && $max_element_y <= $option['height']);
+                        
+                        if ($fits) {
+                            // Berechne Fit-Score (wie effizient wird die Canvas genutzt)
+                            $utilization_x = $max_element_x / $option['width'];
+                            $utilization_y = $max_element_y / $option['height'];
+                            $fit_score = ($utilization_x + $utilization_y) / 2; // Durchschnittliche Nutzung
                             
-                            // Berechne Fit-Score (wie gut passt das Element in die Canvas)
-                            $margin_x = $option['width'] - $max_element_x;
-                            $margin_y = $option['height'] - $max_element_y;
-                            $fit_score = 1.0 - (($margin_x + $margin_y) / ($option['width'] + $option['height']));
+                            $result[] = "   ✅ " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ") - Fit: " . round($fit_score, 3);
                             
-                            $result[] = "✅ Canvas-Option passt: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
-                            $result[] = "   Margin: x=" . round($margin_x, 1) . "px, y=" . round($margin_y, 1) . "px";
-                            $result[] = "   Fit-Score: " . round($fit_score, 3);
-                            break;
+                            // Wähle die Canvas mit der besten Nutzung (höchster Score)
+                            if ($fit_score > $best_fit_score) {
+                                $best_fit = $option;
+                                $best_fit_score = $fit_score;
+                            }
                         } else {
-                            $result[] = "❌ Zu klein: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
+                            $result[] = "   ❌ " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ") - ZU KLEIN";
                         }
                     }
                     
-                    // Canvas-Kontext erstellen
+                    if ($best_fit) {
+                        $inferred_canvas_width = $best_fit['width'];
+                        $inferred_canvas_height = $best_fit['height'];
+                        $device_type = $best_fit['type'];
+                        $confidence = $best_fit_score > 0.6 ? 'high' : ($best_fit_score > 0.3 ? 'medium' : 'low');
+                        
+                        $result[] = "";
+                        $result[] = "🎯 BESTE CANVAS-OPTION GEWÄHLT:";
+                        $result[] = "   Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
+                        $result[] = "   Device-Type: " . $device_type;
+                        $result[] = "   Fit-Score: " . round($best_fit_score, 3);
+                        $result[] = "   Confidence: " . $confidence;
+                    } else {
+                        // Fallback: Verwende die größte Canvas
+                        $inferred_canvas_width = 1024;
+                        $inferred_canvas_height = 768;
+                        $device_type = 'large_desktop';
+                        $confidence = 'low';
+                        $best_fit_score = 0.2;
+                        
+                        $result[] = "⚠️ Kein perfekter Fit - verwende große Canvas als Fallback";
+                    }
+                    
+                    // Canvas-Kontext erstellen mit echten Daten
                     $canvas_context = array(
                         'actual_canvas_size' => array(
                             'width' => $inferred_canvas_width,
@@ -3788,13 +3835,14 @@ private function build_print_provider_email_content($order, $design_items, $note
                         'template_reference_size' => array('width' => 800, 'height' => 600),
                         'device_type' => $device_type,
                         'creation_timestamp' => $creation_timestamp,
-                        'inference_method' => 'element_position_analysis',
-                        'fit_score' => round($fit_score, 3),
-                        'confidence' => $fit_score > 0.8 ? 'high' : ($fit_score > 0.5 ? 'medium' : 'low'),
+                        'inference_method' => 'element_position_analysis_v2',
+                        'fit_score' => round($best_fit_score, 3),
+                        'confidence' => $confidence,
                         'element_data' => array(
-                            'position' => array('x' => round($element_x, 2), 'y' => round($element_y, 2)),
-                            'scaled_size' => array('width' => round($scaled_width, 2), 'height' => round($scaled_height, 2)),
-                            'scale_factors' => array('x' => $scale_x, 'y' => $scale_y)
+                            'position' => array('x' => $element_x, 'y' => $element_y),
+                            'scaled_size' => array('width' => $scaled_width, 'height' => $scaled_height),
+                            'scale_factors' => array('x' => $scale_x, 'y' => $scale_y),
+                            'rotation' => floatval($transform['angle'] ?? 0)
                         )
                     );
                     
@@ -3802,8 +3850,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas erfolgreich abgeleitet:";
                     $result[] = "   Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
                     $result[] = "   Device-Type: " . $device_type;
-                    $result[] = "   Confidence: " . (is_array($canvas_context) ? $canvas_context['confidence'] : 'unknown') . " (Score: " . (is_array($canvas_context) ? $canvas_context['fit_score'] : 'unknown') . ")";
-                    $result[] = "   Inference-Methode: element_position_analysis";
+                    $result[] = "   Confidence: " . $confidence . " (Score: " . round($best_fit_score, 3) . ")";
+                    $result[] = "   Inference-Methode: element_position_analysis_v2";
                     
                     // Responsive Canvas-Skalierung berechnen
                     $scale_factor_x = $inferred_canvas_width / 800; // Template-Referenz
@@ -3819,6 +3867,10 @@ private function build_print_provider_email_content($order, $design_items, $note
                 
             } else {
                 $result[] = "❌ Keine Transform-Daten für Canvas-Ableitung verfügbar";
+                $result[] = "   first_element_data: " . ($first_element_data ? "gefunden" : "null");
+                if ($first_element_data) {
+                    $result[] = "   Verfügbare Element-Schlüssel: " . implode(', ', array_keys($first_element_data));
+                }
                 
                 // Fallback Canvas-Kontext
                 $canvas_context = array(
@@ -3826,9 +3878,15 @@ private function build_print_provider_email_content($order, $design_items, $note
                     'template_reference_size' => array('width' => 800, 'height' => 600),
                     'device_type' => 'desktop',
                     'creation_timestamp' => $creation_timestamp,
-                    'inference_method' => 'fallback_no_transform_data',
+                    'inference_method' => 'fallback_no_transform_data_v2',
                     'fit_score' => 0.5,
-                    'confidence' => 'low'
+                    'confidence' => 'low',
+                    'element_data' => array(
+                        'position' => array('x' => 0, 'y' => 0),
+                        'scaled_size' => array('width' => 0, 'height' => 0),
+                        'scale_factors' => array('x' => 1, 'y' => 1),
+                        'rotation' => 0
+                    )
                 );
             }
         }
@@ -3873,20 +3931,24 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         
         $result[] = "";
-        $result[] = "🎯 TRANSFORM-DATEN KOMPLETT:";
+        $result[] = "🎯 TRANSFORM-DATEN KOMPLETT (ECHTE DATEN):";
         
         // Verwende echte Element-Daten wenn verfügbar
         if (isset($canvas_context) && $canvas_context && is_array($canvas_context) && isset($canvas_context['element_data'])) {
             $element_x = $canvas_context['element_data']['position']['x'];
             $element_y = $canvas_context['element_data']['position']['y'];
-            $element_scale = $canvas_context['element_data']['scale_factors']['x'];
+            $element_scale_x = $canvas_context['element_data']['scale_factors']['x'];
+            $element_scale_y = $canvas_context['element_data']['scale_factors']['y'];
             $element_width = $canvas_context['element_data']['scaled_size']['width'];
             $element_height = $canvas_context['element_data']['scaled_size']['height'];
+            $element_rotation = $canvas_context['element_data']['rotation'];
             
-            $result[] = "   Position: x={$element_x}px, y={$element_y}px";
-            $result[] = "   Skalierung: scaleX={$element_scale}, scaleY={$element_scale}";
-            $result[] = "   Skalierte Größe: {$element_width}×{$element_height}px";
-            $result[] = "   Rotation: 0°";
+            $result[] = "   Position: x=" . round($element_x, 1) . "px, y=" . round($element_y, 1) . "px";
+            $result[] = "   Skalierung: scaleX=" . round($element_scale_x, 6) . ", scaleY=" . round($element_scale_y, 6);
+            $result[] = "   Skalierte Größe: " . round($element_width, 1) . "×" . round($element_height, 1) . "px";
+            $result[] = "   Rotation: " . $element_rotation . "°";
+            $result[] = "   Canvas: " . $canvas_context['actual_canvas_size']['width'] . "×" . $canvas_context['actual_canvas_size']['height'] . "px (" . $canvas_context['device_type'] . ")";
+            $result[] = "   Confidence: " . $canvas_context['confidence'] . " (Fit-Score: " . $canvas_context['fit_score'] . ")";
         } else {
             $result[] = "   Position: x=322px, y=274px (Fallback-Daten)";
             $result[] = "   Skalierung: scaleX=0.0496, scaleY=0.0496 (Fallback-Daten)";
