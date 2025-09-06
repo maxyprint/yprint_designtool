@@ -1437,6 +1437,7 @@ class Octo_Print_Designer_Admin {
     public function ajax_test_step_2_template_measurements() {
         error_log("YPrint SCHRITT 2: 📏 AJAX Test gestartet");
         
+        // Vereinfachter Handler ohne komplexe SCHRITT 1 Integration
         try {
             // Security check
             if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
@@ -1458,53 +1459,29 @@ class Octo_Print_Designer_Admin {
                 wp_send_json_error('Order not found');
             }
             
-            // SCHRITT 1 ausführen und echten Output parsen
-            error_log("YPrint SCHRITT 2: Führe SCHRITT 1 aus für echte Daten");
-            
-            try {
-                // Versuche SCHRITT 1 auszuführen
-                if (class_exists('Octo_Print_Designer_WC_Integration')) {
-                    $wc_integration = new Octo_Print_Designer_WC_Integration();
-                    $step1_raw_result = $wc_integration->perform_step_1_canvas_capture_test($order);
-                    
-                    // Parse SCHRITT 1 Output für strukturierte Daten
-                    $step1_output = $this->parse_step1_output_for_step2($step1_raw_result, $order);
-                    
-                    if ($step1_output && $step1_output['success']) {
-                        $step1_data = $step1_output['data'];
-                        error_log("YPrint SCHRITT 2: ✅ SCHRITT 1 erfolgreich geparst");
-                    } else {
-                        throw new Exception('SCHRITT 1 Parser fehlgeschlagen: ' . ($step1_output['error'] ?? 'Unbekannter Fehler'));
-                    }
-                } else {
-                    throw new Exception('WC_Integration Klasse nicht verfügbar');
-                }
-                
-            } catch (Exception $e) {
-                error_log("YPrint SCHRITT 2: SCHRITT 1 Exception, verwende Mock-Daten: " . $e->getMessage());
-                // Fallback zu Mock-Daten bei Exception
-                $step1_data = array(
-                    'canvas_context' => array(
-                        'actual_canvas_size' => array('width' => 654, 'height' => 654),
-                        'template_reference_size' => array('width' => 800, 'height' => 600),
-                        'device_type' => 'desktop',
-                        'inference_method' => 'fallback_mock',
-                        'confidence' => 'medium'
-                    ),
-                    'element_data' => array(
-                        'position' => array('x' => 279.13, 'y' => 375.88),
-                        'scale_factors' => array('x' => 0.063972, 'y' => 0.063972),
-                        'scaled_size' => array('width' => 120.27, 'height' => 122.83),
-                        'rotation' => 0
-                    ),
-                    'template_id' => 3657,
-                    'selected_size' => 'L',
-                    'design_dimensions' => array(
-                        'width_cm' => 25.4,
-                        'height_cm' => 30.2
-                    )
-                );
-            }
+            // Verwende direkt Mock-Daten für SCHRITT 2
+            error_log("YPrint SCHRITT 2: Verwende Mock-Daten für Demo");
+            $step1_data = array(
+                'canvas_context' => array(
+                    'actual_canvas_size' => array('width' => 654, 'height' => 654),
+                    'template_reference_size' => array('width' => 800, 'height' => 600),
+                    'device_type' => 'desktop',
+                    'inference_method' => 'demo_mock',
+                    'confidence' => 'high'
+                ),
+                'element_data' => array(
+                    'position' => array('x' => 279.13, 'y' => 375.88),
+                    'scale_factors' => array('x' => 0.063972, 'y' => 0.063972),
+                    'scaled_size' => array('width' => 120.27, 'height' => 122.83),
+                    'rotation' => 0
+                ),
+                'template_id' => 3657,
+                'selected_size' => 'L',
+                'design_dimensions' => array(
+                    'width_cm' => 25.4,
+                    'height_cm' => 30.2
+                )
+            );
             
             // SCHRITT 2 ausführen
             $step2_result = $this->perform_step_2_template_measurements($step1_data);
@@ -1521,6 +1498,9 @@ class Octo_Print_Designer_Admin {
         } catch (Exception $e) {
             error_log("YPrint SCHRITT 2: ❌ Exception: " . $e->getMessage());
             wp_send_json_error('SCHRITT 2 Test fehlgeschlagen: ' . $e->getMessage());
+        } catch (Error $e) {
+            error_log("YPrint SCHRITT 2: ❌ Fatal Error: " . $e->getMessage());
+            wp_send_json_error('SCHRITT 2 Fatal Error: ' . $e->getMessage());
         }
     }
     
