@@ -3187,6 +3187,38 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     $result[] = "   Creation Timestamp: " . $metadata['creation_timestamp'];
                                     $result[] = "   🎯 QUELLE: design_metadata (100% ORIGINAL)";
                                     $result[] = "   🎯 CONFIDENCE: perfect (NICHT abgeleitet)";
+
+                                    // ZUSÄTZLICH: Element-Daten für finale Zusammenfassung erfassen
+                                    if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
+                                        foreach ($design_data['variationImages'] as $combined_key => $images_array) {
+                                            if (!empty($images_array) && isset($images_array[0]['transform'])) {
+                                                $element = $images_array[0];
+                                                $transform = $element['transform'];
+                                                
+                                                // Element-Daten in canvas_context speichern für finale Zusammenfassung
+                                                $canvas_context['element_data'] = array(
+                                                    'position' => array(
+                                                        'x' => floatval($transform['left'] ?? 0),
+                                                        'y' => floatval($transform['top'] ?? 0)
+                                                    ),
+                                                    'scale_factors' => array(
+                                                        'x' => floatval($transform['scaleX'] ?? 1),
+                                                        'y' => floatval($transform['scaleY'] ?? 1)
+                                                    ),
+                                                    'scaled_size' => array(
+                                                        'width' => floatval($transform['width'] ?? 0) * floatval($transform['scaleX'] ?? 1),
+                                                        'height' => floatval($transform['height'] ?? 0) * floatval($transform['scaleY'] ?? 1)
+                                                    ),
+                                                    'rotation' => floatval($transform['angle'] ?? 0)
+                                                );
+                                                
+                                                $result[] = "   🎯 Element-Daten für finale Zusammenfassung gespeichert:";
+                                                $result[] = "      Position: x=" . $canvas_context['element_data']['position']['x'] . ", y=" . $canvas_context['element_data']['position']['y'];
+                                                $result[] = "      Skalierung: " . $canvas_context['element_data']['scale_factors']['x'];
+                                                break; // Nur erstes Element
+                                            }
+                                        }
+                                    }
                                     
                                 } else {
                                     $result[] = "⚠️ Keine design_metadata gefunden - leite aus Element-Position ab:";
