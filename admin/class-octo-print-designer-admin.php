@@ -1399,11 +1399,35 @@ class Octo_Print_Designer_Admin {
             
             // Berechne relative Position im Print Area
             $print_area = $view_config['print_area'];
+            
+            // Division-by-zero Schutz
+            if ($print_area['width'] <= 0 || $print_area['height'] <= 0) {
+                $result[] = "❌ SCHRITT 3 FEHLER: Print Area hat ungültige Dimensionen!";
+                $result[] = "   Print Area: " . $print_area['width'] . "x" . $print_area['height'] . "px";
+                $result[] = "   Breite und Höhe müssen > 0 sein";
+                return array(
+                    'success' => false,
+                    'log' => implode("\n", $result)
+                );
+            }
+            
             $relative_x = ($canvas_coordinates['left'] - $print_area['left']) / $print_area['width'];
             $relative_y = ($canvas_coordinates['top'] - $print_area['top']) / $print_area['height'];
             
             // Konvertiere zu mm
             $pixel_to_mm = $view_config['pixel_to_mm_ratio'];
+            
+            // Division-by-zero Schutz für pixel_to_mm_ratio
+            if ($pixel_to_mm <= 0) {
+                $result[] = "❌ SCHRITT 3 FEHLER: Pixel-to-mm-Ratio ist ungültig!";
+                $result[] = "   Pixel-to-mm-Ratio: " . $pixel_to_mm;
+                $result[] = "   Ratio muss > 0 sein";
+                return array(
+                    'success' => false,
+                    'log' => implode("\n", $result)
+                );
+            }
+            
             $mm_x = $canvas_coordinates['left'] * $pixel_to_mm;
             $mm_y = $canvas_coordinates['top'] * $pixel_to_mm;
             
