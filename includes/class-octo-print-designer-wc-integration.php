@@ -677,6 +677,13 @@ private function check_yprint_dependency() {
                             SCHRITT 2 testen
                         </button>
                         
+                        <button type="button" id="test-step-3-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto; background: #0073aa; color: white;">
+                            <span class="dashicons dashicons-location" style="margin-right: 5px;"></span>
+                            SCHRITT 3 testen
+                        </button>
+                        
                         
                         <span class="test-spinner spinner" style="display: none;"></span>
                     </div>
@@ -1457,6 +1464,64 @@ private function check_yprint_dependency() {
                         complete: function() {
                             // Reset button state
                             button.prop('disabled', false).html('<span class="dashicons dashicons-chart-bar" style="margin-right: 5px;"></span>SCHRITT 2 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ SCHRITT 3: Druckkoordinaten-Berechnung Test Button Handler
+                $('#test-step-3-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = button.next('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>SCHRITT 3 läuft...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_step_3_print_coordinates',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data.result);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '✅ SCHRITT 3 erfolgreich', 
+                                    'Druckkoordinaten wurden erfolgreich berechnet. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ SCHRITT 3 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ SCHRITT 3 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen der Druckkoordinaten')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ SCHRITT 3 Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-location" style="margin-right: 5px;"></span>SCHRITT 3 testen');
                             spinner.hide();
                         }
                     });
