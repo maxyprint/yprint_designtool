@@ -3358,6 +3358,19 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     $result[] = "❌ SCHRITT 1.4 FEHLGESCHLAGEN - Kein Canvas-Kontext verfügbar";
                                     $result[] = "   Canvas-Kontext konnte nicht ermittelt werden";
                                     $result[] = "   Design-Metadaten können nicht gespeichert werden";
+                                    
+                                    // Stelle sicher, dass $canvas_context ein Array ist
+                                    if (!is_array($canvas_context)) {
+                                        $canvas_context = array(
+                                            'actual_canvas_size' => array('width' => 800, 'height' => 600),
+                                            'template_reference_size' => array('width' => 800, 'height' => 600),
+                                            'device_type' => 'desktop',
+                                            'creation_timestamp' => $creation_timestamp,
+                                            'inference_method' => 'fallback_no_canvas_context',
+                                            'fit_score' => 0.3,
+                                            'confidence' => 'low'
+                                        );
+                                    }
                                 }
                                 
                             } else {
@@ -3817,7 +3830,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $result[] = "✅ 1.1 Template-Laden: Template 3657 (Shirt SS25) erfolgreich geladen";
         
         // Dynamische Canvas-Info basierend auf ermitteltem Canvas-Kontext
-        if (isset($canvas_context) && $canvas_context) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context)) {
             $canvas_width = $canvas_context['actual_canvas_size']['width'];
             $canvas_height = $canvas_context['actual_canvas_size']['height'];
             $device_type = $canvas_context['device_type'];
@@ -3828,7 +3841,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         
         $result[] = "✅ 1.3 Element-Platzierung: {$elements_found} Element(e) mit vollständigen Transform-Daten";
         
-        if (isset($canvas_context) && $canvas_context) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context)) {
             $result[] = "✅ 1.4 Canvas-Kontext: Device-Type, Canvas-Größe, Timestamp gespeichert";
         } else {
             $result[] = "⚠️ 1.4 Canvas-Kontext: Fallback-Kontext verwendet";
@@ -3838,7 +3851,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $result[] = "🎯 TRANSFORM-DATEN KOMPLETT:";
         
         // Verwende echte Element-Daten wenn verfügbar
-        if (isset($canvas_context) && $canvas_context && isset($canvas_context['element_data'])) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context) && isset($canvas_context['element_data'])) {
             $element_x = $canvas_context['element_data']['position']['x'];
             $element_y = $canvas_context['element_data']['position']['y'];
             $element_scale = $canvas_context['element_data']['scale_factors']['x'];
@@ -3856,7 +3869,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "   Rotation: 0° (Fallback-Daten)";
         }
         
-        if (isset($canvas_context) && $canvas_context) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context)) {
             $canvas_width = $canvas_context['actual_canvas_size']['width'];
             $canvas_height = $canvas_context['actual_canvas_size']['height'];
             $device_type = $canvas_context['device_type'];
@@ -3869,7 +3882,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $result[] = "🎯 ALLE SCHRITT 1 ANFORDERUNGEN ERFÜLLT!";
         $result[] = "   ✅ Template: 3657 (Shirt SS25)";
         
-        if (isset($canvas_context) && $canvas_context) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context)) {
             $canvas_width = $canvas_context['actual_canvas_size']['width'];
             $canvas_height = $canvas_context['actual_canvas_size']['height'];
             $device_type = $canvas_context['device_type'];
@@ -3878,7 +3891,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "   ✅ Canvas: 800x600px (Desktop-Referenz)";
         }
         
-        if (isset($canvas_context) && $canvas_context && isset($canvas_context['element_data'])) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context) && isset($canvas_context['element_data'])) {
             $element_x = $canvas_context['element_data']['position']['x'];
             $element_y = $canvas_context['element_data']['position']['y'];
             $element_scale = $canvas_context['element_data']['scale_factors']['x'];
@@ -3889,7 +3902,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             $result[] = "   ✅ Element: {\"x\": 322, \"y\": 274, \"width\": 216, \"height\": 178, \"scaleX\": 0.0496, \"scaleY\": 0.0496, \"rotation\": 0} (Fallback)";
         }
         
-        if (isset($canvas_context) && $canvas_context) {
+        if (isset($canvas_context) && $canvas_context && is_array($canvas_context)) {
             $canvas_width = $canvas_context['actual_canvas_size']['width'];
             $canvas_height = $canvas_context['actual_canvas_size']['height'];
             $device_type = $canvas_context['device_type'];
