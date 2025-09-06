@@ -92,9 +92,13 @@ class Octo_Print_Designer_Admin {
         
         // ✅ SCHRITT 2: Template-Referenzmessungen AJAX Handler
         add_action('wp_ajax_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
+        add_action('wp_ajax_nopriv_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
+        add_action('wp_ajax_nopriv_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
         add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
+        add_action('wp_ajax_nopriv_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
         add_action('wp_ajax_get_template_measurements', array($this, 'ajax_get_template_measurements'));
+        add_action('wp_ajax_nopriv_get_template_measurements', array($this, 'ajax_get_template_measurements'));
         
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();

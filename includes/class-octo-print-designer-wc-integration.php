@@ -1425,7 +1425,7 @@ private function check_yprint_dependency() {
                         data: {
                             action: 'test_step_2_template_measurements',
                             order_id: orderId,
-                            nonce: $('input[name="octo_print_provider_nonce"]').val()
+                            nonce: $('#octo_print_provider_nonce').val()
                         },
                         success: function(response) {
                             if (response.success) {
