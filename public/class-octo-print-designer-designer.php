@@ -588,11 +588,11 @@ wp_add_inline_script('octo-print-designer-designer', '
                 if (empty($template_image_path)) {
                     // Fallback für Template 3657 (Shirt SS25) - SCHRITT 1.5 VOLLSTÄNDIG
                     if ($template_id == 3657) {
-                        $template_image_path = 'shirt_front_template.jpg';
+                        $template_image_path = plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
                         // Zusätzlich: Meta-Feld direkt setzen für zukünftige Verwendung
-                        update_post_meta($template_id, '_template_image_path', 'shirt_front_template.jpg');
+                        update_post_meta($template_id, '_template_image_path', $template_image_path);
                     } else {
-                        $template_image_path = 'default_template.jpg';
+                        $template_image_path = plugin_dir_url(__FILE__) . '../public/img/default_template.jpg';
                     }
                 }
 
