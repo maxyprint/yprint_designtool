@@ -3148,6 +3148,10 @@ private function build_print_provider_email_content($order, $design_items, $note
                             
                             // Parse das echte Design-Data JSON
                             $design_data = json_decode($design_data_raw, true);
+                            
+                            // ✅ FIX: Speichere die echte design_data in separater Variable um Überschreibung zu vermeiden
+                            $real_design_data_from_db = $design_data;
+                            
                             if (json_last_error() === JSON_ERROR_NONE) {
                                 $result[] = "✅ Echtes Design-JSON erfolgreich geparst";
                                 $result[] = "   📋 Verfügbare Haupteigenschaften: " . implode(', ', array_keys($design_data));
@@ -3698,10 +3702,14 @@ private function build_print_provider_email_content($order, $design_items, $note
             $first_element_data = null;
             $result[] = "🔍 Suche Transform-Daten in design_data...";
             
-            if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
-                $result[] = "✅ variationImages gefunden: " . count($design_data['variationImages']) . " Variationen";
+            // ✅ FIX: Verwende die echte design_data Variable aus der Datenbank
+            $design_data_to_use = isset($real_design_data_from_db) ? $real_design_data_from_db : $design_data;
+            $result[] = "🔍 Verwende design_data Variable: " . (isset($real_design_data_from_db) ? "real_design_data_from_db (aus DB)" : "design_data (Fallback)");
+            
+            if (isset($design_data_to_use['variationImages']) && is_array($design_data_to_use['variationImages'])) {
+                $result[] = "✅ variationImages gefunden: " . count($design_data_to_use['variationImages']) . " Variationen";
                 
-                foreach ($design_data['variationImages'] as $combined_key => $images_array) {
+                foreach ($design_data_to_use['variationImages'] as $combined_key => $images_array) {
                     $result[] = "   Prüfe Variation: " . $combined_key . " (" . count($images_array) . " Elemente)";
                     
                     if (!empty($images_array)) {
@@ -3720,7 +3728,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $result[] = "❌ Keine variationImages in design_data gefunden";
                 
                 // Debug: Zeige verfügbare Schlüssel
-                $result[] = "   Verfügbare design_data Schlüssel: " . implode(', ', array_keys($design_data));
+                $result[] = "   Verfügbare design_data Schlüssel: " . implode(', ', array_keys($design_data_to_use));
+                $result[] = "   Verwendete Variable: " . (isset($real_design_data_from_db) ? "real_design_data_from_db" : "design_data");
             }
             
             if ($first_element_data && isset($first_element_data['transform'])) {
