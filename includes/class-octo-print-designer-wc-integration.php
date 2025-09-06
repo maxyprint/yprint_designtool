@@ -669,6 +669,14 @@ private function check_yprint_dependency() {
                             <span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>
                             SCHRITT 1 testen
                         </button>
+                        
+                        <button type="button" id="test-step-2-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto;">
+                            <span class="dashicons dashicons-chart-bar" style="margin-right: 5px;"></span>
+                            SCHRITT 2 testen
+                        </button>
+                        
                         <span class="test-spinner spinner" style="display: none;"></span>
                     </div>
                     
@@ -1390,6 +1398,64 @@ private function check_yprint_dependency() {
                         complete: function() {
                             // Reset button state
                             button.prop('disabled', false).html('<span class="dashicons dashicons-admin-tools" style="margin-right: 5px;"></span>SCHRITT 1 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ SCHRITT 2: Template-Referenzmessungen Test
+                $('#test-step-2-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = button.next('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>Teste SCHRITT 2...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_step_2_template_measurements',
+                            order_id: orderId,
+                            nonce: $('input[name="octo_print_provider_nonce"]').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data.result);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '✅ SCHRITT 2 erfolgreich', 
+                                    'Template-Referenzmessungen wurden erfolgreich berechnet. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ SCHRITT 2 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ SCHRITT 2 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen der Template-Messungen')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ SCHRITT 2 Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-chart-bar" style="margin-right: 5px;"></span>SCHRITT 2 testen');
                             spinner.hide();
                         }
                     });

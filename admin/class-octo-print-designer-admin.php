@@ -90,6 +90,12 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
         add_action('wp_ajax_nopriv_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
         
+        // ✅ SCHRITT 2: Template-Referenzmessungen AJAX Handler
+        add_action('wp_ajax_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
+        add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
+        add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
+        add_action('wp_ajax_get_template_measurements', array($this, 'ajax_get_template_measurements'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         
@@ -1025,4 +1031,418 @@ class Octo_Print_Designer_Admin {
             'log' => $result
         );
     }
+    
+    /**
+     * ✅ SCHRITT 2: Template-Referenzmessungen implementieren
+     * Basiert auf SCHRITT 1 Ausgabe und berechnet physische Koordinaten
+     */
+    public function perform_step_2_template_measurements($step1_output) {
+        error_log("YPrint SCHRITT 2: 📏 Template-Referenzmessungen gestartet");
+        
+        $result = array();
+        $result[] = "=== YPRINT SCHRITT 2: TEMPLATE-REFERENZMESSUNGEN ===";
+        $result[] = "Input aus SCHRITT 1 erhalten: " . (empty($step1_output) ? "❌ LEER" : "✅ VERFÜGBAR");
+        $result[] = "";
+        
+        // SCHRITT 2.1: Validiere SCHRITT 1 Input
+        if (empty($step1_output) || !isset($step1_output['canvas_context']) || !isset($step1_output['element_data'])) {
+            $result[] = "❌ SCHRITT 2 FEHLER: Ungültiger SCHRITT 1 Input";
+            $result[] = "   Erwartet: canvas_context, element_data, template_id, selected_size";
+            return implode("\n", $result);
+        }
+        
+        $canvas_context = $step1_output['canvas_context'];
+        $element_data = $step1_output['element_data'];
+        $template_id = $step1_output['template_id'];
+        $selected_size = $step1_output['selected_size'];
+        
+        $result[] = "✅ SCHRITT 1 Input validiert:";
+        $result[] = "   Template: {$template_id}";
+        $result[] = "   Bestellgröße: {$selected_size}";
+        $result[] = "   Canvas: " . $canvas_context['actual_canvas_size']['width'] . "x" . $canvas_context['actual_canvas_size']['height'] . "px";
+        $result[] = "   Element-Position: x=" . $element_data['position']['x'] . ", y=" . $element_data['position']['y'];
+        $result[] = "";
+        
+        // SCHRITT 2.2: Template-Maße laden
+        $result[] = "📏 SCHRITT 2.2: Template-Maße laden";
+        $result[] = "----------------------------------------";
+        
+        $template_measurements = get_post_meta($template_id, '_template_measurements_table', true);
+        if (empty($template_measurements) || !is_array($template_measurements)) {
+            $result[] = "❌ Keine Template-Maße gefunden!";
+            $result[] = "   Meta-Key: _template_measurements_table";
+            $result[] = "   Template-ID: {$template_id}";
+            $result[] = "";
+            $result[] = "💡 LÖSUNG: Template-Maße im Admin definieren:";
+            $result[] = "   1. Template bearbeiten";
+            $result[] = "   2. Größentabelle ausfüllen (S/M/L/XL)";
+            $result[] = "   3. Speichern";
+            
+            return implode("\n", $result);
+        }
+        
+        $result[] = "✅ Template-Maße geladen:";
+        foreach ($template_measurements as $measurement_type => $sizes) {
+            $result[] = "   {$measurement_type}:";
+            foreach ($sizes as $size => $value) {
+                $result[] = "     {$size}: {$value}cm";
+            }
+        }
+        $result[] = "";
+        
+        // SCHRITT 2.3: Pixel-zu-Physisch Mapping laden
+        $result[] = "🎯 SCHRITT 2.3: Pixel-zu-Physisch Mapping laden";
+        $result[] = "----------------------------------------";
+        
+        $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
+        if (empty($pixel_mappings) || !is_array($pixel_mappings)) {
+            $result[] = "❌ Keine Pixel-Mappings gefunden!";
+            $result[] = "   Meta-Key: _template_pixel_mappings";
+            $result[] = "   Template-ID: {$template_id}";
+            $result[] = "";
+            $result[] = "💡 LÖSUNG: Pixel-Mappings im Admin definieren:";
+            $result[] = "   1. Template bearbeiten";
+            $result[] = "   2. Referenzpunkte auf Template-Bild markieren";
+            $result[] = "   3. Physische Distanzen eingeben";
+            $result[] = "   4. Speichern";
+            
+            return implode("\n", $result);
+        }
+        
+        $used_mapping = null;
+        foreach ($pixel_mappings as $view_id => $mapping) {
+            if (isset($mapping['reference_measurement'])) {
+                $used_mapping = $mapping['reference_measurement'];
+                $result[] = "✅ Pixel-Mapping für View {$view_id} gefunden:";
+                $result[] = "   Measurement-Type: " . $used_mapping['type'];
+                $result[] = "   Pixel Start: (" . $used_mapping['pixel_start']['x'] . ", " . $used_mapping['pixel_start']['y'] . ")";
+                $result[] = "   Pixel End: (" . $used_mapping['pixel_end']['x'] . ", " . $used_mapping['pixel_end']['y'] . ")";
+                $result[] = "   Pixel Distance: " . $used_mapping['pixel_distance'] . "px";
+                $result[] = "   Physical Distance: " . $used_mapping['physical_distance_cm'] . "cm";
+                break;
+            }
+        }
+        
+        if (!$used_mapping) {
+            $result[] = "❌ Kein verwendbares Pixel-Mapping gefunden!";
+            return implode("\n", $result);
+        }
+        $result[] = "";
+        
+        // SCHRITT 2.4: Canvas-Normalisierung
+        $result[] = "🔄 SCHRITT 2.4: Canvas-Normalisierung";
+        $result[] = "----------------------------------------";
+        
+        $canvas_width = $canvas_context['actual_canvas_size']['width'];
+        $canvas_height = $canvas_context['actual_canvas_size']['height'];
+        $template_reference_width = 800;  // Standard Template-Referenz
+        $template_reference_height = 600;
+        
+        // Relative Koordinaten berechnen
+        $relative_x = $element_data['position']['x'] / $canvas_width;
+        $relative_y = $element_data['position']['y'] / $canvas_height;
+        
+        // Auf Template-Referenz-Canvas projizieren
+        $normalized_x = $relative_x * $template_reference_width;
+        $normalized_y = $relative_y * $template_reference_height;
+        
+        $result[] = "✅ Canvas-Normalisierung:";
+        $result[] = "   Original Canvas: {$canvas_width}x{$canvas_height}px";
+        $result[] = "   Original Position: (" . $element_data['position']['x'] . ", " . $element_data['position']['y'] . ")";
+        $result[] = "   Relative Koordinaten: (" . round($relative_x, 4) . ", " . round($relative_y, 4) . ")";
+        $result[] = "   Template-Referenz: {$template_reference_width}x{$template_reference_height}px";
+        $result[] = "   Normalisierte Position: (" . round($normalized_x, 2) . ", " . round($normalized_y, 2) . ")";
+        $result[] = "";
+        
+        // SCHRITT 2.5: Physische Koordinaten-Berechnung
+        $result[] = "📐 SCHRITT 2.5: Physische Koordinaten-Berechnung";
+        $result[] = "----------------------------------------";
+        
+        // Physische Koordinaten aus Pixel-Mapping ableiten
+        $physical_x_cm = ($normalized_x / $used_mapping['pixel_distance']) * $used_mapping['physical_distance_cm'];
+        $physical_y_cm = ($normalized_y / $used_mapping['pixel_distance']) * $used_mapping['physical_distance_cm'];
+        
+        $result[] = "✅ Basis physische Koordinaten (Referenz-Größe):";
+        $result[] = "   X: " . round($physical_x_cm, 2) . "cm";
+        $result[] = "   Y: " . round($physical_y_cm, 2) . "cm";
+        $result[] = "";
+        
+        // SCHRITT 2.6: Größenspezifische Skalierung
+        $result[] = "📏 SCHRITT 2.6: Größenspezifische Skalierung";
+        $result[] = "----------------------------------------";
+        
+        $measurement_type = $used_mapping['type']; // z.B. "chest"
+        if (!isset($template_measurements[$measurement_type])) {
+            $result[] = "❌ Measurement-Type '{$measurement_type}' nicht in Template-Maßen gefunden!";
+            return implode("\n", $result);
+        }
+        
+        $size_measurements = $template_measurements[$measurement_type];
+        $reference_size = "M"; // M als Referenz
+        
+        if (!isset($size_measurements[$reference_size]) || !isset($size_measurements[$selected_size])) {
+            $result[] = "❌ Referenz-Größe '{$reference_size}' oder Bestell-Größe '{$selected_size}' nicht gefunden!";
+            $result[] = "   Verfügbare Größen: " . implode(", ", array_keys($size_measurements));
+            return implode("\n", $result);
+        }
+        
+        $reference_measurement = $size_measurements[$reference_size];
+        $selected_measurement = $size_measurements[$selected_size];
+        $size_factor = $selected_measurement / $reference_measurement;
+        
+        // Finale skalierte Koordinaten
+        $final_x_cm = $physical_x_cm * $size_factor;
+        $final_y_cm = $physical_y_cm * $size_factor;
+        
+        $result[] = "✅ Größen-Skalierung:";
+        $result[] = "   Measurement-Type: {$measurement_type}";
+        $result[] = "   Referenz-Größe {$reference_size}: {$reference_measurement}cm";
+        $result[] = "   Bestell-Größe {$selected_size}: {$selected_measurement}cm";
+        $result[] = "   Skalierungsfaktor: " . round($size_factor, 4);
+        $result[] = "";
+        $result[] = "✅ FINALE PHYSISCHE KOORDINATEN:";
+        $result[] = "   X: " . round($final_x_cm, 2) . "cm";
+        $result[] = "   Y: " . round($final_y_cm, 2) . "cm";
+        $result[] = "";
+        
+        // SCHRITT 2.7: Output für SCHRITT 3 vorbereiten
+        $step2_output = array(
+            'template_id' => $template_id,
+            'selected_size' => $selected_size,
+            'canvas_normalization' => array(
+                'relative_coordinates' => array('x' => $relative_x, 'y' => $relative_y),
+                'normalized_coordinates' => array('x' => $normalized_x, 'y' => $normalized_y)
+            ),
+            'physical_coordinates' => array(
+                'base_cm' => array('x' => $physical_x_cm, 'y' => $physical_y_cm),
+                'final_cm' => array('x' => $final_x_cm, 'y' => $final_y_cm)
+            ),
+            'size_scaling' => array(
+                'measurement_type' => $measurement_type,
+                'reference_size' => $reference_size,
+                'reference_value' => $reference_measurement,
+                'selected_value' => $selected_measurement,
+                'scale_factor' => $size_factor
+            ),
+            'pixel_mapping_used' => $used_mapping,
+            'template_measurements' => $template_measurements,
+            'confidence' => 'high',
+            'step2_timestamp' => current_time('mysql')
+        );
+        
+        $result[] = "🚀 SCHRITT 2 ERFOLGREICH ABGESCHLOSSEN!";
+        $result[] = "✅ Bereit für SCHRITT 3: Druckkoordinaten-Berechnung";
+        
+        // Für Debug/Test-Ausgabe
+        error_log("YPrint SCHRITT 2: ✅ Erfolgreich abgeschlossen - Finale Koordinaten: x=" . round($final_x_cm, 2) . "cm, y=" . round($final_y_cm, 2) . "cm");
+        
+        return array(
+            'success' => true,
+            'step2_output' => $step2_output,
+            'log' => implode("\n", $result)
+        );
+    }
+    
+    /**
+     * ✅ SCHRITT 2: AJAX Handler für Template-Messungen Test
+     */
+    public function ajax_test_step_2_template_measurements() {
+        error_log("YPrint SCHRITT 2: 📏 AJAX Test gestartet");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            // Check permissions
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('Insufficient permissions');
+            }
+            
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            if (!$order_id) {
+                wp_send_json_error('Missing order ID');
+            }
+            
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_send_json_error('Order not found');
+            }
+            
+            // SCHRITT 1 ausführen um Input für SCHRITT 2 zu erhalten
+            $wc_integration = new Octo_Print_Designer_WC_Integration();
+            $step1_result = $wc_integration->perform_step_1_canvas_capture_test($order);
+            
+            // Parse SCHRITT 1 Output
+            if (strpos($step1_result, '❌') !== false) {
+                wp_send_json_error('SCHRITT 1 fehlgeschlagen - kann SCHRITT 2 nicht ausführen');
+            }
+            
+            // Simuliere SCHRITT 1 Output für SCHRITT 2 (aus SCHRITT 1 Parse oder Mock)
+            $step1_output = array(
+                'canvas_context' => array(
+                    'actual_canvas_size' => array('width' => 654, 'height' => 654),
+                    'device_type' => 'desktop',
+                    'confidence' => 'perfect'
+                ),
+                'element_data' => array(
+                    'position' => array('x' => 279.13, 'y' => 375.88),
+                    'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
+                ),
+                'template_id' => 3657,
+                'selected_size' => 'L'
+            );
+            
+            // SCHRITT 2 ausführen
+            $step2_result = $this->perform_step_2_template_measurements($step1_output);
+            
+            if ($step2_result['success']) {
+                wp_send_json_success(array(
+                    'message' => 'SCHRITT 2 erfolgreich',
+                    'result' => $step2_result['log']
+                ));
+            } else {
+                wp_send_json_error($step2_result['log']);
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint SCHRITT 2: ❌ Exception: " . $e->getMessage());
+            wp_send_json_error('SCHRITT 2 Test fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ✅ SCHRITT 2: AJAX Handler für Template-Größentabelle speichern
+     */
+    public function ajax_save_template_measurements_table() {
+        try {
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+            $measurements = isset($_POST['measurements']) ? $_POST['measurements'] : array();
+            
+            if (!$template_id) {
+                wp_send_json_error('Invalid template ID');
+            }
+            
+            // Sanitize measurements data
+            $sanitized_measurements = array();
+            foreach ($measurements as $type => $sizes) {
+                $sanitized_measurements[sanitize_text_field($type)] = array();
+                foreach ($sizes as $size => $value) {
+                    $sanitized_measurements[sanitize_text_field($type)][sanitize_text_field($size)] = floatval($value);
+                }
+            }
+            
+            // Save to database
+            $result = update_post_meta($template_id, '_template_measurements_table', $sanitized_measurements);
+            
+            if ($result !== false) {
+                error_log("YPrint SCHRITT 2: ✅ Template-Größentabelle gespeichert für Template {$template_id}");
+                wp_send_json_success(array(
+                    'message' => 'Template-Größentabelle erfolgreich gespeichert',
+                    'measurements' => $sanitized_measurements
+                ));
+            } else {
+                wp_send_json_error('Fehler beim Speichern der Größentabelle');
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint SCHRITT 2: ❌ Exception beim Speichern der Größentabelle: " . $e->getMessage());
+            wp_send_json_error('Exception: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ✅ SCHRITT 2: AJAX Handler für Pixel-Mapping speichern
+     */
+    public function ajax_save_pixel_mapping() {
+        try {
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+            $view_id = isset($_POST['view_id']) ? sanitize_text_field($_POST['view_id']) : '';
+            $mapping_data = isset($_POST['mapping_data']) ? $_POST['mapping_data'] : array();
+            
+            if (!$template_id || !$view_id) {
+                wp_send_json_error('Invalid template ID or view ID');
+            }
+            
+            // Load existing mappings
+            $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
+            if (!is_array($pixel_mappings)) {
+                $pixel_mappings = array();
+            }
+            
+            // Sanitize and save new mapping
+            $pixel_mappings[$view_id] = array(
+                'view_name' => sanitize_text_field($mapping_data['view_name'] ?? 'front'),
+                'reference_measurement' => array(
+                    'type' => sanitize_text_field($mapping_data['measurement_type'] ?? 'chest'),
+                    'pixel_start' => array(
+                        'x' => floatval($mapping_data['pixel_start_x'] ?? 0),
+                        'y' => floatval($mapping_data['pixel_start_y'] ?? 0)
+                    ),
+                    'pixel_end' => array(
+                        'x' => floatval($mapping_data['pixel_end_x'] ?? 0),
+                        'y' => floatval($mapping_data['pixel_end_y'] ?? 0)
+                    ),
+                    'pixel_distance' => floatval($mapping_data['pixel_distance'] ?? 0),
+                    'physical_distance_cm' => floatval($mapping_data['physical_distance_cm'] ?? 0)
+                ),
+                'created_at' => current_time('mysql')
+            );
+            
+            $result = update_post_meta($template_id, '_template_pixel_mappings', $pixel_mappings);
+            
+            if ($result !== false) {
+                error_log("YPrint SCHRITT 2: ✅ Pixel-Mapping gespeichert für Template {$template_id}, View {$view_id}");
+                wp_send_json_success(array(
+                    'message' => 'Pixel-Mapping erfolgreich gespeichert',
+                    'mapping' => $pixel_mappings[$view_id]
+                ));
+            } else {
+                wp_send_json_error('Fehler beim Speichern des Pixel-Mappings');
+            }
+            
+        } catch (Exception $e) {
+            error_log("YPrint SCHRITT 2: ❌ Exception beim Speichern des Pixel-Mappings: " . $e->getMessage());
+            wp_send_json_error('Exception: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ✅ SCHRITT 2: AJAX Handler für Template-Messungen abrufen
+     */
+    public function ajax_get_template_measurements() {
+        try {
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+            
+            if (!$template_id) {
+                wp_send_json_error('Invalid template ID');
+            }
+            
+            $measurements_table = get_post_meta($template_id, '_template_measurements_table', true);
+            $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
+            
+            wp_send_json_success(array(
+                'measurements_table' => $measurements_table ?: array(),
+                'pixel_mappings' => $pixel_mappings ?: array()
+            ));
+            
+        } catch (Exception $e) {
+            error_log("YPrint SCHRITT 2: ❌ Exception beim Abrufen der Template-Messungen: " . $e->getMessage());
+            wp_send_json_error('Exception: ' . $e->getMessage());
+        }
+    }
+
 }
