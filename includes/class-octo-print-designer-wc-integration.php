@@ -3669,97 +3669,115 @@ private function build_print_provider_email_content($order, $design_items, $note
             
             if ($first_element_data && isset($first_element_data['transform'])) {
                 $transform = $first_element_data['transform'];
-                $element_x = $transform['left'];
-                $element_y = $transform['top'];
-                $scale_x = $transform['scaleX'];
-                $scale_y = $transform['scaleY'];
-                $original_width = $transform['width'];
-                $original_height = $transform['height'];
                 
-                // Berechne finale Element-Größe
-                $scaled_width = $original_width * $scale_x;
-                $scaled_height = $original_height * $scale_y;
-                
-                // Berechne maximale Element-Position
-                $max_element_x = $element_x + $scaled_width;
-                $max_element_y = $element_y + $scaled_height;
-                
-                $result[] = "📊 Element-Analyse für Canvas-Ableitung:";
-                $result[] = "   Position: x=" . round($element_x, 1) . "px, y=" . round($element_y, 1) . "px";
-                $result[] = "   Skalierte Größe: " . round($scaled_width, 1) . "x" . round($scaled_height, 1) . "px";
-                $result[] = "   Max Element-Position: x=" . round($max_element_x, 1) . "px, y=" . round($max_element_y, 1) . "px";
-                
-                // Canvas-Größe ableiten
-                $inferred_canvas_width = 800;
-                $inferred_canvas_height = 600;
-                $device_type = 'desktop';
-                $fit_score = 1.0;
-                $confidence = 'high';
-                
-                // Prüfe verschiedene Canvas-Größen
-                $canvas_options = array(
-                    array('width' => 400, 'height' => 300, 'type' => 'mobile'),
-                    array('width' => 600, 'height' => 450, 'type' => 'tablet'),
-                    array('width' => 800, 'height' => 600, 'type' => 'desktop'),
-                    array('width' => 1024, 'height' => 768, 'type' => 'large_desktop')
-                );
-                
-                foreach ($canvas_options as $option) {
-                    if ($max_element_x <= $option['width'] && $max_element_y <= $option['height']) {
-                        $inferred_canvas_width = $option['width'];
-                        $inferred_canvas_height = $option['height'];
-                        $device_type = $option['type'];
-                        
-                        // Berechne Fit-Score (wie gut passt das Element in die Canvas)
-                        $margin_x = $option['width'] - $max_element_x;
-                        $margin_y = $option['height'] - $max_element_y;
-                        $fit_score = 1.0 - (($margin_x + $margin_y) / ($option['width'] + $option['height']));
-                        
-                        $result[] = "✅ Canvas-Option passt: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
-                        $result[] = "   Margin: x=" . round($margin_x, 1) . "px, y=" . round($margin_y, 1) . "px";
-                        $result[] = "   Fit-Score: " . round($fit_score, 3);
-                        break;
-                    } else {
-                        $result[] = "❌ Zu klein: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
+                // Prüfe ob transform ein Array ist
+                if (!is_array($transform)) {
+                    $result[] = "❌ Transform-Daten sind kein Array: " . gettype($transform);
+                    $result[] = "   Transform-Wert: " . (is_string($transform) ? substr($transform, 0, 100) . '...' : $transform);
+                    
+                    // Fallback Canvas-Kontext
+                    $canvas_context = array(
+                        'actual_canvas_size' => array('width' => 800, 'height' => 600),
+                        'template_reference_size' => array('width' => 800, 'height' => 600),
+                        'device_type' => 'desktop',
+                        'creation_timestamp' => $creation_timestamp,
+                        'inference_method' => 'fallback_invalid_transform',
+                        'fit_score' => 0.5,
+                        'confidence' => 'low'
+                    );
+                } else {
+                    $element_x = $transform['left'] ?? 0;
+                    $element_y = $transform['top'] ?? 0;
+                    $scale_x = $transform['scaleX'] ?? 1;
+                    $scale_y = $transform['scaleY'] ?? 1;
+                    $original_width = $transform['width'] ?? 100;
+                    $original_height = $transform['height'] ?? 100;
+                    
+                    // Berechne finale Element-Größe
+                    $scaled_width = $original_width * $scale_x;
+                    $scaled_height = $original_height * $scale_y;
+                    
+                    // Berechne maximale Element-Position
+                    $max_element_x = $element_x + $scaled_width;
+                    $max_element_y = $element_y + $scaled_height;
+                    
+                    $result[] = "📊 Element-Analyse für Canvas-Ableitung:";
+                    $result[] = "   Position: x=" . round($element_x, 1) . "px, y=" . round($element_y, 1) . "px";
+                    $result[] = "   Skalierte Größe: " . round($scaled_width, 1) . "x" . round($scaled_height, 1) . "px";
+                    $result[] = "   Max Element-Position: x=" . round($max_element_x, 1) . "px, y=" . round($max_element_y, 1) . "px";
+                    
+                    // Canvas-Größe ableiten
+                    $inferred_canvas_width = 800;
+                    $inferred_canvas_height = 600;
+                    $device_type = 'desktop';
+                    $fit_score = 1.0;
+                    $confidence = 'high';
+                    
+                    // Prüfe verschiedene Canvas-Größen
+                    $canvas_options = array(
+                        array('width' => 400, 'height' => 300, 'type' => 'mobile'),
+                        array('width' => 600, 'height' => 450, 'type' => 'tablet'),
+                        array('width' => 800, 'height' => 600, 'type' => 'desktop'),
+                        array('width' => 1024, 'height' => 768, 'type' => 'large_desktop')
+                    );
+                    
+                    foreach ($canvas_options as $option) {
+                        if ($max_element_x <= $option['width'] && $max_element_y <= $option['height']) {
+                            $inferred_canvas_width = $option['width'];
+                            $inferred_canvas_height = $option['height'];
+                            $device_type = $option['type'];
+                            
+                            // Berechne Fit-Score (wie gut passt das Element in die Canvas)
+                            $margin_x = $option['width'] - $max_element_x;
+                            $margin_y = $option['height'] - $max_element_y;
+                            $fit_score = 1.0 - (($margin_x + $margin_y) / ($option['width'] + $option['height']));
+                            
+                            $result[] = "✅ Canvas-Option passt: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
+                            $result[] = "   Margin: x=" . round($margin_x, 1) . "px, y=" . round($margin_y, 1) . "px";
+                            $result[] = "   Fit-Score: " . round($fit_score, 3);
+                            break;
+                        } else {
+                            $result[] = "❌ Zu klein: " . $option['width'] . "x" . $option['height'] . "px (" . $option['type'] . ")";
+                        }
                     }
+                    
+                    // Canvas-Kontext erstellen
+                    $canvas_context = array(
+                        'actual_canvas_size' => array(
+                            'width' => $inferred_canvas_width,
+                            'height' => $inferred_canvas_height
+                        ),
+                        'template_reference_size' => array('width' => 800, 'height' => 600),
+                        'device_type' => $device_type,
+                        'creation_timestamp' => $creation_timestamp,
+                        'inference_method' => 'element_position_analysis',
+                        'fit_score' => round($fit_score, 3),
+                        'confidence' => $fit_score > 0.8 ? 'high' : ($fit_score > 0.5 ? 'medium' : 'low'),
+                        'element_data' => array(
+                            'position' => array('x' => round($element_x, 2), 'y' => round($element_y, 2)),
+                            'scaled_size' => array('width' => round($scaled_width, 2), 'height' => round($scaled_height, 2)),
+                            'scale_factors' => array('x' => $scale_x, 'y' => $scale_y)
+                        )
+                    );
+                    
+                    $result[] = "";
+                    $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas erfolgreich abgeleitet:";
+                    $result[] = "   Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
+                    $result[] = "   Device-Type: " . $device_type;
+                    $result[] = "   Confidence: " . $canvas_context['confidence'] . " (Score: " . $canvas_context['fit_score'] . ")";
+                    $result[] = "   Inference-Methode: element_position_analysis";
+                    
+                    // Responsive Canvas-Skalierung berechnen
+                    $scale_factor_x = $inferred_canvas_width / 800; // Template-Referenz
+                    $scale_factor_y = $inferred_canvas_height / 600;
+                    
+                    $result[] = "";
+                    $result[] = "📱 SCHRITT 1.2 RESPONSIVE CANVAS-SKALIERUNG:";
+                    $result[] = "   Template-Referenz: 800x600px";
+                    $result[] = "   Aktuelle Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
+                    $result[] = "   Skalierungsfaktor X: " . round($scale_factor_x, 3) . "x";
+                    $result[] = "   Skalierungsfaktor Y: " . round($scale_factor_y, 3) . "x";
                 }
-                
-                // Canvas-Kontext erstellen
-                $canvas_context = array(
-                    'actual_canvas_size' => array(
-                        'width' => $inferred_canvas_width,
-                        'height' => $inferred_canvas_height
-                    ),
-                    'template_reference_size' => array('width' => 800, 'height' => 600),
-                    'device_type' => $device_type,
-                    'creation_timestamp' => $creation_timestamp,
-                    'inference_method' => 'element_position_analysis',
-                    'fit_score' => round($fit_score, 3),
-                    'confidence' => $fit_score > 0.8 ? 'high' : ($fit_score > 0.5 ? 'medium' : 'low'),
-                    'element_data' => array(
-                        'position' => array('x' => round($element_x, 2), 'y' => round($element_y, 2)),
-                        'scaled_size' => array('width' => round($scaled_width, 2), 'height' => round($scaled_height, 2)),
-                        'scale_factors' => array('x' => $scale_x, 'y' => $scale_y)
-                    )
-                );
-                
-                $result[] = "";
-                $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas erfolgreich abgeleitet:";
-                $result[] = "   Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
-                $result[] = "   Device-Type: " . $device_type;
-                $result[] = "   Confidence: " . $canvas_context['confidence'] . " (Score: " . $canvas_context['fit_score'] . ")";
-                $result[] = "   Inference-Methode: element_position_analysis";
-                
-                // Responsive Canvas-Skalierung berechnen
-                $scale_factor_x = $inferred_canvas_width / 800; // Template-Referenz
-                $scale_factor_y = $inferred_canvas_height / 600;
-                
-                $result[] = "";
-                $result[] = "📱 SCHRITT 1.2 RESPONSIVE CANVAS-SKALIERUNG:";
-                $result[] = "   Template-Referenz: 800x600px";
-                $result[] = "   Aktuelle Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
-                $result[] = "   Skalierungsfaktor X: " . round($scale_factor_x, 3) . "x";
-                $result[] = "   Skalierungsfaktor Y: " . round($scale_factor_y, 3) . "x";
                 
             } else {
                 $result[] = "❌ Keine Transform-Daten für Canvas-Ableitung verfügbar";
