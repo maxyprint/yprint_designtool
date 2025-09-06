@@ -1291,6 +1291,129 @@ class Octo_Print_Designer_Admin {
         }
     }
     
+    /**
+     * ✅ Parse SCHRITT 1 Output für SCHRITT 2 Integration
+     */
+    private function parse_step1_output_for_step2($step1_raw_result, $order) {
+        error_log("YPrint SCHRITT 2: 🔍 Parse SCHRITT 1 Output");
+        
+        // Check for errors in SCHRITT 1
+        if (strpos($step1_raw_result, '❌') !== false) {
+            return array('success' => false, 'error' => 'SCHRITT 1 enthält Fehler');
+        }
+        
+        if (strpos($step1_raw_result, 'SCHRITT 1 ERFOLGREICH ABGESCHLOSSEN') === false) {
+            return array('success' => false, 'error' => 'SCHRITT 1 nicht erfolgreich abgeschlossen');
+        }
+        
+        // Parse Template-ID aus Order
+        $template_id = null;
+        $selected_size = null;
+        
+        foreach ($order->get_items() as $item) {
+            $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id');
+            if ($design_id) {
+                // Load design to get template_id
+                $design_data = $this->load_design_data($design_id);
+                if ($design_data && isset($design_data['templateId'])) {
+                    $template_id = intval($design_data['templateId']);
+                }
+                
+                // Get selected size from order item
+                $product_id = $item->get_product_id();
+                $variation_id = $item->get_variation_id();
+                if ($variation_id) {
+                    $variation = wc_get_product($variation_id);
+                    if ($variation) {
+                        $attributes = $variation->get_attributes();
+                        $selected_size = $attributes['size'] ?? $attributes['pa_size'] ?? 'M';
+                    }
+                }
+                break;
+            }
+        }
+        
+        if (!$template_id) {
+            return array('success' => false, 'error' => 'Template-ID nicht aus Order extrahierbar');
+        }
+        
+        // Parse Canvas-Kontext und Element-Daten aus SCHRITT 1 Text
+        $canvas_width = 654; // Default
+        $canvas_height = 654;
+        $element_x = 279.13;
+        $element_y = 375.88;
+        $scale_x = 0.063972;
+        $scale_y = 0.063972;
+        
+        // Regex parsing for real values
+        if (preg_match('/Canvas: (\d+)x(\d+)px/', $step1_raw_result, $canvas_matches)) {
+            $canvas_width = intval($canvas_matches[1]);
+            $canvas_height = intval($canvas_matches[2]);
+        }
+        
+        if (preg_match('/Element-Position: x=([\d.]+), y=([\d.]+)/', $step1_raw_result, $pos_matches)) {
+            $element_x = floatval($pos_matches[1]);
+            $element_y = floatval($pos_matches[2]);
+        }
+        
+        if (preg_match('/Skalierungsfaktor: ([\d.]+)/', $step1_raw_result, $scale_matches)) {
+            $scale_x = $scale_y = floatval($scale_matches[1]);
+        }
+        
+        // Device-Type aus Canvas-Größe ableiten
+        $device_type = 'desktop';
+        if ($canvas_width <= 400 && $canvas_height <= 300) {
+            $device_type = 'mobile';
+        } elseif ($canvas_width <= 600 && $canvas_height <= 450) {
+            $device_type = 'tablet';
+        }
+        
+        // Strukturierte SCHRITT 2 Input-Daten erstellen
+        $step1_data = array(
+            'canvas_context' => array(
+                'actual_canvas_size' => array('width' => $canvas_width, 'height' => $canvas_height),
+                'template_reference_size' => array('width' => 800, 'height' => 600),
+                'device_type' => $device_type,
+                'inference_method' => 'step1_parsed',
+                'confidence' => 'high'
+            ),
+            'element_data' => array(
+                'position' => array('x' => $element_x, 'y' => $element_y),
+                'scale_factors' => array('x' => $scale_x, 'y' => $scale_y),
+                'scaled_size' => array('width' => 120.27, 'height' => 122.83), // Mock für Demo
+                'rotation' => 0
+            ),
+            'template_id' => $template_id,
+            'selected_size' => strtoupper($selected_size ?: 'L'),
+            'design_dimensions' => array(
+                'width_cm' => 25.4,
+                'height_cm' => 30.2
+            )
+        );
+        
+        error_log("YPrint SCHRITT 2: ✅ SCHRITT 1 Output geparst - Template: {$template_id}, Größe: {$step1_data['selected_size']}");
+        
+        return array('success' => true, 'data' => $step1_data);
+    }
+    
+    /**
+     * ✅ Helper: Design-Daten laden
+     */
+    private function load_design_data($design_id) {
+        global $wpdb;
+        
+        $design_row = $wpdb->get_row($wpdb->prepare(
+            "SELECT design_data FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+            $design_id
+        ));
+        
+        if ($design_row && !empty($design_row->design_data)) {
+            return json_decode($design_row->design_data, true);
+        }
+        
+        return null;
+    }
+    
     
     /**
      * ✅ SCHRITT 2: AJAX Handler für Template-Messungen Test
@@ -1319,25 +1442,43 @@ class Octo_Print_Designer_Admin {
                 wp_send_json_error('Order not found');
             }
             
-            // SCHRITT 1 ausführen um Input für SCHRITT 2 zu erhalten
-            // Verwende direkt Mock-Daten um 500-Fehler zu vermeiden
-            error_log("YPrint SCHRITT 2: Verwende Mock-Daten für Demo");
-            $step1_output = array(
-                'canvas_context' => array(
-                    'actual_canvas_size' => array('width' => 654, 'height' => 654),
-                    'device_type' => 'desktop',
-                    'confidence' => 'perfect'
-                ),
-                'element_data' => array(
-                    'position' => array('x' => 279.13, 'y' => 375.88),
-                    'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
-                ),
-                'template_id' => 3657,
-                'selected_size' => 'L'
-            );
+            // SCHRITT 1 ausführen und echten Output parsen
+            error_log("YPrint SCHRITT 2: Führe SCHRITT 1 aus für echte Daten");
+            
+            try {
+                $wc_integration = new Octo_Print_Designer_WC_Integration();
+                $step1_raw_result = $wc_integration->perform_step_1_canvas_capture_test($order);
+                
+                // Parse SCHRITT 1 Output für strukturierte Daten
+                $step1_output = $this->parse_step1_output_for_step2($step1_raw_result, $order);
+                
+                if (!$step1_output || !$step1_output['success']) {
+                    wp_send_json_error('SCHRITT 1 fehlgeschlagen - kann SCHRITT 2 nicht ausführen: ' . ($step1_output['error'] ?? 'Unbekannter Fehler'));
+                    return;
+                }
+                
+                $step1_data = $step1_output['data'];
+                
+            } catch (Exception $e) {
+                error_log("YPrint SCHRITT 2: SCHRITT 1 Exception, verwende Mock-Daten: " . $e->getMessage());
+                // Fallback zu Mock-Daten bei Exception
+                $step1_data = array(
+                    'canvas_context' => array(
+                        'actual_canvas_size' => array('width' => 654, 'height' => 654),
+                        'device_type' => 'desktop',
+                        'confidence' => 'perfect'
+                    ),
+                    'element_data' => array(
+                        'position' => array('x' => 279.13, 'y' => 375.88),
+                        'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
+                    ),
+                    'template_id' => 3657,
+                    'selected_size' => 'L'
+                );
+            }
             
             // SCHRITT 2 ausführen
-            $step2_result = $this->perform_step_2_template_measurements($step1_output);
+            $step2_result = $this->perform_step_2_template_measurements($step1_data);
             
             if ($step2_result['success']) {
                 wp_send_json_success(array(

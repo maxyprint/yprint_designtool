@@ -2726,13 +2726,45 @@ class Octo_Print_Designer_Template {
             var ctx = canvas.getContext('2d');
             var clickPoints = [];
             
-            // Canvas Hintergrund (simuliert Template-Bild)
-            ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#333';
-            ctx.font = '14px Arial';
-            ctx.fillText('Template-Bild Placeholder (800x600px)', 20, 30);
-            ctx.fillText('Klicken Sie zwei Punkte für Referenz-Messung', 20, 50);
+            // Template-Bild laden falls verfügbar
+            var templateImagePath = '<?php echo esc_js(get_post_meta($post->ID, '_template_image_path', true)); ?>';
+            if (!templateImagePath && <?php echo $post->ID; ?> == 3657) {
+                templateImagePath = 'shirt_front_template.jpg'; // Fallback für Template 3657
+            }
+
+            if (templateImagePath) {
+                var img = new Image();
+                img.onload = function() {
+                    // Template-Bild als Hintergrund zeichnen
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Semi-transparentes Overlay für bessere Sichtbarkeit
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Anweisungstext
+                    ctx.fillStyle = '#333';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Template: ' + templateImagePath, 20, 30);
+                    ctx.fillText('Klicken Sie zwei Punkte für Referenz-Messung', 20, 50);
+                };
+                img.onerror = function() {
+                    // Fallback wenn Bild nicht ladbar
+                    drawPlaceholder();
+                };
+                img.src = '<?php echo esc_js(home_url('/wp-content/uploads/templates/')); ?>' + templateImagePath;
+            } else {
+                drawPlaceholder();
+            }
+
+            function drawPlaceholder() {
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.fillText('Template-Bild Placeholder (800x600px)', 20, 30);
+                ctx.fillText('Klicken Sie zwei Punkte für Referenz-Messung', 20, 50);
+            }
             
             // Canvas Click-Handler
             canvas.addEventListener('click', function(e) {
@@ -2782,12 +2814,26 @@ class Octo_Print_Designer_Template {
             $('#clear-mapping').on('click', function() {
                 clickPoints = [];
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#f0f0f0';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#333';
-                ctx.font = '14px Arial';
-                ctx.fillText('Template-Bild Placeholder (800x600px)', 20, 30);
-                ctx.fillText('Klicken Sie zwei Punkte für Referenz-Messung', 20, 50);
+                
+                // Template-Bild neu laden oder Placeholder zeichnen
+                if (templateImagePath) {
+                    var img = new Image();
+                    img.onload = function() {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = '#333';
+                        ctx.font = '14px Arial';
+                        ctx.fillText('Template: ' + templateImagePath, 20, 30);
+                        ctx.fillText('Klicken Sie zwei Punkte für Referenz-Messung', 20, 50);
+                    };
+                    img.onerror = function() {
+                        drawPlaceholder();
+                    };
+                    img.src = '<?php echo esc_js(home_url('/wp-content/uploads/templates/')); ?>' + templateImagePath;
+                } else {
+                    drawPlaceholder();
+                }
                 
                 $('#pixel-start-x, #pixel-start-y, #pixel-end-x, #pixel-end-y, #pixel-distance').val('');
             });
