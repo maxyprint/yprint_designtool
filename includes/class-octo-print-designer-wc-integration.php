@@ -3164,51 +3164,84 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 $result[] = "💾 1.4 CANVAS-KONTEXT AUS ECHTEN DESIGN-DATEN";
                                 $result[] = "----------------------------------------------";
                                 
-                                // Verschiedene Canvas-Feld-Namen prüfen
-                                $canvas_width = null;
-                                $canvas_height = null;
-                                
-                                $canvas_fields = ['canvasWidth', 'canvas_width', 'width', 'templateWidth'];
-                                $canvas_height_fields = ['canvasHeight', 'canvas_height', 'height', 'templateHeight'];
-                                
-                                foreach ($canvas_fields as $field) {
-                                    if (isset($design_data[$field])) {
-                                        $canvas_width = $design_data[$field];
-                                        $result[] = "✅ Canvas-Breite gefunden in Feld: {$field} = {$canvas_width}";
-                                        break;
-                                    }
-                                }
-                                
-                                foreach ($canvas_height_fields as $field) {
-                                    if (isset($design_data[$field])) {
-                                        $canvas_height = $design_data[$field];
-                                        $result[] = "✅ Canvas-Höhe gefunden in Feld: {$field} = {$canvas_height}";
-                                        break;
-                                    }
-                                }
-                                
-                                if ($canvas_width && $canvas_height) {
+                                // SCHRITT 1.4 PRIORITY 1: design_metadata prüfen
+                                if (isset($design_data['design_metadata']) && is_array($design_data['design_metadata'])) {
+                                    $metadata = $design_data['design_metadata'];
+                                    $result[] = "✅ design_metadata gefunden! Verwende ECHTE Canvas-Daten:";
+                                    $result[] = "   Raw metadata: " . json_encode($metadata, JSON_PRETTY_PRINT);
+                                    
                                     $canvas_context = array(
-                                        'actual_canvas_size' => array(
-                                            'width' => $canvas_width,
-                                            'height' => $canvas_height
-                                        ),
-                                        'template_reference_size' => array('width' => 800, 'height' => 600),
-                                        'device_type' => $canvas_width <= 400 ? 'mobile' : 
-                                                       ($canvas_width <= 600 ? 'tablet' : 'desktop'),
-                                        'creation_timestamp' => $creation_timestamp
+                                        'actual_canvas_size' => $metadata['actual_canvas_size'],
+                                        'template_reference_size' => $metadata['template_reference_size'] ?? array('width' => 800, 'height' => 600),
+                                        'device_type' => $metadata['device_type'],
+                                        'creation_timestamp' => $metadata['creation_timestamp'],
+                                        'inference_method' => 'design_metadata_original',
+                                        'fit_score' => 1.0,
+                                        'confidence' => 'perfect'
                                     );
                                     
-                                    $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext erfolgreich ermittelt:";
-                                    $result[] = "   Actual Canvas: {$canvas_width}x{$canvas_height}px";
-                                    $result[] = "   Device Type: " . (is_array($canvas_context) ? $canvas_context['device_type'] : 'unknown');
-                                    $result[] = "   Template Reference: 800x600px";
-                                    $result[] = "   Creation Timestamp: " . $creation_timestamp;
-                                } else {
-                                    $result[] = "⚠️ Canvas-Größe nicht in JSON - leite aus ECHTEN Element-Daten ab:";
+                                    $result[] = "🎯 SCHRITT 1.4 PERFEKT ERFÜLLT - ECHTE Canvas-Daten verwendet:";
+                                    $result[] = "   Canvas: " . $metadata['actual_canvas_size']['width'] . "x" . $metadata['actual_canvas_size']['height'] . "px";
+                                    $result[] = "   Device-Type: " . $metadata['device_type'];
+                                    $result[] = "   Template-Referenz: " . ($metadata['template_reference_size']['width'] ?? 800) . "x" . ($metadata['template_reference_size']['height'] ?? 600) . "px";
+                                    $result[] = "   Creation Timestamp: " . $metadata['creation_timestamp'];
+                                    $result[] = "   🎯 QUELLE: design_metadata (100% ORIGINAL)";
+                                    $result[] = "   🎯 CONFIDENCE: perfect (NICHT abgeleitet)";
                                     
-                                    // Diese Variable wird NACH der Element-Analyse gesetzt
-                                    $canvas_context = 'PLACEHOLDER_FOR_ELEMENT_BASED_INFERENCE';
+                                } else {
+                                    $result[] = "⚠️ Keine design_metadata gefunden - leite aus Element-Position ab:";
+                                    $result[] = "   Verfügbare JSON-Keys: " . implode(', ', array_keys($design_data));
+                                    
+                                    // Fallback: Verschiedene Canvas-Feld-Namen prüfen
+                                    $canvas_width = null;
+                                    $canvas_height = null;
+                                    
+                                    $canvas_fields = ['canvasWidth', 'canvas_width', 'width', 'templateWidth'];
+                                    $canvas_height_fields = ['canvasHeight', 'canvas_height', 'height', 'templateHeight'];
+                                    
+                                    foreach ($canvas_fields as $field) {
+                                        if (isset($design_data[$field])) {
+                                            $canvas_width = $design_data[$field];
+                                            $result[] = "✅ Canvas-Breite gefunden in Feld: {$field} = {$canvas_width}";
+                                            break;
+                                        }
+                                    }
+                                    
+                                    foreach ($canvas_height_fields as $field) {
+                                        if (isset($design_data[$field])) {
+                                            $canvas_height = $design_data[$field];
+                                            $result[] = "✅ Canvas-Höhe gefunden in Feld: {$field} = {$canvas_height}";
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if ($canvas_width && $canvas_height) {
+                                        $canvas_context = array(
+                                            'actual_canvas_size' => array(
+                                                'width' => $canvas_width,
+                                                'height' => $canvas_height
+                                            ),
+                                            'template_reference_size' => array('width' => 800, 'height' => 600),
+                                            'device_type' => $canvas_width <= 400 ? 'mobile' : 
+                                                           ($canvas_width <= 600 ? 'tablet' : 'desktop'),
+                                            'creation_timestamp' => $creation_timestamp,
+                                            'inference_method' => 'legacy_canvas_fields',
+                                            'fit_score' => 0.8,
+                                            'confidence' => 'high'
+                                        );
+                                        
+                                        $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext erfolgreich ermittelt:";
+                                        $result[] = "   Actual Canvas: {$canvas_width}x{$canvas_height}px";
+                                        $result[] = "   Device Type: " . $canvas_context['device_type'];
+                                        $result[] = "   Template Reference: 800x600px";
+                                        $result[] = "   Creation Timestamp: " . $creation_timestamp;
+                                        $result[] = "   🎯 QUELLE: legacy canvas fields";
+                                    } else {
+                                        $result[] = "⚠️ Canvas-Größe nicht in JSON - leite aus ECHTEN Element-Daten ab:";
+                                        
+                                        // Diese Variable wird NACH der Element-Analyse gesetzt
+                                        $canvas_context = 'PLACEHOLDER_FOR_ELEMENT_BASED_INFERENCE';
+                                    }
                                 }
                                 
                                 // 1.3 DESIGN-ELEMENT-PLATZIERUNG AUS ECHTEN DATEN
