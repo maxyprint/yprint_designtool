@@ -3197,7 +3197,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     
                                     $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext erfolgreich ermittelt:";
                                     $result[] = "   Actual Canvas: {$canvas_width}x{$canvas_height}px";
-                                    $result[] = "   Device Type: " . $canvas_context['device_type'];
+                                    $result[] = "   Device Type: " . (is_array($canvas_context) ? $canvas_context['device_type'] : 'unknown');
                                     $result[] = "   Template Reference: 800x600px";
                                     $result[] = "   Creation Timestamp: " . $creation_timestamp;
                                 } else {
@@ -3319,39 +3319,64 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     $result[] = "--------------------------------";
                                     
                                     // Canvas-Kontext als Design-Metadaten speichern
-                                    $design_metadata = array(
-                                        'design_metadata' => array(
-                                            'actual_canvas_size' => $canvas_context['actual_canvas_size'],
-                                            'template_reference_size' => $canvas_context['template_reference_size'],
-                                            'device_type' => $canvas_context['device_type'],
-                                            'creation_timestamp' => $canvas_context['creation_timestamp'],
-                                            'inference_method' => $canvas_context['inference_method'] ?? 'direct_json',
-                                            'fit_score' => $canvas_context['fit_score'] ?? 1.0,
-                                            'confidence' => $canvas_context['confidence'] ?? 'high'
-                                        )
-                                    );
+                                    if (is_array($canvas_context)) {
+                                        $design_metadata = array(
+                                            'design_metadata' => array(
+                                                'actual_canvas_size' => $canvas_context['actual_canvas_size'],
+                                                'template_reference_size' => $canvas_context['template_reference_size'],
+                                                'device_type' => $canvas_context['device_type'],
+                                                'creation_timestamp' => $canvas_context['creation_timestamp'],
+                                                'inference_method' => $canvas_context['inference_method'] ?? 'direct_json',
+                                                'fit_score' => $canvas_context['fit_score'] ?? 1.0,
+                                                'confidence' => $canvas_context['confidence'] ?? 'high'
+                                            )
+                                        );
+                                    } else {
+                                        $design_metadata = array(
+                                            'design_metadata' => array(
+                                                'actual_canvas_size' => array('width' => 800, 'height' => 600),
+                                                'template_reference_size' => array('width' => 800, 'height' => 600),
+                                                'device_type' => 'desktop',
+                                                'creation_timestamp' => $creation_timestamp,
+                                                'inference_method' => 'fallback_invalid_canvas_context',
+                                                'fit_score' => 0.5,
+                                                'confidence' => 'low'
+                                            )
+                                        );
+                                    }
                                     
                                     $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext gespeichert:";
                                     $result[] = "   Design-Metadaten: " . json_encode($design_metadata, JSON_PRETTY_PRINT);
-                                    $result[] = "   Canvas-Größe: " . $canvas_context['actual_canvas_size']['width'] . "x" . $canvas_context['actual_canvas_size']['height'] . "px";
-                                    $result[] = "   Device-Type: " . $canvas_context['device_type'];
-                                    $result[] = "   Template-Referenz: " . $canvas_context['template_reference_size']['width'] . "x" . $canvas_context['template_reference_size']['height'] . "px";
-                                    $result[] = "   Creation-Timestamp: " . $canvas_context['creation_timestamp'];
-                                    $result[] = "   Inference-Method: " . ($canvas_context['inference_method'] ?? 'direct_json');
                                     
-                                    if (isset($canvas_context['fit_score'])) {
-                                        $result[] = "   Fit-Score: " . round($canvas_context['fit_score'] * 100, 1) . "%";
-                                        $result[] = "   Confidence: " . $canvas_context['confidence'];
+                                    if (is_array($canvas_context)) {
+                                        $result[] = "   Canvas-Größe: " . $canvas_context['actual_canvas_size']['width'] . "x" . $canvas_context['actual_canvas_size']['height'] . "px";
+                                        $result[] = "   Device-Type: " . $canvas_context['device_type'];
+                                        $result[] = "   Template-Referenz: " . $canvas_context['template_reference_size']['width'] . "x" . $canvas_context['template_reference_size']['height'] . "px";
+                                        $result[] = "   Creation-Timestamp: " . $canvas_context['creation_timestamp'];
+                                        $result[] = "   Inference-Method: " . ($canvas_context['inference_method'] ?? 'direct_json');
+                                        
+                                        if (isset($canvas_context['fit_score'])) {
+                                            $result[] = "   Fit-Score: " . round($canvas_context['fit_score'] * 100, 1) . "%";
+                                            $result[] = "   Confidence: " . $canvas_context['confidence'];
+                                        }
+                                        
+                                        // Responsive Canvas-Skalierung berechnen
+                                        $result[] = "";
+                                        $result[] = "📱 RESPONSIVE CANVAS-SKALIERUNG:";
+                                        $scale_x = $canvas_context['actual_canvas_size']['width'] / $canvas_context['template_reference_size']['width'];
+                                        $scale_y = $canvas_context['actual_canvas_size']['height'] / $canvas_context['template_reference_size']['height'];
+                                        $result[] = "   Skalierungsfaktor X: {$scale_x}x";
+                                        $result[] = "   Skalierungsfaktor Y: {$scale_y}x";
+                                        $result[] = "   Aspect Ratio: " . round($canvas_context['actual_canvas_size']['width'] / $canvas_context['actual_canvas_size']['height'], 3);
+                                    } else {
+                                        $result[] = "   Canvas-Größe: 800x600px (Fallback)";
+                                        $result[] = "   Device-Type: desktop (Fallback)";
+                                        $result[] = "   Template-Referenz: 800x600px (Fallback)";
+                                        $result[] = "   Creation-Timestamp: " . $creation_timestamp;
+                                        $result[] = "   Inference-Method: fallback_invalid_canvas_context";
+                                        $result[] = "   Fit-Score: 50% (Fallback)";
+                                        $result[] = "   Confidence: low (Fallback)";
                                     }
-                                    
-                                    // Responsive Canvas-Skalierung berechnen
-                                    $result[] = "";
-                                    $result[] = "📱 RESPONSIVE CANVAS-SKALIERUNG:";
-                                    $scale_x = $canvas_context['actual_canvas_size']['width'] / $canvas_context['template_reference_size']['width'];
-                                    $scale_y = $canvas_context['actual_canvas_size']['height'] / $canvas_context['template_reference_size']['height'];
-                                    $result[] = "   Skalierungsfaktor X: {$scale_x}x";
-                                    $result[] = "   Skalierungsfaktor Y: {$scale_y}x";
-                                    $result[] = "   Aspect Ratio: " . round($canvas_context['actual_canvas_size']['width'] / $canvas_context['actual_canvas_size']['height'], 3);
                                     
                                 } else {
                                     $result[] = "";
@@ -3777,7 +3802,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $result[] = "✅ SCHRITT 1.2 ERFÜLLT - Canvas erfolgreich abgeleitet:";
                     $result[] = "   Canvas: " . $inferred_canvas_width . "x" . $inferred_canvas_height . "px";
                     $result[] = "   Device-Type: " . $device_type;
-                    $result[] = "   Confidence: " . $canvas_context['confidence'] . " (Score: " . $canvas_context['fit_score'] . ")";
+                    $result[] = "   Confidence: " . (is_array($canvas_context) ? $canvas_context['confidence'] : 'unknown') . " (Score: " . (is_array($canvas_context) ? $canvas_context['fit_score'] : 'unknown') . ")";
                     $result[] = "   Inference-Methode: element_position_analysis";
                     
                     // Responsive Canvas-Skalierung berechnen
