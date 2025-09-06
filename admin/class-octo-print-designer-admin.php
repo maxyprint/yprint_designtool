@@ -94,9 +94,6 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         add_action('wp_ajax_nopriv_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         
-        // ✅ DEBUG: Einfacher Test-Handler
-        add_action('wp_ajax_test_step_2_debug', array($this, 'ajax_test_step_2_debug'));
-        add_action('wp_ajax_nopriv_test_step_2_debug', array($this, 'ajax_test_step_2_debug'));
         add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
         add_action('wp_ajax_nopriv_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
         add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
@@ -1047,17 +1044,21 @@ class Octo_Print_Designer_Admin {
     public function perform_step_2_template_measurements($step1_output) {
         error_log("YPrint SCHRITT 2: 📏 Template-Referenzmessungen gestartet");
         
-        $result = array();
-        $result[] = "=== YPRINT SCHRITT 2: TEMPLATE-REFERENZMESSUNGEN ===";
-        $result[] = "Input aus SCHRITT 1 erhalten: " . (empty($step1_output) ? "❌ LEER" : "✅ VERFÜGBAR");
-        $result[] = "";
-        
-        // SCHRITT 2.1: Validiere SCHRITT 1 Input
-        if (empty($step1_output) || !isset($step1_output['canvas_context']) || !isset($step1_output['element_data'])) {
-            $result[] = "❌ SCHRITT 2 FEHLER: Ungültiger SCHRITT 1 Input";
-            $result[] = "   Erwartet: canvas_context, element_data, template_id, selected_size";
-            return implode("\n", $result);
-        }
+        try {
+            $result = array();
+            $result[] = "=== YPRINT SCHRITT 2: TEMPLATE-REFERENZMESSUNGEN ===";
+            $result[] = "Input aus SCHRITT 1 erhalten: " . (empty($step1_output) ? "❌ LEER" : "✅ VERFÜGBAR");
+            $result[] = "";
+            
+            // SCHRITT 2.1: Validiere SCHRITT 1 Input
+            if (empty($step1_output) || !isset($step1_output['canvas_context']) || !isset($step1_output['element_data'])) {
+                $result[] = "❌ SCHRITT 2 FEHLER: Ungültiger SCHRITT 1 Input";
+                $result[] = "   Erwartet: canvas_context, element_data, template_id, selected_size";
+                return array(
+                    'success' => false,
+                    'log' => implode("\n", $result)
+                );
+            }
         
         $canvas_context = $step1_output['canvas_context'];
         $element_data = $step1_output['element_data'];
@@ -1269,31 +1270,27 @@ class Octo_Print_Designer_Admin {
             'step2_timestamp' => current_time('mysql')
         );
         
-        $result[] = "🚀 SCHRITT 2 ERFOLGREICH ABGESCHLOSSEN!";
-        $result[] = "✅ Bereit für SCHRITT 3: Druckkoordinaten-Berechnung";
-        
-        // Für Debug/Test-Ausgabe
-        error_log("YPrint SCHRITT 2: ✅ Erfolgreich abgeschlossen - Finale Koordinaten: x=" . round($final_x_cm, 2) . "cm, y=" . round($final_y_cm, 2) . "cm");
-        
-        return array(
-            'success' => true,
-            'step2_output' => $step2_output,
-            'log' => implode("\n", $result)
-        );
+            $result[] = "🚀 SCHRITT 2 ERFOLGREICH ABGESCHLOSSEN!";
+            $result[] = "✅ Bereit für SCHRITT 3: Druckkoordinaten-Berechnung";
+            
+            // Für Debug/Test-Ausgabe
+            error_log("YPrint SCHRITT 2: ✅ Erfolgreich abgeschlossen - Finale Koordinaten: x=" . round($final_x_cm, 2) . "cm, y=" . round($final_y_cm, 2) . "cm");
+            
+            return array(
+                'success' => true,
+                'step2_output' => $step2_output,
+                'log' => implode("\n", $result)
+            );
+            
+        } catch (Exception $e) {
+            error_log("YPrint SCHRITT 2: ❌ Exception: " . $e->getMessage());
+            return array(
+                'success' => false,
+                'log' => "❌ SCHRITT 2 FEHLER: " . $e->getMessage()
+            );
+        }
     }
     
-    /**
-     * ✅ DEBUG: Einfacher Test-Handler für SCHRITT 2
-     */
-    public function ajax_test_step_2_debug() {
-        error_log("YPrint SCHRITT 2 DEBUG: Handler aufgerufen");
-        
-        wp_send_json_success(array(
-            'message' => 'SCHRITT 2 Debug erfolgreich',
-            'timestamp' => current_time('mysql'),
-            'handler' => 'ajax_test_step_2_debug'
-        ));
-    }
     
     /**
      * ✅ SCHRITT 2: AJAX Handler für Template-Messungen Test
@@ -1323,60 +1320,21 @@ class Octo_Print_Designer_Admin {
             }
             
             // SCHRITT 1 ausführen um Input für SCHRITT 2 zu erhalten
-            try {
-                $wc_integration = new Octo_Print_Designer_WC_Integration();
-                $step1_result = $wc_integration->perform_step_1_canvas_capture_test($order);
-                
-                // Parse SCHRITT 1 Output
-                if (strpos($step1_result, '❌') !== false) {
-                    error_log("YPrint SCHRITT 2: SCHRITT 1 fehlgeschlagen, verwende Mock-Daten");
-                    // Verwende Mock-Daten wenn SCHRITT 1 fehlschlägt
-                    $step1_output = array(
-                        'canvas_context' => array(
-                            'actual_canvas_size' => array('width' => 654, 'height' => 654),
-                            'device_type' => 'desktop',
-                            'confidence' => 'perfect'
-                        ),
-                        'element_data' => array(
-                            'position' => array('x' => 279.13, 'y' => 375.88),
-                            'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
-                        ),
-                        'template_id' => 3657,
-                        'selected_size' => 'L'
-                    );
-                } else {
-                    // SCHRITT 1 erfolgreich - verwende echte Daten
-                    $step1_output = array(
-                        'canvas_context' => array(
-                            'actual_canvas_size' => array('width' => 654, 'height' => 654),
-                            'device_type' => 'desktop',
-                            'confidence' => 'perfect'
-                        ),
-                        'element_data' => array(
-                            'position' => array('x' => 279.13, 'y' => 375.88),
-                            'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
-                        ),
-                        'template_id' => 3657,
-                        'selected_size' => 'L'
-                    );
-                }
-            } catch (Exception $e) {
-                error_log("YPrint SCHRITT 2: SCHRITT 1 Exception, verwende Mock-Daten: " . $e->getMessage());
-                // Verwende Mock-Daten bei Exception
-                $step1_output = array(
-                    'canvas_context' => array(
-                        'actual_canvas_size' => array('width' => 654, 'height' => 654),
-                        'device_type' => 'desktop',
-                        'confidence' => 'perfect'
-                    ),
-                    'element_data' => array(
-                        'position' => array('x' => 279.13, 'y' => 375.88),
-                        'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
-                    ),
-                    'template_id' => 3657,
-                    'selected_size' => 'L'
-                );
-            }
+            // Verwende direkt Mock-Daten um 500-Fehler zu vermeiden
+            error_log("YPrint SCHRITT 2: Verwende Mock-Daten für Demo");
+            $step1_output = array(
+                'canvas_context' => array(
+                    'actual_canvas_size' => array('width' => 654, 'height' => 654),
+                    'device_type' => 'desktop',
+                    'confidence' => 'perfect'
+                ),
+                'element_data' => array(
+                    'position' => array('x' => 279.13, 'y' => 375.88),
+                    'scale_factors' => array('x' => 0.063972, 'y' => 0.063972)
+                ),
+                'template_id' => 3657,
+                'selected_size' => 'L'
+            );
             
             // SCHRITT 2 ausführen
             $step2_result = $this->perform_step_2_template_measurements($step1_output);
