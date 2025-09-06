@@ -906,4 +906,123 @@ class Octo_Print_Designer_Admin {
         $screen = get_current_screen();
         return $screen && $screen->post_type === 'design_template';
     }
+
+    /**
+     * SCHRITT 1.3: Design-Element-Struktur für Workflow konvertieren
+     */
+    public function convert_design_elements_to_workflow($design_data) {
+        $result = array();
+        $workflow_elements = array();
+        $element_counter = 1;
+
+        // 1.3 DESIGN-ELEMENT-PLATZIERUNG AUS ECHTEN DESIGN-DATEN
+        if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
+            $variation_images = $design_data['variationImages'];
+            $result[] = "✅ variationImages gefunden: " . count($variation_images) . " Variationen";
+            
+            // SCHRITT 1.3 ANFORDERUNG: Workflow-konforme Element-Liste erstellen
+            foreach ($variation_images as $combined_key => $images_array) {
+                foreach ($images_array as $idx => $element) {
+                    if (isset($element['transform'])) {
+                        $transform = $element['transform'];
+                        
+                        // WORKFLOW-KONFORME ELEMENT-STRUKTUR
+                        $workflow_element = array(
+                            'element_id' => $element['id'] ?? ('element_' . $element_counter),
+                            'type' => 'image', // Da wir Bilder haben
+                            'content' => basename($element['url'] ?? ''),
+                            'position' => array(
+                                'x' => floatval($transform['left'] ?? 0),
+                                'y' => floatval($transform['top'] ?? 0)
+                            ),
+                            'size' => array(
+                                'width' => floatval($transform['width'] ?? 0) * floatval($transform['scaleX'] ?? 1),
+                                'height' => floatval($transform['height'] ?? 0) * floatval($transform['scaleY'] ?? 1)
+                            ),
+                            'transform' => array(
+                                'scaleX' => floatval($transform['scaleX'] ?? 1),
+                                'scaleY' => floatval($transform['scaleY'] ?? 1),
+                                'rotation' => floatval($transform['angle'] ?? 0)
+                            )
+                        );
+                        
+                        $workflow_elements[] = $workflow_element;
+                        $element_counter++;
+                        
+                        $result[] = "   🎯 WORKFLOW-ELEMENT " . count($workflow_elements) . ":";
+                        $result[] = "      element_id: " . $workflow_element['element_id'];
+                        $result[] = "      type: " . $workflow_element['type'];
+                        $result[] = "      content: " . $workflow_element['content'];
+                        $result[] = "      position: x=" . $workflow_element['position']['x'] . ", y=" . $workflow_element['position']['y'];
+                        $result[] = "      size: " . $workflow_element['size']['width'] . "×" . $workflow_element['size']['height'];
+                        $result[] = "      transform: scaleX=" . $workflow_element['transform']['scaleX'] . ", scaleY=" . $workflow_element['transform']['scaleY'] . ", rotation=" . $workflow_element['transform']['rotation'];
+                    }
+                }
+            }
+            
+            $result[] = "";
+            $result[] = "✅ SCHRITT 1.3 WORKFLOW-KONFORME ELEMENTE: " . count($workflow_elements) . " Elemente konvertiert";
+        }
+
+        return array(
+            'workflow_elements' => $workflow_elements,
+            'log' => $result
+        );
+    }
+
+    /**
+     * SCHRITT 1.4: Canvas-Kontext aus design_metadata laden
+     */
+    public function load_canvas_context_from_metadata($design_data) {
+        $result = array();
+        $canvas_context = array();
+
+        // SCHRITT 1.4 ANFORDERUNG: Canvas-Kontext aus design_metadata laden
+        if (isset($design_data['design_metadata']) && is_array($design_data['design_metadata'])) {
+            $metadata = $design_data['design_metadata'];
+            
+            $canvas_context = array(
+                'actual_canvas_size' => $metadata['actual_canvas_size'],
+                'template_reference_size' => $metadata['template_reference_size'],
+                'device_type' => $metadata['device_type'],
+                'creation_timestamp' => $metadata['creation_timestamp'],
+                'inference_method' => 'design_metadata_direct'
+            );
+            
+            $result[] = "✅ SCHRITT 1.4 ERFÜLLT - Canvas-Kontext aus design_metadata:";
+            $result[] = "   Canvas: " . $metadata['actual_canvas_size']['width'] . "x" . $metadata['actual_canvas_size']['height'] . "px";
+            $result[] = "   Device-Type: " . $metadata['device_type'];
+            $result[] = "   Template-Referenz: " . $metadata['template_reference_size']['width'] . "x" . $metadata['template_reference_size']['height'] . "px";
+            $result[] = "   Creation Timestamp: " . $metadata['creation_timestamp'];
+            $result[] = "   Quelle: design_metadata (ORIGINAL)";
+            
+        } else if (isset($design_data['canvasWidth']) && isset($design_data['canvasHeight'])) {
+            // Fallback für alte Struktur
+            $canvas_context = array(
+                'actual_canvas_size' => array(
+                    'width' => intval($design_data['canvasWidth']),
+                    'height' => intval($design_data['canvasHeight'])
+                ),
+                'template_reference_size' => array(
+                    'width' => 800,
+                    'height' => 600
+                ),
+                'device_type' => 'unknown',
+                'creation_timestamp' => date('Y-m-d H:i:s'),
+                'inference_method' => 'legacy_canvas_data'
+            );
+            
+            $result[] = "⚠️ SCHRITT 1.4 FALLBACK - Canvas-Kontext aus legacy Daten:";
+            $result[] = "   Canvas: " . $design_data['canvasWidth'] . "x" . $design_data['canvasHeight'] . "px";
+            $result[] = "   Quelle: legacy canvasWidth/canvasHeight";
+        } else {
+            $result[] = "❌ SCHRITT 1.4 FEHLER - Keine Canvas-Daten gefunden";
+            $result[] = "   Weder design_metadata noch legacy canvasWidth/canvasHeight verfügbar";
+        }
+
+        return array(
+            'canvas_context' => $canvas_context,
+            'log' => $result
+        );
+    }
 }

@@ -1898,11 +1898,28 @@ setTimeout(function () {
   }, {
     key: "collectDesignState",
     value: function collectDesignState() {
+      // 1.2 + 1.4 SCHRITT 1 ANFORDERUNG: Canvas-Kontext beim Speichern erfassen
+      var canvasDimensions = this.getCurrentCanvasDimensions();
+      var deviceType = this.detectDeviceType(canvasDimensions.width, canvasDimensions.height);
+
       // Create an object representing the current state of the design
       var state = {
         templateId: this.activeTemplateId,
         currentVariation: this.currentVariation,
-        variationImages: {}
+        variationImages: {},
+        // NEU: SCHRITT 1.4 Canvas-Kontext speichern
+        design_metadata: {
+          actual_canvas_size: {
+            width: canvasDimensions.width,
+            height: canvasDimensions.height
+          },
+          template_reference_size: {
+            width: 800,
+            height: 600
+          },
+          device_type: deviceType,
+          creation_timestamp: new Date().toISOString()
+        }
       };
 
       // Convert the variationImages Map to a plain object with arrays
@@ -2334,6 +2351,25 @@ setTimeout(function () {
       }
       return captureAllViewsPreviews;
     }()
+  }, {
+    key: "getCurrentCanvasDimensions",
+    value: function getCurrentCanvasDimensions() {
+      // SCHRITT 1 HILFSMETHODEN
+      if (this.fabricCanvas) {
+        return {
+          width: this.fabricCanvas.getWidth(),
+          height: this.fabricCanvas.getHeight()
+        };
+      }
+      return { width: 800, height: 600 }; // Fallback
+    }
+  }, {
+    key: "detectDeviceType",
+    value: function detectDeviceType(width, height) {
+      if (width <= 400 && height <= 300) return 'mobile';
+      if (width <= 600 && height <= 450) return 'tablet';
+      return 'desktop';
+    }
   }]);
 }();
 

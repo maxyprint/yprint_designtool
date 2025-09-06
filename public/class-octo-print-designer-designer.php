@@ -583,10 +583,18 @@ wp_add_inline_script('octo-print-designer-designer', '
                 // Convert template variations to format expected by frontend
                 $variations = $this->format_variations($variations);
 
+                // 1.1 SCHRITT 1 ANFORDERUNG: Template-Bild-Referenz hinzufügen
+                $template_image_path = get_post_meta($template_id, '_template_image_path', true);
+                if (empty($template_image_path)) {
+                    // Fallback für Template 3657 (Shirt SS25)
+                    $template_image_path = ($template_id == 3657) ? 'shirt_front_template.jpg' : 'default_template.jpg';
+                }
+
                 // Add template to array
                 $templates[$template_id] = array(
                     'id' => $template_id,
                     'name' => get_the_title(),
+                    'template_image' => $template_image_path, // NEU: Template-Bild-Referenz
                     'variations' => $variations,
                     'physical_width_cm' => (float) $physical_width_cm,
                     'physical_height_cm' => (float) $physical_height_cm
