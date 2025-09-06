@@ -93,6 +93,10 @@ class Octo_Print_Designer_Admin {
         // ✅ SCHRITT 2: Template-Referenzmessungen AJAX Handler
         add_action('wp_ajax_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         add_action('wp_ajax_nopriv_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
+        
+        // ✅ DEBUG: Einfacher Test-Handler
+        add_action('wp_ajax_test_step_2_debug', array($this, 'ajax_test_step_2_debug'));
+        add_action('wp_ajax_nopriv_test_step_2_debug', array($this, 'ajax_test_step_2_debug'));
         add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
         add_action('wp_ajax_nopriv_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
         add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
@@ -1245,6 +1249,19 @@ class Octo_Print_Designer_Admin {
             'step2_output' => $step2_output,
             'log' => implode("\n", $result)
         );
+    }
+    
+    /**
+     * ✅ DEBUG: Einfacher Test-Handler für SCHRITT 2
+     */
+    public function ajax_test_step_2_debug() {
+        error_log("YPrint SCHRITT 2 DEBUG: Handler aufgerufen");
+        
+        wp_send_json_success(array(
+            'message' => 'SCHRITT 2 Debug erfolgreich',
+            'timestamp' => current_time('mysql'),
+            'handler' => 'ajax_test_step_2_debug'
+        ));
     }
     
     /**
