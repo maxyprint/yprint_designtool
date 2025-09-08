@@ -2397,7 +2397,8 @@ class Octo_Print_Designer_Admin {
             'template_image_url' => $template_image_url,
             'selected_size' => $selected_size,
             'template_id' => $template_id,
-            'debug_info' => $debug_info
+            'debug_info' => $debug_info,
+            'template_image_search_debug' => $GLOBALS['yprint_debug_info'] ?? null
         );
         
         if ($preview_type === 'reference_measurement_image') {
@@ -2714,6 +2715,9 @@ class Octo_Print_Designer_Admin {
             
             // Debug-Info in die Preview-Daten einbetten
             $GLOBALS['yprint_debug_info'] = $debug_info;
+            
+            // Debug-Info auch in die Preview-Daten einbetten
+            $debug_info['template_image_search_debug'] = $debug_info;
         }
         
         // Fallback: Platzhalter-Bild

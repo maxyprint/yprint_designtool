@@ -1934,6 +1934,14 @@ private function check_yprint_dependency() {
                                     console.log('🔍 YPrint Detailed Debug Info:', data.debug_info);
                                 }
                                 
+                                if (data.template_image_search_debug) {
+                                    console.log('🔍 YPrint Template Image Search Debug:', data.template_image_search_debug);
+                                    console.log('📊 Template Meta Fields:', data.template_image_search_debug.template_meta_keys);
+                                    console.log('📊 Template Meta Values:', data.template_image_search_debug.template_meta_values);
+                                    console.log('📊 Found In Field:', data.template_image_search_debug.found_in_field);
+                                    console.log('📊 Fallback Reason:', data.template_image_search_debug.fallback_reason);
+                                }
+                                
                                 if (data.error) {
                                     console.error('YPrint Preview Error:', data.error);
                                     console.log('YPrint Debug Info:', data.debug_info);
