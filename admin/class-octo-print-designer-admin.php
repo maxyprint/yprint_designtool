@@ -3068,9 +3068,9 @@ class Octo_Print_Designer_Admin {
                     
                     <!-- Preview Content -->
                     <div id="yprint-preview-content" style="display: none;">
-                        <!-- Template Image -->
+                        <!-- Template Image/HTML Content -->
                         <div style="text-align: center; margin-bottom: 20px;">
-                            <img id="yprint-preview-image" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px;" alt="Template Vorschau">
+                            <div id="yprint-preview-image-container" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;"></div>
                         </div>
                         
                         <!-- Debug Information -->
@@ -3314,47 +3314,42 @@ class Octo_Print_Designer_Admin {
             return $template_image_url;
         }
         
-        // Größere SVG für Vollbild-Vorschau (800x1000)
-        $svg = '<svg width="800" height="1000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-            <!-- Template Background Image -->
-            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="800" height="1000" preserveAspectRatio="xMidYMid meet"/>
-            
+        // Verwende HTML mit CSS statt SVG für bessere Bildanzeige
+        $html = '<div style="position: relative; width: 800px; height: 1000px; background-image: url(\'' . esc_attr($template_image_url) . '\'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #f0f0f0;">
             <!-- Overlay für bessere Sichtbarkeit -->
-            <rect x="0" y="0" width="800" height="1000" fill="rgba(0,0,0,0.1)"/>
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.1);"></div>
             
             <!-- Chest Measurement Line (horizontal red line) - Skaliert für größeres Bild -->
-            <line x1="' . ($reference_data['pixel_start']['x'] * 2) . '" y1="' . ($reference_data['pixel_start']['y'] * 2) . '" 
-                  x2="' . ($reference_data['pixel_end']['x'] * 2) . '" y2="' . ($reference_data['pixel_end']['y'] * 2) . '" 
-                  stroke="#dc3545" stroke-width="8"/>
-            <circle cx="' . ($reference_data['pixel_start']['x'] * 2) . '" cy="' . ($reference_data['pixel_start']['y'] * 2) . '" r="12" fill="#dc3545"/>
-            <circle cx="' . ($reference_data['pixel_end']['x'] * 2) . '" cy="' . ($reference_data['pixel_end']['y'] * 2) . '" r="12" fill="#dc3545"/>
+            <div style="position: absolute; left: ' . ($reference_data['pixel_start']['x'] * 2) . 'px; top: ' . ($reference_data['pixel_start']['y'] * 2) . 'px; width: ' . (($reference_data['pixel_end']['x'] - $reference_data['pixel_start']['x']) * 2) . 'px; height: 8px; background: #dc3545; border-radius: 4px;"></div>
+            <div style="position: absolute; left: ' . (($reference_data['pixel_start']['x'] * 2) - 12) . 'px; top: ' . (($reference_data['pixel_start']['y'] * 2) - 12) . 'px; width: 24px; height: 24px; background: #dc3545; border-radius: 50%;"></div>
+            <div style="position: absolute; left: ' . (($reference_data['pixel_end']['x'] * 2) - 12) . 'px; top: ' . (($reference_data['pixel_end']['y'] * 2) - 12) . 'px; width: 24px; height: 24px; background: #dc3545; border-radius: 50%;"></div>
             
             <!-- Measurement Labels - Größer für Vollbild -->
-            <rect x="' . (($reference_data['pixel_start']['x'] * 2) - 100) . '" y="' . (($reference_data['pixel_start']['y'] * 2) - 60) . '" 
-                  width="200" height="50" fill="rgba(220,53,69,0.9)" rx="10"/>
-            <text x="' . (($reference_data['pixel_start']['x'] + $reference_data['pixel_end']['x'])) . '" 
-                  y="' . (($reference_data['pixel_start']['y'] * 2) - 20) . '" 
-                  text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">
-                ' . $reference_data['real_distance_cm'] . ' cm
-            </text>
+            <div style="position: absolute; left: ' . (($reference_data['pixel_start']['x'] * 2) - 100) . 'px; top: ' . (($reference_data['pixel_start']['y'] * 2) - 60) . 'px; width: 200px; height: 50px; background: rgba(220,53,69,0.9); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 24px; font-weight: bold;">
+                    ' . $reference_data['real_distance_cm'] . ' cm
+                </span>
+            </div>
             
             <!-- Size Label - Größer -->
-            <rect x="400" y="840" width="160" height="60" fill="#007bff" rx="10"/>
-            <text x="480" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white">
-                Größe ' . esc_attr($selected_size) . '
-            </text>
+            <div style="position: absolute; left: 400px; top: 840px; width: 160px; height: 60px; background: #007bff; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold;">
+                    Größe ' . esc_attr($selected_size) . '
+                </span>
+            </div>
             
             <!-- Title - Größer -->
-            <rect x="100" y="40" width="600" height="80" fill="rgba(0,0,0,0.8)" rx="10"/>
-            <text x="400" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white">
-                REFERENZMESSUNG
-            </text>
-            <text x="400" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#ccc">
-                ' . esc_attr($reference_data['measurement_type']) . ' Measurement
-            </text>
-        </svg>';
+            <div style="position: absolute; left: 100px; top: 40px; width: 600px; height: 80px; background: rgba(0,0,0,0.8); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 32px; font-weight: bold;">
+                    REFERENZMESSUNG
+                </span>
+                <span style="color: #ccc; font-family: Arial, sans-serif; font-size: 24px;">
+                    ' . esc_attr($reference_data['measurement_type']) . ' Measurement
+                </span>
+            </div>
+        </div>';
         
-        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        return 'data:text/html;base64,' . base64_encode($html);
     }
 
     /**
@@ -3374,86 +3369,73 @@ class Octo_Print_Designer_Admin {
         $height_mm = $api_data['height_mm'] ?? 0;
         $dpi = $api_data['dpi'] ?? 0;
         
-        // Koordinaten für größeres SVG umrechnen
+        // Koordinaten für größeres Bild umrechnen
         $scale = 3.0; // Größere Skalierung für Vollbild
         $design_x = 200 + ($x_mm * $scale);
         $design_y = 200 + ($y_mm * $scale);
         $design_width = $width_mm * $scale;
         $design_height = $height_mm * $scale;
         
-        $svg = '<svg width="800" height="1000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-            <!-- Template Background Image -->
-            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="800" height="1000" preserveAspectRatio="xMidYMid meet"/>
-            
+        // Verwende HTML mit CSS statt SVG für bessere Bildanzeige
+        $html = '<div style="position: relative; width: 800px; height: 1000px; background-image: url(\'' . esc_attr($template_image_url) . '\'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #f0f0f0;">
             <!-- Overlay für bessere Sichtbarkeit -->
-            <rect x="0" y="0" width="800" height="1000" fill="rgba(0,0,0,0.1)"/>
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.1);"></div>
             
             <!-- Design Platzierung (Rechteck mit Pattern) -->
-            <defs>
-                <pattern id="designPatternFull" patternUnits="userSpaceOnUse" width="40" height="40">
-                    <rect width="40" height="40" fill="#28a745" opacity="0.4"/>
-                    <circle cx="20" cy="20" r="6" fill="#28a745"/>
-                </pattern>
-            </defs>
-            
-            <rect x="' . $design_x . '" y="' . $design_y . '" 
-                  width="' . $design_width . '" height="' . $design_height . '" 
-                  fill="url(#designPatternFull)" stroke="#28a745" stroke-width="6" stroke-dasharray="10,10"/>
+            <div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; background: repeating-linear-gradient(45deg, rgba(40,167,69,0.4) 0px, rgba(40,167,69,0.4) 20px, rgba(40,167,69,0.2) 20px, rgba(40,167,69,0.2) 40px); border: 6px dashed #28a745; border-radius: 8px;"></div>
             
             <!-- Referenzpunkt Markierung (🎯 Symbol) - Größer -->
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="20" fill="#dc3545"/>
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="12" fill="#ffffff"/>
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="6" fill="#dc3545"/>
+            <div style="position: absolute; left: ' . ($design_x - 20) . 'px; top: ' . ($design_y - 20) . 'px; width: 40px; height: 40px; background: #dc3545; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 24px; height: 24px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 12px; height: 12px; background: #dc3545; border-radius: 50%;"></div>
+                </div>
+            </div>
             
             <!-- Maßlinien - Größer -->
             <!-- Horizontale Maßlinie -->
-            <line x1="' . $design_x . '" y1="' . ($design_y + $design_height + 40) . '" 
-                  x2="' . ($design_x + $design_width) . '" y2="' . ($design_y + $design_height + 40) . '" 
-                  stroke="#6c757d" stroke-width="4" stroke-dasharray="6,6"/>
-            <rect x="' . ($design_x + $design_width/2 - 40) . '" y="' . ($design_y + $design_height + 50) . '" 
-                  width="80" height="30" fill="rgba(108,117,125,0.9)" rx="5"/>
-            <text x="' . ($design_x + $design_width/2) . '" y="' . ($design_y + $design_height + 70) . '" 
-                  text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
-                ' . $width_mm . 'mm
-            </text>
+            <div style="position: absolute; left: ' . $design_x . 'px; top: ' . ($design_y + $design_height + 40) . 'px; width: ' . $design_width . 'px; height: 4px; background: repeating-linear-gradient(to right, #6c757d 0px, #6c757d 6px, transparent 6px, transparent 12px);"></div>
+            <div style="position: absolute; left: ' . ($design_x + $design_width/2 - 40) . 'px; top: ' . ($design_y + $design_height + 50) . 'px; width: 80px; height: 30px; background: rgba(108,117,125,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;">
+                    ' . $width_mm . 'mm
+                </span>
+            </div>
             
             <!-- Vertikale Maßlinie -->
-            <line x1="' . ($design_x + $design_width + 40) . '" y1="' . $design_y . '" 
-                  x2="' . ($design_x + $design_width + 40) . '" y2="' . ($design_y + $design_height) . '" 
-                  stroke="#6c757d" stroke-width="4" stroke-dasharray="6,6"/>
-            <rect x="' . ($design_x + $design_width + 50) . '" y="' . ($design_y + $design_height/2 - 15) . '" 
-                  width="60" height="30" fill="rgba(108,117,125,0.9)" rx="5"/>
-            <text x="' . ($design_x + $design_width + 80) . '" y="' . ($design_y + $design_height/2 + 5) . '" 
-                  text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
-                ' . $height_mm . 'mm
-            </text>
+            <div style="position: absolute; left: ' . ($design_x + $design_width + 40) . 'px; top: ' . $design_y . 'px; width: 4px; height: ' . $design_height . 'px; background: repeating-linear-gradient(to bottom, #6c757d 0px, #6c757d 6px, transparent 6px, transparent 12px);"></div>
+            <div style="position: absolute; left: ' . ($design_x + $design_width + 50) . 'px; top: ' . ($design_y + $design_height/2 - 15) . 'px; width: 60px; height: 30px; background: rgba(108,117,125,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;">
+                    ' . $height_mm . 'mm
+                </span>
+            </div>
             
             <!-- Info-Boxen - Größer -->
-            <rect x="50" y="50" width="300" height="120" fill="rgba(0,0,0,0.8)" rx="10"/>
-            <text x="200" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">
-                FINALE DRUCKPLATZIERUNG
-            </text>
-            <text x="200" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#ccc">
-                ' . esc_attr($view_name) . '
-            </text>
-            <text x="200" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#28a745">
-                Größe: ' . esc_attr($selected_size) . ' | DPI: ' . $dpi . '
-            </text>
+            <div style="position: absolute; left: 50px; top: 50px; width: 300px; height: 120px; background: rgba(0,0,0,0.8); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; text-align: center;">
+                    FINALE DRUCKPLATZIERUNG
+                </span>
+                <span style="color: #ccc; font-family: Arial, sans-serif; font-size: 18px; text-align: center; margin: 5px 0;">
+                    ' . esc_attr($view_name) . '
+                </span>
+                <span style="color: #28a745; font-family: Arial, sans-serif; font-size: 16px; text-align: center;">
+                    Größe: ' . esc_attr($selected_size) . ' | DPI: ' . $dpi . '
+                </span>
+            </div>
             
             <!-- Koordinaten-Info -->
-            <rect x="450" y="50" width="300" height="120" fill="rgba(0,123,255,0.8)" rx="10"/>
-            <text x="600" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
-                KOORDINATEN
-            </text>
-            <text x="600" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="white">
-                X: ' . $x_mm . 'mm | Y: ' . $y_mm . 'mm
-            </text>
-            <text x="600" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="white">
-                W: ' . $width_mm . 'mm | H: ' . $height_mm . 'mm
-            </text>
-        </svg>';
+            <div style="position: absolute; left: 450px; top: 50px; width: 300px; height: 120px; background: rgba(0,123,255,0.8); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; text-align: center;">
+                    KOORDINATEN
+                </span>
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 16px; text-align: center; margin: 5px 0;">
+                    X: ' . $x_mm . 'mm | Y: ' . $y_mm . 'mm
+                </span>
+                <span style="color: white; font-family: Arial, sans-serif; font-size: 16px; text-align: center;">
+                    W: ' . $width_mm . 'mm | H: ' . $height_mm . 'mm
+                </span>
+            </div>
+        </div>';
         
-        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        return 'data:text/html;base64,' . base64_encode($html);
     }
 
     /**
