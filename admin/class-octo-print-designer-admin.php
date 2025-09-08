@@ -2620,9 +2620,9 @@ class Octo_Print_Designer_Admin {
         }
         
         // Generiere SVG-Overlay für echtes Template-Bild
-        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
             <!-- Template Background Image -->
-            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
+            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
             
             <!-- Overlay für bessere Sichtbarkeit -->
             <rect x="0" y="0" width="400" height="500" fill="rgba(0,0,0,0.1)"/>
@@ -2685,9 +2685,9 @@ class Octo_Print_Designer_Admin {
         $design_width = $width_mm * $scale;
         $design_height = $height_mm * $scale;
         
-        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
             <!-- Template Background Image -->
-            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
+            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
             
             <!-- Overlay für bessere Sichtbarkeit -->
             <rect x="0" y="0" width="400" height="500" fill="rgba(0,0,0,0.1)"/>
