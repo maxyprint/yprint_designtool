@@ -2739,6 +2739,10 @@ class Octo_Print_Designer_Admin {
             global $wpdb;
             $template_id = $template_data['id'];
             
+            $debug_info['database_search_attempted'] = true;
+            $debug_info['template_id_for_search'] = $template_id;
+            $debug_info['view_name_for_search'] = $view_name;
+            
             // Suche nach Template-Bildern basierend auf dem View-Namen
             $view_based_query = $wpdb->prepare(
                 "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
@@ -2749,7 +2753,10 @@ class Octo_Print_Designer_Admin {
                 '%' . $wpdb->esc_like($view_name) . '%'
             );
             
+            $debug_info['view_based_query'] = $view_based_query;
             $template_image = $wpdb->get_row($view_based_query);
+            $debug_info['view_based_result'] = $template_image;
+            
             if ($template_image) {
                 $debug_info['found_in'] = 'deo6_posts_by_view_name';
                 $debug_info['template_image_title'] = $template_image->post_title;
@@ -2774,7 +2781,10 @@ class Octo_Print_Designer_Admin {
                 '%kaan%'
             );
             
+            $debug_info['kaan_query'] = $kaan_query;
             $kaan_image = $wpdb->get_row($kaan_query);
+            $debug_info['kaan_result'] = $kaan_image;
+            
             if ($kaan_image) {
                 $debug_info['found_in'] = 'deo6_posts_by_kaan';
                 $debug_info['kaan_image_title'] = $kaan_image->post_title;
@@ -2788,6 +2798,14 @@ class Octo_Print_Designer_Admin {
                     return $image_url;
                 }
             }
+            
+            // Debug: Alle verfügbaren Bilder auflisten
+            $all_images_query = "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
+                                WHERE post_type = 'attachment' 
+                                AND post_mime_type LIKE 'image/%'
+                                ORDER BY post_date DESC LIMIT 10";
+            $all_images = $wpdb->get_results($all_images_query);
+            $debug_info['all_available_images'] = $all_images;
         }
         
         if (!empty($template_data['id'])) {
