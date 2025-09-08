@@ -2167,6 +2167,21 @@ class Octo_Print_Designer_Admin {
         $view_name = $view_result['view_name'];
         $view_key = $view_result['view_key'];
         
+        // SCHRITT 4.1: Prüfe ob visual_previews bereits vorhanden sind
+        if (!empty($view_result['visual_previews']['dual_visualization'])) {
+            $dual_preview = $view_result['visual_previews']['dual_visualization'];
+            return array(
+                'view_name' => $view_name,
+                'view_key' => $view_key,
+                'preview_type' => 'dual_visualization',
+                'template_image_url' => 'dual_visualization',
+                'selected_size' => $view_result['selected_size'] ?? 'M',
+                'template_id' => $view_result['template_id'] ?? null,
+                'image_url' => 'data:text/html;base64,' . base64_encode($dual_preview['html']),
+                'debug_info' => $dual_preview['description']
+            );
+        }
+        
         // Template-Daten laden
         $template_id = null;
         $debug_info = array();
@@ -2347,6 +2362,12 @@ class Octo_Print_Designer_Admin {
             $preview_data['placement_data'] = $step8_data;
             $preview_data['image_url'] = $this->generate_fullsize_placement_image($template_image_url, $step8_data, $view_name, $selected_size);
             $preview_data['debug_info'] = $this->format_placement_debug_info($step8_data, $template_data, $selected_size);
+            
+        } elseif ($preview_type === 'dual_visualization') {
+            // SCHRITT 4.1: Doppel-Visualisierung
+            $dual_html = $this->generate_dual_visualization($view_result, $template_id, $view_name, $selected_size);
+            $preview_data['image_url'] = 'data:text/html;base64,' . base64_encode($dual_html);
+            $preview_data['debug_info'] = "Doppel-Visualisierung für {$view_name} - Größe {$selected_size}";
         }
         
         return $preview_data;
