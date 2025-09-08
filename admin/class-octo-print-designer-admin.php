@@ -94,12 +94,13 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         add_action('wp_ajax_nopriv_test_step_2_template_measurements', array($this, 'ajax_test_step_2_template_measurements'));
         
-        add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
-        add_action('wp_ajax_nopriv_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
-        add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
-        add_action('wp_ajax_nopriv_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
-        add_action('wp_ajax_get_template_measurements', array($this, 'ajax_get_template_measurements'));
-        add_action('wp_ajax_nopriv_get_template_measurements', array($this, 'ajax_get_template_measurements'));
+        // ❌ ENTFERNT: Doppelte SCHRITT 2 AJAX-Handler (verwende Original-System)
+        // add_action('wp_ajax_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
+        // add_action('wp_ajax_nopriv_save_template_measurements_table', array($this, 'ajax_save_template_measurements_table'));
+        // add_action('wp_ajax_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
+        // add_action('wp_ajax_nopriv_save_pixel_mapping', array($this, 'ajax_save_pixel_mapping'));
+        // add_action('wp_ajax_get_template_measurements', array($this, 'ajax_get_template_measurements'));
+        // add_action('wp_ajax_nopriv_get_template_measurements', array($this, 'ajax_get_template_measurements'));
         
         // ✅ SCHRITT 3: Druckkoordinaten-Berechnung AJAX Handler
         add_action('wp_ajax_test_step_3_print_coordinates', array($this, 'ajax_test_step_3_print_coordinates'));
@@ -1083,13 +1084,24 @@ class Octo_Print_Designer_Admin {
         $result[] = "";
         
         // SCHRITT 2.2: Template-Maße laden
-        $result[] = "📏 SCHRITT 2.2: Template-Maße laden";
+        $result[] = "📏 SCHRITT 2.2: Template-Maße laden (ORIGINAL-SYSTEM)";
         $result[] = "----------------------------------------";
         
-        $template_measurements = get_post_meta($template_id, '_template_measurements_table', true);
-        if (empty($template_measurements) || !is_array($template_measurements)) {
+        // Template-Produktdimensionen aus ORIGINAL-System laden
+        $template_measurements = null;
+        $possible_keys = array('_template_product_dimensions', '_product_dimensions');
+        foreach ($possible_keys as $key) {
+            $temp = get_post_meta($template_id, $key, true);
+            if (!empty($temp) && is_array($temp)) {
+                $template_measurements = $temp;
+                $result[] = "✅ Template-Maße gefunden in Meta-Key: {$key}";
+                break;
+            }
+        }
+        
+        if (empty($template_measurements)) {
             $result[] = "⚠️ Keine Template-Maße gefunden - verwende Mock-Daten für Demo:";
-            $result[] = "   Meta-Key: _template_measurements_table";
+            $result[] = "   Geprüfte Meta-Keys: _template_product_dimensions, _product_dimensions";
             $result[] = "   Template-ID: {$template_id}";
             $result[] = "";
             $result[] = "💡 LÖSUNG: Template-Maße im Admin definieren:";
@@ -1097,22 +1109,14 @@ class Octo_Print_Designer_Admin {
             $result[] = "   2. Größentabelle ausfüllen (S/M/L/XL)";
             $result[] = "   3. Speichern";
             $result[] = "";
-            $result[] = "🔄 Verwende Mock-Daten für Demo:";
+            $result[] = "🔄 Verwende Mock-Daten für Demo (ORIGINAL-FORMAT):";
             
-            // Mock-Daten für Demo verwenden
+            // Mock-Daten im ORIGINAL _template_product_dimensions Format
             $template_measurements = array(
-                'chest' => array(
-                    'S' => 48.0,
-                    'M' => 51.0,
-                    'L' => 54.0,
-                    'XL' => 57.0
-                ),
-                'height_from_shoulder' => array(
-                    'S' => 65.0,
-                    'M' => 68.0,
-                    'L' => 71.0,
-                    'XL' => 74.0
-                )
+                'S' => array('chest_width' => 48.0, 'length' => 65.0),
+                'M' => array('chest_width' => 51.0, 'length' => 68.0),
+                'L' => array('chest_width' => 54.0, 'length' => 71.0),
+                'XL' => array('chest_width' => 57.0, 'length' => 74.0)
             );
         }
         
@@ -1126,50 +1130,58 @@ class Octo_Print_Designer_Admin {
         $result[] = "";
         
         // SCHRITT 2.3: Pixel-zu-Physisch Mapping laden
-        $result[] = "🎯 SCHRITT 2.3: Pixel-zu-Physisch Mapping laden";
+        $result[] = "🎯 SCHRITT 2.3: Pixel-zu-Physisch Mapping laden (ORIGINAL-SYSTEM)";
         $result[] = "----------------------------------------";
         
-        $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
-        if (empty($pixel_mappings) || !is_array($pixel_mappings)) {
-            $result[] = "⚠️ Keine Pixel-Mappings gefunden - verwende Mock-Daten für Demo:";
-            $result[] = "   Meta-Key: _template_pixel_mappings";
+        // Referenzmessungen aus ORIGINAL-System laden
+        $pixel_mappings = get_post_meta($template_id, '_template_view_print_areas', true);
+        if (!empty($pixel_mappings) && is_array($pixel_mappings)) {
+            $result[] = "✅ Referenzmessungen gefunden in Meta-Key: _template_view_print_areas";
+        } else {
+            $result[] = "⚠️ Keine Referenzmessungen gefunden - verwende Mock-Daten für Demo:";
+            $result[] = "   Meta-Key: _template_view_print_areas";
             $result[] = "   Template-ID: {$template_id}";
             $result[] = "";
-            $result[] = "💡 LÖSUNG: Pixel-Mappings im Admin definieren:";
+            $result[] = "💡 LÖSUNG: Referenzmessungen im Admin definieren:";
             $result[] = "   1. Template bearbeiten";
             $result[] = "   2. Referenzpunkte auf Template-Bild markieren";
             $result[] = "   3. Physische Distanzen eingeben";
             $result[] = "   4. Speichern";
             $result[] = "";
-            $result[] = "🔄 Verwende Mock-Daten für Demo:";
+            $result[] = "🔄 Verwende Mock-Daten für Demo (ORIGINAL-FORMAT):";
             
-            // Mock-Daten für Demo verwenden
+            // Mock-Daten für Demo verwenden (ORIGINAL-FORMAT)
             $pixel_mappings = array(
-                '189542' => array(
+                'front' => array(
                     'view_name' => 'Front View',
-                    'reference_measurement' => array(
-                        'type' => 'chest',
-                        'pixel_start' => array('x' => 100, 'y' => 200),
-                        'pixel_end' => array('x' => 300, 'y' => 200),
-                        'pixel_distance' => 200.0,
-                        'physical_distance_cm' => 51.0
-                    ),
-                    'created_at' => current_time('mysql')
+                    'measurements' => array(
+                        array(
+                            'type' => 'chest_width',
+                            'pixel_distance' => 200.0,
+                            'real_distance_cm' => 51.0
+                        )
+                    )
                 )
             );
         }
         
         $used_mapping = null;
         foreach ($pixel_mappings as $view_id => $mapping) {
-            if (isset($mapping['reference_measurement'])) {
-                $used_mapping = $mapping['reference_measurement'];
-                $result[] = "✅ Pixel-Mapping für View {$view_id} gefunden:";
-                $result[] = "   Measurement-Type: " . $used_mapping['type'];
-                $result[] = "   Pixel Start: (" . $used_mapping['pixel_start']['x'] . ", " . $used_mapping['pixel_start']['y'] . ")";
-                $result[] = "   Pixel End: (" . $used_mapping['pixel_end']['x'] . ", " . $used_mapping['pixel_end']['y'] . ")";
-                $result[] = "   Pixel Distance: " . $used_mapping['pixel_distance'] . "px";
-                $result[] = "   Physical Distance: " . $used_mapping['physical_distance_cm'] . "cm";
-                break;
+            if (isset($mapping['measurements']) && is_array($mapping['measurements'])) {
+                foreach ($mapping['measurements'] as $measurement) {
+                    if (isset($measurement['type']) && isset($measurement['pixel_distance'])) {
+                        $used_mapping = array(
+                            'measurement_type' => $measurement['type'],
+                            'pixel_distance' => floatval($measurement['pixel_distance']),
+                            'physical_distance_cm' => floatval($measurement['real_distance_cm'] ?? 51.0)
+                        );
+                        $result[] = "✅ Referenzmessung für View {$view_id} gefunden:";
+                        $result[] = "   Measurement-Type: " . $used_mapping['measurement_type'];
+                        $result[] = "   Pixel Distance: " . $used_mapping['pixel_distance'] . "px";
+                        $result[] = "   Physical Distance: " . $used_mapping['physical_distance_cm'] . "cm";
+                        break 2;
+                    }
+                }
             }
         }
         
@@ -1221,13 +1233,25 @@ class Octo_Print_Designer_Admin {
         $result[] = "📏 SCHRITT 2.6: Größenspezifische Skalierung";
         $result[] = "----------------------------------------";
         
-        $measurement_type = $used_mapping['type']; // z.B. "chest"
-        if (!isset($template_measurements[$measurement_type])) {
+        // ORIGINAL Format für _template_product_dimensions
+        $measurement_type = $used_mapping['measurement_type'] ?? 'chest_width';
+        
+        // Template-Produktdimensionen in SCHRITT 2 Format konvertieren
+        $size_measurements = array();
+        if (isset($template_measurements[$selected_size][$measurement_type])) {
+            foreach ($template_measurements as $size => $dimensions) {
+                if (isset($dimensions[$measurement_type])) {
+                    $size_measurements[$size] = $dimensions[$measurement_type];
+                }
+            }
+        }
+        
+        if (empty($size_measurements)) {
             $result[] = "❌ Measurement-Type '{$measurement_type}' nicht in Template-Maßen gefunden!";
+            $result[] = "   Verfügbare Template-Dimensionen: " . print_r(array_keys($template_measurements), true);
             return implode("\n", $result);
         }
         
-        $size_measurements = $template_measurements[$measurement_type];
         $reference_size = "M"; // M als Referenz
         
         if (!isset($size_measurements[$reference_size]) || !isset($size_measurements[$selected_size])) {
@@ -1851,138 +1875,9 @@ class Octo_Print_Designer_Admin {
         }
     }
     
-    /**
-     * ✅ SCHRITT 2: AJAX Handler für Template-Größentabelle speichern
-     */
-    public function ajax_save_template_measurements_table() {
-        try {
-            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
-                wp_send_json_error('Security check failed');
-            }
-            
-            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
-            $measurements = isset($_POST['measurements']) ? $_POST['measurements'] : array();
-            
-            if (!$template_id) {
-                wp_send_json_error('Invalid template ID');
-            }
-            
-            // Sanitize measurements data
-            $sanitized_measurements = array();
-            foreach ($measurements as $type => $sizes) {
-                $sanitized_measurements[sanitize_text_field($type)] = array();
-                foreach ($sizes as $size => $value) {
-                    $sanitized_measurements[sanitize_text_field($type)][sanitize_text_field($size)] = floatval($value);
-                }
-            }
-            
-            // Save to database
-            $result = update_post_meta($template_id, '_template_measurements_table', $sanitized_measurements);
-            
-            if ($result !== false) {
-                error_log("YPrint SCHRITT 2: ✅ Template-Größentabelle gespeichert für Template {$template_id}");
-                wp_send_json_success(array(
-                    'message' => 'Template-Größentabelle erfolgreich gespeichert',
-                    'measurements' => $sanitized_measurements
-                ));
-            } else {
-                wp_send_json_error('Fehler beim Speichern der Größentabelle');
-            }
-            
-        } catch (Exception $e) {
-            error_log("YPrint SCHRITT 2: ❌ Exception beim Speichern der Größentabelle: " . $e->getMessage());
-            wp_send_json_error('Exception: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * ✅ SCHRITT 2: AJAX Handler für Pixel-Mapping speichern
-     */
-    public function ajax_save_pixel_mapping() {
-        try {
-            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
-                wp_send_json_error('Security check failed');
-            }
-            
-            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
-            $view_id = isset($_POST['view_id']) ? sanitize_text_field($_POST['view_id']) : '';
-            $mapping_data = isset($_POST['mapping_data']) ? $_POST['mapping_data'] : array();
-            
-            if (!$template_id || !$view_id) {
-                wp_send_json_error('Invalid template ID or view ID');
-            }
-            
-            // Load existing mappings
-            $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
-            if (!is_array($pixel_mappings)) {
-                $pixel_mappings = array();
-            }
-            
-            // Sanitize and save new mapping
-            $pixel_mappings[$view_id] = array(
-                'view_name' => sanitize_text_field($mapping_data['view_name'] ?? 'front'),
-                'reference_measurement' => array(
-                    'type' => sanitize_text_field($mapping_data['measurement_type'] ?? 'chest'),
-                    'pixel_start' => array(
-                        'x' => floatval($mapping_data['pixel_start_x'] ?? 0),
-                        'y' => floatval($mapping_data['pixel_start_y'] ?? 0)
-                    ),
-                    'pixel_end' => array(
-                        'x' => floatval($mapping_data['pixel_end_x'] ?? 0),
-                        'y' => floatval($mapping_data['pixel_end_y'] ?? 0)
-                    ),
-                    'pixel_distance' => floatval($mapping_data['pixel_distance'] ?? 0),
-                    'physical_distance_cm' => floatval($mapping_data['physical_distance_cm'] ?? 0)
-                ),
-                'created_at' => current_time('mysql')
-            );
-            
-            $result = update_post_meta($template_id, '_template_pixel_mappings', $pixel_mappings);
-            
-            if ($result !== false) {
-                error_log("YPrint SCHRITT 2: ✅ Pixel-Mapping gespeichert für Template {$template_id}, View {$view_id}");
-                wp_send_json_success(array(
-                    'message' => 'Pixel-Mapping erfolgreich gespeichert',
-                    'mapping' => $pixel_mappings[$view_id]
-                ));
-            } else {
-                wp_send_json_error('Fehler beim Speichern des Pixel-Mappings');
-            }
-            
-        } catch (Exception $e) {
-            error_log("YPrint SCHRITT 2: ❌ Exception beim Speichern des Pixel-Mappings: " . $e->getMessage());
-            wp_send_json_error('Exception: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * ✅ SCHRITT 2: AJAX Handler für Template-Messungen abrufen
-     */
-    public function ajax_get_template_measurements() {
-        try {
-            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
-                wp_send_json_error('Security check failed');
-            }
-            
-            $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
-            
-            if (!$template_id) {
-                wp_send_json_error('Invalid template ID');
-            }
-            
-            $measurements_table = get_post_meta($template_id, '_template_measurements_table', true);
-            $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
-            
-            wp_send_json_success(array(
-                'measurements_table' => $measurements_table ?: array(),
-                'pixel_mappings' => $pixel_mappings ?: array()
-            ));
-            
-        } catch (Exception $e) {
-            error_log("YPrint SCHRITT 2: ❌ Exception beim Abrufen der Template-Messungen: " . $e->getMessage());
-            wp_send_json_error('Exception: ' . $e->getMessage());
-        }
-    }
+    // ❌ ENTFERNT: ajax_save_template_measurements_table() - verwende Original-System
+    // ❌ ENTFERNT: ajax_save_pixel_mapping() - verwende Original-System  
+    // ❌ ENTFERNT: ajax_get_template_measurements() - verwende Original-System
 
     /**
      * ✅ NEU: Vollständiger Workflow & Debug - Hauptfunktion
@@ -2392,6 +2287,12 @@ class Octo_Print_Designer_Admin {
         $debug_info['template_image_debug_available'] = isset($GLOBALS['yprint_template_image_debug']);
         $debug_info['template_image_debug_content'] = $GLOBALS['yprint_template_image_debug'] ?? 'not_set';
         
+        // Debug: Template-Daten direkt ausgeben
+        $debug_info['template_data_full'] = $template_data;
+        $debug_info['template_data_image_path_value'] = $template_data['image_path'] ?? 'not_found';
+        $debug_info['template_data_image_path_type'] = gettype($template_data['image_path'] ?? null);
+        $debug_info['template_data_image_path_length'] = strlen($template_data['image_path'] ?? '');
+        
         // Zusätzliche Debug-Info für Template-Daten-Suche
         $debug_info['template_data_image_path'] = $template_data['image_path'] ?? 'not_found';
         $debug_info['template_data_has_image_path'] = !empty($template_data['image_path']);
@@ -2531,14 +2432,16 @@ class Octo_Print_Designer_Admin {
     private function execute_step_3_for_view($step2_result, $template_data, $selected_size, &$debug_log) {
         $debug_log[] = "  📏 SCHRITT 3: Template-Referenzmessungen";
         
-        // Mock Template-Maße für Demo (in echter Implementierung aus Meta-Daten laden)
+        // Mock Template-Maße für Demo (ORIGINAL-FORMAT)
         $mock_measurements = array(
-            'chest' => array('S' => 48, 'M' => 51, 'L' => 53, 'XL' => 56),
-            'height' => array('S' => 58, 'M' => 62, 'L' => 65, 'XL' => 68)
+            'S' => array('chest_width' => 48.0, 'length' => 58.0),
+            'M' => array('chest_width' => 51.0, 'length' => 62.0),
+            'L' => array('chest_width' => 53.0, 'length' => 65.0),
+            'XL' => array('chest_width' => 56.0, 'length' => 68.0)
         );
         
-        $chest_cm = $mock_measurements['chest'][$selected_size] ?? 53;
-        $height_cm = $mock_measurements['height'][$selected_size] ?? 65;
+        $chest_cm = $mock_measurements[$selected_size]['chest_width'] ?? 53.0;
+        $height_cm = $mock_measurements[$selected_size]['length'] ?? 65.0;
         
         $debug_log[] = "    ✅ Größe {$selected_size}: Brust={$chest_cm}cm, Höhe={$height_cm}cm";
         
@@ -2926,10 +2829,15 @@ class Octo_Print_Designer_Admin {
             return $this->get_fallback_measurement_data($selected_size);
         }
         
-        // 1. Lade Template-Messungen aus _template_measurements_table
-        $template_measurements = get_post_meta($template_id, '_template_measurements_table', true);
-        if (empty($template_measurements)) {
-            $template_measurements = get_post_meta($template_id, '_template_product_dimensions', true);
+        // 1. Lade Template-Messungen aus ORIGINAL-System
+        $template_measurements = null;
+        $possible_keys = array('_template_product_dimensions', '_product_dimensions');
+        foreach ($possible_keys as $key) {
+            $temp = get_post_meta($template_id, $key, true);
+            if (!empty($temp) && is_array($temp)) {
+                $template_measurements = $temp;
+                break;
+            }
         }
         
         // 2. Lade View-spezifische Konfiguration aus _template_view_print_areas
@@ -2978,12 +2886,7 @@ class Octo_Print_Designer_Admin {
             return $this->get_fallback_measurement_data($selected_size)['real_distance_cm'];
         }
         
-        // Struktur 1: _template_measurements_table
-        if (isset($template_measurements[$measurement_type][$selected_size])) {
-            return floatval($template_measurements[$measurement_type][$selected_size]);
-        }
-        
-        // Struktur 2: _template_product_dimensions
+        // ORIGINAL Format: _template_product_dimensions
         if (isset($template_measurements[$selected_size][$measurement_type])) {
             return floatval($template_measurements[$selected_size][$measurement_type]);
         }
@@ -3373,8 +3276,8 @@ class Octo_Print_Designer_Admin {
         return array(
             'id' => $template_id,
             'name' => get_the_title($template_id),
-            'measurements' => get_post_meta($template_id, '_template_measurements_table', true),
-            'pixel_mappings' => get_post_meta($template_id, '_template_pixel_mappings', true),
+            'measurements' => get_post_meta($template_id, '_template_product_dimensions', true),
+            'pixel_mappings' => get_post_meta($template_id, '_template_view_print_areas', true),
             'image_path' => get_post_meta($template_id, '_template_image_path', true)
         );
     }
@@ -3751,6 +3654,41 @@ class Octo_Print_Designer_Admin {
         $html .= '</table>';
         $html .= '</div>';
         return $html;
+    }
+
+    /**
+     * Extrahiert Referenzmessung aus _template_view_print_areas
+     */
+    private function extract_reference_from_view_print_areas($view_print_areas) {
+        if (empty($view_print_areas) || !is_array($view_print_areas)) {
+            return array(
+                'measurement_type' => 'chest_width',
+                'pixel_distance' => 200.0,
+                'physical_distance_cm' => 51.0
+            );
+        }
+        
+        // Durchsuche alle Views nach Referenzmessungen
+        foreach ($view_print_areas as $view_id => $view_data) {
+            if (isset($view_data['measurements']) && is_array($view_data['measurements'])) {
+                foreach ($view_data['measurements'] as $measurement) {
+                    if (isset($measurement['type']) && isset($measurement['pixel_distance'])) {
+                        return array(
+                            'measurement_type' => $measurement['type'],
+                            'pixel_distance' => floatval($measurement['pixel_distance']),
+                            'physical_distance_cm' => floatval($measurement['real_distance_cm'] ?? 51.0)
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Fallback
+        return array(
+            'measurement_type' => 'chest_width',
+            'pixel_distance' => 200.0,
+            'physical_distance_cm' => 51.0
+        );
     }
 
 }
