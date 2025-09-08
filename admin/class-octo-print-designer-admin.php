@@ -2655,6 +2655,41 @@ class Octo_Print_Designer_Admin {
         $upload_dir = wp_upload_dir();
         $debug_info = array();
         
+        // ZUERST: Prüfe direkt in den Template-Daten
+        if (!empty($template_data['image_path'])) {
+            $image_path = $template_data['image_path'];
+            $debug_info['found_in'] = 'template_data_image_path';
+            $debug_info['image_path'] = $image_path;
+            
+            // Prüfe ob es eine absolute URL ist
+            if (filter_var($image_path, FILTER_VALIDATE_URL)) {
+                $debug_info['is_absolute_url'] = true;
+                return $image_path;
+            }
+            
+            // Prüfe ob es ein relativer Pfad ist
+            if (file_exists($image_path)) {
+                $debug_info['file_exists'] = true;
+                return $image_path;
+            }
+            
+            // Prüfe ob es ein Upload-Pfad ist
+            $upload_path = $upload_dir['basedir'] . '/' . ltrim($image_path, '/');
+            if (file_exists($upload_path)) {
+                $debug_info['file_exists_in_uploads'] = true;
+                $debug_info['upload_path'] = $upload_path;
+                return $upload_dir['baseurl'] . '/' . ltrim($image_path, '/');
+            }
+            
+            // Prüfe ob es ein Plugin-Pfad ist
+            $plugin_path = plugin_dir_path(__FILE__) . '../' . ltrim($image_path, '/');
+            if (file_exists($plugin_path)) {
+                $debug_info['file_exists_in_plugin'] = true;
+                $debug_info['plugin_path'] = $plugin_path;
+                return plugin_dir_url(__FILE__) . '../' . ltrim($image_path, '/');
+            }
+        }
+        
         if (!empty($template_data['id'])) {
             $template_id = $template_data['id'];
             
