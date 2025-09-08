@@ -2384,103 +2384,172 @@ class Octo_Print_Designer_Admin {
     private function generate_visual_previews_for_view($template_data, $step5_result, $step8_result, $view_name, $selected_size) {
         $previews = array();
         
-        // Template-Bild-URL ermitteln
-        $template_image_url = null;
+        // Template-Bild-URL ermitteln - echte Template-Bilder verwenden
+        $template_image_url = $this->get_template_image_url($template_data, $view_name);
         
-        // 1. Versuche Template-spezifisches Bild zu finden
-        if (!empty($template_data['image_path'])) {
-            $template_image_path = $template_data['image_path'];
-            $upload_dir = wp_upload_dir();
-            $template_image_url = $upload_dir['baseurl'] . '/template-images/' . $template_image_path;
-            
-            // Prüfe ob Datei existiert
-            $template_image_file = $upload_dir['basedir'] . '/template-images/' . $template_image_path;
-            if (!file_exists($template_image_file)) {
-                $template_image_url = null;
-            }
-        }
-        
-        // 2. Fallback: Standard Template-Bild
-        if (!$template_image_url) {
-            $plugin_url = plugin_dir_url(dirname(__FILE__));
-            $template_image_url = $plugin_url . 'assets/images/shirt_front_template.jpg';
-        }
-        
-        // 3. Finaler Fallback: Platzhalter-Bild
-        if (!$template_image_url) {
-            $template_image_url = 'data:image/svg+xml;base64,' . base64_encode(
-                '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="300" height="400" fill="#f0f0f0" stroke="#ccc" stroke-width="2"/>
-                    <text x="150" y="200" text-anchor="middle" font-family="Arial" font-size="16" fill="#666">
-                        Template Bild
-                    </text>
-                    <text x="150" y="220" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">
-                        ' . esc_attr($view_name) . '
-                    </text>
-                </svg>'
-            );
-        }
-        
-        // Referenzmessung Bild
-        $reference_svg = $this->generate_reference_measurement_svg($template_image_url, $selected_size);
+        // Referenzmessung Bild mit echtem Template-Bild
+        $reference_data = $this->get_reference_measurement_data($template_data, $selected_size);
+        $reference_image = $this->generate_reference_measurement_image($template_image_url, $reference_data, $view_name, $selected_size);
         $previews['reference_measurement_image'] = array(
-            'url' => $reference_svg,
+            'url' => $reference_image,
             'description' => "Referenzmessung für {$view_name} - Größe {$selected_size}",
-            'measurements_shown' => "Brust: 53.0 cm (Größe {$selected_size})",
-            'type' => 'reference'
+            'measurements_shown' => $reference_data['measurement_text'],
+            'type' => 'reference',
+            'template_image_url' => $template_image_url
         );
         
-        // Finale Platzierung Bild
-        $placement_svg = $this->generate_final_placement_svg($template_image_url, $step8_result['final_api_data'], $view_name);
+        // Finale Platzierung Bild mit echtem Template-Bild
+        $placement_image = $this->generate_final_placement_image($template_image_url, $step8_result['final_api_data'], $view_name, $selected_size);
         $previews['final_placement_image'] = array(
-            'url' => $placement_svg,
+            'url' => $placement_image,
             'description' => "Finale Druckplatzierung für {$view_name}",
             'coordinates_shown' => $step8_result['final_api_data'],
-            'type' => 'placement'
+            'type' => 'placement',
+            'template_image_url' => $template_image_url
         );
         
         return $previews;
     }
     
     /**
-     * ✅ NEU: Referenzmessung SVG generieren
+     * ✅ NEU: Template-Bild-URL ermitteln
      */
-    private function generate_reference_measurement_svg($template_url, $selected_size) {
+    private function get_template_image_url($template_data, $view_name) {
+        $upload_dir = wp_upload_dir();
+        
+        // 1. Versuche Template-spezifisches Bild zu finden
+        if (!empty($template_data['image_path'])) {
+            $template_image_path = $template_data['image_path'];
+            $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
+            
+            // Prüfe ob Datei existiert
+            $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
+            if (file_exists($template_image_file)) {
+                return $template_image_url;
+            }
+        }
+        
+        // 2. Versuche View-spezifisches Bild basierend auf View-Name
+        $view_image_mapping = array(
+            'shirt_front_template' => 'shirt_front_template.jpg',
+            'shirt_back_template' => 'shirt_back_template.jpg',
+            'shirt_left_template' => 'shirt_left_template.jpg',
+            'shirt_right_template' => 'shirt_right_template.jpg'
+        );
+        
+        if (isset($view_image_mapping[$view_name])) {
+            $image_filename = $view_image_mapping[$view_name];
+            $template_image_url = $upload_dir['baseurl'] . '/templates/' . $image_filename;
+            $template_image_file = $upload_dir['basedir'] . '/templates/' . $image_filename;
+            
+            if (file_exists($template_image_file)) {
+                return $template_image_url;
+            }
+        }
+        
+        // 3. Fallback: Standard Template-Bild
+        $plugin_url = plugin_dir_url(dirname(__FILE__));
+        $fallback_url = $plugin_url . 'assets/images/shirt_front_template.jpg';
+        
+        // 4. Finaler Fallback: Platzhalter-Bild
+        return $this->generate_placeholder_image($view_name);
+    }
+    
+    /**
+     * ✅ NEU: Referenzmessung-Daten ermitteln
+     */
+    private function get_reference_measurement_data($template_data, $selected_size) {
+        // Lade Template-Messungen
+        $template_measurements = $template_data['measurements'] ?? array();
+        $pixel_mappings = $template_data['pixel_mappings'] ?? array();
+        
+        // Mock-Daten für Demo (in echter Implementierung aus Template-Daten)
         $chest_measurements = array('S' => 48, 'M' => 51, 'L' => 53, 'XL' => 56);
         $chest_cm = $chest_measurements[$selected_size] ?? 53;
         
+        // Mock Pixel-Mapping
+        $pixel_distance = 200.0;
+        $pixel_start = array('x' => 120, 'y' => 180);
+        $pixel_end = array('x' => 320, 'y' => 180);
+        
+        return array(
+            'measurement_type' => 'chest',
+            'real_distance_cm' => $chest_cm,
+            'pixel_distance' => $pixel_distance,
+            'pixel_start' => $pixel_start,
+            'pixel_end' => $pixel_end,
+            'measurement_text' => "Brust: {$chest_cm} cm (Größe {$selected_size})"
+        );
+    }
+    
+    /**
+     * ✅ NEU: Platzhalter-Bild generieren
+     */
+    private function generate_placeholder_image($view_name) {
+        return 'data:image/svg+xml;base64,' . base64_encode(
+            '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+                <rect width="400" height="500" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+                <rect x="50" y="50" width="300" height="400" fill="#ffffff" stroke="#6c757d" stroke-width="2" rx="10"/>
+                <text x="200" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#6c757d">
+                    Template Bild nicht gefunden
+                </text>
+                <text x="200" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#6c757d">
+                    ' . esc_attr($view_name) . '
+                </text>
+                <text x="200" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6c757d">
+                    Bitte Template-Bild hochladen
+                </text>
+            </svg>'
+        );
+    }
+    
+    /**
+     * ✅ NEU: Referenzmessung Bild mit echtem Template-Bild generieren
+     */
+    private function generate_reference_measurement_image($template_image_url, $reference_data, $view_name, $selected_size) {
+        // Prüfe ob es ein echtes Template-Bild ist
+        if (strpos($template_image_url, 'data:image/svg') === 0) {
+            // Verwende das Platzhalter-Bild direkt
+            return $template_image_url;
+        }
+        
+        // Generiere SVG-Overlay für echtes Template-Bild
         $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
-            <!-- Template Background -->
-            <rect width="400" height="500" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+            <!-- Template Background Image -->
+            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
             
-            <!-- T-Shirt Outline -->
-            <path d="M100 100 L120 80 L160 80 L200 60 L240 60 L280 80 L320 80 L340 100 L340 150 L320 150 L320 400 L100 400 L100 150 L80 150 L80 100 Z" 
-                  fill="#ffffff" stroke="#6c757d" stroke-width="2"/>
+            <!-- Overlay für bessere Sichtbarkeit -->
+            <rect x="0" y="0" width="400" height="500" fill="rgba(0,0,0,0.1)"/>
             
             <!-- Chest Measurement Line (horizontal red line) -->
-            <line x1="120" y1="180" x2="320" y2="180" stroke="#dc3545" stroke-width="3"/>
-            <circle cx="120" cy="180" r="4" fill="#dc3545"/>
-            <circle cx="320" cy="180" r="4" fill="#dc3545"/>
+            <line x1="' . $reference_data['pixel_start']['x'] . '" y1="' . $reference_data['pixel_start']['y'] . '" 
+                  x2="' . $reference_data['pixel_end']['x'] . '" y2="' . $reference_data['pixel_end']['y'] . '" 
+                  stroke="#dc3545" stroke-width="4"/>
+            <circle cx="' . $reference_data['pixel_start']['x'] . '" cy="' . $reference_data['pixel_start']['y'] . '" r="6" fill="#dc3545"/>
+            <circle cx="' . $reference_data['pixel_end']['x'] . '" cy="' . $reference_data['pixel_end']['y'] . '" r="6" fill="#dc3545"/>
             
             <!-- Measurement Labels -->
-            <text x="220" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dc3545">
-                Brust: ' . $chest_cm . ' cm
+            <rect x="' . ($reference_data['pixel_start']['x'] - 50) . '" y="' . ($reference_data['pixel_start']['y'] - 30) . '" 
+                  width="100" height="25" fill="rgba(220,53,69,0.9)" rx="5"/>
+            <text x="' . (($reference_data['pixel_start']['x'] + $reference_data['pixel_end']['x']) / 2) . '" 
+                  y="' . ($reference_data['pixel_start']['y'] - 10) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+                ' . $reference_data['real_distance_cm'] . ' cm
             </text>
             
             <!-- Size Label -->
-            <rect x="200" y="420" width="60" height="30" fill="#007bff" rx="5"/>
-            <text x="230" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
+            <rect x="200" y="420" width="80" height="30" fill="#007bff" rx="5"/>
+            <text x="240" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
                 Größe ' . esc_attr($selected_size) . '
             </text>
             
             <!-- Title -->
-            <text x="220" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#343a40">
+            <rect x="50" y="20" width="300" height="40" fill="rgba(0,0,0,0.8)" rx="5"/>
+            <text x="200" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
                 REFERENZMESSUNG
             </text>
-            
-            <!-- Measurement Type -->
-            <text x="220" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6c757d">
-                Chest Measurement
+            <text x="200" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#ccc">
+                ' . esc_attr($reference_data['measurement_type']) . ' Measurement
             </text>
         </svg>';
         
@@ -2488,9 +2557,15 @@ class Octo_Print_Designer_Admin {
     }
     
     /**
-     * ✅ NEU: Finale Platzierung SVG generieren
+     * ✅ NEU: Finale Platzierung Bild mit echtem Template-Bild generieren
      */
-    private function generate_final_placement_svg($template_url, $api_data, $view_name) {
+    private function generate_final_placement_image($template_image_url, $api_data, $view_name, $selected_size) {
+        // Prüfe ob es ein echtes Template-Bild ist
+        if (strpos($template_image_url, 'data:image/svg') === 0) {
+            // Verwende das Platzhalter-Bild direkt
+            return $template_image_url;
+        }
+        
         $x_mm = $api_data['x_mm'];
         $y_mm = $api_data['y_mm'];
         $width_mm = $api_data['width_mm'];
@@ -2505,52 +2580,56 @@ class Octo_Print_Designer_Admin {
         $design_height = $height_mm * $scale;
         
         $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
-            <!-- Template Background -->
-            <rect width="400" height="500" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+            <!-- Template Background Image -->
+            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="400" height="500" preserveAspectRatio="xMidYMid meet"/>
             
-            <!-- T-Shirt Outline -->
-            <path d="M100 100 L120 80 L160 80 L200 60 L240 60 L280 80 L320 80 L340 100 L340 150 L320 150 L320 400 L100 400 L100 150 L80 150 L80 100 Z" 
-                  fill="#ffffff" stroke="#6c757d" stroke-width="2"/>
+            <!-- Overlay für bessere Sichtbarkeit -->
+            <rect x="0" y="0" width="400" height="500" fill="rgba(0,0,0,0.1)"/>
             
             <!-- Design Platzierung (Rechteck mit Pattern) -->
             <defs>
                 <pattern id="designPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-                    <rect width="20" height="20" fill="#28a745" opacity="0.3"/>
+                    <rect width="20" height="20" fill="#28a745" opacity="0.4"/>
                     <circle cx="10" cy="10" r="3" fill="#28a745"/>
                 </pattern>
             </defs>
             
             <rect x="' . $design_x . '" y="' . $design_y . '" 
                   width="' . $design_width . '" height="' . $design_height . '" 
-                  fill="url(#designPattern)" stroke="#28a745" stroke-width="2" stroke-dasharray="5,5"/>
+                  fill="url(#designPattern)" stroke="#28a745" stroke-width="3" stroke-dasharray="5,5"/>
             
             <!-- Referenzpunkt Markierung (🎯 Symbol) -->
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="8" fill="#dc3545"/>
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="4" fill="#ffffff"/>
-            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="2" fill="#dc3545"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="10" fill="#dc3545"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="6" fill="#ffffff"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="3" fill="#dc3545"/>
             
             <!-- Maßlinien -->
             <!-- Horizontale Maßlinie -->
             <line x1="' . $design_x . '" y1="' . ($design_y + $design_height + 20) . '" 
                   x2="' . ($design_x + $design_width) . '" y2="' . ($design_y + $design_height + 20) . '" 
-                  stroke="#6c757d" stroke-width="1" stroke-dasharray="3,3"/>
+                  stroke="#6c757d" stroke-width="2" stroke-dasharray="3,3"/>
+            <rect x="' . ($design_x + $design_width/2 - 20) . '" y="' . ($design_y + $design_height + 25) . '" 
+                  width="40" height="15" fill="rgba(108,117,125,0.9)" rx="3"/>
             <text x="' . ($design_x + $design_width/2) . '" y="' . ($design_y + $design_height + 35) . '" 
-                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="white">
                 ' . $width_mm . ' mm
             </text>
             
             <!-- Vertikale Maßlinie -->
             <line x1="' . ($design_x + $design_width + 20) . '" y1="' . $design_y . '" 
                   x2="' . ($design_x + $design_width + 20) . '" y2="' . ($design_y + $design_height) . '" 
-                  stroke="#6c757d" stroke-width="1" stroke-dasharray="3,3"/>
-            <text x="' . ($design_x + $design_width + 35) . '" y="' . ($design_y + $design_height/2) . '" 
-                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d" 
-                  transform="rotate(90 ' . ($design_x + $design_width + 35) . ' ' . ($design_y + $design_height/2) . ')">
+                  stroke="#6c757d" stroke-width="2" stroke-dasharray="3,3"/>
+            <rect x="' . ($design_x + $design_width + 25) . '" y="' . ($design_y + $design_height/2 - 10) . '" 
+                  width="40" height="15" fill="rgba(108,117,125,0.9)" rx="3" 
+                  transform="rotate(90 ' . ($design_x + $design_width + 45) . ' ' . ($design_y + $design_height/2) . ')"/>
+            <text x="' . ($design_x + $design_width + 45) . '" y="' . ($design_y + $design_height/2) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="white" 
+                  transform="rotate(90 ' . ($design_x + $design_width + 45) . ' ' . ($design_y + $design_height/2) . ')">
                 ' . $height_mm . ' mm
             </text>
             
             <!-- Koordinaten-Labels -->
-            <rect x="10" y="420" width="180" height="70" fill="#007bff" rx="5" opacity="0.9"/>
+            <rect x="10" y="420" width="200" height="70" fill="rgba(0,123,255,0.9)" rx="5"/>
             <text x="20" y="440" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
                 Position: ' . $x_mm . ', ' . $y_mm . ' mm
             </text>
@@ -2560,14 +2639,16 @@ class Octo_Print_Designer_Admin {
             <text x="20" y="470" font-family="Arial, sans-serif" font-size="12" fill="white">
                 DPI: ' . $dpi . ' | Ref: top-left
             </text>
-            
-            <!-- Title -->
-            <text x="220" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#343a40">
-                FINALE DRUCKPLATZIERUNG
+            <text x="20" y="485" font-family="Arial, sans-serif" font-size="12" fill="white">
+                Größe: ' . esc_attr($selected_size) . '
             </text>
             
-            <!-- View Name -->
-            <text x="220" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6c757d">
+            <!-- Title -->
+            <rect x="50" y="20" width="300" height="40" fill="rgba(0,0,0,0.8)" rx="5"/>
+            <text x="200" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+                FINALE DRUCKPLATZIERUNG
+            </text>
+            <text x="200" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#ccc">
                 ' . esc_attr($view_name) . '
             </text>
         </svg>';
@@ -2611,21 +2692,23 @@ class Octo_Print_Designer_Admin {
             $html .= '<div class="debug-view-section">';
             $html .= '<h4>🎯 ' . esc_html($view_result['view_name']) . '</h4>';
             
-            // Workflow Steps Table
+            // Workflow Steps Table - Strukturierte Debugging-Daten
             $html .= '<div class="workflow-steps-table">';
             $html .= '<h5>📋 Workflow-Schritte Details:</h5>';
             $html .= '<table border="1" style="width:100%; border-collapse: collapse;">';
-            $html .= '<tr><th>Schritt</th><th>Eingabedaten</th><th>Berechnete Werte</th><th>Beispielwerte</th></tr>';
+            $html .= '<tr><th>Schritt</th><th>Eingabedaten</th><th>Berechnete/Ausgegebene Werte</th><th>Beispielwerte</th></tr>';
             
             for ($i = 1; $i <= 8; $i++) {
                 $step_key = "step{$i}";
                 if (isset($view_result['workflow_steps'][$step_key])) {
                     $step_data = $view_result['workflow_steps'][$step_key];
+                    $step_name = $this->get_step_name($i);
+                    
                     $html .= '<tr>';
-                    $html .= '<td><strong>SCHRITT ' . $i . '</strong></td>';
-                    $html .= '<td>' . esc_html(wp_json_encode($step_data, JSON_PRETTY_PRINT)) . '</td>';
-                    $html .= '<td>✅ Erfolgreich</td>';
-                    $html .= '<td>Siehe Links</td>';
+                    $html .= '<td><strong>' . $step_name . '</strong></td>';
+                    $html .= '<td>' . $this->format_step_input_data($step_data, $i) . '</td>';
+                    $html .= '<td>' . $this->format_step_output_data($step_data, $i) . '</td>';
+                    $html .= '<td>' . $this->format_step_example_values($step_data, $i) . '</td>';
                     $html .= '</tr>';
                 }
             }
@@ -2706,6 +2789,189 @@ class Octo_Print_Designer_Admin {
         );
         
         return $view_names[$view_id] ?? "view_{$view_id}";
+    }
+
+    /**
+     * ✅ NEU: Schritt-Namen für Debugging-Tabelle
+     */
+    private function get_step_name($step_number) {
+        $step_names = array(
+            1 => 'SCHRITT 1: Canvas-Erfassung',
+            2 => 'SCHRITT 2: Relative Koordinaten',
+            3 => 'SCHRITT 3: Template-Referenzmessungen',
+            4 => 'SCHRITT 4: Pixel-zu-Physisch Mapping',
+            5 => 'SCHRITT 5: Finale mm-Koordinaten',
+            6 => 'SCHRITT 6: DPI-Berechnung',
+            7 => 'SCHRITT 7: Qualitätskontrolle',
+            8 => 'SCHRITT 8: API-Format'
+        );
+        
+        return $step_names[$step_number] ?? "SCHRITT {$step_number}: Unbekannt";
+    }
+
+    /**
+     * ✅ NEU: Eingabedaten für Debugging-Tabelle formatieren
+     */
+    private function format_step_input_data($step_data, $step_number) {
+        switch ($step_number) {
+            case 1:
+                return '<strong>Canvas-Kontext:</strong><br>' .
+                       '• actual_canvas_size: ' . ($step_data['canvas_context']['actual_canvas_size']['width'] ?? 'N/A') . 'x' . ($step_data['canvas_context']['actual_canvas_size']['height'] ?? 'N/A') . 'px<br>' .
+                       '• device_type: ' . ($step_data['canvas_context']['device_type'] ?? 'N/A') . '<br>' .
+                       '• inference_method: ' . ($step_data['canvas_context']['inference_method'] ?? 'N/A');
+                       
+            case 2:
+                return '<strong>Canvas-Normalisierung:</strong><br>' .
+                       '• Canvas-Größe: ' . ($step_data['canvas_context']['actual_canvas_size']['width'] ?? 'N/A') . 'x' . ($step_data['canvas_context']['actual_canvas_size']['height'] ?? 'N/A') . 'px<br>' .
+                       '• Element-Position: x=' . ($step_data['element_data']['position']['x'] ?? 'N/A') . ', y=' . ($step_data['element_data']['position']['y'] ?? 'N/A');
+                       
+            case 3:
+                return '<strong>Template-Daten:</strong><br>' .
+                       '• Template-ID: ' . ($step_data['template_id'] ?? 'N/A') . '<br>' .
+                       '• Ausgewählte Größe: ' . ($step_data['selected_size'] ?? 'N/A');
+                       
+            case 4:
+                return '<strong>Pixel-Mapping:</strong><br>' .
+                       '• Template-Messungen: ' . (isset($step_data['template_measurements']) ? 'Verfügbar' : 'Nicht verfügbar') . '<br>' .
+                       '• Mapping-Quelle: ' . ($step_data['mapping_source'] ?? 'N/A');
+                       
+            case 5:
+                return '<strong>Koordinaten-Berechnung:</strong><br>' .
+                       '• Pixel-zu-mm Ratio: ' . ($step_data['pixel_to_mm_ratio'] ?? 'N/A') . '<br>' .
+                       '• Template-Daten: ' . (isset($step_data['template_data']) ? 'Verfügbar' : 'Nicht verfügbar');
+                       
+            case 6:
+                return '<strong>DPI-Eingabe:</strong><br>' .
+                       '• Finale Koordinaten: x=' . ($step_data['final_coordinates']['x_mm'] ?? 'N/A') . 'mm, y=' . ($step_data['final_coordinates']['y_mm'] ?? 'N/A') . 'mm<br>' .
+                       '• Referenzpunkt-Modus: ' . ($step_data['reference_point_mode'] ?? 'N/A');
+                       
+            case 7:
+                return '<strong>Qualitätskontrolle:</strong><br>' .
+                       '• Berechnete DPI: ' . ($step_data['calculated_dpi'] ?? 'N/A') . '<br>' .
+                       '• Koordinaten-Validierung: Aktiv';
+                       
+            case 8:
+                return '<strong>API-Vorbereitung:</strong><br>' .
+                       '• Qualitäts-Score: ' . ($step_data['quality_score'] ?? 'N/A') . '<br>' .
+                       '• Qualitäts-Checks: ' . (($step_data['quality_checks_passed'] ?? false) ? 'Bestanden' : 'Fehlgeschlagen');
+                       
+            default:
+                return 'Unbekannte Eingabedaten';
+        }
+    }
+
+    /**
+     * ✅ NEU: Ausgabedaten für Debugging-Tabelle formatieren
+     */
+    private function format_step_output_data($step_data, $step_number) {
+        switch ($step_number) {
+            case 1:
+                return '<strong>Canvas-Kontext:</strong><br>' .
+                       '• Canvas: ' . ($step_data['canvas_context']['actual_canvas_size']['width'] ?? 'N/A') . 'x' . ($step_data['canvas_context']['actual_canvas_size']['height'] ?? 'N/A') . 'px<br>' .
+                       '• Device-Type: ' . ($step_data['canvas_context']['device_type'] ?? 'N/A') . '<br>' .
+                       '• Element-Position: x=' . ($step_data['element_data']['position']['x'] ?? 'N/A') . ', y=' . ($step_data['element_data']['position']['y'] ?? 'N/A');
+                       
+            case 2:
+                return '<strong>Relative Faktoren:</strong><br>' .
+                       '• x_factor: ' . ($step_data['position_factors']['x'] ?? 'N/A') . '<br>' .
+                       '• y_factor: ' . ($step_data['position_factors']['y'] ?? 'N/A') . '<br>' .
+                       '• Normalisiert: x=' . ($step_data['normalized_position']['x'] ?? 'N/A') . 'px, y=' . ($step_data['normalized_position']['y'] ?? 'N/A') . 'px';
+                       
+            case 3:
+                return '<strong>Template-Messungen:</strong><br>' .
+                       '• Brust: ' . ($step_data['template_measurements']['chest_cm'] ?? 'N/A') . 'cm<br>' .
+                       '• Höhe: ' . ($step_data['template_measurements']['height_cm'] ?? 'N/A') . 'cm<br>' .
+                       '• Größe: ' . ($step_data['selected_size'] ?? 'N/A');
+                       
+            case 4:
+                return '<strong>Pixel-Mapping:</strong><br>' .
+                       '• Pixel-zu-mm Ratio: ' . ($step_data['pixel_to_mm_ratio'] ?? 'N/A') . '<br>' .
+                       '• Mapping-Quelle: ' . ($step_data['mapping_source'] ?? 'N/A');
+                       
+            case 5:
+                return '<strong>Finale mm-Koordinaten:</strong><br>' .
+                       '• Position: x=' . ($step_data['final_coordinates']['x_mm'] ?? 'N/A') . 'mm, y=' . ($step_data['final_coordinates']['y_mm'] ?? 'N/A') . 'mm<br>' .
+                       '• Größe: ' . ($step_data['final_coordinates']['width_mm'] ?? 'N/A') . 'mm × ' . ($step_data['final_coordinates']['height_mm'] ?? 'N/A') . 'mm<br>' .
+                       '• Referenzpunkt: ' . ($step_data['reference_point_mode'] ?? 'N/A');
+                       
+            case 6:
+                return '<strong>DPI-Berechnung:</strong><br>' .
+                       '• Berechnete DPI: ' . ($step_data['calculated_dpi'] ?? 'N/A');
+                       
+            case 7:
+                return '<strong>Qualitätskontrolle:</strong><br>' .
+                       '• Qualitäts-Score: ' . ($step_data['quality_score'] ?? 'N/A') . '<br>' .
+                       '• Checks bestanden: ' . (($step_data['quality_checks_passed'] ?? false) ? 'Ja' : 'Nein');
+                       
+            case 8:
+                return '<strong>API-Format:</strong><br>' .
+                       '• x_mm: ' . ($step_data['final_api_data']['x_mm'] ?? 'N/A') . '<br>' .
+                       '• y_mm: ' . ($step_data['final_api_data']['y_mm'] ?? 'N/A') . '<br>' .
+                       '• width_mm: ' . ($step_data['final_api_data']['width_mm'] ?? 'N/A') . '<br>' .
+                       '• height_mm: ' . ($step_data['final_api_data']['height_mm'] ?? 'N/A') . '<br>' .
+                       '• dpi: ' . ($step_data['final_api_data']['dpi'] ?? 'N/A') . '<br>' .
+                       '• format: ' . ($step_data['final_api_data']['format'] ?? 'N/A');
+                       
+            default:
+                return 'Unbekannte Ausgabedaten';
+        }
+    }
+
+    /**
+     * ✅ NEU: Beispielwerte für Debugging-Tabelle formatieren
+     */
+    private function format_step_example_values($step_data, $step_number) {
+        switch ($step_number) {
+            case 1:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• device_type: mobile<br>' .
+                       '• canvas: 375x667px<br>' .
+                       '• element: x=150, y=200';
+                       
+            case 2:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• x_factor: 0.4<br>' .
+                       '• y_factor: 0.3<br>' .
+                       '• normalized: x=320px, y=180px';
+                       
+            case 3:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• chest_cm: 53.0<br>' .
+                       '• height_cm: 65.0<br>' .
+                       '• size: L';
+                       
+            case 4:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• pixel_to_mm_ratio: 2.28<br>' .
+                       '• mapping_source: template_default';
+                       
+            case 5:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• x_mm: 81.24<br>' .
+                       '• y_mm: 109.4<br>' .
+                       '• reference_point_mode: top-left';
+                       
+            case 6:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• calculated_dpi: 74';
+                       
+            case 7:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• quality_score: 0.95<br>' .
+                       '• quality_checks_passed: true';
+                       
+            case 8:
+                return '<strong>Beispiel:</strong><br>' .
+                       '• x_mm: 81.24<br>' .
+                       '• y_mm: 109.4<br>' .
+                       '• width_mm: 200.0<br>' .
+                       '• height_mm: 250.0<br>' .
+                       '• dpi: 74<br>' .
+                       '• format: DTG_READY';
+                       
+            default:
+                return 'Keine Beispielwerte';
+        }
     }
 
 }
