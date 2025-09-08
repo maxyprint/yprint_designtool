@@ -722,6 +722,13 @@ private function check_yprint_dependency() {
                             <span class="dashicons dashicons-controls-play" style="margin-right: 5px;"></span>
                             VOLLSTÄNDIGER WORKFLOW
                         </button>
+                        
+                        <button type="button" class="button button-primary complete-workflow-debug-button" 
+                                data-order-id="<?php echo esc_attr($order->get_id()); ?>" 
+                                style="margin-left: 10px; background-color: #0073aa;">
+                            <span class="dashicons dashicons-visibility" style="margin-right: 5px;"></span>
+                            Vollständiger Workflow &amp; Debug
+                        </button>
                     </div>
                     
                     <div style="margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 4px; font-size: 11px; color: #6c757d;">
@@ -1795,6 +1802,86 @@ private function check_yprint_dependency() {
                         complete: function() {
                             // Reset button state
                             button.prop('disabled', false).html('<span class="dashicons dashicons-controls-play" style="margin-right: 5px;"></span>VOLLSTÄNDIGER WORKFLOW');
+                            spinner.hide();
+                        }
+                    });
+                });
+
+                // ✅ NEU: Vollständiger Workflow & Debug Button Handler
+                $('.complete-workflow-debug-button').on('click', function() {
+                    var button = $(this);
+                    var orderId = button.data('order-id');
+                    var nonce = $('#octo_print_provider_nonce').val();
+                    var spinner = $('#yprint-spinner');
+                    
+                    // Clear previous results
+                    $('.yprint-debug-result').remove();
+                    $('.status-message').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update-alt spin" style="margin-right: 5px;"></span>Vollständiger Workflow & Debug läuft...');
+                    spinner.show();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'complete_workflow_debug',
+                            order_id: orderId,
+                            nonce: nonce
+                        },
+                        timeout: 60000, // 60 seconds timeout
+                        success: function(response) {
+                            if (response.success) {
+                                // Create expandable debug result container
+                                var debugContainer = $('<div class="yprint-debug-result">' +
+                                    '<h3>🎯 Vollständiger Workflow & Debug Ergebnis</h3>' +
+                                    '<div class="debug-summary">' +
+                                        '<p><strong>Views verarbeitet:</strong> ' + response.data.views_processed + '</p>' +
+                                        '<p><strong>Verarbeitungszeit:</strong> ' + response.data.processing_time + '</p>' +
+                                    '</div>' +
+                                    '<div class="debug-toggle-container">' +
+                                        '<button type="button" class="button debug-toggle-btn">📋 Detaillierte Debug-Daten anzeigen</button>' +
+                                    '</div>' +
+                                    '<div class="debug-detailed-output" style="display: none;">' +
+                                        response.data.html_output +
+                                    '</div>' +
+                                '</div>');
+                                
+                                debugContainer.insertBefore(button.parent());
+                                
+                                // Toggle functionality for detailed output
+                                debugContainer.find('.debug-toggle-btn').on('click', function() {
+                                    var detailedOutput = debugContainer.find('.debug-detailed-output');
+                                    var toggleBtn = $(this);
+                                    
+                                    if (detailedOutput.is(':visible')) {
+                                        detailedOutput.slideUp();
+                                        toggleBtn.text('📋 Detaillierte Debug-Daten anzeigen');
+                                    } else {
+                                        detailedOutput.slideDown();
+                                        toggleBtn.text('📋 Detaillierte Debug-Daten ausblenden');
+                                    }
+                                });
+                                
+                                createStatusMessage('success', '✅ Vollständiger Workflow & Debug erfolgreich', 
+                                    'Alle ' + response.data.views_processed + ' Views wurden erfolgreich verarbeitet in ' + response.data.processing_time)
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                createStatusMessage('error', '❌ Vollständiger Workflow & Debug fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Debug-Workflow')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            createStatusMessage('error', '❌ Debug-Workflow Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-visibility" style="margin-right: 5px;"></span>Vollständiger Workflow &amp; Debug');
                             spinner.hide();
                         }
                     });
