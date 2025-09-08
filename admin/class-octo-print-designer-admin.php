@@ -1333,10 +1333,40 @@ class Octo_Print_Designer_Admin {
             $result[] = "----------------------------------------";
             
             $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            $use_mock_data = false;
+            
+            // Prüfe ob Template-Druckbereiche existieren und gültig sind
             if (empty($view_print_areas) || !is_array($view_print_areas)) {
+                $use_mock_data = true;
                 $result[] = "⚠️ Keine Template-Druckbereiche gefunden - verwende Mock-Daten für Demo:";
                 $result[] = "   Meta-Key: _template_view_print_areas";
                 $result[] = "   Template-ID: {$template_id}";
+            } else {
+                // Prüfe ob die gefundenen Daten gültig sind
+                $has_valid_data = false;
+                foreach ($view_print_areas as $view_name => $view_config) {
+                    if (isset($view_config['print_area']) && 
+                        isset($view_config['print_area']['width']) && 
+                        isset($view_config['print_area']['height']) &&
+                        $view_config['print_area']['width'] > 0 && 
+                        $view_config['print_area']['height'] > 0 &&
+                        isset($view_config['pixel_to_mm_ratio']) && 
+                        $view_config['pixel_to_mm_ratio'] > 0) {
+                        $has_valid_data = true;
+                        break;
+                    }
+                }
+                
+                if (!$has_valid_data) {
+                    $use_mock_data = true;
+                    $result[] = "⚠️ Template-Druckbereiche gefunden, aber ungültige Daten - verwende Mock-Daten für Demo:";
+                    $result[] = "   Meta-Key: _template_view_print_areas";
+                    $result[] = "   Template-ID: {$template_id}";
+                    $result[] = "   Problem: Ungültige Print Area-Dimensionen oder pixel_to_mm_ratio";
+                }
+            }
+            
+            if ($use_mock_data) {
                 $result[] = "";
                 $result[] = "💡 LÖSUNG: Template-Druckbereiche im Admin definieren:";
                 $result[] = "   1. Template bearbeiten";
@@ -1394,8 +1424,33 @@ class Octo_Print_Designer_Admin {
             $result[] = "----------------------------------------";
             
             // Simuliere bestehende convert_canvas_to_print_coordinates() Logik
-            $view_name = 'front';
-            $view_config = $view_print_areas[$view_name];
+            // Finde die erste gültige View-Konfiguration
+            $view_name = null;
+            $view_config = null;
+            
+            foreach ($view_print_areas as $current_view_name => $current_view_config) {
+                if (isset($current_view_config['print_area']) && 
+                    isset($current_view_config['print_area']['width']) && 
+                    isset($current_view_config['print_area']['height']) &&
+                    $current_view_config['print_area']['width'] > 0 && 
+                    $current_view_config['print_area']['height'] > 0 &&
+                    isset($current_view_config['pixel_to_mm_ratio']) && 
+                    $current_view_config['pixel_to_mm_ratio'] > 0) {
+                    $view_name = $current_view_name;
+                    $view_config = $current_view_config;
+                    break;
+                }
+            }
+            
+            // Fallback falls keine gültige View gefunden wird
+            if (!$view_name || !$view_config) {
+                $result[] = "❌ SCHRITT 3 FEHLER: Keine gültige View-Konfiguration gefunden!";
+                $result[] = "   Alle Views haben ungültige Print Area-Dimensionen oder pixel_to_mm_ratio";
+                return array(
+                    'success' => false,
+                    'log' => implode("\n", $result)
+                );
+            }
             
             // Berechne relative Position im Print Area
             $print_area = $view_config['print_area'];
