@@ -2244,6 +2244,17 @@ class Octo_Print_Designer_Admin {
             // Preview-Daten für die spezifische View generieren
             $preview_data = $this->generate_fullsize_preview_for_view($view_result, $preview_type, $order_id);
             
+            // Debug-Informationen hinzufügen
+            $preview_data['debug_console_info'] = array(
+                'template_id' => $template_id ?? 'not_found',
+                'view_name' => $view_name,
+                'view_key' => $view_key,
+                'preview_type' => $preview_type,
+                'template_image_url' => $preview_data['template_image_url'] ?? 'not_found',
+                'is_placeholder' => strpos($preview_data['template_image_url'] ?? '', 'data:image/svg') === 0,
+                'method_called' => 'generate_fullsize_preview_for_view'
+            );
+            
             wp_send_json_success($preview_data);
             
         } catch (Exception $e) {

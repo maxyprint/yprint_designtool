@@ -1922,6 +1922,18 @@ private function check_yprint_dependency() {
                                 var data = response.data;
                                 console.log('YPrint Preview Data:', data);
                                 
+                                // Debug-Informationen anzeigen
+                                if (data.debug_console_info) {
+                                    console.log('🔍 YPrint Debug Console Info:', data.debug_console_info);
+                                    console.log('📊 Template ID:', data.debug_console_info.template_id);
+                                    console.log('🖼️ Template Image URL:', data.debug_console_info.template_image_url);
+                                    console.log('🎯 Is Placeholder:', data.debug_console_info.is_placeholder);
+                                }
+                                
+                                if (data.debug_info) {
+                                    console.log('🔍 YPrint Detailed Debug Info:', data.debug_info);
+                                }
+                                
                                 if (data.error) {
                                     console.error('YPrint Preview Error:', data.error);
                                     console.log('YPrint Debug Info:', data.debug_info);
