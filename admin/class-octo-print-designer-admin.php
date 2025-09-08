@@ -2648,12 +2648,70 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
+     * ✅ SCHRITT 4.1 FIX: Verbesserte Template-Bild-URL-Methode
+     */
+    private function get_template_image_url_fixed($template_id, $view_id) {
+        error_log("YPrint SCHRITT 4.1 FIX: Template-ID {$template_id}, View-ID {$view_id}");
+        
+        if (!$template_id) {
+            error_log("YPrint SCHRITT 4.1 FIX: Template-ID fehlt, verwende Fallback");
+            return plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
+        }
+        
+        // Template-Variations laden
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
+        
+        if (!empty($template_variations) && is_array($template_variations)) {
+            foreach ($template_variations as $variation_id => $variation) {
+                if (!empty($variation['views']) && is_array($variation['views'])) {
+                    foreach ($variation['views'] as $v_id => $view) {
+                        // Erste passende View verwenden oder spezifische View-ID
+                        if ((!$view_id || $v_id == $view_id) && !empty($view['image'])) {
+                            $attachment_id = intval($view['image']);
+                            $image_url = wp_get_attachment_url($attachment_id);
+                            if ($image_url) {
+                                error_log("YPrint SCHRITT 4.1 FIX: Template-Bild gefunden - {$image_url}");
+                                return $image_url;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback
+        error_log("YPrint SCHRITT 4.1 FIX: Fallback verwendet");
+        return plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
+    }
+
+    /**
      * ✅ SCHRITT 4.1: Doppelte Visualisierung - Referenz + Design
      */
     private function generate_dual_visualization($view_result, $template_id, $view_name, $selected_size) {
-        // SCHRITT 4.1: Template-Bild-URL laden
-        $view_id = $this->extract_view_id_from_view_result($view_result);
-        $template_image_url = $this->get_template_image_url($template_id, $view_id);
+        // SCHRITT 4.1 FIX: Template-ID aus Order-Item extrahieren
+        $order_id = $_POST['order_id'] ?? 0;
+        $order = wc_get_order($order_id);
+        $template_id = null;
+        if ($order) {
+            foreach ($order->get_items() as $item) {
+                $item_template_id = $item->get_meta('_yprint_template_id');
+                if ($item_template_id) {
+                    $template_id = intval($item_template_id);
+                    break;
+                }
+            }
+        }
+
+        // SCHRITT 4.1 FIX: View-ID aus view_key extrahieren
+        $view_id = null;
+        if (!empty($view_result['view_key'])) {
+            if (preg_match('/\d+_(\d+)/', $view_result['view_key'], $matches)) {
+                $view_id = $matches[1];
+            }
+        }
+
+        // SCHRITT 4.1 FIX: Template-Bild-URL laden
+        $template_image_url = $this->get_template_image_url_fixed($template_id, $view_id);
         
         // SCHRITT 4.1: Workflow-Daten extrahieren
         $step2_data = $view_result['workflow_steps']['step2']['output'] ?? array();
@@ -2667,16 +2725,14 @@ class Octo_Print_Designer_Admin {
         
         // LINKS: Referenzmaß-Visualisierung
         $html .= '<div style="flex: 1; text-align: center;">';
-        $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Referenzmessung für ' . esc_html($view_name) . '</h4>';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">Template-Referenzbild</h4>';
         $html .= $this->generate_reference_measurement_visualization($template_image_url, $reference_measurements, $selected_size);
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type'] ?? 'Brust') . ': ' . esc_html($reference_measurements['size_cm'] ?? '0') . ' cm (Größe ' . esc_html($selected_size) . ')</p>';
         $html .= '</div>';
         
         // RECHTS: Design-Platzierung-Visualisierung  
         $html .= '<div style="flex: 1; text-align: center;">';
-        $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung für ' . esc_html($view_name) . '</h4>';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">Template-Produktbild</h4>';
         $html .= $this->generate_design_placement_visualization($template_image_url, $final_coordinates, $view_result);
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Koordinaten:</strong> ' . esc_html($final_coordinates['x_mm'] ?? '0') . 'mm, ' . esc_html($final_coordinates['y_mm'] ?? '0') . 'mm</p>';
         $html .= '</div>';
         
         $html .= '</div>';
@@ -2698,70 +2754,25 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
-     * ✅ SCHRITT 4.1: Referenzmessung-Visualisierung
+     * ✅ SCHRITT 4.1 FIX: Saubere Referenzmessung-Visualisierung ohne Markierungen
      */
     private function generate_reference_measurement_visualization($template_image_url, $reference_data, $selected_size) {
-        return '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid #dee2e6; border-radius: 4px;">
-            <!-- Template Hintergrund -->
-            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="300" height="400" preserveAspectRatio="xMidYMid meet"/>
-            
-            <!-- Semi-transparenter Overlay -->
-            <rect x="0" y="0" width="300" height="400" fill="rgba(220,53,69,0.1)"/>
-            
-            <!-- Referenz-Messlinie (horizontal) -->
-            <line x1="50" y1="200" x2="250" y2="200" stroke="#dc3545" stroke-width="3"/>
-            <circle cx="50" cy="200" r="4" fill="#dc3545"/>
-            <circle cx="250" cy="200" r="4" fill="#dc3545"/>
-            
-            <!-- Mess-Label -->
-            <rect x="125" y="180" width="50" height="20" fill="rgba(220,53,69,0.9)" rx="3"/>
-            <text x="150" y="194" text-anchor="middle" font-family="Arial" font-size="12" fill="white">' . esc_attr($reference_data['size_cm'] ?? '53') . ' cm</text>
-            
-            <!-- Größen-Label -->
-            <rect x="10" y="10" width="60" height="25" fill="rgba(220,53,69,0.9)" rx="3"/>
-            <text x="40" y="27" text-anchor="middle" font-family="Arial" font-size="14" fill="white">Größe ' . esc_attr($selected_size) . '</text>
-        </svg>';
+        return '<div style="text-align: center;">
+            <img src="' . esc_attr($template_image_url) . '" 
+                 alt="Template Referenzmessung" 
+                 style="max-width: 300px; height: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+        </div>';
     }
 
     /**
-     * ✅ SCHRITT 4.1: Design-Platzierung-Visualisierung
+     * ✅ SCHRITT 4.1 FIX: Saubere Design-Platzierung-Visualisierung ohne Markierungen
      */
     private function generate_design_placement_visualization($template_image_url, $final_coords, $view_result) {
-        $design_width = floatval($final_coords['width_mm'] ?? 200);
-        $design_height = floatval($final_coords['height_mm'] ?? 250);
-        $design_x = floatval($final_coords['x_mm'] ?? 81.24);
-        $design_y = floatval($final_coords['y_mm'] ?? 109.4);
-        
-        // Skalierung für SVG (mm zu Pixel)
-        $scale = 2.0;
-        $svg_x = $design_x * $scale;
-        $svg_y = $design_y * $scale;
-        $svg_width = $design_width * $scale;
-        $svg_height = $design_height * $scale;
-        
-        return '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid #dee2e6; border-radius: 4px;">
-            <!-- Template Hintergrund -->
-            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="300" height="400" preserveAspectRatio="xMidYMid meet"/>
-            
-            <!-- Semi-transparenter Overlay -->
-            <rect x="0" y="0" width="300" height="400" fill="rgba(40,167,69,0.1)"/>
-            
-            <!-- Design-Bereich -->
-            <rect x="' . $svg_x . '" y="' . $svg_y . '" width="' . $svg_width . '" height="' . $svg_height . '" 
-                  fill="rgba(40,167,69,0.3)" stroke="#28a745" stroke-width="2" rx="3"/>
-            
-            <!-- Koordinaten-Linien -->
-            <line x1="0" y1="' . $svg_y . '" x2="300" y2="' . $svg_y . '" stroke="#28a745" stroke-width="1" stroke-dasharray="3,3"/>
-            <line x1="' . $svg_x . '" y1="0" x2="' . $svg_x . '" y2="400" stroke="#28a745" stroke-width="1" stroke-dasharray="3,3"/>
-            
-            <!-- Maß-Labels -->
-            <rect x="' . ($svg_x + 5) . '" y="' . ($svg_y + 5) . '" width="80" height="15" fill="rgba(40,167,69,0.9)" rx="2"/>
-            <text x="' . ($svg_x + 45) . '" y="' . ($svg_y + 16) . '" text-anchor="middle" font-family="Arial" font-size="10" fill="white">' . round($design_width) . '×' . round($design_height) . 'mm</text>
-            
-            <!-- Position-Label -->
-            <rect x="10" y="10" width="80" height="25" fill="rgba(40,167,69,0.9)" rx="3"/>
-            <text x="50" y="27" text-anchor="middle" font-family="Arial" font-size="12" fill="white">' . round($design_x, 1) . ',' . round($design_y, 1) . 'mm</text>
-        </svg>';
+        return '<div style="text-align: center;">
+            <img src="' . esc_attr($template_image_url) . '" 
+                 alt="Template Design-Platzierung" 
+                 style="max-width: 300px; height: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+        </div>';
     }
     
     /**
