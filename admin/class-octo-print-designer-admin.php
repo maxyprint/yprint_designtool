@@ -2271,7 +2271,8 @@ class Octo_Print_Designer_Admin {
         }
         
         // Template-Bild-URL ermitteln
-        $template_image_url = $this->get_template_image_url($template_data, $view_name);
+        $template_id = $template_data['id'] ?? null;
+        $template_image_url = $this->get_template_image_url($template_id, null);
         
         // Debug-Logging für Console
         $debug_info['template_image_url_result'] = $template_image_url;
@@ -2539,33 +2540,27 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
-     * ✅ NEU: Visuelle Vorschau-Bilder generieren
+     * ✅ SCHRITT 4.1: Visuelle Vorschau-Bilder mit Doppel-Visualisierung
      */
     private function generate_visual_previews_for_view($template_data, $step5_result, $step8_result, $view_name, $selected_size, $view_key = null) {
         $previews = array();
         
-        // Template-Bild-URL ermitteln - echte Template-Bilder verwenden
-        $template_image_url = $this->get_template_image_url($template_data, $view_name);
-        
-        // Referenzmessung Bild mit echtem Template-Bild
-        $reference_data = $this->get_reference_measurement_data($template_data, $selected_size, $view_key);
-        $reference_image = $this->generate_reference_measurement_image($template_image_url, $reference_data, $view_name, $selected_size);
-        $previews['reference_measurement_image'] = array(
-            'url' => $reference_image,
-            'description' => "Referenzmessung für {$view_name} - Größe {$selected_size}",
-            'measurements_shown' => $reference_data['measurement_text'],
-            'type' => 'reference',
-            'template_image_url' => $template_image_url
+        // SCHRITT 4.1: View-Result für Doppel-Visualisierung erstellen
+        $view_result = array(
+            'view_key' => $view_key,
+            'workflow_steps' => array(
+                'step2' => array('output' => array('reference_measurements' => $this->get_reference_measurement_data($template_data, $selected_size, $view_key))),
+                'step5' => array('output' => array('final_coordinates' => $step5_result))
+            )
         );
         
-        // Finale Platzierung Bild mit echtem Template-Bild
-        $placement_image = $this->generate_final_placement_image($template_image_url, $step8_result['final_api_data'], $view_name, $selected_size);
-        $previews['final_placement_image'] = array(
-            'url' => $placement_image,
-            'description' => "Finale Druckplatzierung für {$view_name}",
-            'coordinates_shown' => $step8_result['final_api_data'],
-            'type' => 'placement',
-            'template_image_url' => $template_image_url
+        $template_id = $template_data['id'] ?? null;
+        
+        // SCHRITT 4.1: Doppel-Visualisierung generieren
+        $previews['dual_visualization'] = array(
+            'html' => $this->generate_dual_visualization($view_result, $template_id, $view_name, $selected_size),
+            'description' => "Vollständige Produktvorschau für {$view_name} - Größe {$selected_size}",
+            'type' => 'dual_preview'
         );
         
         return $previews;
@@ -2597,226 +2592,155 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
-     * ✅ NEU: Template-Bild-URL ermitteln
+     * ✅ SCHRITT 4.1: Template-Bild-URL mit direkter Attachment-ID
      */
-    private function get_template_image_url($template_data, $view_name) {
-        $upload_dir = wp_upload_dir();
-        $debug_info = array();
+    private function get_template_image_url($template_id, $view_id = null) {
+        error_log("YPrint SCHRITT 4.1: Template-Bild für Template {$template_id}, View-ID: {$view_id}");
         
-        // ZUERST: Prüfe direkt in den Template-Daten
-        if (!empty($template_data['image_path'])) {
-            $image_path = $template_data['image_path'];
-            $debug_info['found_in'] = 'template_data_image_path';
-            $debug_info['image_path'] = $image_path;
-            $debug_info['image_path_not_empty'] = true;
-            
-            // Debug-Info in globale Variable speichern
-            $GLOBALS['yprint_template_image_debug'] = $debug_info;
-            
-            // Prüfe ob es eine absolute URL ist
-            if (filter_var($image_path, FILTER_VALIDATE_URL)) {
-                $debug_info['is_absolute_url'] = true;
-                $debug_info['return_reason'] = 'absolute_url_found';
-                $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                return $image_path;
-            }
-            
-            // Prüfe ob es ein relativer Pfad ist
-            if (file_exists($image_path)) {
-                $debug_info['file_exists'] = true;
-                $debug_info['return_reason'] = 'file_exists';
-                $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                return $image_path;
-            }
-            
-            // Prüfe ob es ein Upload-Pfad ist
-            $upload_path = $upload_dir['basedir'] . '/' . ltrim($image_path, '/');
-            if (file_exists($upload_path)) {
-                $debug_info['file_exists_in_uploads'] = true;
-                $debug_info['upload_path'] = $upload_path;
-                $debug_info['return_reason'] = 'file_exists_in_uploads';
-                $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                return $upload_dir['baseurl'] . '/' . ltrim($image_path, '/');
-            }
-            
-            // Prüfe ob es ein Plugin-Pfad ist
-            $plugin_path = plugin_dir_path(__FILE__) . '../' . ltrim($image_path, '/');
-            if (file_exists($plugin_path)) {
-                $debug_info['file_exists_in_plugin'] = true;
-                $debug_info['plugin_path'] = $plugin_path;
-                $debug_info['return_reason'] = 'file_exists_in_plugin';
-                $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                return plugin_dir_url(__FILE__) . '../' . ltrim($image_path, '/');
-            }
-            
-            // Wenn der image_path nicht funktioniert, weiter zur Datenbank-Suche
-            $debug_info['image_path_failed'] = true;
-            $debug_info['image_path_checks_failed'] = array(
-                'is_absolute_url' => filter_var($image_path, FILTER_VALIDATE_URL),
-                'file_exists' => file_exists($image_path),
-                'file_exists_in_uploads' => file_exists($upload_path),
-                'file_exists_in_plugin' => file_exists($plugin_path)
-            );
-        } else {
-            $debug_info['image_path_empty'] = true;
-        }
+        // SCHRITT 4.1: Direkte Extraktion aus Template-Variations
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
         
-        // NEU: Suche nach Template-Bildern in der deo6_posts Tabelle
-        if (!empty($template_data['id'])) {
-            global $wpdb;
-            $template_id = $template_data['id'];
-            
-            $debug_info['database_search_attempted'] = true;
-            $debug_info['template_id_for_search'] = $template_id;
-            $debug_info['view_name_for_search'] = $view_name;
-            
-            // Suche nach Template-Bildern basierend auf dem View-Namen
-            $view_based_query = $wpdb->prepare(
-                "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
-                 WHERE post_type = 'attachment' 
-                 AND post_title LIKE %s 
-                 AND post_mime_type LIKE 'image/%'
-                 ORDER BY post_date DESC LIMIT 1",
-                '%' . $wpdb->esc_like($view_name) . '%'
-            );
-            
-            $debug_info['view_based_query'] = $view_based_query;
-            $template_image = $wpdb->get_row($view_based_query);
-            $debug_info['view_based_result'] = $template_image;
-            
-            if ($template_image) {
-                $debug_info['found_in'] = 'deo6_posts_by_view_name';
-                $debug_info['template_image_title'] = $template_image->post_title;
-                $debug_info['template_image_content'] = $template_image->post_content;
-                
-                // Extrahiere die Bild-URL aus dem post_content
-                if (preg_match('/https:\/\/[^\s"]+\.(jpg|jpeg|png|webp|gif)/i', $template_image->post_content, $matches)) {
-                    $image_url = $matches[0];
-                    $debug_info['extracted_image_url'] = $image_url;
-                    $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                    return $image_url;
-                }
-            }
-            
-            // Fallback: Suche nach Template-Bildern mit "kaan" im Namen
-            $kaan_query = $wpdb->prepare(
-                "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
-                 WHERE post_type = 'attachment' 
-                 AND post_title LIKE %s 
-                 AND post_mime_type LIKE 'image/%'
-                 ORDER BY post_date DESC LIMIT 1",
-                '%kaan%'
-            );
-            
-            $debug_info['kaan_query'] = $kaan_query;
-            $kaan_image = $wpdb->get_row($kaan_query);
-            $debug_info['kaan_result'] = $kaan_image;
-            
-            if ($kaan_image) {
-                $debug_info['found_in'] = 'deo6_posts_by_kaan';
-                $debug_info['kaan_image_title'] = $kaan_image->post_title;
-                $debug_info['kaan_image_content'] = $kaan_image->post_content;
-                
-                // Extrahiere die Bild-URL aus dem post_content
-                if (preg_match('/https:\/\/[^\s"]+\.(jpg|jpeg|png|webp|gif)/i', $kaan_image->post_content, $matches)) {
-                    $image_url = $matches[0];
-                    $debug_info['extracted_kaan_image_url'] = $image_url;
-                    $GLOBALS['yprint_template_image_debug'] = $debug_info;
-                    return $image_url;
-                }
-            }
-            
-            // Debug: Alle verfügbaren Bilder auflisten
-            $all_images_query = "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
-                                WHERE post_type = 'attachment' 
-                                AND post_mime_type LIKE 'image/%'
-                                ORDER BY post_date DESC LIMIT 10";
-            $all_images = $wpdb->get_results($all_images_query);
-            $debug_info['all_available_images'] = $all_images;
-        }
-        
-        if (!empty($template_data['id'])) {
-            $template_id = $template_data['id'];
-            
-            // Alle möglichen Meta-Felder für Template-Bilder durchsuchen
-            $possible_meta_fields = array(
-                '_template_image_path',
-                '_template_view_image',
-                '_template_image_url',
-                '_template_background_image',
-                '_view_image_path',
-                '_template_image',
-                '_image_path',
-                '_background_image',
-                '_template_view_image_path',
-                '_view_background_image',
-                '_template_thumbnail',
-                '_template_preview'
-            );
-            
-            foreach ($possible_meta_fields as $meta_field) {
-                $image_path = get_post_meta($template_id, $meta_field, true);
-                $debug_info[$meta_field] = $image_path;
-                
-                if (!empty($image_path)) {
-                    // Prüfe ob es bereits eine vollständige URL ist
-                    if (filter_var($image_path, FILTER_VALIDATE_URL)) {
-                        $debug_info['found_url'] = $image_path;
-                        $debug_info['found_in_field'] = $meta_field;
-                        return $image_path;
-                    } else {
-                        // Versuche verschiedene Pfade
-                        $possible_paths = array(
-                            $upload_dir['baseurl'] . '/templates/' . $image_path,
-                            $upload_dir['baseurl'] . '/' . $image_path,
-                            $upload_dir['baseurl'] . '/yprint/' . $image_path,
-                            $upload_dir['baseurl'] . '/designs/' . $image_path,
-                            get_site_url() . '/wp-content/uploads/' . $image_path,
-                            get_site_url() . '/wp-content/uploads/templates/' . $image_path,
-                            get_site_url() . '/wp-content/uploads/yprint/' . $image_path
-                        );
-                        
-                        foreach ($possible_paths as $test_url) {
-                            $test_file = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $test_url);
-                            if (file_exists($test_file)) {
-                                $debug_info['found_file'] = $test_url;
-                                $debug_info['found_in_field'] = $meta_field;
-                                return $test_url;
+        if (!empty($template_variations) && is_array($template_variations)) {
+            foreach ($template_variations as $variation_id => $variation) {
+                if (!empty($variation['views']) && is_array($variation['views'])) {
+                    // Suche nach spezifischer View-ID oder verwende erste verfügbare
+                    foreach ($variation['views'] as $v_id => $view) {
+                        if (($view_id && $v_id == $view_id) || (!$view_id && !empty($view['image']))) {
+                            $attachment_id = intval($view['image']);
+                            if ($attachment_id > 0) {
+                                $image_url = wp_get_attachment_url($attachment_id);
+                                if ($image_url) {
+                                    error_log("YPrint SCHRITT 4.1: Template-Bild gefunden - Attachment {$attachment_id}: {$image_url}");
+                                    return $image_url;
+                                }
                             }
                         }
                     }
                 }
             }
-            
-            // Debug-Informationen für Console
-            $debug_info['template_id'] = $template_id;
-            $debug_info['view_name'] = $view_name;
-            $debug_info['upload_dir'] = $upload_dir;
-            
-            // Alle Meta-Felder des Templates auflisten
-            $all_meta = get_post_meta($template_id);
-            $debug_info['all_meta_keys'] = array_keys($all_meta);
-            
-            // Debug-Info in Console ausgeben
-            error_log("YPrint Template Image Debug: " . json_encode($debug_info, JSON_PRETTY_PRINT));
-            
-            // Zusätzlich: Debug-Info für Browser-Console
-            $debug_info['method_called'] = 'get_template_image_url';
-            $debug_info['fallback_reason'] = 'no_image_found_in_meta_fields';
-            
-            // Debug-Info in die Preview-Daten einbetten
-            $GLOBALS['yprint_debug_info'] = $debug_info;
-            $GLOBALS['yprint_template_image_debug'] = $debug_info;
-            
-            // Debug-Info auch in die Preview-Daten einbetten
-            $debug_info['template_image_search_debug'] = $debug_info;
         }
         
-        // Debug-Info am Ende der Methode speichern
-        $GLOBALS['yprint_template_image_debug'] = $debug_info;
+        // Fallback
+        $fallback_url = plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
+        error_log("YPrint SCHRITT 4.1: Fallback verwendet - " . $fallback_url);
+        return $fallback_url;
+    }
+
+    /**
+     * ✅ SCHRITT 4.1: Doppelte Visualisierung - Referenz + Design
+     */
+    private function generate_dual_visualization($view_result, $template_id, $view_name, $selected_size) {
+        // SCHRITT 4.1: Template-Bild-URL laden
+        $view_id = $this->extract_view_id_from_view_result($view_result);
+        $template_image_url = $this->get_template_image_url($template_id, $view_id);
         
-        // Fallback: Platzhalter-Bild
-        return $this->generate_placeholder_image($view_name, $template_data);
+        // SCHRITT 4.1: Workflow-Daten extrahieren
+        $step2_data = $view_result['workflow_steps']['step2']['output'] ?? array();
+        $step5_data = $view_result['workflow_steps']['step5']['output'] ?? array();
+        
+        $reference_measurements = $step2_data['reference_measurements'] ?? array();
+        $final_coordinates = $step5_data['final_coordinates'] ?? array();
+        
+        // SCHRITT 4.1: HTML-Container für Doppel-Visualisierung
+        $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
+        
+        // LINKS: Referenzmaß-Visualisierung
+        $html .= '<div style="flex: 1; text-align: center;">';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Referenzmessung für ' . esc_html($view_name) . '</h4>';
+        $html .= $this->generate_reference_measurement_visualization($template_image_url, $reference_measurements, $selected_size);
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type'] ?? 'Brust') . ': ' . esc_html($reference_measurements['size_cm'] ?? '0') . ' cm (Größe ' . esc_html($selected_size) . ')</p>';
+        $html .= '</div>';
+        
+        // RECHTS: Design-Platzierung-Visualisierung  
+        $html .= '<div style="flex: 1; text-align: center;">';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung für ' . esc_html($view_name) . '</h4>';
+        $html .= $this->generate_design_placement_visualization($template_image_url, $final_coordinates, $view_result);
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Koordinaten:</strong> ' . esc_html($final_coordinates['x_mm'] ?? '0') . 'mm, ' . esc_html($final_coordinates['y_mm'] ?? '0') . 'mm</p>';
+        $html .= '</div>';
+        
+        $html .= '</div>';
+        
+        return $html;
+    }
+
+    /**
+     * ✅ SCHRITT 4.1: View-ID aus View-Result extrahieren
+     */
+    private function extract_view_id_from_view_result($view_result) {
+        // Extrahiere View-ID aus view_key (Format: design_id_view_id)
+        if (!empty($view_result['view_key'])) {
+            if (preg_match('/\d+_(\d+)/', $view_result['view_key'], $matches)) {
+                return $matches[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * ✅ SCHRITT 4.1: Referenzmessung-Visualisierung
+     */
+    private function generate_reference_measurement_visualization($template_image_url, $reference_data, $selected_size) {
+        return '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid #dee2e6; border-radius: 4px;">
+            <!-- Template Hintergrund -->
+            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="300" height="400" preserveAspectRatio="xMidYMid meet"/>
+            
+            <!-- Semi-transparenter Overlay -->
+            <rect x="0" y="0" width="300" height="400" fill="rgba(220,53,69,0.1)"/>
+            
+            <!-- Referenz-Messlinie (horizontal) -->
+            <line x1="50" y1="200" x2="250" y2="200" stroke="#dc3545" stroke-width="3"/>
+            <circle cx="50" cy="200" r="4" fill="#dc3545"/>
+            <circle cx="250" cy="200" r="4" fill="#dc3545"/>
+            
+            <!-- Mess-Label -->
+            <rect x="125" y="180" width="50" height="20" fill="rgba(220,53,69,0.9)" rx="3"/>
+            <text x="150" y="194" text-anchor="middle" font-family="Arial" font-size="12" fill="white">' . esc_attr($reference_data['size_cm'] ?? '53') . ' cm</text>
+            
+            <!-- Größen-Label -->
+            <rect x="10" y="10" width="60" height="25" fill="rgba(220,53,69,0.9)" rx="3"/>
+            <text x="40" y="27" text-anchor="middle" font-family="Arial" font-size="14" fill="white">Größe ' . esc_attr($selected_size) . '</text>
+        </svg>';
+    }
+
+    /**
+     * ✅ SCHRITT 4.1: Design-Platzierung-Visualisierung
+     */
+    private function generate_design_placement_visualization($template_image_url, $final_coords, $view_result) {
+        $design_width = floatval($final_coords['width_mm'] ?? 200);
+        $design_height = floatval($final_coords['height_mm'] ?? 250);
+        $design_x = floatval($final_coords['x_mm'] ?? 81.24);
+        $design_y = floatval($final_coords['y_mm'] ?? 109.4);
+        
+        // Skalierung für SVG (mm zu Pixel)
+        $scale = 2.0;
+        $svg_x = $design_x * $scale;
+        $svg_y = $design_y * $scale;
+        $svg_width = $design_width * $scale;
+        $svg_height = $design_height * $scale;
+        
+        return '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid #dee2e6; border-radius: 4px;">
+            <!-- Template Hintergrund -->
+            <image href="' . esc_attr($template_image_url) . '" x="0" y="0" width="300" height="400" preserveAspectRatio="xMidYMid meet"/>
+            
+            <!-- Semi-transparenter Overlay -->
+            <rect x="0" y="0" width="300" height="400" fill="rgba(40,167,69,0.1)"/>
+            
+            <!-- Design-Bereich -->
+            <rect x="' . $svg_x . '" y="' . $svg_y . '" width="' . $svg_width . '" height="' . $svg_height . '" 
+                  fill="rgba(40,167,69,0.3)" stroke="#28a745" stroke-width="2" rx="3"/>
+            
+            <!-- Koordinaten-Linien -->
+            <line x1="0" y1="' . $svg_y . '" x2="300" y2="' . $svg_y . '" stroke="#28a745" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="' . $svg_x . '" y1="0" x2="' . $svg_x . '" y2="400" stroke="#28a745" stroke-width="1" stroke-dasharray="3,3"/>
+            
+            <!-- Maß-Labels -->
+            <rect x="' . ($svg_x + 5) . '" y="' . ($svg_y + 5) . '" width="80" height="15" fill="rgba(40,167,69,0.9)" rx="2"/>
+            <text x="' . ($svg_x + 45) . '" y="' . ($svg_y + 16) . '" text-anchor="middle" font-family="Arial" font-size="10" fill="white">' . round($design_width) . '×' . round($design_height) . 'mm</text>
+            
+            <!-- Position-Label -->
+            <rect x="10" y="10" width="80" height="25" fill="rgba(40,167,69,0.9)" rx="3"/>
+            <text x="50" y="27" text-anchor="middle" font-family="Arial" font-size="12" fill="white">' . round($design_x, 1) . ',' . round($design_y, 1) . 'mm</text>
+        </svg>';
     }
     
     /**
