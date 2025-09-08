@@ -3314,8 +3314,11 @@ class Octo_Print_Designer_Admin {
             return $template_image_url;
         }
         
-        // Verwende HTML mit CSS statt SVG für bessere Bildanzeige
-        $html = '<div style="position: relative; width: 800px; height: 1000px; background-image: url(\'' . esc_attr($template_image_url) . '\'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #f0f0f0;">
+        // Verwende HTML mit img-Tag für bessere Bildanzeige
+        $html = '<div style="position: relative; width: 800px; height: 1000px; background-color: #f0f0f0;">
+            <!-- Template Bild als img-Tag -->
+            <img src="' . esc_attr($template_image_url) . '" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; object-position: center;" alt="Template Bild">
+            
             <!-- Overlay für bessere Sichtbarkeit -->
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.1);"></div>
             
@@ -3376,8 +3379,11 @@ class Octo_Print_Designer_Admin {
         $design_width = $width_mm * $scale;
         $design_height = $height_mm * $scale;
         
-        // Verwende HTML mit CSS statt SVG für bessere Bildanzeige
-        $html = '<div style="position: relative; width: 800px; height: 1000px; background-image: url(\'' . esc_attr($template_image_url) . '\'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #f0f0f0;">
+        // Verwende HTML mit img-Tag für bessere Bildanzeige
+        $html = '<div style="position: relative; width: 800px; height: 1000px; background-color: #f0f0f0;">
+            <!-- Template Bild als img-Tag -->
+            <img src="' . esc_attr($template_image_url) . '" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; object-position: center;" alt="Template Bild">
+            
             <!-- Overlay für bessere Sichtbarkeit -->
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.1);"></div>
             
