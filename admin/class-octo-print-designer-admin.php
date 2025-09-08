@@ -2671,9 +2671,9 @@ class Octo_Print_Designer_Admin {
                             $image_url = wp_get_attachment_url($attachment_id);
                             if ($image_url) {
                                 error_log("YPrint SCHRITT 4.1 FIX: Template-Bild gefunden - {$image_url}");
-                                return $image_url;
-                            }
-                        }
+                    return $image_url;
+                }
+            }
                     }
                 }
             }

@@ -286,23 +286,34 @@ class Octo_Print_Designer_Template {
                 update_post_meta($post_id, '_template_physical_height_cm', sanitize_text_field($_POST['physical_height_cm']));
             }
 
-            // Produkt-Dimensionen pro Größe
+            // Produkt-Dimensionen pro Größe - VERBESSERTE SPEICHER-LOGIK
             if (isset($_POST['product_dimensions']) && is_array($_POST['product_dimensions'])) {
                 $product_dimensions = array();
                 $measurement_keys = array_keys($this->get_measurement_labels());
                 
+                error_log("YPrint Template {$post_id}: Speichere Produkt-Dimensionen");
+                error_log("YPrint Template {$post_id}: POST-Daten = " . print_r($_POST['product_dimensions'], true));
+                
                 foreach ($_POST['product_dimensions'] as $size_id => $config) {
-                    $product_dimensions[sanitize_text_field($size_id)] = array();
+                    $sanitized_size_id = sanitize_text_field($size_id);
+                    $product_dimensions[$sanitized_size_id] = array();
                     
                     // Speichere alle verfügbaren Messungen
                     foreach ($measurement_keys as $measurement_key) {
-                        if (isset($config[$measurement_key])) {
-                            $product_dimensions[sanitize_text_field($size_id)][$measurement_key] = floatval($config[$measurement_key]);
+                        if (isset($config[$measurement_key]) && $config[$measurement_key] !== '') {
+                            $value = floatval($config[$measurement_key]);
+                            if ($value > 0) {
+                                $product_dimensions[$sanitized_size_id][$measurement_key] = $value;
+                                error_log("YPrint Template {$post_id}: Speichere {$sanitized_size_id}.{$measurement_key} = {$value}");
+                            }
                         }
                     }
                 }
                 
-                update_post_meta($post_id, '_template_product_dimensions', $product_dimensions);
+                // Speichere in Datenbank
+                $result = update_post_meta($post_id, '_template_product_dimensions', $product_dimensions);
+                error_log("YPrint Template {$post_id}: Speicher-Ergebnis = " . ($result ? 'ERFOLG' : 'FEHLER'));
+                error_log("YPrint Template {$post_id}: Finale Daten = " . print_r($product_dimensions, true));
             }
 
                          // View-spezifische Konfigurationen
@@ -1158,14 +1169,19 @@ class Octo_Print_Designer_Template {
     public function render_physical_dimensions_meta_box($post) {
         wp_nonce_field('save_template_physical_dimensions', 'template_physical_dimensions_nonce');
         
-        // Lade Template-Daten
+        // Lade Template-Daten mit Debugging
         $template_variations = get_post_meta($post->ID, '_template_variations', true);
         $template_sizes = get_post_meta($post->ID, '_template_sizes', true);
         $product_dimensions = get_post_meta($post->ID, '_template_product_dimensions', true);
         $view_print_areas = get_post_meta($post->ID, '_template_view_print_areas', true);
         
+        // Debug-Logging
+        error_log("YPrint Template {$post->ID}: Lade Produkt-Dimensionen");
+        error_log("YPrint Template {$post->ID}: _template_product_dimensions = " . print_r($product_dimensions, true));
+        
         if (!is_array($product_dimensions)) {
             $product_dimensions = array();
+            error_log("YPrint Template {$post->ID}: Keine gespeicherten Produkt-Dimensionen gefunden, verwende leeres Array");
         }
         if (!is_array($view_print_areas)) {
             $view_print_areas = array();
@@ -1228,12 +1244,26 @@ class Octo_Print_Designer_Template {
                                             <?php echo esc_html($measurement_labels[$measurement_key]); ?>
                                         </td>
                                         <?php foreach ($template_sizes as $size): ?>
-                                            <?php 
-                                            $size_id = $size['id'];
-                                            $size_config = $product_dimensions[$size_id] ?? array();
-                                            $defaults = $this->get_default_product_dimensions_by_size($size_id);
-                                            $value = $size_config[$measurement_key] ?? $defaults[$measurement_key] ?? 0;
-                                            ?>
+                                        <?php 
+                                        $size_id = $size['id'];
+                                        $size_config = $product_dimensions[$size_id] ?? array();
+                                        $defaults = $this->get_default_product_dimensions_by_size($size_id);
+                                        
+                                        // VERBESSERTE LOGIK: Priorisiere gespeicherte Werte
+                                        $value = 0;
+                                        $value_source = 'default';
+                                        
+                                        if (isset($size_config[$measurement_key]) && $size_config[$measurement_key] > 0) {
+                                            $value = $size_config[$measurement_key];
+                                            $value_source = 'saved';
+                                        } elseif (isset($defaults[$measurement_key])) {
+                                            $value = $defaults[$measurement_key];
+                                            $value_source = 'default';
+                                        }
+                                        
+                                        // Debug-Logging für jeden Wert
+                                        error_log("YPrint Template {$post->ID}: Größe {$size_id}, Messung {$measurement_key} = {$value} (Quelle: {$value_source})");
+                                        ?>
                                             <td style="padding: 8px; text-align: center;">
                                                 <input type="number" 
                                                        name="product_dimensions[<?php echo esc_attr($size_id); ?>][<?php echo esc_attr($measurement_key); ?>]"
