@@ -2382,30 +2382,220 @@ class Octo_Print_Designer_Admin {
      * ✅ NEU: Visuelle Vorschau-Bilder generieren
      */
     private function generate_visual_previews_for_view($template_data, $step5_result, $step8_result, $view_name, $selected_size) {
-        // Für diese Implementierung verwenden wir Platzhalter-URLs
-        // In der echten Implementierung würden hier dynamische Bilder erstellt
+        $previews = array();
         
-        $template_image_url = wp_upload_dir()['baseurl'] . '/template-images/shirt_front_template.jpg';
+        // Template-Bild-URL ermitteln
+        $template_image_url = null;
         
-        return array(
-            'reference_measurement_image' => array(
-                'url' => $template_image_url . '?overlay=reference',
-                'description' => "Referenzmessung für {$view_name} - Größe {$selected_size}",
-                'measurements_shown' => 'chest: 53.0 cm'
-            ),
-            'final_placement_image' => array(
-                'url' => $template_image_url . '?overlay=placement',
-                'description' => "Finale Druckplatzierung für {$view_name}",
-                'coordinates_shown' => $step8_result['final_api_data']
-            )
+        // 1. Versuche Template-spezifisches Bild zu finden
+        if (!empty($template_data['image_path'])) {
+            $template_image_path = $template_data['image_path'];
+            $upload_dir = wp_upload_dir();
+            $template_image_url = $upload_dir['baseurl'] . '/template-images/' . $template_image_path;
+            
+            // Prüfe ob Datei existiert
+            $template_image_file = $upload_dir['basedir'] . '/template-images/' . $template_image_path;
+            if (!file_exists($template_image_file)) {
+                $template_image_url = null;
+            }
+        }
+        
+        // 2. Fallback: Standard Template-Bild
+        if (!$template_image_url) {
+            $plugin_url = plugin_dir_url(dirname(__FILE__));
+            $template_image_url = $plugin_url . 'assets/images/shirt_front_template.jpg';
+        }
+        
+        // 3. Finaler Fallback: Platzhalter-Bild
+        if (!$template_image_url) {
+            $template_image_url = 'data:image/svg+xml;base64,' . base64_encode(
+                '<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="300" height="400" fill="#f0f0f0" stroke="#ccc" stroke-width="2"/>
+                    <text x="150" y="200" text-anchor="middle" font-family="Arial" font-size="16" fill="#666">
+                        Template Bild
+                    </text>
+                    <text x="150" y="220" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">
+                        ' . esc_attr($view_name) . '
+                    </text>
+                </svg>'
+            );
+        }
+        
+        // Referenzmessung Bild
+        $reference_svg = $this->generate_reference_measurement_svg($template_image_url, $selected_size);
+        $previews['reference_measurement_image'] = array(
+            'url' => $reference_svg,
+            'description' => "Referenzmessung für {$view_name} - Größe {$selected_size}",
+            'measurements_shown' => "Brust: 53.0 cm (Größe {$selected_size})",
+            'type' => 'reference'
         );
+        
+        // Finale Platzierung Bild
+        $placement_svg = $this->generate_final_placement_svg($template_image_url, $step8_result['final_api_data'], $view_name);
+        $previews['final_placement_image'] = array(
+            'url' => $placement_svg,
+            'description' => "Finale Druckplatzierung für {$view_name}",
+            'coordinates_shown' => $step8_result['final_api_data'],
+            'type' => 'placement'
+        );
+        
+        return $previews;
+    }
+    
+    /**
+     * ✅ NEU: Referenzmessung SVG generieren
+     */
+    private function generate_reference_measurement_svg($template_url, $selected_size) {
+        $chest_measurements = array('S' => 48, 'M' => 51, 'L' => 53, 'XL' => 56);
+        $chest_cm = $chest_measurements[$selected_size] ?? 53;
+        
+        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+            <!-- Template Background -->
+            <rect width="400" height="500" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+            
+            <!-- T-Shirt Outline -->
+            <path d="M100 100 L120 80 L160 80 L200 60 L240 60 L280 80 L320 80 L340 100 L340 150 L320 150 L320 400 L100 400 L100 150 L80 150 L80 100 Z" 
+                  fill="#ffffff" stroke="#6c757d" stroke-width="2"/>
+            
+            <!-- Chest Measurement Line (horizontal red line) -->
+            <line x1="120" y1="180" x2="320" y2="180" stroke="#dc3545" stroke-width="3"/>
+            <circle cx="120" cy="180" r="4" fill="#dc3545"/>
+            <circle cx="320" cy="180" r="4" fill="#dc3545"/>
+            
+            <!-- Measurement Labels -->
+            <text x="220" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dc3545">
+                Brust: ' . $chest_cm . ' cm
+            </text>
+            
+            <!-- Size Label -->
+            <rect x="200" y="420" width="60" height="30" fill="#007bff" rx="5"/>
+            <text x="230" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">
+                Größe ' . esc_attr($selected_size) . '
+            </text>
+            
+            <!-- Title -->
+            <text x="220" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#343a40">
+                REFERENZMESSUNG
+            </text>
+            
+            <!-- Measurement Type -->
+            <text x="220" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6c757d">
+                Chest Measurement
+            </text>
+        </svg>';
+        
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+    
+    /**
+     * ✅ NEU: Finale Platzierung SVG generieren
+     */
+    private function generate_final_placement_svg($template_url, $api_data, $view_name) {
+        $x_mm = $api_data['x_mm'];
+        $y_mm = $api_data['y_mm'];
+        $width_mm = $api_data['width_mm'];
+        $height_mm = $api_data['height_mm'];
+        $dpi = $api_data['dpi'];
+        
+        // Koordinaten für SVG umrechnen (vereinfacht)
+        $scale = 1.5; // SVG-Skalierung
+        $design_x = 100 + ($x_mm * $scale);
+        $design_y = 100 + ($y_mm * $scale);
+        $design_width = $width_mm * $scale;
+        $design_height = $height_mm * $scale;
+        
+        $svg = '<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+            <!-- Template Background -->
+            <rect width="400" height="500" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+            
+            <!-- T-Shirt Outline -->
+            <path d="M100 100 L120 80 L160 80 L200 60 L240 60 L280 80 L320 80 L340 100 L340 150 L320 150 L320 400 L100 400 L100 150 L80 150 L80 100 Z" 
+                  fill="#ffffff" stroke="#6c757d" stroke-width="2"/>
+            
+            <!-- Design Platzierung (Rechteck mit Pattern) -->
+            <defs>
+                <pattern id="designPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+                    <rect width="20" height="20" fill="#28a745" opacity="0.3"/>
+                    <circle cx="10" cy="10" r="3" fill="#28a745"/>
+                </pattern>
+            </defs>
+            
+            <rect x="' . $design_x . '" y="' . $design_y . '" 
+                  width="' . $design_width . '" height="' . $design_height . '" 
+                  fill="url(#designPattern)" stroke="#28a745" stroke-width="2" stroke-dasharray="5,5"/>
+            
+            <!-- Referenzpunkt Markierung (🎯 Symbol) -->
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="8" fill="#dc3545"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="4" fill="#ffffff"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="2" fill="#dc3545"/>
+            
+            <!-- Maßlinien -->
+            <!-- Horizontale Maßlinie -->
+            <line x1="' . $design_x . '" y1="' . ($design_y + $design_height + 20) . '" 
+                  x2="' . ($design_x + $design_width) . '" y2="' . ($design_y + $design_height + 20) . '" 
+                  stroke="#6c757d" stroke-width="1" stroke-dasharray="3,3"/>
+            <text x="' . ($design_x + $design_width/2) . '" y="' . ($design_y + $design_height + 35) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">
+                ' . $width_mm . ' mm
+            </text>
+            
+            <!-- Vertikale Maßlinie -->
+            <line x1="' . ($design_x + $design_width + 20) . '" y1="' . $design_y . '" 
+                  x2="' . ($design_x + $design_width + 20) . '" y2="' . ($design_y + $design_height) . '" 
+                  stroke="#6c757d" stroke-width="1" stroke-dasharray="3,3"/>
+            <text x="' . ($design_x + $design_width + 35) . '" y="' . ($design_y + $design_height/2) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d" 
+                  transform="rotate(90 ' . ($design_x + $design_width + 35) . ' ' . ($design_y + $design_height/2) . ')">
+                ' . $height_mm . ' mm
+            </text>
+            
+            <!-- Koordinaten-Labels -->
+            <rect x="10" y="420" width="180" height="70" fill="#007bff" rx="5" opacity="0.9"/>
+            <text x="20" y="440" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+                Position: ' . $x_mm . ', ' . $y_mm . ' mm
+            </text>
+            <text x="20" y="455" font-family="Arial, sans-serif" font-size="12" fill="white">
+                Größe: ' . $width_mm . ' × ' . $height_mm . ' mm
+            </text>
+            <text x="20" y="470" font-family="Arial, sans-serif" font-size="12" fill="white">
+                DPI: ' . $dpi . ' | Ref: top-left
+            </text>
+            
+            <!-- Title -->
+            <text x="220" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#343a40">
+                FINALE DRUCKPLATZIERUNG
+            </text>
+            
+            <!-- View Name -->
+            <text x="220" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6c757d">
+                ' . esc_attr($view_name) . '
+            </text>
+        </svg>';
+        
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
     /**
      * ✅ NEU: Debug-Output zu HTML formatieren
      */
     private function format_workflow_debug_output($result) {
-        $html = '<div class="yprint-workflow-debug-output">';
+        $html = '<style>
+            .yprint-workflow-debug-output { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            .debug-summary-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            .debug-summary-table td { padding: 8px; border: 1px solid #ddd; }
+            .debug-summary-table td:first-child { font-weight: bold; background: #f8f9fa; width: 200px; }
+            .workflow-steps-table table { font-size: 12px; }
+            .workflow-steps-table th, .workflow-steps-table td { padding: 8px; vertical-align: top; }
+            .workflow-steps-table th { background: #007cba; color: white; }
+            .preview-images { display: flex; gap: 20px; margin: 15px 0; flex-wrap: wrap; }
+            .preview-image-container { flex: 1; min-width: 300px; text-align: center; }
+            .preview-image-container h6 { margin: 0 0 10px 0; color: #23282d; font-size: 14px; }
+            .preview-image-container img { max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            .debug-log-content { background: #f1f1f1; padding: 15px; border-radius: 4px; font-family: "Courier New", monospace; font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+            .debug-view-section { border: 1px solid #ddd; margin: 15px 0; padding: 15px; border-radius: 8px; background: #fff; }
+            .debug-summary-section { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        </style>';
+        $html .= '<div class="yprint-workflow-debug-output">';
         
         // Summary Section
         $html .= '<div class="debug-summary-section">';
@@ -2452,7 +2642,19 @@ class Octo_Print_Designer_Admin {
                 foreach ($view_result['visual_previews'] as $preview_type => $preview_data) {
                     $html .= '<div class="preview-image-container">';
                     $html .= '<h6>' . esc_html($preview_data['description']) . '</h6>';
-                    $html .= '<img src="' . esc_url($preview_data['url']) . '" alt="' . esc_attr($preview_data['description']) . '" style="max-width: 300px; height: auto; border: 1px solid #ddd;">';
+                    $html .= '<div class="preview-image-wrapper">';
+                    $html .= '<img src="' . esc_attr($preview_data['url']) . '" alt="' . esc_attr($preview_data['description']) . '" loading="lazy">';
+                    $html .= '</div>';
+                    
+                    // Zusätzliche Infos anzeigen
+                    if (isset($preview_data['measurements_shown'])) {
+                        $html .= '<p class="preview-info"><strong>Messung:</strong> ' . esc_html($preview_data['measurements_shown']) . '</p>';
+                    }
+                    if (isset($preview_data['coordinates_shown'])) {
+                        $coords = $preview_data['coordinates_shown'];
+                        $html .= '<p class="preview-info"><strong>Koordinaten:</strong> ' . esc_html($coords['x_mm']) . 'mm, ' . esc_html($coords['y_mm']) . 'mm</p>';
+                    }
+                    
                     $html .= '</div>';
                 }
                 
