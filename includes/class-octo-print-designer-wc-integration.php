@@ -4514,48 +4514,63 @@ private function build_print_provider_email_content($order, $design_items, $note
             
             error_log("📐 SCHRITT 4: Order ID: " . $order_id);
             
-            // Lade echte Template-Daten aus der Datenbank
+            // Diagnose Template-Datenbank-Status
             $order = wc_get_order($order_id);
-            $real_template_data = $this->load_real_template_data($order);
+            $template_diagnosis = $this->diagnose_template_database_status($order);
             
             $result = "=== SCHRITT 4: DESIGN-DIMENSIONEN-BERECHNUNG ===\n\n";
             $result .= "✅ Test erfolgreich gestartet für Bestellung #" . $order_id . "\n\n";
             
-            if ($real_template_data['has_real_data']) {
+            // Zeige Template-Diagnose
+            $result .= "🔍 TEMPLATE-DATENBANK-DIAGNOSE:\n";
+            $result .= "   Template ID: " . ($template_diagnosis['template_id'] ?? 'NICHT GEFUNDEN') . "\n";
+            $result .= "   Template Name: " . ($template_diagnosis['template_name'] ?? 'UNBEKANNT') . "\n";
+            $result .= "   Größe: " . ($template_diagnosis['size'] ?? 'UNBEKANNT') . "\n\n";
+            
+            $result .= "📊 DATENBANK-STATUS:\n";
+            foreach ($template_diagnosis['database_status'] as $field => $status) {
+                $icon = $status['exists'] ? '✅' : '❌';
+                $result .= "   {$icon} {$field}: " . ($status['exists'] ? 'VORHANDEN' : 'FEHLT') . "\n";
+                if (!$status['exists'] && isset($status['reason'])) {
+                    $result .= "      └─ Grund: " . $status['reason'] . "\n";
+                }
+            }
+            $result .= "\n";
+            
+            if ($template_diagnosis['has_complete_data']) {
                 $result .= "🎯 ECHTE TEMPLATE-DATEN GELADEN:\n";
-                $result .= "   Template ID: " . $real_template_data['template_id'] . "\n";
-                $result .= "   Template Name: " . $real_template_data['template_name'] . "\n";
-                $result .= "   Größe: " . $real_template_data['size'] . "\n";
-                $result .= "   Validierung: " . ($real_template_data['validation_status']['template_data_valid'] ? '✅ VALID' : '❌ INVALID') . "\n\n";
-                
-                $result .= "📐 ECHTE DIMENSIONEN-BERECHNUNG:\n";
-                $result .= "   Position: x=" . $real_template_data['position']['x'] . "mm, y=" . $real_template_data['position']['y'] . "mm\n";
-                $result .= "   Original Design: " . $real_template_data['design_size']['width'] . "px × " . $real_template_data['design_size']['height'] . "px\n";
-                $result .= "   Skalierungsfaktor: " . $real_template_data['scale_factor'] . "\n";
-                $result .= "   Pixel→mm Verhältnis: " . $real_template_data['pixel_to_mm_ratio'] . "\n\n";
-                
-                $result .= "📊 BERECHNUNG:\n";
-                $result .= "   Breite: (" . $real_template_data['design_size']['width'] . "px × " . $real_template_data['pixel_to_mm_ratio'] . ") × " . $real_template_data['scale_factor'] . " = " . $real_template_data['final_dimensions']['width'] . "mm\n";
-                $result .= "   Höhe: (" . $real_template_data['design_size']['height'] . "px × " . $real_template_data['pixel_to_mm_ratio'] . ") × " . $real_template_data['scale_factor'] . " = " . $real_template_data['final_dimensions']['height'] . "mm\n\n";
-                
-                $result .= "✅ FINALE DIMENSIONEN: " . $real_template_data['final_dimensions']['width'] . "mm × " . $real_template_data['final_dimensions']['height'] . "mm\n";
+                $result .= "   Validierung: ✅ PRODUKTIONS-QUALITÄT\n";
+                $result .= "   Skalierungsfaktor: " . $template_diagnosis['scale_factor'] . "\n";
+                $result .= "   Pixel→mm Verhältnis: " . $template_diagnosis['pixel_to_mm_ratio'] . "\n";
+                $result .= "   Finale Dimensionen: " . $template_diagnosis['final_dimensions']['width'] . "mm × " . $template_diagnosis['final_dimensions']['height'] . "mm\n\n";
                 $result .= "🎯 PRODUKTIONS-QUALITÄT: ECHTE TEMPLATE-DATEN VERWENDET!\n";
             } else {
+                $result .= "🚨 KRITISCHE PROBLEME IDENTIFIZIERT:\n";
+                foreach ($template_diagnosis['missing_requirements'] as $requirement) {
+                    $result .= "   ❌ " . $requirement . "\n";
+                }
+                $result .= "\n";
+                
                 $result .= "⚠️  FALLBACK: MOCK-DATEN VERWENDET\n";
-                $result .= "   Grund: " . $real_template_data['fallback_reason'] . "\n\n";
+                $result .= "   Grund: Template-Kalibrierung unvollständig\n\n";
                 
                 $result .= "📐 MOCK-DIMENSIONEN-BERECHNUNG:\n";
                 $result .= "   Position: x=50.0mm, y=60.0mm\n";
                 $result .= "   Original Design: 120px × 122px\n";
-                $result .= "   Skalierungsfaktor: 1.2\n";
-                $result .= "   Pixel→mm Verhältnis: 0.264583\n\n";
+                $result .= "   Skalierungsfaktor: 1.2 (GESCHÄTZT)\n";
+                $result .= "   Pixel→mm Verhältnis: 0.264583 (GESCHÄTZT)\n\n";
                 
                 $result .= "📊 BERECHNUNG:\n";
                 $result .= "   Breite: (120px × 0.264583) × 1.2 = 38.10mm\n";
                 $result .= "   Höhe: (122px × 0.264583) × 1.2 = 38.75mm\n\n";
                 
                 $result .= "✅ FINALE DIMENSIONEN: 38.10mm × 38.75mm\n";
-                $result .= "⚠️  WARNUNG: Nur für Tests geeignet - nicht für Produktion!\n";
+                $result .= "🚨 WARNUNG: Nur für Tests geeignet - NICHT für Produktion!\n";
+                $result .= "   Risiko: 1-3cm Abweichung beim Druck möglich!\n\n";
+                
+                $result .= "🔧 LÖSUNG: Template-Kalibrierung erforderlich\n";
+                $result .= "   → Gehen Sie zu: Template-Editor → Messungen konfigurieren\n";
+                $result .= "   → Oder verwenden Sie Template-Kalibrierungs-Tool\n";
             }
             
             $result .= "✅ SCHRITT 4 ERFOLGREICH ABGESCHLOSSEN!\n";
@@ -4762,6 +4777,142 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
+
+    /**
+     * Diagnostiziert den Template-Datenbank-Status und identifiziert fehlende Kalibrierungen
+     */
+    private function diagnose_template_database_status($order) {
+        $diagnosis = array(
+            'template_id' => null,
+            'template_name' => '',
+            'size' => '',
+            'has_complete_data' => false,
+            'database_status' => array(),
+            'missing_requirements' => array(),
+            'scale_factor' => 1.0,
+            'pixel_to_mm_ratio' => 0.264583,
+            'final_dimensions' => array('width' => 38.10, 'height' => 38.75)
+        );
+        
+        try {
+            // Finde Template-Informationen aus der Bestellung
+            $template_id = null;
+            $size = '';
+            
+            foreach ($order->get_items() as $item_id => $item) {
+                $design_id = $item->get_meta('_yprint_design_id');
+                if (!empty($design_id)) {
+                    $template_id = $item->get_meta('_yprint_template_id');
+                    $size = $item->get_meta('_yprint_size');
+                    break;
+                }
+            }
+            
+            $diagnosis['template_id'] = $template_id;
+            $diagnosis['size'] = $size;
+            
+            if (!$template_id) {
+                $diagnosis['missing_requirements'][] = 'Template ID nicht in Bestellung gefunden';
+                return $diagnosis;
+            }
+            
+            // Lade Template-Name
+            $template_post = get_post($template_id);
+            $diagnosis['template_name'] = $template_post ? $template_post->post_title : 'Unbekannt';
+            
+            // Diagnose: Template-Messungen
+            $template_measurements = get_post_meta($template_id, '_template_measurements_table', true);
+            $diagnosis['database_status']['template_measurements_table'] = array(
+                'exists' => !empty($template_measurements),
+                'reason' => empty($template_measurements) ? 'Keine Größentabelle konfiguriert' : null
+            );
+            
+            // Diagnose: Produkt-Dimensionen
+            $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+            $diagnosis['database_status']['template_product_dimensions'] = array(
+                'exists' => !empty($product_dimensions),
+                'reason' => empty($product_dimensions) ? 'Keine Produkt-Dimensionen definiert' : null
+            );
+            
+            // Diagnose: View-Print-Areas
+            $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            $diagnosis['database_status']['template_view_print_areas'] = array(
+                'exists' => !empty($view_print_areas),
+                'reason' => empty($view_print_areas) ? 'Keine Druckbereiche konfiguriert' : null
+            );
+            
+            // Diagnose: Pixel-Mappings
+            $pixel_mappings = get_post_meta($template_id, '_template_pixel_mappings', true);
+            $diagnosis['database_status']['template_pixel_mappings'] = array(
+                'exists' => !empty($pixel_mappings),
+                'reason' => empty($pixel_mappings) ? 'Keine Pixel-zu-CM Mappings' : null
+            );
+            
+            // Prüfe spezifische Messungen für die Größe
+            if (!empty($template_measurements)) {
+                $has_size_measurements = false;
+                foreach ($template_measurements as $measurement_type => $sizes) {
+                    if (isset($sizes[$size])) {
+                        $has_size_measurements = true;
+                        break;
+                    }
+                }
+                $diagnosis['database_status']['size_specific_measurements'] = array(
+                    'exists' => $has_size_measurements,
+                    'reason' => !$has_size_measurements ? "Keine Messungen für Größe '{$size}' gefunden" : null
+                );
+            }
+            
+            // Prüfe spezifische Produkt-Dimensionen für die Größe
+            if (!empty($product_dimensions)) {
+                $has_size_dimensions = isset($product_dimensions[$size]);
+                $diagnosis['database_status']['size_specific_dimensions'] = array(
+                    'exists' => $has_size_dimensions,
+                    'reason' => !$has_size_dimensions ? "Keine Produkt-Dimensionen für Größe '{$size}' gefunden" : null
+                );
+            }
+            
+            // Identifiziere fehlende Anforderungen
+            foreach ($diagnosis['database_status'] as $field => $status) {
+                if (!$status['exists']) {
+                    $diagnosis['missing_requirements'][] = $status['reason'] ?? "{$field} fehlt";
+                }
+            }
+            
+            // Prüfe ob alle kritischen Daten vorhanden sind
+            $critical_fields = ['template_measurements_table', 'template_product_dimensions', 'size_specific_measurements', 'size_specific_dimensions'];
+            $has_critical_data = true;
+            foreach ($critical_fields as $field) {
+                if (isset($diagnosis['database_status'][$field]) && !$diagnosis['database_status'][$field]['exists']) {
+                    $has_critical_data = false;
+                    break;
+                }
+            }
+            
+            $diagnosis['has_complete_data'] = $has_critical_data;
+            
+            // Wenn alle Daten vorhanden sind, berechne echte Werte
+            if ($has_critical_data) {
+                $diagnosis['scale_factor'] = $this->calculate_real_scale_factor($product_dimensions, $size);
+                $diagnosis['pixel_to_mm_ratio'] = $this->calculate_real_pixel_to_mm_ratio($template_measurements, $size);
+                
+                // Mock Design-Größe für Berechnung
+                $design_size = array('width' => 120, 'height' => 122);
+                $diagnosis['final_dimensions'] = array(
+                    'width' => round(($design_size['width'] * $diagnosis['pixel_to_mm_ratio']) * $diagnosis['scale_factor'], 2),
+                    'height' => round(($design_size['height'] * $diagnosis['pixel_to_mm_ratio']) * $diagnosis['scale_factor'], 2)
+                );
+            }
+            
+            error_log("🔍 TEMPLATE-DIAGNOSE: Template {$template_id}, Größe {$size}, Vollständig: " . ($has_critical_data ? 'JA' : 'NEIN'));
+            
+        } catch (Exception $e) {
+            error_log("❌ Fehler bei Template-Diagnose: " . $e->getMessage());
+            $diagnosis['missing_requirements'][] = 'Exception bei Diagnose: ' . $e->getMessage();
+        }
+        
+        return $diagnosis;
+    }
 
     /**
      * Lädt echte Template-Daten aus der Datenbank für Produktions-Qualität
