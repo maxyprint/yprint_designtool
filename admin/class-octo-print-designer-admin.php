@@ -2203,7 +2203,7 @@ class Octo_Print_Designer_Admin {
     public function ajax_yprint_preview_modal() {
         try {
             // Security Check
-            if (!wp_verify_nonce($_POST['nonce'], 'yprint_debug_nonce')) {
+            if (!wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
                 wp_send_json_error('Security check failed');
             }
             
