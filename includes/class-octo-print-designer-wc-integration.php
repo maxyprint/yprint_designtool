@@ -1887,6 +1887,72 @@ private function check_yprint_dependency() {
                     });
                 });
                 
+                // ✅ NEU: Popup-Vorschau Button Handler
+                $(document).on('click', '.yprint-preview-button', function() {
+                    var button = $(this);
+                    var orderId = $('.complete-workflow-debug-button').data('order-id');
+                    var viewKey = button.data('view-key');
+                    var previewType = button.data('preview-type');
+                    var viewName = button.data('view-name');
+                    var nonce = $('#octo_print_provider_nonce').val();
+                    
+                    // Modal öffnen
+                    $('#yprint-preview-modal').show();
+                    $('#yprint-preview-title').text('Vollbild-Vorschau: ' + viewName);
+                    $('#yprint-preview-loading').show();
+                    $('#yprint-preview-content').hide();
+                    $('#yprint-preview-error').hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'yprint_preview_modal',
+                            order_id: orderId,
+                            view_key: viewKey,
+                            preview_type: previewType,
+                            view_name: viewName,
+                            nonce: nonce
+                        },
+                        timeout: 30000,
+                        success: function(response) {
+                            if (response.success) {
+                                var data = response.data;
+                                
+                                if (data.error) {
+                                    $('#yprint-preview-error-message').text(data.error);
+                                    $('#yprint-preview-error').show();
+                                } else {
+                                    // Bild anzeigen
+                                    $('#yprint-preview-image').attr('src', data.image_url);
+                                    
+                                    // Debug-Info anzeigen
+                                    $('#yprint-preview-debug-content').html(data.debug_info);
+                                    
+                                    $('#yprint-preview-content').show();
+                                }
+                            } else {
+                                $('#yprint-preview-error-message').text(response.data || 'Unbekannter Fehler');
+                                $('#yprint-preview-error').show();
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            $('#yprint-preview-error-message').text('AJAX-Fehler: ' + error);
+                            $('#yprint-preview-error').show();
+                        },
+                        complete: function() {
+                            $('#yprint-preview-loading').hide();
+                        }
+                    });
+                });
+                
+                // Modal schließen
+                $('#yprint-preview-close, #yprint-preview-modal').on('click', function(e) {
+                    if (e.target === this) {
+                        $('#yprint-preview-modal').hide();
+                    }
+                });
+                
             });
         </script>
         <?php

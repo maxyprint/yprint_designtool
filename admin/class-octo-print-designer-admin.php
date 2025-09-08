@@ -108,6 +108,9 @@ class Octo_Print_Designer_Admin {
         // ✅ NEU: Vollständiger Workflow & Debug AJAX Handler
         add_action('wp_ajax_complete_workflow_debug', array($this, 'ajax_complete_workflow_debug'));
         
+        // ✅ NEU: AJAX handler für Popup-Vorschau
+        add_action('wp_ajax_yprint_preview_modal', array($this, 'ajax_yprint_preview_modal'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         
@@ -2195,6 +2198,131 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
+     * ✅ NEU: AJAX Handler für Popup-Vorschau
+     */
+    public function ajax_yprint_preview_modal() {
+        try {
+            // Security Check
+            if (!wp_verify_nonce($_POST['nonce'], 'yprint_debug_nonce')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            // Permission Check
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('Insufficient permissions');
+            }
+            
+            $order_id = intval($_POST['order_id']);
+            $view_key = sanitize_text_field($_POST['view_key']);
+            $preview_type = sanitize_text_field($_POST['preview_type']);
+            $view_name = sanitize_text_field($_POST['view_name']);
+            
+            error_log("YPrint Preview: Loading preview for Order {$order_id}, View {$view_key}, Type {$preview_type}");
+            
+            // Order laden
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_send_json_error('Order not found');
+            }
+            
+            // Vollständigen Workflow für diese spezifische View ausführen
+            $result = $this->perform_complete_workflow_debug($order_id);
+            
+            // Spezifische View-Daten finden
+            $view_result = null;
+            foreach ($result['view_results'] as $vr) {
+                if ($vr['view_key'] === $view_key) {
+                    $view_result = $vr;
+                    break;
+                }
+            }
+            
+            if (!$view_result) {
+                wp_send_json_error('View not found in workflow result');
+            }
+            
+            // Preview-Daten für die spezifische View generieren
+            $preview_data = $this->generate_fullsize_preview_for_view($view_result, $preview_type, $order_id);
+            
+            wp_send_json_success($preview_data);
+            
+        } catch (Exception $e) {
+            error_log("YPrint Preview: ❌ Exception in ajax_yprint_preview_modal: " . $e->getMessage());
+            wp_send_json_error('Exception: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: Vollbild-Vorschau für spezifische View generieren
+     */
+    private function generate_fullsize_preview_for_view($view_result, $preview_type, $order_id) {
+        $view_name = $view_result['view_name'];
+        $view_key = $view_result['view_key'];
+        
+        // Template-Daten laden
+        $template_id = null;
+        foreach ($view_result['workflow_steps']['step1']['output'] as $item) {
+            if (isset($item['template_id'])) {
+                $template_id = $item['template_id'];
+                break;
+            }
+        }
+        
+        if (!$template_id) {
+            return array(
+                'error' => 'Template ID nicht gefunden',
+                'debug_info' => 'Keine Template-ID in Workflow-Schritt 1 gefunden'
+            );
+        }
+        
+        $template_data = $this->load_template_data($template_id);
+        if (!$template_data) {
+            return array(
+                'error' => 'Template-Daten nicht gefunden',
+                'debug_info' => "Template ID {$template_id} konnte nicht geladen werden"
+            );
+        }
+        
+        // Template-Bild-URL ermitteln
+        $template_image_url = $this->get_template_image_url($template_data, $view_name);
+        
+        // Größe ermitteln
+        $selected_size = 'L'; // Default, sollte aus Order-Item kommen
+        foreach ($view_result['workflow_steps']['step1']['output'] as $item) {
+            if (isset($item['selected_size'])) {
+                $selected_size = $item['selected_size'];
+                break;
+            }
+        }
+        
+        $preview_data = array(
+            'view_name' => $view_name,
+            'view_key' => $view_key,
+            'preview_type' => $preview_type,
+            'template_image_url' => $template_image_url,
+            'selected_size' => $selected_size,
+            'template_id' => $template_id
+        );
+        
+        if ($preview_type === 'reference_measurement_image') {
+            // Referenzmessung-Vorschau
+            $reference_data = $this->get_reference_measurement_data($template_data, $selected_size, $view_key);
+            $preview_data['reference_data'] = $reference_data;
+            $preview_data['image_url'] = $this->generate_fullsize_reference_image($template_image_url, $reference_data, $view_name, $selected_size);
+            $preview_data['debug_info'] = $this->format_reference_debug_info($reference_data, $template_data, $selected_size);
+            
+        } elseif ($preview_type === 'final_placement_image') {
+            // Finale Platzierung-Vorschau
+            $step8_data = $view_result['workflow_steps']['step8']['output'] ?? array();
+            $preview_data['placement_data'] = $step8_data;
+            $preview_data['image_url'] = $this->generate_fullsize_placement_image($template_image_url, $step8_data, $view_name, $selected_size);
+            $preview_data['debug_info'] = $this->format_placement_debug_info($step8_data, $template_data, $selected_size);
+        }
+        
+        return $preview_data;
+    }
+
+    /**
      * ✅ NEU: Helper-Methoden für Workflow-Schritte
      */
     private function execute_step_1_for_view($design_data, $view_key, &$debug_log) {
@@ -2831,6 +2959,18 @@ class Octo_Print_Designer_Admin {
                 foreach ($view_result['visual_previews'] as $preview_type => $preview_data) {
                     $html .= '<div class="preview-image-container">';
                     $html .= '<h6>' . esc_html($preview_data['description']) . '</h6>';
+                    
+                    // Vorschau-Button hinzufügen
+                    $view_key = $view_result['view_key'] ?? 'unknown';
+                    $html .= '<button type="button" class="button button-secondary yprint-preview-button" 
+                                data-view-key="' . esc_attr($view_key) . '" 
+                                data-preview-type="' . esc_attr($preview_type) . '" 
+                                data-view-name="' . esc_attr($view_result['view_name']) . '"
+                                style="margin-bottom: 10px; font-size: 12px;">
+                                <span class="dashicons dashicons-visibility" style="margin-right: 5px;"></span>
+                                Vollbild-Vorschau
+                            </button>';
+                    
                     $html .= '<div class="preview-image-wrapper">';
                     $html .= '<img src="' . esc_attr($preview_data['url']) . '" alt="' . esc_attr($preview_data['description']) . '" loading="lazy">';
                     $html .= '</div>';
@@ -2862,7 +3002,55 @@ class Octo_Print_Designer_Admin {
 
         $html .= '</div>';
         
+        // Popup-Modal für Vollbild-Vorschau hinzufügen
+        $html .= $this->get_preview_popup_html();
+        
         return $html;
+    }
+
+    /**
+     * ✅ NEU: Popup-Modal HTML für Vollbild-Vorschau
+     */
+    private function get_preview_popup_html() {
+        return '
+        <div id="yprint-preview-modal" style="display: none; position: fixed; z-index: 999999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+            <div style="position: relative; margin: 2% auto; background: white; border-radius: 8px; max-width: 95%; max-height: 95%; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                <!-- Modal Header -->
+                <div style="padding: 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="yprint-preview-title" style="margin: 0; color: #23282d;">Vollbild-Vorschau</h3>
+                    <button type="button" id="yprint-preview-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+                </div>
+                
+                <!-- Modal Content -->
+                <div style="padding: 20px;">
+                    <!-- Loading Indicator -->
+                    <div id="yprint-preview-loading" style="text-align: center; padding: 40px;">
+                        <div class="spinner is-active" style="float: none; margin: 0 auto;"></div>
+                        <p>Lade Vorschau...</p>
+                    </div>
+                    
+                    <!-- Preview Content -->
+                    <div id="yprint-preview-content" style="display: none;">
+                        <!-- Template Image -->
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <img id="yprint-preview-image" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px;" alt="Template Vorschau">
+                        </div>
+                        
+                        <!-- Debug Information -->
+                        <div id="yprint-preview-debug" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                            <h4>🔍 Debug-Informationen</h4>
+                            <div id="yprint-preview-debug-content"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Error Message -->
+                    <div id="yprint-preview-error" style="display: none; text-align: center; padding: 40px; color: #dc3545;">
+                        <h4>❌ Fehler beim Laden der Vorschau</h4>
+                        <p id="yprint-preview-error-message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>';
     }
 
     /**
@@ -3078,6 +3266,194 @@ class Octo_Print_Designer_Admin {
             default:
                 return 'Keine Beispielwerte';
         }
+    }
+
+    /**
+     * ✅ NEU: Vollbild-Referenzmessung generieren
+     */
+    private function generate_fullsize_reference_image($template_image_url, $reference_data, $view_name, $selected_size) {
+        // Prüfe ob es ein echtes Template-Bild ist
+        if (strpos($template_image_url, 'data:image/svg') === 0) {
+            return $template_image_url;
+        }
+        
+        // Größere SVG für Vollbild-Vorschau (800x1000)
+        $svg = '<svg width="800" height="1000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <!-- Template Background Image -->
+            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="800" height="1000" preserveAspectRatio="xMidYMid meet"/>
+            
+            <!-- Overlay für bessere Sichtbarkeit -->
+            <rect x="0" y="0" width="800" height="1000" fill="rgba(0,0,0,0.1)"/>
+            
+            <!-- Chest Measurement Line (horizontal red line) - Skaliert für größeres Bild -->
+            <line x1="' . ($reference_data['pixel_start']['x'] * 2) . '" y1="' . ($reference_data['pixel_start']['y'] * 2) . '" 
+                  x2="' . ($reference_data['pixel_end']['x'] * 2) . '" y2="' . ($reference_data['pixel_end']['y'] * 2) . '" 
+                  stroke="#dc3545" stroke-width="8"/>
+            <circle cx="' . ($reference_data['pixel_start']['x'] * 2) . '" cy="' . ($reference_data['pixel_start']['y'] * 2) . '" r="12" fill="#dc3545"/>
+            <circle cx="' . ($reference_data['pixel_end']['x'] * 2) . '" cy="' . ($reference_data['pixel_end']['y'] * 2) . '" r="12" fill="#dc3545"/>
+            
+            <!-- Measurement Labels - Größer für Vollbild -->
+            <rect x="' . (($reference_data['pixel_start']['x'] * 2) - 100) . '" y="' . (($reference_data['pixel_start']['y'] * 2) - 60) . '" 
+                  width="200" height="50" fill="rgba(220,53,69,0.9)" rx="10"/>
+            <text x="' . (($reference_data['pixel_start']['x'] + $reference_data['pixel_end']['x'])) . '" 
+                  y="' . (($reference_data['pixel_start']['y'] * 2) - 20) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">
+                ' . $reference_data['real_distance_cm'] . ' cm
+            </text>
+            
+            <!-- Size Label - Größer -->
+            <rect x="400" y="840" width="160" height="60" fill="#007bff" rx="10"/>
+            <text x="480" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white">
+                Größe ' . esc_attr($selected_size) . '
+            </text>
+            
+            <!-- Title - Größer -->
+            <rect x="100" y="40" width="600" height="80" fill="rgba(0,0,0,0.8)" rx="10"/>
+            <text x="400" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white">
+                REFERENZMESSUNG
+            </text>
+            <text x="400" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#ccc">
+                ' . esc_attr($reference_data['measurement_type']) . ' Measurement
+            </text>
+        </svg>';
+        
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    /**
+     * ✅ NEU: Vollbild-Platzierung generieren
+     */
+    private function generate_fullsize_placement_image($template_image_url, $step8_data, $view_name, $selected_size) {
+        // Prüfe ob es ein echtes Template-Bild ist
+        if (strpos($template_image_url, 'data:image/svg') === 0) {
+            return $template_image_url;
+        }
+        
+        // API-Daten aus step8 extrahieren
+        $api_data = $step8_data['final_api_data'] ?? array();
+        $x_mm = $api_data['x_mm'] ?? 0;
+        $y_mm = $api_data['y_mm'] ?? 0;
+        $width_mm = $api_data['width_mm'] ?? 0;
+        $height_mm = $api_data['height_mm'] ?? 0;
+        $dpi = $api_data['dpi'] ?? 0;
+        
+        // Koordinaten für größeres SVG umrechnen
+        $scale = 3.0; // Größere Skalierung für Vollbild
+        $design_x = 200 + ($x_mm * $scale);
+        $design_y = 200 + ($y_mm * $scale);
+        $design_width = $width_mm * $scale;
+        $design_height = $height_mm * $scale;
+        
+        $svg = '<svg width="800" height="1000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <!-- Template Background Image -->
+            <image xlink:href="' . esc_attr($template_image_url) . '" x="0" y="0" width="800" height="1000" preserveAspectRatio="xMidYMid meet"/>
+            
+            <!-- Overlay für bessere Sichtbarkeit -->
+            <rect x="0" y="0" width="800" height="1000" fill="rgba(0,0,0,0.1)"/>
+            
+            <!-- Design Platzierung (Rechteck mit Pattern) -->
+            <defs>
+                <pattern id="designPatternFull" patternUnits="userSpaceOnUse" width="40" height="40">
+                    <rect width="40" height="40" fill="#28a745" opacity="0.4"/>
+                    <circle cx="20" cy="20" r="6" fill="#28a745"/>
+                </pattern>
+            </defs>
+            
+            <rect x="' . $design_x . '" y="' . $design_y . '" 
+                  width="' . $design_width . '" height="' . $design_height . '" 
+                  fill="url(#designPatternFull)" stroke="#28a745" stroke-width="6" stroke-dasharray="10,10"/>
+            
+            <!-- Referenzpunkt Markierung (🎯 Symbol) - Größer -->
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="20" fill="#dc3545"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="12" fill="#ffffff"/>
+            <circle cx="' . $design_x . '" cy="' . $design_y . '" r="6" fill="#dc3545"/>
+            
+            <!-- Maßlinien - Größer -->
+            <!-- Horizontale Maßlinie -->
+            <line x1="' . $design_x . '" y1="' . ($design_y + $design_height + 40) . '" 
+                  x2="' . ($design_x + $design_width) . '" y2="' . ($design_y + $design_height + 40) . '" 
+                  stroke="#6c757d" stroke-width="4" stroke-dasharray="6,6"/>
+            <rect x="' . ($design_x + $design_width/2 - 40) . '" y="' . ($design_y + $design_height + 50) . '" 
+                  width="80" height="30" fill="rgba(108,117,125,0.9)" rx="5"/>
+            <text x="' . ($design_x + $design_width/2) . '" y="' . ($design_y + $design_height + 70) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+                ' . $width_mm . 'mm
+            </text>
+            
+            <!-- Vertikale Maßlinie -->
+            <line x1="' . ($design_x + $design_width + 40) . '" y1="' . $design_y . '" 
+                  x2="' . ($design_x + $design_width + 40) . '" y2="' . ($design_y + $design_height) . '" 
+                  stroke="#6c757d" stroke-width="4" stroke-dasharray="6,6"/>
+            <rect x="' . ($design_x + $design_width + 50) . '" y="' . ($design_y + $design_height/2 - 15) . '" 
+                  width="60" height="30" fill="rgba(108,117,125,0.9)" rx="5"/>
+            <text x="' . ($design_x + $design_width + 80) . '" y="' . ($design_y + $design_height/2 + 5) . '" 
+                  text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
+                ' . $height_mm . 'mm
+            </text>
+            
+            <!-- Info-Boxen - Größer -->
+            <rect x="50" y="50" width="300" height="120" fill="rgba(0,0,0,0.8)" rx="10"/>
+            <text x="200" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">
+                FINALE DRUCKPLATZIERUNG
+            </text>
+            <text x="200" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#ccc">
+                ' . esc_attr($view_name) . '
+            </text>
+            <text x="200" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#28a745">
+                Größe: ' . esc_attr($selected_size) . ' | DPI: ' . $dpi . '
+            </text>
+            
+            <!-- Koordinaten-Info -->
+            <rect x="450" y="50" width="300" height="120" fill="rgba(0,123,255,0.8)" rx="10"/>
+            <text x="600" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
+                KOORDINATEN
+            </text>
+            <text x="600" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="white">
+                X: ' . $x_mm . 'mm | Y: ' . $y_mm . 'mm
+            </text>
+            <text x="600" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="white">
+                W: ' . $width_mm . 'mm | H: ' . $height_mm . 'mm
+            </text>
+        </svg>';
+        
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    /**
+     * ✅ NEU: Debug-Info für Referenzmessung formatieren
+     */
+    private function format_reference_debug_info($reference_data, $template_data, $selected_size) {
+        $html = '<div style="font-family: monospace; font-size: 14px;">';
+        $html .= '<h4>📏 Referenzmessung-Details</h4>';
+        $html .= '<table style="width: 100%; border-collapse: collapse;">';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Messungstyp:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($reference_data['measurement_type']) . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Echte Distanz:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($reference_data['real_distance_cm']) . ' cm</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Pixel-Start:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">X: ' . esc_html($reference_data['pixel_start']['x']) . ', Y: ' . esc_html($reference_data['pixel_start']['y']) . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Pixel-Ende:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">X: ' . esc_html($reference_data['pixel_end']['x']) . ', Y: ' . esc_html($reference_data['pixel_end']['y']) . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Gewählte Größe:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($selected_size) . '</td></tr>';
+        $html .= '</table>';
+        $html .= '</div>';
+        return $html;
+    }
+
+    /**
+     * ✅ NEU: Debug-Info für Platzierung formatieren
+     */
+    private function format_placement_debug_info($step8_data, $template_data, $selected_size) {
+        $api_data = $step8_data['final_api_data'] ?? array();
+        $html = '<div style="font-family: monospace; font-size: 14px;">';
+        $html .= '<h4>🎯 Platzierung-Details</h4>';
+        $html .= '<table style="width: 100%; border-collapse: collapse;">';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>X-Koordinate:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['x_mm'] ?? 'N/A') . ' mm</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Y-Koordinate:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['y_mm'] ?? 'N/A') . ' mm</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Breite:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['width_mm'] ?? 'N/A') . ' mm</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Höhe:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['height_mm'] ?? 'N/A') . ' mm</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>DPI:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['dpi'] ?? 'N/A') . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Format:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($api_data['format'] ?? 'N/A') . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa;"><strong>Gewählte Größe:</strong></td><td style="padding: 5px; border: 1px solid #ddd;">' . esc_html($selected_size) . '</td></tr>';
+        $html .= '</table>';
+        $html .= '</div>';
+        return $html;
     }
 
 }
