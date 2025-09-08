@@ -2313,17 +2313,24 @@ class Octo_Print_Designer_Admin {
             $debug_info['found_in'] = 'view_result_direct';
         }
         
-        // Alternative: Aus View-Key extrahieren (Format: design_id_template_id)
+        // Alternative: Aus View-Key extrahieren (Format: design_id_view_id)
         if (!$template_id && isset($view_result['view_key'])) {
             $view_key = $view_result['view_key'];
             $debug_info['view_key'] = $view_key;
             
-            // Versuche Template-ID aus View-Key zu extrahieren
+            // Versuche View-ID aus View-Key zu extrahieren
             if (preg_match('/\d+_(\d+)/', $view_key, $matches)) {
-                $template_id = $matches[1];
+                $view_id = $matches[1];
                 $debug_info['found_in'] = 'view_key_extraction';
-                $debug_info['extracted_template_id'] = $template_id;
+                $debug_info['extracted_view_id'] = $view_id;
                 $debug_info['regex_matches'] = $matches;
+                
+                // Suche das Template, das diese View-ID enthält
+                $template_id = $this->find_template_by_view_id($view_id);
+                if ($template_id) {
+                    $debug_info['template_id_found'] = $template_id;
+                    $debug_info['found_in'] = 'template_by_view_id';
+                }
             } else {
                 $debug_info['regex_failed'] = 'No match found in view_key: ' . $view_key;
             }
@@ -2380,6 +2387,10 @@ class Octo_Print_Designer_Admin {
         if (isset($GLOBALS['yprint_template_image_debug'])) {
             $debug_info['template_image_search_debug'] = $GLOBALS['yprint_template_image_debug'];
         }
+        
+        // Zusätzliche Debug-Info für Template-Daten-Suche
+        $debug_info['template_data_image_path'] = $template_data['image_path'] ?? 'not_found';
+        $debug_info['template_data_has_image_path'] = !empty($template_data['image_path']);
         
         // Teste ob es ein Platzhalter-Bild ist
         $debug_info['is_placeholder'] = strpos($template_image_url, 'data:image/svg') === 0;
@@ -2653,6 +2664,31 @@ class Octo_Print_Designer_Admin {
         return $previews;
     }
     
+    /**
+     * ✅ NEU: Template-ID anhand der View-ID finden
+     */
+    private function find_template_by_view_id($view_id) {
+        // Suche alle Templates mit design_template Post-Type
+        $templates = get_posts(array(
+            'post_type' => 'design_template',
+            'post_status' => 'publish',
+            'numberposts' => -1,
+            'fields' => 'ids'
+        ));
+        
+        foreach ($templates as $template_id) {
+            // Prüfe _template_view_print_areas Meta-Feld
+            $print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+            if ($print_areas && is_array($print_areas)) {
+                if (isset($print_areas[$view_id])) {
+                    return $template_id;
+                }
+            }
+        }
+        
+        return null;
+    }
+
     /**
      * ✅ NEU: Template-Bild-URL ermitteln
      */

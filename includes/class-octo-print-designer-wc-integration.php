@@ -1959,6 +1959,13 @@ private function check_yprint_dependency() {
                                     console.log('📊 Template ID From Data:', data.template_meta_debug.template_id_from_data);
                                 }
                                 
+                                if (data.debug_console_info && data.debug_console_info.debug_info) {
+                                    console.log('🔍 YPrint Template Data Search Debug:', data.debug_console_info.debug_info);
+                                    console.log('📊 Template Data Image Path:', data.debug_console_info.debug_info.template_data_image_path);
+                                    console.log('📊 Template Data Has Image Path:', data.debug_console_info.debug_info.template_data_has_image_path);
+                                    console.log('📊 Template Image Search Debug:', data.debug_console_info.debug_info.template_image_search_debug);
+                                }
+                                
                                 if (data.error) {
                                     console.error('YPrint Preview Error:', data.error);
                                     console.log('YPrint Debug Info:', data.debug_info);
