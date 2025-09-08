@@ -2424,11 +2424,18 @@ class Octo_Print_Designer_Admin {
             $template_image_path = get_post_meta($template_id, '_template_image_path', true);
             
             if (!empty($template_image_path)) {
-                $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
-                $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
-                
-                if (file_exists($template_image_file)) {
-                    return $template_image_url;
+                // Prüfe ob es bereits eine vollständige URL ist
+                if (filter_var($template_image_path, FILTER_VALIDATE_URL)) {
+                    // Es ist bereits eine vollständige URL - verwende sie direkt
+                    return $template_image_path;
+                } else {
+                    // Es ist nur ein Dateiname, baue URL zusammen
+                    $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
+                    $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
+                    
+                    if (file_exists($template_image_file)) {
+                        return $template_image_url;
+                    }
                 }
             }
         }
@@ -2436,12 +2443,17 @@ class Octo_Print_Designer_Admin {
         // 2. Versuche Template-spezifisches Bild zu finden
         if (!empty($template_data['image_path'])) {
             $template_image_path = $template_data['image_path'];
-            $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
             
-            // Prüfe ob Datei existiert
-            $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
-            if (file_exists($template_image_file)) {
-                return $template_image_url;
+            // Prüfe ob es bereits eine vollständige URL ist
+            if (filter_var($template_image_path, FILTER_VALIDATE_URL)) {
+                return $template_image_path;
+            } else {
+                $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
+                $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
+                
+                if (file_exists($template_image_file)) {
+                    return $template_image_url;
+                }
             }
         }
         
