@@ -2376,6 +2376,11 @@ class Octo_Print_Designer_Admin {
         $debug_info['template_data_keys'] = array_keys($template_data);
         $debug_info['template_id_from_data'] = $template_data['id'] ?? 'not_found';
         
+        // Debug-Informationen aus get_template_image_url hinzufügen
+        if (isset($GLOBALS['yprint_template_image_debug'])) {
+            $debug_info['template_image_search_debug'] = $GLOBALS['yprint_template_image_debug'];
+        }
+        
         // Teste ob es ein Platzhalter-Bild ist
         $debug_info['is_placeholder'] = strpos($template_image_url, 'data:image/svg') === 0;
         
@@ -2661,6 +2666,9 @@ class Octo_Print_Designer_Admin {
             $debug_info['found_in'] = 'template_data_image_path';
             $debug_info['image_path'] = $image_path;
             
+            // Debug-Info in globale Variable speichern
+            $GLOBALS['yprint_template_image_debug'] = $debug_info;
+            
             // Prüfe ob es eine absolute URL ist
             if (filter_var($image_path, FILTER_VALIDATE_URL)) {
                 $debug_info['is_absolute_url'] = true;
@@ -2761,6 +2769,7 @@ class Octo_Print_Designer_Admin {
             
             // Debug-Info in die Preview-Daten einbetten
             $GLOBALS['yprint_debug_info'] = $debug_info;
+            $GLOBALS['yprint_template_image_debug'] = $debug_info;
             
             // Debug-Info auch in die Preview-Daten einbetten
             $debug_info['template_image_search_debug'] = $debug_info;
