@@ -2582,65 +2582,75 @@ class Octo_Print_Designer_Admin {
      */
     private function get_template_image_url($template_data, $view_name) {
         $upload_dir = wp_upload_dir();
+        $debug_info = array();
         
-        // 1. Template-ID aus template_data verwenden
         if (!empty($template_data['id'])) {
             $template_id = $template_data['id'];
-            $template_image_path = get_post_meta($template_id, '_template_image_path', true);
             
-            if (!empty($template_image_path)) {
-                // Prüfe ob es bereits eine vollständige URL ist
-                if (filter_var($template_image_path, FILTER_VALIDATE_URL)) {
-                    // Es ist bereits eine vollständige URL - verwende sie direkt
-                    return $template_image_path;
-                } else {
-                    // Es ist nur ein Dateiname, baue URL zusammen
-                    $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
-                    $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
-                    
-                    if (file_exists($template_image_file)) {
-                        return $template_image_url;
+            // Alle möglichen Meta-Felder für Template-Bilder durchsuchen
+            $possible_meta_fields = array(
+                '_template_image_path',
+                '_template_view_image',
+                '_template_image_url',
+                '_template_background_image',
+                '_view_image_path',
+                '_template_image',
+                '_image_path',
+                '_background_image',
+                '_template_view_image_path',
+                '_view_background_image',
+                '_template_thumbnail',
+                '_template_preview'
+            );
+            
+            foreach ($possible_meta_fields as $meta_field) {
+                $image_path = get_post_meta($template_id, $meta_field, true);
+                $debug_info[$meta_field] = $image_path;
+                
+                if (!empty($image_path)) {
+                    // Prüfe ob es bereits eine vollständige URL ist
+                    if (filter_var($image_path, FILTER_VALIDATE_URL)) {
+                        $debug_info['found_url'] = $image_path;
+                        $debug_info['found_in_field'] = $meta_field;
+                        return $image_path;
+                    } else {
+                        // Versuche verschiedene Pfade
+                        $possible_paths = array(
+                            $upload_dir['baseurl'] . '/templates/' . $image_path,
+                            $upload_dir['baseurl'] . '/' . $image_path,
+                            $upload_dir['baseurl'] . '/yprint/' . $image_path,
+                            $upload_dir['baseurl'] . '/designs/' . $image_path,
+                            get_site_url() . '/wp-content/uploads/' . $image_path,
+                            get_site_url() . '/wp-content/uploads/templates/' . $image_path,
+                            get_site_url() . '/wp-content/uploads/yprint/' . $image_path
+                        );
+                        
+                        foreach ($possible_paths as $test_url) {
+                            $test_file = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $test_url);
+                            if (file_exists($test_file)) {
+                                $debug_info['found_file'] = $test_url;
+                                $debug_info['found_in_field'] = $meta_field;
+                                return $test_url;
+                            }
+                        }
                     }
                 }
             }
-        }
-        
-        // 2. Versuche Template-spezifisches Bild zu finden
-        if (!empty($template_data['image_path'])) {
-            $template_image_path = $template_data['image_path'];
             
-            // Prüfe ob es bereits eine vollständige URL ist
-            if (filter_var($template_image_path, FILTER_VALIDATE_URL)) {
-                return $template_image_path;
-            } else {
-                $template_image_url = $upload_dir['baseurl'] . '/templates/' . $template_image_path;
-                $template_image_file = $upload_dir['basedir'] . '/templates/' . $template_image_path;
-                
-                if (file_exists($template_image_file)) {
-                    return $template_image_url;
-                }
-            }
-        }
-        
-        // 3. Versuche View-spezifisches Bild basierend auf View-Name
-        $view_image_mapping = array(
-            'shirt_front_template' => 'shirt_front_template.jpg',
-            'shirt_back_template' => 'shirt_back_template.jpg',
-            'shirt_left_template' => 'shirt_left_template.jpg',
-            'shirt_right_template' => 'shirt_right_template.jpg'
-        );
-        
-        if (isset($view_image_mapping[$view_name])) {
-            $image_filename = $view_image_mapping[$view_name];
-            $template_image_url = $upload_dir['baseurl'] . '/templates/' . $image_filename;
-            $template_image_file = $upload_dir['basedir'] . '/templates/' . $image_filename;
+            // Debug-Informationen für Console
+            $debug_info['template_id'] = $template_id;
+            $debug_info['view_name'] = $view_name;
+            $debug_info['upload_dir'] = $upload_dir;
             
-            if (file_exists($template_image_file)) {
-                return $template_image_url;
-            }
+            // Alle Meta-Felder des Templates auflisten
+            $all_meta = get_post_meta($template_id);
+            $debug_info['all_meta_keys'] = array_keys($all_meta);
+            
+            // Debug-Info in Console ausgeben
+            error_log("YPrint Template Image Debug: " . json_encode($debug_info, JSON_PRETTY_PRINT));
         }
         
-        // 4. Finaler Fallback: Platzhalter-Bild
+        // Fallback: Platzhalter-Bild
         return $this->generate_placeholder_image($view_name, $template_data);
     }
     
