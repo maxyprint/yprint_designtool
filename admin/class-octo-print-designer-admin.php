@@ -2323,6 +2323,21 @@ class Octo_Print_Designer_Admin {
         // Template-Bild-URL ermitteln
         $template_image_url = $this->get_template_image_url($template_data, $view_name);
         
+        // Debug-Logging für Console
+        $debug_info['template_image_url_result'] = $template_image_url;
+        $debug_info['template_data_keys'] = array_keys($template_data);
+        $debug_info['template_id_from_data'] = $template_data['id'] ?? 'not_found';
+        
+        // Teste ob es ein Platzhalter-Bild ist
+        $debug_info['is_placeholder'] = strpos($template_image_url, 'data:image/svg') === 0;
+        
+        // Alle Meta-Felder des Templates auflisten
+        if (!empty($template_data['id'])) {
+            $all_meta = get_post_meta($template_data['id']);
+            $debug_info['template_meta_keys'] = array_keys($all_meta);
+            $debug_info['template_meta_values'] = $all_meta;
+        }
+        
         // Größe ermitteln
         $selected_size = 'L'; // Default, sollte aus Order-Item kommen
         foreach ($view_result['workflow_steps']['step1']['output'] as $item) {
@@ -2338,7 +2353,8 @@ class Octo_Print_Designer_Admin {
             'preview_type' => $preview_type,
             'template_image_url' => $template_image_url,
             'selected_size' => $selected_size,
-            'template_id' => $template_id
+            'template_id' => $template_id,
+            'debug_info' => $debug_info
         );
         
         if ($preview_type === 'reference_measurement_image') {
@@ -2648,6 +2664,13 @@ class Octo_Print_Designer_Admin {
             
             // Debug-Info in Console ausgeben
             error_log("YPrint Template Image Debug: " . json_encode($debug_info, JSON_PRETTY_PRINT));
+            
+            // Zusätzlich: Debug-Info für Browser-Console
+            $debug_info['method_called'] = 'get_template_image_url';
+            $debug_info['fallback_reason'] = 'no_image_found_in_meta_fields';
+            
+            // Debug-Info in die Preview-Daten einbetten
+            $GLOBALS['yprint_debug_info'] = $debug_info;
         }
         
         // Fallback: Platzhalter-Bild
