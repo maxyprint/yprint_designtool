@@ -1928,6 +1928,15 @@ private function check_yprint_dependency() {
                                     console.log('📊 Template ID:', data.debug_console_info.template_id);
                                     console.log('🖼️ Template Image URL:', data.debug_console_info.template_image_url);
                                     console.log('🎯 Is Placeholder:', data.debug_console_info.is_placeholder);
+                                    
+                                    if (data.debug_console_info.debug_info) {
+                                        console.log('🔍 Template ID Extraction Debug:', data.debug_console_info.debug_info);
+                                        console.log('📊 View Key:', data.debug_console_info.debug_info.view_key);
+                                        console.log('📊 Found In:', data.debug_console_info.debug_info.found_in);
+                                        console.log('📊 Extracted Template ID:', data.debug_console_info.debug_info.extracted_template_id);
+                                        console.log('📊 Regex Matches:', data.debug_console_info.debug_info.regex_matches);
+                                        console.log('📊 Regex Failed:', data.debug_console_info.debug_info.regex_failed);
+                                    }
                                 }
                                 
                                 if (data.debug_info) {
