@@ -2388,6 +2388,10 @@ class Octo_Print_Designer_Admin {
             $debug_info['template_image_search_debug'] = $GLOBALS['yprint_template_image_debug'];
         }
         
+        // Zusätzliche Debug-Info für Template-Bild-Suche
+        $debug_info['template_image_debug_available'] = isset($GLOBALS['yprint_template_image_debug']);
+        $debug_info['template_image_debug_content'] = $GLOBALS['yprint_template_image_debug'] ?? 'not_set';
+        
         // Zusätzliche Debug-Info für Template-Daten-Suche
         $debug_info['template_data_image_path'] = $template_data['image_path'] ?? 'not_found';
         $debug_info['template_data_has_image_path'] = !empty($template_data['image_path']);
@@ -2884,6 +2888,9 @@ class Octo_Print_Designer_Admin {
             // Debug-Info auch in die Preview-Daten einbetten
             $debug_info['template_image_search_debug'] = $debug_info;
         }
+        
+        // Debug-Info am Ende der Methode speichern
+        $GLOBALS['yprint_template_image_debug'] = $debug_info;
         
         // Fallback: Platzhalter-Bild
         return $this->generate_placeholder_image($view_name, $template_data);
