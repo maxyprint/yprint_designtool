@@ -1916,13 +1916,19 @@ private function check_yprint_dependency() {
                         },
                         timeout: 30000,
                         success: function(response) {
+                            console.log('YPrint Preview Response:', response);
+                            
                             if (response.success) {
                                 var data = response.data;
+                                console.log('YPrint Preview Data:', data);
                                 
                                 if (data.error) {
+                                    console.error('YPrint Preview Error:', data.error);
+                                    console.log('YPrint Debug Info:', data.debug_info);
                                     $('#yprint-preview-error-message').text(data.error);
                                     $('#yprint-preview-error').show();
                                 } else {
+                                    console.log('YPrint Preview Success - Image URL:', data.image_url);
                                     // Bild anzeigen
                                     $('#yprint-preview-image').attr('src', data.image_url);
                                     
@@ -1932,6 +1938,7 @@ private function check_yprint_dependency() {
                                     $('#yprint-preview-content').show();
                                 }
                             } else {
+                                console.error('YPrint Preview AJAX Error:', response.data);
                                 $('#yprint-preview-error-message').text(response.data || 'Unbekannter Fehler');
                                 $('#yprint-preview-error').show();
                             }

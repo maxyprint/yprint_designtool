@@ -2261,17 +2261,54 @@ class Octo_Print_Designer_Admin {
         
         // Template-Daten laden
         $template_id = null;
-        foreach ($view_result['workflow_steps']['step1']['output'] as $item) {
-            if (isset($item['template_id'])) {
-                $template_id = $item['template_id'];
-                break;
+        $debug_info = array();
+        
+        // Verschiedene Wege versuchen, Template-ID zu finden
+        if (isset($view_result['workflow_steps']['step1']['output'])) {
+            $debug_info['step1_output'] = $view_result['workflow_steps']['step1']['output'];
+            foreach ($view_result['workflow_steps']['step1']['output'] as $item) {
+                if (isset($item['template_id'])) {
+                    $template_id = $item['template_id'];
+                    $debug_info['found_in'] = 'step1_output';
+                    break;
+                }
             }
         }
+        
+        // Alternative: Direkt aus view_result
+        if (!$template_id && isset($view_result['template_id'])) {
+            $template_id = $view_result['template_id'];
+            $debug_info['found_in'] = 'view_result_direct';
+        }
+        
+        // Alternative: Aus Order-Items
+        if (!$template_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $order_items_debug = array();
+                foreach ($order->get_items() as $item) {
+                    $item_template_id = $item->get_meta('_yprint_template_id');
+                    $order_items_debug[] = array(
+                        'item_id' => $item->get_id(),
+                        'template_id' => $item_template_id
+                    );
+                    if ($item_template_id) {
+                        $template_id = $item_template_id;
+                        $debug_info['found_in'] = 'order_items';
+                        break;
+                    }
+                }
+                $debug_info['order_items'] = $order_items_debug;
+            }
+        }
+        
+        $debug_info['final_template_id'] = $template_id;
+        $debug_info['view_result_keys'] = array_keys($view_result);
         
         if (!$template_id) {
             return array(
                 'error' => 'Template ID nicht gefunden',
-                'debug_info' => 'Keine Template-ID in Workflow-Schritt 1 gefunden'
+                'debug_info' => 'Console Debug: ' . json_encode($debug_info, JSON_PRETTY_PRINT)
             );
         }
         
