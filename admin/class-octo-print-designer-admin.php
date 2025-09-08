@@ -2274,6 +2274,10 @@ class Octo_Print_Designer_Admin {
         $template_id = null;
         $debug_info = array();
         
+        // Debug: Zeige die komplette view_result Struktur
+        $debug_info['view_result_structure'] = $view_result;
+        $debug_info['view_result_keys'] = array_keys($view_result);
+        
         // Verschiedene Wege versuchen, Template-ID zu finden
         if (isset($view_result['workflow_steps']['step1']['output'])) {
             $debug_info['step1_output'] = $view_result['workflow_steps']['step1']['output'];
@@ -2286,10 +2290,38 @@ class Octo_Print_Designer_Admin {
             }
         }
         
+        // Alternative: Suche in allen Workflow-Schritten
+        if (!$template_id) {
+            foreach ($view_result['workflow_steps'] as $step_key => $step_data) {
+                if (isset($step_data['output'])) {
+                    foreach ($step_data['output'] as $item) {
+                        if (isset($item['template_id'])) {
+                            $template_id = $item['template_id'];
+                            $debug_info['found_in'] = $step_key;
+                            break 2;
+                        }
+                    }
+                }
+            }
+        }
+        
         // Alternative: Direkt aus view_result
         if (!$template_id && isset($view_result['template_id'])) {
             $template_id = $view_result['template_id'];
             $debug_info['found_in'] = 'view_result_direct';
+        }
+        
+        // Alternative: Aus View-Key extrahieren (Format: design_id_template_id)
+        if (!$template_id && isset($view_result['view_key'])) {
+            $view_key = $view_result['view_key'];
+            $debug_info['view_key'] = $view_key;
+            
+            // Versuche Template-ID aus View-Key zu extrahieren
+            if (preg_match('/\d+_(\d+)/', $view_key, $matches)) {
+                $template_id = $matches[1];
+                $debug_info['found_in'] = 'view_key_extraction';
+                $debug_info['extracted_template_id'] = $template_id;
+            }
         }
         
         // Alternative: Aus Order-Items
