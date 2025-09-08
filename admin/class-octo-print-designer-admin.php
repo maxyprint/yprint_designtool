@@ -12,6 +12,9 @@ class Octo_Print_Designer_Admin {
 
         // ✅ NEU: Lade die Octo_Print_API_Integration Klasse
         $this->load_api_integration();
+        
+        // ✅ NEU: Lade das Referenzlinien-System
+        $this->load_reference_line_system();
 
         $this->define_hooks();
     }
@@ -38,6 +41,23 @@ class Octo_Print_Designer_Admin {
             if (!isset($octo_print_api_integration)) {
                 $octo_print_api_integration = Octo_Print_API_Integration::get_instance();
                 error_log("YPrint: Globale Octo_Print_API_Integration Instanz erstellt");
+            }
+        }
+    }
+    
+    /**
+     * ✅ NEU: Lädt das Referenzlinien-System
+     */
+    private function load_reference_line_system() {
+        // Prüfe ob die Klasse bereits geladen ist
+        if (!class_exists('YPrint_Reference_Line_System')) {
+            // Versuche die Klasse aus dem includes Verzeichnis zu laden
+            $reference_system_file = plugin_dir_path(dirname(__FILE__)) . 'includes/class-yprint-reference-line-system.php';
+            if (file_exists($reference_system_file)) {
+                require_once $reference_system_file;
+                error_log("YPrint: YPrint_Reference_Line_System Klasse geladen aus: " . $reference_system_file);
+            } else {
+                error_log("YPrint: YPrint_Reference_Line_System Datei nicht gefunden: " . $reference_system_file);
             }
         }
     }
@@ -111,6 +131,10 @@ class Octo_Print_Designer_Admin {
         
         // ✅ NEU: AJAX handler für Popup-Vorschau
         add_action('wp_ajax_yprint_preview_modal', array($this, 'ajax_yprint_preview_modal'));
+        
+        // ✅ NEU: AJAX handler für dynamische Referenzlinien
+        add_action('wp_ajax_yprint_update_reference_lines', array($this, 'ajax_update_reference_lines'));
+        add_action('wp_ajax_nopriv_yprint_update_reference_lines', array($this, 'ajax_update_reference_lines'));
         
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
@@ -2093,6 +2117,51 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
+     * ✅ NEU: AJAX Handler für dynamische Referenzlinien
+     */
+    public function ajax_update_reference_lines() {
+        try {
+            // Security Check
+            if (!wp_verify_nonce($_POST['nonce'], 'yprint_reference_lines_nonce')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            // Permission Check
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('Insufficient permissions');
+            }
+            
+            $template_id = intval($_POST['template_id']);
+            $view_id = sanitize_text_field($_POST['view_id']);
+            $order_size = sanitize_text_field($_POST['order_size']);
+            $canvas_width = intval($_POST['canvas_width']);
+            $canvas_height = intval($_POST['canvas_height']);
+            
+            error_log("YPrint Reference Lines: Updating for Template {$template_id}, View {$view_id}, Size {$order_size}");
+            
+            // Prüfe ob die Referenzlinien-Klasse geladen ist
+            if (!class_exists('YPrint_Reference_Line_System')) {
+                wp_send_json_error('Reference line system not loaded');
+            }
+            
+            // Berechne Referenzlinien
+            $result = YPrint_Reference_Line_System::render_reference_lines(
+                $template_id, 
+                $view_id, 
+                $order_size,
+                $canvas_width,
+                $canvas_height
+            );
+            
+            wp_send_json_success($result);
+            
+        } catch (Exception $e) {
+            error_log("YPrint Reference Lines Error: " . $e->getMessage());
+            wp_send_json_error('Error updating reference lines: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * ✅ NEU: AJAX Handler für Popup-Vorschau
      */
     public function ajax_yprint_preview_modal() {
@@ -2755,13 +2824,77 @@ class Octo_Print_Designer_Admin {
 
     /**
      * ✅ SCHRITT 4.1 FIX: Saubere Referenzmessung-Visualisierung ohne Markierungen
+     * ✅ NEU: Integriert dynamisches Referenzlinien-System
      */
     private function generate_reference_measurement_visualization($template_image_url, $reference_data, $selected_size) {
+        // Prüfe ob das Referenzlinien-System verfügbar ist
+        if (class_exists('YPrint_Reference_Line_System')) {
+            // Extrahiere Template-ID und View-ID aus den verfügbaren Daten
+            $template_id = $this->get_template_id_from_context();
+            $view_id = $this->get_view_id_from_context();
+            
+            if ($template_id && $view_id) {
+                // Berechne dynamische Referenzlinien
+                $reference_result = YPrint_Reference_Line_System::render_reference_lines(
+                    $template_id, 
+                    $view_id, 
+                    $selected_size,
+                    300, // Canvas-Breite für die Vorschau
+                    400  // Canvas-Höhe für die Vorschau
+                );
+                
+                // Kombiniere Template-Bild mit Referenzlinien
+                return '<div style="position: relative; text-align: center;">
+                    <img src="' . esc_attr($template_image_url) . '" 
+                         alt="Template Referenzmessung" 
+                         style="max-width: 300px; height: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+                    ' . $reference_result['html'] . '
+                </div>';
+            }
+        }
+        
+        // Fallback: Einfaches Template-Bild ohne Referenzlinien
         return '<div style="text-align: center;">
             <img src="' . esc_attr($template_image_url) . '" 
                  alt="Template Referenzmessung" 
                  style="max-width: 300px; height: auto; border: 1px solid #dee2e6; border-radius: 4px;">
         </div>';
+    }
+    
+    /**
+     * ✅ NEU: Hilfsfunktion um Template-ID aus dem aktuellen Kontext zu extrahieren
+     */
+    private function get_template_id_from_context() {
+        // Versuche Template-ID aus verschiedenen Quellen zu extrahieren
+        if (isset($_POST['order_id'])) {
+            $order = wc_get_order($_POST['order_id']);
+            if ($order) {
+                foreach ($order->get_items() as $item) {
+                    $template_id = $item->get_meta('_yprint_template_id');
+                    if ($template_id) {
+                        return intval($template_id);
+                    }
+                }
+            }
+        }
+        
+        // Fallback: Verwende Template 3657 als Standard
+        return 3657;
+    }
+    
+    /**
+     * ✅ NEU: Hilfsfunktion um View-ID aus dem aktuellen Kontext zu extrahieren
+     */
+    private function get_view_id_from_context() {
+        // Versuche View-ID aus verschiedenen Quellen zu extrahieren
+        if (isset($_POST['view_key'])) {
+            if (preg_match('/\d+_(\d+)/', $_POST['view_key'], $matches)) {
+                return $matches[1];
+            }
+        }
+        
+        // Fallback: Verwende View-ID 189542 (Front-View) als Standard
+        return '189542';
     }
 
     /**
