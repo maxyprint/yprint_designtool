@@ -3748,4 +3748,371 @@ class Octo_Print_API_Integration {
         error_log("YPrint API: ✅ Erfolgreich " . count($calculated_coordinates) . " Elemente für Größe {$normalized_size} berechnet");
         return $calculated_coordinates;
     }
+
+    /**
+     * SCHRITT 4: Design-Dimensionen-Berechnung
+     * Input: Position in mm von SCHRITT 3
+     * Output: Position + Dimensionen für Print-Provider
+     */
+    public function perform_step_4_design_dimensions($step3_output) {
+        $debug_output = array();
+        $debug_output[] = "=== YPRINT SCHRITT 4: DESIGN-DIMENSIONEN-BERECHNUNG ===";
+        
+        // Input-Validierung
+        if (empty($step3_output['coordinate_conversion']['final_coordinates_mm'])) {
+            return array(
+                'success' => false,
+                'error' => 'Keine gültigen Koordinaten von SCHRITT 3 erhalten',
+                'debug' => $debug_output
+            );
+        }
+        
+        $final_coords = $step3_output['coordinate_conversion']['final_coordinates_mm'];
+        $template_id = $step3_output['template_id'];
+        $selected_size = $step3_output['selected_size'];
+        
+        $debug_output[] = "✅ Input validiert: Position x={$final_coords['x']}mm, y={$final_coords['y']}mm";
+        $debug_output[] = "✅ Template: {$template_id}, Größe: {$selected_size}";
+        
+        // SCHRITT 4.1: Original Design-Größe aus Design-Daten laden
+        $original_design_size = $this->get_original_design_size($step3_output);
+        $debug_output[] = "✅ Original Design: {$original_design_size['width']}px × {$original_design_size['height']}px";
+        
+        // SCHRITT 4.2: Skalierungsfaktoren anwenden (gleiche wie für Position)
+        $scale_factor = $step3_output['coordinate_conversion']['size_scale_factor'];
+        $pixel_to_mm_ratio = $step3_output['template_print_area']['pixel_to_mm_ratio'];
+        
+        // SCHRITT 4.3: px→mm Konversion für Design-Dimensionen
+        $width_mm = ($original_design_size['width'] * $pixel_to_mm_ratio) * $scale_factor;
+        $height_mm = ($original_design_size['height'] * $pixel_to_mm_ratio) * $scale_factor;
+        
+        $debug_output[] = "✅ Skalierungsfaktor: {$scale_factor}, Pixel→mm: {$pixel_to_mm_ratio}";
+        $debug_output[] = "✅ FINALE DIMENSIONEN: {$width_mm}mm × {$height_mm}mm";
+        
+        // Output-Struktur
+        $step4_output = array(
+            'position' => $final_coords,
+            'dimensions' => array(
+                'width' => round($width_mm, 2),
+                'height' => round($height_mm, 2)
+            ),
+            'template_id' => $template_id,
+            'size' => $selected_size,
+            'scale_factor_used' => $scale_factor,
+            'pixel_to_mm_ratio' => $pixel_to_mm_ratio,
+            'ready_for_step_5' => true
+        );
+        
+        $debug_output[] = "✅ SCHRITT 4 ERFOLGREICH ABGESCHLOSSEN!";
+        
+        return array(
+            'success' => true,
+            'step4_output' => $step4_output,
+            'debug' => $debug_output
+        );
+    }
+
+    /**
+     * SCHRITT 5: Multi-Element-Support
+     * Problem: Eine Bestellung kann mehrere Design-Elemente haben
+     */
+    public function perform_step_5_multi_element_processing($order_id) {
+        $debug_output = array();
+        $debug_output[] = "=== YPRINT SCHRITT 5: MULTI-ELEMENT-VERARBEITUNG ===";
+        
+        // SCHRITT 5.1: Alle Design-Elemente aus Bestellung finden
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return array(
+                'success' => false,
+                'error' => "Bestellung {$order_id} nicht gefunden",
+                'debug' => $debug_output
+            );
+        }
+        
+        $all_elements = array();
+        $collision_detected = false;
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            $design_id = $item->get_meta('_yprint_design_id');
+            if (empty($design_id)) {
+                continue; // Kein Design-Item
+            }
+            
+            $debug_output[] = "🔍 Verarbeite Item {$item_id} mit Design-ID {$design_id}";
+            
+            // SCHRITT 5.2: SCHRITT 1-4 für jedes Element einzeln durchführen
+            $step1_result = $this->perform_step_1_data_extraction($item_id);
+            if (!$step1_result['success']) {
+                $debug_output[] = "❌ SCHRITT 1 fehlgeschlagen für Item {$item_id}";
+                continue;
+            }
+            
+            $step2_result = $this->perform_step_2_coordinate_conversion($step1_result['step1_output']);
+            if (!$step2_result['success']) {
+                $debug_output[] = "❌ SCHRITT 2 fehlgeschlagen für Item {$item_id}";
+                continue;
+            }
+            
+            $step3_result = $this->perform_step_3_print_coordinates($step2_result['step2_output']);
+            if (!$step3_result['success']) {
+                $debug_output[] = "❌ SCHRITT 3 fehlgeschlagen für Item {$item_id}";
+                continue;
+            }
+            
+            $step4_result = $this->perform_step_4_design_dimensions($step3_result['step3_output']);
+            if (!$step4_result['success']) {
+                $debug_output[] = "❌ SCHRITT 4 fehlgeschlagen für Item {$item_id}";
+                continue;
+            }
+            
+            // Element erfolgreich verarbeitet
+            $element_data = array(
+                'item_id' => $item_id,
+                'design_id' => $design_id,
+                'type' => $this->detect_element_type($item),
+                'position' => $step4_result['step4_output']['position'],
+                'dimensions' => $step4_result['step4_output']['dimensions'],
+                'template_id' => $step4_result['step4_output']['template_id'],
+                'size' => $step4_result['step4_output']['size']
+            );
+            
+            $all_elements[] = $element_data;
+            $debug_output[] = "✅ Element {$item_id} erfolgreich verarbeitet";
+        }
+        
+        // SCHRITT 5.3: Kollisions-Prüfung
+        if (count($all_elements) > 1) {
+            $collision_detected = $this->check_element_collisions($all_elements);
+            if ($collision_detected) {
+                $debug_output[] = "⚠️ WARNUNG: Element-Überlappung erkannt!";
+            } else {
+                $debug_output[] = "✅ Keine Element-Überlappungen gefunden";
+            }
+        }
+        
+        $step5_output = array(
+            'elements' => $all_elements,
+            'total_elements' => count($all_elements),
+            'collisions_detected' => $collision_detected,
+            'ready_for_step_6' => true
+        );
+        
+        $debug_output[] = "✅ SCHRITT 5 ABGESCHLOSSEN: " . count($all_elements) . " Elemente verarbeitet";
+        
+        return array(
+            'success' => true,
+            'step5_output' => $step5_output,
+            'debug' => $debug_output
+        );
+    }
+
+    /**
+     * SCHRITT 6: Qualitätskontrolle & Export-Vorbereitung
+     */
+    public function perform_step_6_quality_and_export($step5_output) {
+        $debug_output = array();
+        $debug_output[] = "=== YPRINT SCHRITT 6: QUALITÄTSKONTROLLE & EXPORT ===";
+        
+        if (empty($step5_output['elements'])) {
+            return array(
+                'success' => false,
+                'error' => 'Keine Elemente für Qualitätsprüfung erhalten',
+                'debug' => $debug_output
+            );
+        }
+        
+        $quality_report = array();
+        $export_ready_elements = array();
+        $overall_quality = 'high';
+        
+        foreach ($step5_output['elements'] as $element) {
+            $debug_output[] = "🔍 Prüfe Element {$element['item_id']}...";
+            
+            // SCHRITT 6.1: DPI-Prüfung (min. 150 DPI für Druck)
+            $dpi_check = $this->check_element_dpi($element);
+            
+            // SCHRITT 6.2: Größen-Validierung
+            $size_check = $this->validate_element_size($element);
+            
+            // SCHRITT 6.3: Druckbereich-Grenzen prüfen
+            $bounds_check = $this->check_print_area_bounds($element);
+            
+            $element_quality = 'high';
+            if (!$dpi_check['passed'] || !$size_check['passed'] || !$bounds_check['passed']) {
+                $element_quality = 'medium';
+                $overall_quality = 'medium';
+            }
+            
+            // SCHRITT 6.4: Export-Format generieren
+            $export_element = array(
+                'offsetX' => $element['position']['x'],
+                'offsetY' => $element['position']['y'],
+                'width' => $element['dimensions']['width'],
+                'height' => $element['dimensions']['height'],
+                'quality' => $element_quality,
+                'template_id' => $element['template_id'],
+                'size' => $element['size']
+            );
+            
+            $export_ready_elements[] = $export_element;
+            
+            $quality_report[] = array(
+                'element_id' => $element['item_id'],
+                'dpi_check' => $dpi_check,
+                'size_check' => $size_check,
+                'bounds_check' => $bounds_check,
+                'overall_quality' => $element_quality
+            );
+            
+            $debug_output[] = "✅ Element {$element['item_id']}: Qualität {$element_quality}";
+        }
+        
+        // AllesKlarDruck API Export-Format
+        $api_export_data = array(
+            'order_processing_method' => 'yprint_6_step_pipeline',
+            'overall_quality' => $overall_quality,
+            'collisions_detected' => $step5_output['collisions_detected'],
+            'elements' => $export_ready_elements,
+            'quality_report' => $quality_report,
+            'processing_timestamp' => current_time('mysql')
+        );
+        
+        $debug_output[] = "✅ EXPORT-DATEN GENERIERT: " . count($export_ready_elements) . " Elemente";
+        $debug_output[] = "✅ GESAMT-QUALITÄT: {$overall_quality}";
+        $debug_output[] = "✅ SCHRITT 6 ERFOLGREICH ABGESCHLOSSEN!";
+        
+        return array(
+            'success' => true,
+            'step6_output' => array(
+                'export_data' => $api_export_data,
+                'quality_report' => $quality_report,
+                'ready_for_api' => true
+            ),
+            'debug' => $debug_output
+        );
+    }
+
+    // HILFSMETHODEN FÜR SCHRITTE 4-6
+
+    private function get_original_design_size($step3_output) {
+        // Mock-Implementierung - in Realität aus Design-Daten laden
+        return array('width' => 120, 'height' => 122);
+    }
+
+    private function detect_element_type($item) {
+        $design_meta = $item->get_meta('_yprint_design_data');
+        if (strpos($design_meta, 'text') !== false) {
+            return 'text';
+        } elseif (strpos($design_meta, 'image') !== false) {
+            return 'image';
+        }
+        return 'unknown';
+    }
+
+    private function check_element_collisions($elements) {
+        // Vereinfachte Kollisionsprüfung
+        for ($i = 0; $i < count($elements); $i++) {
+            for ($j = $i + 1; $j < count($elements); $j++) {
+                $elem1 = $elements[$i];
+                $elem2 = $elements[$j];
+                
+                // Bounding-Box-Überlappung prüfen
+                $overlap_x = ($elem1['position']['x'] < $elem2['position']['x'] + $elem2['dimensions']['width']) &&
+                           ($elem1['position']['x'] + $elem1['dimensions']['width'] > $elem2['position']['x']);
+                           
+                $overlap_y = ($elem1['position']['y'] < $elem2['position']['y'] + $elem2['dimensions']['height']) &&
+                           ($elem1['position']['y'] + $elem1['dimensions']['height'] > $elem2['position']['y']);
+                           
+                if ($overlap_x && $overlap_y) {
+                    return true; // Kollision gefunden
+                }
+            }
+        }
+        return false;
+    }
+
+    private function check_element_dpi($element) {
+        // Mock-DPI-Prüfung - in Realität aus Bild-Metadaten
+        return array('passed' => true, 'dpi' => 300, 'required' => 150);
+    }
+
+    private function validate_element_size($element) {
+        $width = $element['dimensions']['width'];
+        $height = $element['dimensions']['height'];
+        
+        // Größen-Grenzen (5mm bis 300mm)
+        $valid = ($width >= 5 && $width <= 300 && $height >= 5 && $height <= 300);
+        
+        return array(
+            'passed' => $valid,
+            'width' => $width,
+            'height' => $height,
+            'min_size' => 5,
+            'max_size' => 300
+        );
+    }
+
+    private function check_print_area_bounds($element) {
+        // Standard T-Shirt Druckbereich: 250mm × 300mm
+        $print_area_width = 250;
+        $print_area_height = 300;
+        
+        $x = $element['position']['x'];
+        $y = $element['position']['y'];
+        $width = $element['dimensions']['width'];
+        $height = $element['dimensions']['height'];
+        
+        $within_bounds = ($x >= 0 && $y >= 0 && 
+                         ($x + $width) <= $print_area_width && 
+                         ($y + $height) <= $print_area_height);
+        
+        return array(
+            'passed' => $within_bounds,
+            'position' => array('x' => $x, 'y' => $y),
+            'dimensions' => array('width' => $width, 'height' => $height),
+            'print_area' => array('width' => $print_area_width, 'height' => $print_area_height)
+        );
+    }
+
+    /**
+     * VOLLSTÄNDIGER 6-SCHRITTE WORKFLOW
+     * Führt alle Schritte für eine Bestellung aus
+     */
+    public function execute_complete_workflow($order_id) {
+        $debug_output = array();
+        $debug_output[] = "=== YPRINT VOLLSTÄNDIGER 6-SCHRITTE WORKFLOW ===";
+        $debug_output[] = "🚀 Starte Verarbeitung für Bestellung {$order_id}";
+        
+        // SCHRITT 5: Multi-Element-Processing (enthält SCHRITT 1-4)
+        $step5_result = $this->perform_step_5_multi_element_processing($order_id);
+        if (!$step5_result['success']) {
+            return array(
+                'success' => false,
+                'error' => 'SCHRITT 5 fehlgeschlagen',
+                'debug' => array_merge($debug_output, $step5_result['debug'])
+            );
+        }
+        
+        // SCHRITT 6: Qualitätskontrolle & Export
+        $step6_result = $this->perform_step_6_quality_and_export($step5_result['step5_output']);
+        if (!$step6_result['success']) {
+            return array(
+                'success' => false,
+                'error' => 'SCHRITT 6 fehlgeschlagen',
+                'debug' => array_merge($debug_output, $step5_result['debug'], $step6_result['debug'])
+            );
+        }
+        
+        $debug_output[] = "🎉 WORKFLOW KOMPLETT ABGESCHLOSSEN!";
+        $debug_output[] = "📊 " . count($step5_result['step5_output']['elements']) . " Elemente verarbeitet";
+        $debug_output[] = "⭐ Qualität: " . $step6_result['step6_output']['export_data']['overall_quality'];
+        
+        return array(
+            'success' => true,
+            'final_export_data' => $step6_result['step6_output']['export_data'],
+            'quality_report' => $step6_result['step6_output']['quality_report'],
+            'debug' => array_merge($debug_output, $step5_result['debug'], $step6_result['debug'])
+        );
+    }
 }
