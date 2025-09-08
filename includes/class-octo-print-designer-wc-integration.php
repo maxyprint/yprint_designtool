@@ -44,6 +44,12 @@ class Octo_Print_Designer_WC_Integration {
         
         // ✅ NEU: AJAX Handler für SCHRITT 1: Canvas-Erfassung & Design-Platzierung
         add_action('wp_ajax_test_step_1_canvas_capture', array($this, 'ajax_test_step_1_canvas_capture'));
+        
+        // ✅ NEU: AJAX Handler für SCHRITTE 4-6
+        add_action('wp_ajax_test_step_4_design_dimensions', array($this, 'ajax_test_step_4_design_dimensions'));
+        add_action('wp_ajax_test_step_5_multi_element', array($this, 'ajax_test_step_5_multi_element'));
+        add_action('wp_ajax_test_step_6_quality_export', array($this, 'ajax_test_step_6_quality_export'));
+        add_action('wp_ajax_test_complete_workflow', array($this, 'ajax_test_complete_workflow'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -684,8 +690,43 @@ private function check_yprint_dependency() {
                             SCHRITT 3 testen
                         </button>
                         
-                        
                         <span class="test-spinner spinner" style="display: none;"></span>
+                    </div>
+                    
+                    <!-- ✅ NEU: SCHRITTE 4-6 Test Buttons -->
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+                        <button type="button" id="test-step-4-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto; background: #28a745; color: white;">
+                            <span class="dashicons dashicons-screenoptions" style="margin-right: 5px;"></span>
+                            SCHRITT 4 testen
+                        </button>
+                        
+                        <button type="button" id="test-step-5-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto; background: #fd7e14; color: white;">
+                            <span class="dashicons dashicons-groups" style="margin-right: 5px;"></span>
+                            SCHRITT 5 testen
+                        </button>
+                        
+                        <button type="button" id="test-step-6-btn" class="button button-secondary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto; background: #6f42c1; color: white;">
+                            <span class="dashicons dashicons-yes-alt" style="margin-right: 5px;"></span>
+                            SCHRITT 6 testen
+                        </button>
+                        
+                        <button type="button" id="test-complete-workflow-btn" class="button button-primary" 
+                                data-order-id="<?php echo $order_id; ?>"
+                                style="flex: 1; padding: 8px 12px; height: auto; background: #dc3545; color: white; font-weight: bold;">
+                            <span class="dashicons dashicons-controls-play" style="margin-right: 5px;"></span>
+                            VOLLSTÄNDIGER WORKFLOW
+                        </button>
+                    </div>
+                    
+                    <div style="margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 4px; font-size: 11px; color: #6c757d;">
+                        <strong>SCHRITTE 4-6:</strong> Design-Dimensionen → Multi-Element → Qualitätskontrolle & Export
+                    </div>
                     </div>
                     
                     <div id="test-result-container" style="display: none; margin-top: 15px;">
@@ -1522,6 +1563,238 @@ private function check_yprint_dependency() {
                         complete: function() {
                             // Reset button state
                             button.prop('disabled', false).html('<span class="dashicons dashicons-location" style="margin-right: 5px;"></span>SCHRITT 3 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ NEU: SCHRITT 4: Design-Dimensionen-Berechnung Test Button Handler
+                $('#test-step-4-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = $('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>SCHRITT 4 läuft...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_step_4_design_dimensions',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '✅ SCHRITT 4 erfolgreich', 
+                                    'Design-Dimensionen wurden erfolgreich berechnet. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ SCHRITT 4 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ SCHRITT 4 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen der Design-Dimensionen')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ SCHRITT 4 Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-screenoptions" style="margin-right: 5px;"></span>SCHRITT 4 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ NEU: SCHRITT 5: Multi-Element-Processing Test Button Handler
+                $('#test-step-5-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = $('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>SCHRITT 5 läuft...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_step_5_multi_element',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '✅ SCHRITT 5 erfolgreich', 
+                                    'Multi-Element-Processing wurde erfolgreich durchgeführt. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ SCHRITT 5 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ SCHRITT 5 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen des Multi-Element-Processing')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ SCHRITT 5 Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-groups" style="margin-right: 5px;"></span>SCHRITT 5 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ NEU: SCHRITT 6: Qualitätskontrolle & Export Test Button Handler
+                $('#test-step-6-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = $('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>SCHRITT 6 läuft...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_step_6_quality_export',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '✅ SCHRITT 6 erfolgreich', 
+                                    'Qualitätskontrolle & Export wurden erfolgreich durchgeführt. Siehe Ergebnis unten.')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ SCHRITT 6 FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ SCHRITT 6 fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen der Qualitätskontrolle & Export')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ SCHRITT 6 Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-yes-alt" style="margin-right: 5px;"></span>SCHRITT 6 testen');
+                            spinner.hide();
+                        }
+                    });
+                });
+                
+                // ✅ NEU: VOLLSTÄNDIGER WORKFLOW Test Button Handler
+                $('#test-complete-workflow-btn').on('click', function() {
+                    var button = $(this);
+                    var spinner = $('.test-spinner');
+                    var resultContainer = $('#test-result-container');
+                    var resultContent = $('#test-result-content');
+                    var orderId = button.data('order-id');
+                    
+                    // Remove any existing notices
+                    $('.notice').remove();
+                    
+                    // Show loading state
+                    button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; margin-right: 5px;"></span>VOLLSTÄNDIGER WORKFLOW läuft...');
+                    spinner.show();
+                    resultContainer.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'test_complete_workflow',
+                            order_id: orderId,
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultContent.text(response.data);
+                                resultContainer.show();
+                                
+                                createStatusMessage('success', '🎉 VOLLSTÄNDIGER WORKFLOW erfolgreich', 
+                                    'Alle 6 Schritte wurden erfolgreich durchgeführt. Bestellung ist bereit für API-Export!')
+                                    .insertBefore(button.parent());
+                                
+                            } else {
+                                resultContent.text('❌ VOLLSTÄNDIGER WORKFLOW FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
+                                resultContainer.show();
+                                
+                                createStatusMessage('error', '❌ VOLLSTÄNDIGER WORKFLOW fehlgeschlagen', 
+                                    response.data || 'Unbekannter Fehler beim Testen des vollständigen Workflows')
+                                    .insertBefore(button.parent());
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultContent.text('❌ AJAX FEHLER: ' + error);
+                            resultContainer.show();
+                            
+                            createStatusMessage('error', '❌ VOLLSTÄNDIGER WORKFLOW Netzwerkfehler', 
+                                'Verbindung zum Server fehlgeschlagen: ' + error)
+                                .insertBefore(button.parent());
+                        },
+                        complete: function() {
+                            // Reset button state
+                            button.prop('disabled', false).html('<span class="dashicons dashicons-controls-play" style="margin-right: 5px;"></span>VOLLSTÄNDIGER WORKFLOW');
                             spinner.hide();
                         }
                     });
@@ -4211,6 +4484,307 @@ private function build_print_provider_email_content($order, $design_items, $note
         $result[] = "";
         $result[] = "⏭️  NÄCHSTER SCHRITT:";
         $result[] = "   SCHRITT 2: Produkt-Dimensionen und Skalierungsfaktoren";
+        
+        return implode("\n", $result);
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für SCHRITT 4: Design-Dimensionen-Berechnung
+     */
+    public function ajax_test_step_4_design_dimensions() {
+        error_log("📐 SCHRITT 4: AJAX Design Dimensions Test started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('You do not have permission to perform this action');
+            }
+            
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            if (!$order_id) {
+                wp_send_json_error('Invalid order ID');
+            }
+            
+            // Get API integration instance
+            $api_integration = new Octo_Print_API_Integration();
+            
+            // First run SCHRITTE 1-3 to get step3_output
+            $order = wc_get_order($order_id);
+            $step3_outputs = array();
+            
+            foreach ($order->get_items() as $item_id => $item) {
+                $design_id = $item->get_meta('_yprint_design_id');
+                if (empty($design_id)) continue;
+                
+                // Run SCHRITTE 1-3
+                $step1_result = $api_integration->perform_step_1_data_extraction($item_id);
+                if (!$step1_result['success']) continue;
+                
+                $step2_result = $api_integration->perform_step_2_coordinate_conversion($step1_result['step1_output']);
+                if (!$step2_result['success']) continue;
+                
+                $step3_result = $api_integration->perform_step_3_print_coordinates($step2_result['step2_output']);
+                if (!$step3_result['success']) continue;
+                
+                // Now test SCHRITT 4
+                $step4_result = $api_integration->perform_step_4_design_dimensions($step3_result['step3_output']);
+                
+                if ($step4_result['success']) {
+                    $step3_outputs[] = array(
+                        'item_id' => $item_id,
+                        'step4_output' => $step4_result['step4_output'],
+                        'debug' => $step4_result['debug']
+                    );
+                }
+            }
+            
+            $result = $this->format_step_4_test_result($step3_outputs);
+            wp_send_json_success($result);
+            
+        } catch (Exception $e) {
+            error_log("❌ SCHRITT 4 AJAX Error: " . $e->getMessage());
+            wp_send_json_error('Test failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für SCHRITT 5: Multi-Element-Processing
+     */
+    public function ajax_test_step_5_multi_element() {
+        error_log("👥 SCHRITT 5: AJAX Multi Element Test started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('You do not have permission to perform this action');
+            }
+            
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            if (!$order_id) {
+                wp_send_json_error('Invalid order ID');
+            }
+            
+            // Get API integration instance
+            $api_integration = new Octo_Print_API_Integration();
+            
+            // Test SCHRITT 5 (includes SCHRITTE 1-4)
+            $step5_result = $api_integration->perform_step_5_multi_element_processing($order_id);
+            
+            if ($step5_result['success']) {
+                $result = $this->format_step_5_test_result($step5_result['step5_output'], $step5_result['debug']);
+                wp_send_json_success($result);
+            } else {
+                wp_send_json_error('SCHRITT 5 failed: ' . $step5_result['error']);
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ SCHRITT 5 AJAX Error: " . $e->getMessage());
+            wp_send_json_error('Test failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für SCHRITT 6: Qualitätskontrolle & Export
+     */
+    public function ajax_test_step_6_quality_export() {
+        error_log("✅ SCHRITT 6: AJAX Quality & Export Test started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('You do not have permission to perform this action');
+            }
+            
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            if (!$order_id) {
+                wp_send_json_error('Invalid order ID');
+            }
+            
+            // Get API integration instance
+            $api_integration = new Octo_Print_API_Integration();
+            
+            // First run SCHRITT 5 to get step5_output
+            $step5_result = $api_integration->perform_step_5_multi_element_processing($order_id);
+            if (!$step5_result['success']) {
+                wp_send_json_error('SCHRITT 5 failed: ' . $step5_result['error']);
+            }
+            
+            // Now test SCHRITT 6
+            $step6_result = $api_integration->perform_step_6_quality_and_export($step5_result['step5_output']);
+            
+            if ($step6_result['success']) {
+                $result = $this->format_step_6_test_result($step6_result['step6_output'], $step6_result['debug']);
+                wp_send_json_success($result);
+            } else {
+                wp_send_json_error('SCHRITT 6 failed: ' . $step6_result['error']);
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ SCHRITT 6 AJAX Error: " . $e->getMessage());
+            wp_send_json_error('Test failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für VOLLSTÄNDIGEN 6-SCHRITTE WORKFLOW
+     */
+    public function ajax_test_complete_workflow() {
+        error_log("🚀 VOLLSTÄNDIGER WORKFLOW: AJAX Complete Workflow Test started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                wp_send_json_error('Security check failed');
+            }
+            
+            if (!current_user_can('edit_shop_orders')) {
+                wp_send_json_error('You do not have permission to perform this action');
+            }
+            
+            $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+            if (!$order_id) {
+                wp_send_json_error('Invalid order ID');
+            }
+            
+            // Get API integration instance
+            $api_integration = new Octo_Print_API_Integration();
+            
+            // Execute complete workflow
+            $workflow_result = $api_integration->execute_complete_workflow($order_id);
+            
+            if ($workflow_result['success']) {
+                $result = $this->format_complete_workflow_test_result($workflow_result);
+                wp_send_json_success($result);
+            } else {
+                wp_send_json_error('Complete workflow failed: ' . $workflow_result['error']);
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ COMPLETE WORKFLOW AJAX Error: " . $e->getMessage());
+            wp_send_json_error('Test failed: ' . $e->getMessage());
+        }
+    }
+
+    // HILFSMETHODEN FÜR TEST-FORMATIERUNG
+
+    private function format_step_4_test_result($step4_outputs) {
+        $result = array();
+        $result[] = "=== SCHRITT 4: DESIGN-DIMENSIONEN-BERECHNUNG ===";
+        $result[] = "";
+        
+        if (empty($step4_outputs)) {
+            $result[] = "❌ Keine Elemente für SCHRITT 4 gefunden";
+            return implode("\n", $result);
+        }
+        
+        foreach ($step4_outputs as $output) {
+            $result[] = "📐 ELEMENT {$output['item_id']}:";
+            $result[] = "   Position: x={$output['step4_output']['position']['x']}mm, y={$output['step4_output']['position']['y']}mm";
+            $result[] = "   Dimensionen: {$output['step4_output']['dimensions']['width']}mm × {$output['step4_output']['dimensions']['height']}mm";
+            $result[] = "   Template: {$output['step4_output']['template_id']}, Größe: {$output['step4_output']['size']}";
+            $result[] = "   Skalierungsfaktor: {$output['step4_output']['scale_factor_used']}";
+            $result[] = "";
+        }
+        
+        $result[] = "✅ SCHRITT 4 ERFOLGREICH ABGESCHLOSSEN!";
+        $result[] = "⏭️  NÄCHSTER SCHRITT: SCHRITT 5 - Multi-Element-Processing";
+        
+        return implode("\n", $result);
+    }
+
+    private function format_step_5_test_result($step5_output, $debug) {
+        $result = array();
+        $result[] = "=== SCHRITT 5: MULTI-ELEMENT-VERARBEITUNG ===";
+        $result[] = "";
+        
+        $result[] = "📊 GESAMT-STATISTIK:";
+        $result[] = "   Elemente verarbeitet: {$step5_output['total_elements']}";
+        $result[] = "   Kollisionen erkannt: " . ($step5_output['collisions_detected'] ? 'JA' : 'NEIN');
+        $result[] = "";
+        
+        foreach ($step5_output['elements'] as $element) {
+            $result[] = "🎨 ELEMENT {$element['item_id']} ({$element['type']}):";
+            $result[] = "   Position: x={$element['position']['x']}mm, y={$element['position']['y']}mm";
+            $result[] = "   Dimensionen: {$element['dimensions']['width']}mm × {$element['dimensions']['height']}mm";
+            $result[] = "   Template: {$element['template_id']}, Größe: {$element['size']}";
+            $result[] = "";
+        }
+        
+        if ($step5_output['collisions_detected']) {
+            $result[] = "⚠️  WARNUNG: Element-Überlappungen erkannt!";
+        }
+        
+        $result[] = "✅ SCHRITT 5 ERFOLGREICH ABGESCHLOSSEN!";
+        $result[] = "⏭️  NÄCHSTER SCHRITT: SCHRITT 6 - Qualitätskontrolle & Export";
+        
+        return implode("\n", $result);
+    }
+
+    private function format_step_6_test_result($step6_output, $debug) {
+        $result = array();
+        $result[] = "=== SCHRITT 6: QUALITÄTSKONTROLLE & EXPORT ===";
+        $result[] = "";
+        
+        $export_data = $step6_output['export_data'];
+        $result[] = "📊 EXPORT-STATISTIK:";
+        $result[] = "   Gesamt-Qualität: {$export_data['overall_quality']}";
+        $result[] = "   Elemente exportiert: " . count($export_data['elements']);
+        $result[] = "   Kollisionen: " . ($export_data['collisions_detected'] ? 'JA' : 'NEIN');
+        $result[] = "   Verarbeitungszeit: {$export_data['processing_timestamp']}";
+        $result[] = "";
+        
+        foreach ($export_data['elements'] as $i => $element) {
+            $result[] = "📦 EXPORT-ELEMENT " . ($i + 1) . ":";
+            $result[] = "   offsetX: {$element['offsetX']}mm";
+            $result[] = "   offsetY: {$element['offsetY']}mm";
+            $result[] = "   width: {$element['width']}mm";
+            $result[] = "   height: {$element['height']}mm";
+            $result[] = "   quality: {$element['quality']}";
+            $result[] = "";
+        }
+        
+        $result[] = "✅ SCHRITT 6 ERFOLGREICH ABGESCHLOSSEN!";
+        $result[] = "🎉 ALLE 6 SCHRITTE ABGESCHLOSSEN - BEREIT FÜR API-EXPORT!";
+        
+        return implode("\n", $result);
+    }
+
+    private function format_complete_workflow_test_result($workflow_result) {
+        $result = array();
+        $result[] = "=== VOLLSTÄNDIGER 6-SCHRITTE WORKFLOW ===";
+        $result[] = "";
+        
+        $export_data = $workflow_result['final_export_data'];
+        $result[] = "🎉 WORKFLOW KOMPLETT ABGESCHLOSSEN!";
+        $result[] = "";
+        $result[] = "📊 FINALE STATISTIK:";
+        $result[] = "   Verarbeitungsmethode: {$export_data['order_processing_method']}";
+        $result[] = "   Gesamt-Qualität: {$export_data['overall_quality']}";
+        $result[] = "   Elemente verarbeitet: " . count($export_data['elements']);
+        $result[] = "   Kollisionen erkannt: " . ($export_data['collisions_detected'] ? 'JA' : 'NEIN');
+        $result[] = "   Verarbeitungszeit: {$export_data['processing_timestamp']}";
+        $result[] = "";
+        
+        $result[] = "📦 EXPORT-BEREITE ELEMENTE:";
+        foreach ($export_data['elements'] as $i => $element) {
+            $result[] = "   Element " . ($i + 1) . ": {$element['offsetX']}mm, {$element['offsetY']}mm, {$element['width']}mm × {$element['height']}mm (Qualität: {$element['quality']})";
+        }
+        $result[] = "";
+        
+        $result[] = "🚀 BEREIT FÜR ALLESKLARDRUCK API!";
+        $result[] = "   Diese Daten können direkt an die Print-Provider API gesendet werden.";
         
         return implode("\n", $result);
     }
