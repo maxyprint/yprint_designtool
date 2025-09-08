@@ -2403,7 +2403,13 @@ class Octo_Print_Designer_Admin {
             'selected_size' => $selected_size,
             'template_id' => $template_id,
             'debug_info' => $debug_info,
-            'template_image_search_debug' => $GLOBALS['yprint_debug_info'] ?? null
+            'template_image_search_debug' => $GLOBALS['yprint_debug_info'] ?? null,
+            'template_meta_debug' => array(
+                'template_meta_keys' => $debug_info['template_meta_keys'] ?? null,
+                'template_meta_values' => $debug_info['template_meta_values'] ?? null,
+                'template_data_keys' => $debug_info['template_data_keys'] ?? null,
+                'template_id_from_data' => $debug_info['template_id_from_data'] ?? null
+            )
         );
         
         if ($preview_type === 'reference_measurement_image') {

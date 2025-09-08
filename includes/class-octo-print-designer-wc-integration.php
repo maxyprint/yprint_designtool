@@ -1951,6 +1951,14 @@ private function check_yprint_dependency() {
                                     console.log('📊 Fallback Reason:', data.template_image_search_debug.fallback_reason);
                                 }
                                 
+                                if (data.template_meta_debug) {
+                                    console.log('🔍 YPrint Template Meta Debug:', data.template_meta_debug);
+                                    console.log('📊 Template Meta Keys:', data.template_meta_debug.template_meta_keys);
+                                    console.log('📊 Template Meta Values:', data.template_meta_debug.template_meta_values);
+                                    console.log('📊 Template Data Keys:', data.template_meta_debug.template_data_keys);
+                                    console.log('📊 Template ID From Data:', data.template_meta_debug.template_id_from_data);
+                                }
+                                
                                 if (data.error) {
                                     console.error('YPrint Preview Error:', data.error);
                                     console.log('YPrint Debug Info:', data.debug_info);
