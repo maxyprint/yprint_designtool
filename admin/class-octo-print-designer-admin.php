@@ -2734,6 +2734,62 @@ class Octo_Print_Designer_Admin {
             }
         }
         
+        // NEU: Suche nach Template-Bildern in der deo6_posts Tabelle
+        if (!empty($template_data['id'])) {
+            global $wpdb;
+            $template_id = $template_data['id'];
+            
+            // Suche nach Template-Bildern basierend auf dem View-Namen
+            $view_based_query = $wpdb->prepare(
+                "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
+                 WHERE post_type = 'attachment' 
+                 AND post_title LIKE %s 
+                 AND post_mime_type LIKE 'image/%'
+                 ORDER BY post_date DESC LIMIT 1",
+                '%' . $wpdb->esc_like($view_name) . '%'
+            );
+            
+            $template_image = $wpdb->get_row($view_based_query);
+            if ($template_image) {
+                $debug_info['found_in'] = 'deo6_posts_by_view_name';
+                $debug_info['template_image_title'] = $template_image->post_title;
+                $debug_info['template_image_content'] = $template_image->post_content;
+                
+                // Extrahiere die Bild-URL aus dem post_content
+                if (preg_match('/https:\/\/[^\s"]+\.(jpg|jpeg|png|webp|gif)/i', $template_image->post_content, $matches)) {
+                    $image_url = $matches[0];
+                    $debug_info['extracted_image_url'] = $image_url;
+                    $GLOBALS['yprint_template_image_debug'] = $debug_info;
+                    return $image_url;
+                }
+            }
+            
+            // Fallback: Suche nach Template-Bildern mit "kaan" im Namen
+            $kaan_query = $wpdb->prepare(
+                "SELECT post_title, post_content FROM {$wpdb->prefix}posts 
+                 WHERE post_type = 'attachment' 
+                 AND post_title LIKE %s 
+                 AND post_mime_type LIKE 'image/%'
+                 ORDER BY post_date DESC LIMIT 1",
+                '%kaan%'
+            );
+            
+            $kaan_image = $wpdb->get_row($kaan_query);
+            if ($kaan_image) {
+                $debug_info['found_in'] = 'deo6_posts_by_kaan';
+                $debug_info['kaan_image_title'] = $kaan_image->post_title;
+                $debug_info['kaan_image_content'] = $kaan_image->post_content;
+                
+                // Extrahiere die Bild-URL aus dem post_content
+                if (preg_match('/https:\/\/[^\s"]+\.(jpg|jpeg|png|webp|gif)/i', $kaan_image->post_content, $matches)) {
+                    $image_url = $matches[0];
+                    $debug_info['extracted_kaan_image_url'] = $image_url;
+                    $GLOBALS['yprint_template_image_debug'] = $debug_info;
+                    return $image_url;
+                }
+            }
+        }
+        
         if (!empty($template_data['id'])) {
             $template_id = $template_data['id'];
             
