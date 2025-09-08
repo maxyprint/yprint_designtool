@@ -2705,6 +2705,7 @@ class Octo_Print_Designer_Admin {
             $image_path = $template_data['image_path'];
             $debug_info['found_in'] = 'template_data_image_path';
             $debug_info['image_path'] = $image_path;
+            $debug_info['image_path_not_empty'] = true;
             
             // Debug-Info in globale Variable speichern
             $GLOBALS['yprint_template_image_debug'] = $debug_info;
@@ -2712,12 +2713,16 @@ class Octo_Print_Designer_Admin {
             // Prüfe ob es eine absolute URL ist
             if (filter_var($image_path, FILTER_VALIDATE_URL)) {
                 $debug_info['is_absolute_url'] = true;
+                $debug_info['return_reason'] = 'absolute_url_found';
+                $GLOBALS['yprint_template_image_debug'] = $debug_info;
                 return $image_path;
             }
             
             // Prüfe ob es ein relativer Pfad ist
             if (file_exists($image_path)) {
                 $debug_info['file_exists'] = true;
+                $debug_info['return_reason'] = 'file_exists';
+                $GLOBALS['yprint_template_image_debug'] = $debug_info;
                 return $image_path;
             }
             
@@ -2726,6 +2731,8 @@ class Octo_Print_Designer_Admin {
             if (file_exists($upload_path)) {
                 $debug_info['file_exists_in_uploads'] = true;
                 $debug_info['upload_path'] = $upload_path;
+                $debug_info['return_reason'] = 'file_exists_in_uploads';
+                $GLOBALS['yprint_template_image_debug'] = $debug_info;
                 return $upload_dir['baseurl'] . '/' . ltrim($image_path, '/');
             }
             
@@ -2734,8 +2741,21 @@ class Octo_Print_Designer_Admin {
             if (file_exists($plugin_path)) {
                 $debug_info['file_exists_in_plugin'] = true;
                 $debug_info['plugin_path'] = $plugin_path;
+                $debug_info['return_reason'] = 'file_exists_in_plugin';
+                $GLOBALS['yprint_template_image_debug'] = $debug_info;
                 return plugin_dir_url(__FILE__) . '../' . ltrim($image_path, '/');
             }
+            
+            // Wenn der image_path nicht funktioniert, weiter zur Datenbank-Suche
+            $debug_info['image_path_failed'] = true;
+            $debug_info['image_path_checks_failed'] = array(
+                'is_absolute_url' => filter_var($image_path, FILTER_VALIDATE_URL),
+                'file_exists' => file_exists($image_path),
+                'file_exists_in_uploads' => file_exists($upload_path),
+                'file_exists_in_plugin' => file_exists($plugin_path)
+            );
+        } else {
+            $debug_info['image_path_empty'] = true;
         }
         
         // NEU: Suche nach Template-Bildern in der deo6_posts Tabelle
