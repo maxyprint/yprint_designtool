@@ -2246,14 +2246,15 @@ class Octo_Print_Designer_Admin {
             
         // Debug-Informationen hinzufügen
         $preview_data['debug_console_info'] = array(
-            'template_id' => $template_id ?? 'not_found',
+            'template_id' => $preview_data['template_id'] ?? 'not_found',
             'view_name' => $view_name,
             'view_key' => $view_key,
             'preview_type' => $preview_type,
             'template_image_url' => $preview_data['template_image_url'] ?? 'not_found',
             'is_placeholder' => strpos($preview_data['template_image_url'] ?? '', 'data:image/svg') === 0,
             'method_called' => 'generate_fullsize_preview_for_view',
-            'debug_info' => $debug_info
+            'debug_info' => $debug_info,
+            'template_id_from_preview_data' => $preview_data['template_id'] ?? 'not_found'
         );
             
             wp_send_json_success($preview_data);
