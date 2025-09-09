@@ -379,23 +379,22 @@ class YPrintTemplateMeasurements {
         const click_x = event.clientX - rect.left;  
         const click_y = event.clientY - rect.top;
 
-        // ✅ ROOT CAUSE FIX: Speichere Bild-Dimensionen für konsistente Skalierung
-        if (this.tempPoints.length === 0) {
-            this.storeImageDimensions(this.currentViewId, rect);
-        }
+        // ✅ MASTER SAFEZONE-SYSTEM: Einheitliche Koordinaten-Transformation
+        const safeZone = this.getSafeZoneForView(this.currentViewId);
+        console.log('🎯 SafeZone für View', this.currentViewId, ':', safeZone);
+        
+        // Canvas-zu-SafeZone Transformation (Master-Koordinatensystem)
+        const master_x = (click_x / rect.width) * safeZone.width;
+        const master_y = (click_y / rect.height) * safeZone.height;
 
-        // ✅ ROOT CAUSE FIX: Verwende Original-Pixel-Koordinaten direkt (keine SafeZone-Transformation)
-        const master_x = click_x;
-        const master_y = click_y;
-
-        console.log('🎯 ROOT CAUSE FIX - ORIGINAL-PIXEL-KOORDINATEN:', {
+        console.log('🎯 MASTER-KOORDINATEN-TRANSFORMATION:', {
             click: {x: click_x, y: click_y},
             rect_size: {width: rect.width, height: rect.height},
-            master_coords: {x: master_x, y: master_y},
-            note: 'Direkte Pixel-Koordinaten ohne Transformation'
+            safeZone: safeZone,
+            master_coords: {x: master_x, y: master_y}
         });
 
-        // ✅ ROOT CAUSE FIX: Speichere Original-Pixel-Koordinaten direkt
+        // Speichere in Master-SafeZone-Koordinaten (einheitlich für alle Anzeigen)
         const point = { 
             x: master_x, 
             y: master_y,
@@ -403,7 +402,7 @@ class YPrintTemplateMeasurements {
             _click_context: {
                 rect_width: rect.width,
                 rect_height: rect.height,
-                stored_dimensions: true
+                safezone_used: safeZone
             }
         };
         
@@ -520,26 +519,23 @@ class YPrintTemplateMeasurements {
             const rect = targetImage.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
             
-            // ✅ ROOT CAUSE FIX: Verwende Original-Pixel-Koordinaten direkt
-            // Berechne aktuelle Skalierung zwischen gespeicherter und aktueller Bildgröße
-            const stored_rect = this.getStoredImageDimensions(viewId) || {width: rect.width, height: rect.height};
-            const scale_x = rect.width / stored_rect.width;
-            const scale_y = rect.height / stored_rect.height;
-
+            // SafeZone-Daten laden (identisch mit Speicher-Transformation)
+            const safeZone = this.getSafeZoneForView(viewId);
+            
+            // Master-SafeZone-Koordinaten zu Display-Koordinaten transformieren
             const display_point1 = {
-                x: points[0].x * scale_x,
-                y: points[0].y * scale_y
+                x: (points[0].x / safeZone.width) * rect.width,
+                y: (points[0].y / safeZone.height) * rect.height
             };
             const display_point2 = {
-                x: points[1].x * scale_x,
-                y: points[1].y * scale_y
+                x: (points[1].x / safeZone.width) * rect.width,
+                y: (points[1].y / safeZone.height) * rect.height
             };
             
-            console.log('🎯 ROOT CAUSE FIX - ORIGINAL-PIXEL-KOORDINATEN:', {
+            console.log('🎯 MASTER-DISPLAY-TRANSFORMATION:', {
                 stored_points: points,
-                stored_rect: stored_rect,
-                current_rect: {width: rect.width, height: rect.height},
-                scale_factors: {x: scale_x, y: scale_y},
+                safeZone: safeZone,
+                rect_size: {width: rect.width, height: rect.height},
                 display_points: [display_point1, display_point2]
             });
             
@@ -896,10 +892,105 @@ class YPrintTemplateMeasurements {
             computedStyle: canvas ? window.getComputedStyle(canvas) : null
         });
         
-        // ✅ ROOT CAUSE FIX: Keine Normalisierung - Speichere Original-Pixel-Koordinaten
-        console.log('✅ Speichere Original-Pixel-Koordinaten (keine Normalisierung):', JSON.stringify(measurementData.points, null, 2));
-        
-        // ✅ ROOT CAUSE FIX: Canvas-Kontextualisierung ohne Normalisierung
+        // ✅ REPARATUR: Warte auf Template-Basis-Dimensionen BEVOR Speicherung
+        console.log('🎯 Template-Basis-Dimensionen aus _template_view_print_areas:');
+        this.loadTemplateBaseDimensions(viewId).then(baseDimensions => {
+            console.log('Basis-Dimensionen:', baseDimensions);
+            
+            // ✅ REPARATUR: Koordinaten-Normalisierung mit tatsächlicher Anwendung
+            if (measurementData.points && canvasRect && baseDimensions) {
+                console.log('🔄 KOORDINATEN-NORMALISIERUNG:');
+                
+                // Normalisiere alle Punkte und überschreibe measurementData
+                measurementData.points = measurementData.points.map((point, index) => {
+                    console.log(`Punkt ${index + 1}:`);
+                    console.log('  Original (Canvas):', point);
+                    console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
+                    
+                    // ✅ KORRIGIERTE Koordinaten-Normalisierung
+                    // Problem: Klick-Koordinaten sind relativ zum Canvas (300x150), nicht zum Bild (304x304)
+                    // Lösung: Verwende Canvas-Dimensionen für Normalisierung
+                    
+                    console.log('🔧 KORRIGIERTE Koordinaten-Normalisierung:');
+                    console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
+                    
+                    // ✅ SafeZone-relative Koordinaten sind bereits korrekt - KEINE weitere Transformation nötig
+                    const normalizedX = point.x; // Bereits SafeZone-relativ
+                    const normalizedY = point.y; // Bereits SafeZone-relativ
+                    
+                    console.log('SafeZone-Speicherung:', {
+                        original_point: point,
+                        stored_x: normalizedX,
+                        stored_y: normalizedY,
+                        note: 'Koordinaten bereits SafeZone-relativ - direkte Speicherung'
+                    });
+                    
+                    // Berechne auch displayX/displayY normalisiert
+                    const normalizedDisplayX = (point.displayX / canvasRect.width) * baseDimensions.width;
+                    const normalizedDisplayY = (point.displayY / canvasRect.height) * baseDimensions.height;
+                    
+                    console.log('  Normalisierungs-Basis: Canvas ' + canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Y-Berechnung: ' + point.y + ' / ' + canvasRect.height + ' * ' + baseDimensions.height);
+                    
+                    // Gültigkeitsprüfung für normalisierte Koordinaten
+                    if (normalizedX < 0 || normalizedX > baseDimensions.width) {
+                        console.warn('⚠️ Normalisierte X-Koordinate außerhalb Bereich:', normalizedX);
+                    }
+                    if (normalizedY < 0 || normalizedY > baseDimensions.height) {
+                        console.warn('⚠️ Normalisierte Y-Koordinate außerhalb Bereich:', normalizedY);
+                    }
+                    
+                    // Clamp Koordinaten auf gültigen Bereich
+                    const clampedX = Math.max(0, Math.min(baseDimensions.width, normalizedX));
+                    const clampedY = Math.max(0, Math.min(baseDimensions.height, normalizedY));
+                    
+                    const normalizedPoint = {
+                        x: Math.round(clampedX),
+                        y: Math.round(clampedY),
+                        displayX: normalizedDisplayX,
+                        displayY: normalizedDisplayY
+                    };
+                    
+                    console.log('  Original normalisiert:', {x: normalizedX, y: normalizedY});
+                    console.log('  Nach Clamping:', normalizedPoint);
+                    
+                    console.log('  Normalisiert (Template):', normalizedPoint);
+                    console.log('  Normalisierungs-Faktoren:', {
+                        x: baseDimensions.width / canvasRect.width,
+                        y: baseDimensions.height / canvasRect.height
+                    });
+                    
+                    return normalizedPoint;
+                });
+                
+                // ✅ KORRIGIERTE Pixel-Distance-Normalisierung
+                // Verwende die tatsächlich berechnete Distanz zwischen normalisierten Punkten
+                const originalPixelDistance = measurementData.pixel_distance;
+                const normalizedDistance = Math.sqrt(
+                    Math.pow(measurementData.points[1].x - measurementData.points[0].x, 2) + 
+                    Math.pow(measurementData.points[1].y - measurementData.points[0].y, 2)
+                );
+                measurementData.pixel_distance = normalizedDistance;
+                
+                console.log('🔧 Pixel-Distance korrigiert:');
+                console.log('  Original Distance:', originalPixelDistance);
+                console.log('  Berechnet aus normalisierten Punkten:', normalizedDistance);
+                
+                console.log('✅ Koordinaten erfolgreich normalisiert auf Template-Basis');
+                console.log('Neue pixel_distance:', measurementData.pixel_distance);
+                
+                // WICHTIG: Übernehme die normalisierten Daten zurück in measurementData
+                console.log('📝 Übernehme normalisierte Koordinaten in measurementData');
+                console.log('Vor Normalisierung:', JSON.stringify(measurementData.points, null, 2));
+                
+                // Die normalisierten Punkte sind bereits in measurementData.points gespeichert
+                // durch die .map() Operation oben
+                console.log('Nach Normalisierung:', JSON.stringify(measurementData.points, null, 2));
+            }
+            
+            // ✅ REPARATUR: Jetzt erst die Canvas-Kontextualisierung
         const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
         console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
         
@@ -950,6 +1041,51 @@ class YPrintTemplateMeasurements {
         .finally(() => {
             this.isSaving = false;
             console.log('🔄 Speicher-Lock freigegeben');
+        });
+            
+        }).catch(error => {
+            console.error('❌ Error loading template base dimensions:', error);
+            // Fallback: Speichere ohne Normalisierung
+            console.log('🔄 Fallback: Speichere ohne Koordinaten-Normalisierung');
+            this.isSaving = false;
+            console.log('🔄 Speicher-Lock freigegeben (Fallback)');
+            
+            const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+            console.log('🎯 Canvas-kontextualisierte Messungs-Daten (Fallback):', enrichedMeasurementData);
+            
+            const templateId = this.getTemplateId();
+            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+            
+            const formData = new FormData();
+            formData.append('action', 'save_measurement_to_database');
+            formData.append('nonce', nonce);
+            formData.append('template_id', templateId);
+            formData.append('view_id', viewId);
+            formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
+            
+            formData.append('canvas_width', enrichedMeasurementData.canvas_width);
+            formData.append('canvas_height', enrichedMeasurementData.canvas_height);
+            formData.append('device_type', enrichedMeasurementData.device_type);
+            
+            fetch(ajaxUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Measurement saved to database successfully (Fallback)');
+                    callback(true);
+                } else {
+                    console.error('❌ Failed to save measurement to database (Fallback):', data.data?.message || 'Unknown error');
+                    callback(false);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error saving measurement to database (Fallback):', error);
+                callback(false);
+            });
         });
     }
 
@@ -1706,26 +1842,6 @@ class YPrintTemplateMeasurements {
             console.error('❌ Error deleting measurement from database:', error);
             callback(false);
         });
-    }
-
-    /**
-     * ✅ ROOT CAUSE FIX: Speichere Bild-Kontext für konsistente Skalierung
-     */
-    getStoredImageDimensions(viewId) {
-        const key = `yprint_image_dimensions_${viewId}`;
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : null;
-    }
-
-    storeImageDimensions(viewId, rect) {
-        const key = `yprint_image_dimensions_${viewId}`;
-        const dimensions = {
-            width: rect.width,
-            height: rect.height,
-            timestamp: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(dimensions));
-        console.log('✅ Bild-Dimensionen gespeichert:', dimensions);
     }
 
     /**
