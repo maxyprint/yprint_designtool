@@ -2844,12 +2844,23 @@ class Octo_Print_Designer_Admin {
                 );
                 
                 // Kombiniere Template-Bild mit Referenzlinien
-                return '<div style="position: relative; text-align: center;">
+                $html = '<div style="position: relative; text-align: center;">
                     <img src="' . esc_attr($template_image_url) . '" 
                          alt="Template Referenzmessung" 
                          style="max-width: 300px; height: auto; border: 1px solid #dee2e6; border-radius: 4px;">
                     ' . $reference_result['html'] . '
                 </div>';
+                
+                // Debug-Informationen hinzufügen
+                if (defined('WP_DEBUG') && WP_DEBUG && !empty($reference_result['debug'])) {
+                    $html .= '<div style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-left: 4px solid #0073aa; font-size: 11px;">
+                        <h4 style="margin: 0 0 5px 0; color: #0073aa;">🔍 Debug-Informationen:</h4>
+                        <pre style="white-space: pre-line; font-family: monospace; font-size: 10px; margin: 0; overflow-x: auto;">';
+                    $html .= implode("\n", $reference_result['debug']);
+                    $html .= '</pre></div>';
+                }
+                
+                return $html;
             }
         }
         

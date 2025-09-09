@@ -23,6 +23,17 @@ class YPrint_Reference_Line_System {
         
         // Template-Referenzmessungen laden
         $template_measurements = get_post_meta($template_id, '_template_view_print_areas', true);
+        $debug_info[] = "📊 GELADENE DATEN:";
+        $debug_info[] = "_template_view_print_areas: " . (empty($template_measurements) ? 'LEER' : 'GEFUNDEN');
+        if (!empty($template_measurements)) {
+            $debug_info[] = "Verfügbare View-IDs: " . implode(', ', array_keys($template_measurements));
+            if (isset($template_measurements[$view_id])) {
+                $debug_info[] = "View {$view_id} gefunden: " . (empty($template_measurements[$view_id]['measurements']) ? 'KEINE MESSUNGEN' : count($template_measurements[$view_id]['measurements']) . ' Messungen');
+            } else {
+                $debug_info[] = "View {$view_id} NICHT gefunden!";
+            }
+        }
+        
         if (empty($template_measurements[$view_id]['measurements'])) {
             $debug_info[] = "❌ FEHLER: Keine Referenzmessungen für View {$view_id} gefunden!";
             return self::output_debug_and_error($debug_info);
@@ -30,6 +41,16 @@ class YPrint_Reference_Line_System {
         
         // Produktdimensionen laden 
         $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        $debug_info[] = "_template_product_dimensions: " . (empty($product_dimensions) ? 'LEER' : 'GEFUNDEN');
+        if (!empty($product_dimensions)) {
+            $debug_info[] = "Verfügbare Größen: " . implode(', ', array_keys($product_dimensions));
+            if (isset($product_dimensions[$order_size])) {
+                $debug_info[] = "Größe {$order_size} gefunden: " . count($product_dimensions[$order_size]) . ' Messwerte';
+            } else {
+                $debug_info[] = "Größe {$order_size} NICHT gefunden!";
+            }
+        }
+        
         if (empty($product_dimensions)) {
             $debug_info[] = "❌ FEHLER: Keine Produktdimensionen gefunden!";
             return self::output_debug_and_error($debug_info);
@@ -183,8 +204,14 @@ class YPrint_Reference_Line_System {
      * Ausgabe bei Fehlern
      */
     private static function output_debug_and_error($debug_info) {
+        $debug_html = '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 11px;">
+            <h4 style="margin: 0 0 5px 0; color: #856404;">🔍 Debug-Informationen:</h4>
+            <pre style="white-space: pre-line; font-family: monospace; font-size: 10px; margin: 0; overflow-x: auto;">';
+        $debug_html .= implode("\n", $debug_info);
+        $debug_html .= '</pre></div>';
+        
         return array(
-            'html' => '<div style="color: red; padding: 10px; border: 1px solid red;">REFERENZLINIEN-FEHLER: Siehe Debug-Info</div>',
+            'html' => '<div style="color: red; padding: 10px; border: 1px solid red;">REFERENZLINIEN-FEHLER: Siehe Debug-Info</div>' . $debug_html,
             'debug' => $debug_info,
             'data' => null
         );
