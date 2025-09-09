@@ -91,6 +91,37 @@ class YPrintTemplateMeasurements {
         });
     }
     
+    // ✅ NEU: Promise-basierte Version für loadSavedMeasurements
+    loadSavedMeasurementsPromise() {
+        return new Promise((resolve, reject) => {
+            const templateId = this.getTemplateId();
+            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+            
+            const formData = new FormData();
+            formData.append('action', 'load_saved_measurements');
+            formData.append('nonce', nonce);
+            formData.append('template_id', templateId);
+            
+            fetch(ajaxUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data && data.data.measurements) {
+                    resolve(data.data.measurements);
+                } else {
+                    resolve({});
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error loading measurements from database:', error);
+                reject(error);
+            });
+        });
+    }
+    
     // ✅ NEU: Zeige gespeicherte Messungen im Frontend an
     displaySavedMeasurements(measurementsData) {
         console.log('🎯 Displaying saved measurements:', measurementsData);
@@ -909,6 +940,10 @@ class YPrintTemplateMeasurements {
                 // WICHTIG: Übernehme die normalisierten Daten zurück in measurementData
                 console.log('📝 Übernehme normalisierte Koordinaten in measurementData');
                 console.log('Vor Normalisierung:', JSON.stringify(measurementData.points, null, 2));
+                
+                // Die normalisierten Punkte sind bereits in measurementData.points gespeichert
+                // durch die .map() Operation oben
+                console.log('Nach Normalisierung:', JSON.stringify(measurementData.points, null, 2));
             }
             
             // ✅ REPARATUR: Jetzt erst die Canvas-Kontextualisierung
@@ -1069,7 +1104,7 @@ class YPrintTemplateMeasurements {
         });
         
         // Prüfe Database-State vs DOM-State
-        this.loadSavedMeasurements().then(dbMeasurements => {
+        this.loadSavedMeasurementsPromise().then(dbMeasurements => {
             const viewMeasurements = dbMeasurements[viewId] || {measurements: []};
             console.log('🔍 Database-Messungen für View ' + viewId + ':', viewMeasurements.measurements.length);
             console.log('🔍 DOM-Messungen für View ' + viewId + ':', existingElements.length);
