@@ -819,7 +819,47 @@ class YPrintTemplateMeasurements {
     
     // ✅ NEU: AJAX-Funktion zum Speichern in der Datenbank
     saveMeasurementToDatabase(viewId, measurementData, callback) {
-        console.log('🎯 saveMeasurementToDatabase called:', { viewId, measurementData });
+        console.log('🔍 KOORDINATEN-DEBUG: saveMeasurementToDatabase aufgerufen');
+        console.log('View ID:', viewId);
+        console.log('Original measurementData:', measurementData);
+        
+        // Canvas-Dimensionen erfassen
+        const canvas = this.getCanvasForView(viewId);
+        const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+        
+        console.log('🎯 Canvas-Info für View ' + viewId + ':', {
+            element: canvas,
+            currentRect: canvasRect,
+            computedStyle: canvas ? window.getComputedStyle(canvas) : null
+        });
+        
+        // Original Template-Dimensionen aus Database
+        console.log('🎯 Template-Basis-Dimensionen aus _template_view_print_areas:');
+        this.loadTemplateBaseDimensions(viewId).then(baseDimensions => {
+            console.log('Basis-Dimensionen:', baseDimensions);
+            
+            // Koordinaten-Normalisierung Debug
+            if (measurementData.points && canvasRect && baseDimensions) {
+                console.log('🔄 KOORDINATEN-NORMALISIERUNG:');
+                
+                measurementData.points.forEach((point, index) => {
+                    console.log(`Punkt ${index + 1}:`);
+                    console.log('  Original (Canvas):', point);
+                    console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
+                    
+                    // Normalisierungsberechnung
+                    const normalizedX = (point.x / canvasRect.width) * baseDimensions.width;
+                    const normalizedY = (point.y / canvasRect.height) * baseDimensions.height;
+                    
+                    console.log('  Normalisiert (Template):', {x: normalizedX, y: normalizedY});
+                    console.log('  Normalisierungs-Faktoren:', {
+                        x: baseDimensions.width / canvasRect.width,
+                        y: baseDimensions.height / canvasRect.height
+                    });
+                });
+            }
+        });
         
         // ✅ NEUE CANVAS-KONTEXTUALISIERUNG: Erweitere Messung mit Canvas-Kontext
         const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
@@ -871,7 +911,83 @@ class YPrintTemplateMeasurements {
         });
     }
 
+    // Neue Hilfsfunktion hinzufügen
+    loadTemplateBaseDimensions(viewId) {
+        return new Promise((resolve, reject) => {
+            const templateId = this.getTemplateId();
+            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+            
+            fetch(ajaxUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'load_template_base_dimensions',
+                    template_id: templateId,
+                    view_id: viewId,
+                    nonce: nonce
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resolve(data.data);
+                } else {
+                    reject(new Error('Failed to load base dimensions'));
+                }
+            })
+            .catch(reject);
+        });
+    }
+
+    getCanvasForView(viewId) {
+        // Suche nach Canvas-Element für spezifische View
+        const selectors = [
+            `[data-view-id="${viewId}"] canvas`,
+            `[data-view-id="${viewId}"] .fabric-canvas-wrapper canvas`,
+            `[data-view-id="${viewId}"] .design-canvas`,
+            `canvas[data-view-id="${viewId}"]`
+        ];
+        
+        for (let selector of selectors) {
+            const canvas = document.querySelector(selector);
+            if (canvas) {
+                return canvas;
+            }
+        }
+        
+        // Fallback: Ersten verfügbaren Canvas verwenden
+        return document.querySelector('canvas') || document.querySelector('.fabric-canvas-wrapper canvas');
+    }
+
     createVisibleMeasurementElement(viewId, measurement) {
+        console.log('🔍 DOM-DEBUG: createVisibleMeasurementElement aufgerufen');
+        console.log('View ID:', viewId);
+        console.log('Measurement Data:', measurement);
+        
+        // Prüfe existierende Messungen im DOM
+        const existingElements = document.querySelectorAll(`[data-view-id="${viewId}"][data-measurement-type="${measurement.measurement_type || measurement.type}"]`);
+        console.log('🔍 Existierende DOM-Elemente für diesen Messungstyp:', existingElements.length);
+        existingElements.forEach((el, index) => {
+            console.log(`  Element ${index + 1}:`, el);
+            console.log('  Data attributes:', el.dataset);
+        });
+        
+        // Prüfe Database-State vs DOM-State
+        this.loadMeasurementsFromDatabase().then(dbMeasurements => {
+            const viewMeasurements = dbMeasurements[viewId] || {measurements: []};
+            console.log('🔍 Database-Messungen für View ' + viewId + ':', viewMeasurements.measurements.length);
+            console.log('🔍 DOM-Messungen für View ' + viewId + ':', existingElements.length);
+            
+            if (viewMeasurements.measurements.length !== existingElements.length) {
+                console.warn('⚠️ INCONSISTENCY: Database vs DOM mismatch!');
+                console.warn('Database:', viewMeasurements.measurements);
+                console.warn('DOM Elements:', existingElements);
+            }
+        });
+        
         console.log('🎯 Creating visible measurement element:', measurement);
         
         try {

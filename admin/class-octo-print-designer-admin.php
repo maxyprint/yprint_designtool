@@ -107,6 +107,10 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_set_master_measurement', array('Octo_Print_Designer_Template', 'ajax_set_master_measurement_static'));
         add_action('wp_ajax_nopriv_set_master_measurement', array('Octo_Print_Designer_Template', 'ajax_set_master_measurement_static'));
         
+        // ✅ NEU: AJAX handler für Template-Basis-Dimensionen Debug
+        add_action('wp_ajax_load_template_base_dimensions', array('Octo_Print_Designer_Template', 'ajax_load_template_base_dimensions'));
+        add_action('wp_ajax_nopriv_load_template_base_dimensions', array('Octo_Print_Designer_Template', 'ajax_load_template_base_dimensions'));
+        
         add_action('wp_ajax_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
         add_action('wp_ajax_nopriv_debug_canvas_system', array('Octo_Print_Designer_Template', 'ajax_debug_canvas_system_static'));
         

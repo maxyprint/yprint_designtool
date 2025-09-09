@@ -1161,6 +1161,47 @@ class Octo_Print_Designer_Template {
     public function init_ajax_handlers() {
         // Die statische Version wird bereits in Admin::define_hooks() registriert
         // add_action('wp_ajax_get_available_measurement_types', array($this, 'ajax_get_available_measurement_types'));
+        add_action('wp_ajax_load_template_base_dimensions', array(__CLASS__, 'ajax_load_template_base_dimensions'));
+    }
+
+    /**
+     * AJAX Handler: Lade Template-Basis-Dimensionen für Debug
+     */
+    public static function ajax_load_template_base_dimensions() {
+        if (!wp_verify_nonce($_POST['nonce'], 'template_measurements_nonce')) {
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+        
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        $debug_info = array(
+            'template_id' => $template_id,
+            'view_id' => $view_id,
+            'view_print_areas_exists' => !empty($view_print_areas),
+            'view_data_exists' => isset($view_print_areas[$view_id])
+        );
+        
+        if (isset($view_print_areas[$view_id])) {
+            $view_data = $view_print_areas[$view_id];
+            $debug_info['canvas_width'] = $view_data['canvas_width'] ?? 0;
+            $debug_info['canvas_height'] = $view_data['canvas_height'] ?? 0;
+            $debug_info['measurements_count'] = count($view_data['measurements'] ?? array());
+            
+            wp_send_json_success(array(
+                'width' => $view_data['canvas_width'] ?? 800,
+                'height' => $view_data['canvas_height'] ?? 600,
+                'debug' => $debug_info
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => 'View data not found',
+                'debug' => $debug_info
+            ));
+        }
     }
 
     /**
