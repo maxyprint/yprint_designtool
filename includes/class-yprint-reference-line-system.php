@@ -131,12 +131,6 @@ class YPrint_Reference_Line_System {
         $start_point = $reference_measurement['points'][0];
         $end_point = $reference_measurement['points'][1];
         
-        // Originale Koordinaten
-        $orig_x1 = $start_point['x'];
-        $orig_y1 = $start_point['y'];
-        $orig_x2 = $end_point['x'];
-        $orig_y2 = $end_point['y'];
-        
         // ✅ FIX: SafeZone-basierte Koordinaten-Transformation
         // Lade safeZone aus Template-Variations für korrekte Koordinaten-Transformation
         $template_variations = get_post_meta($template_id, '_template_variations', true);
@@ -150,6 +144,31 @@ class YPrint_Reference_Line_System {
             }
         }
         
+        $debug_info[] = "🎯 SafeZone: " . ($safe_zone ? "left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}" : "NICHT GEFUNDEN");
+        $debug_info[] = "🎯 Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";
+        
+        // Transformiere Template-Koordinaten zu aktuellen Canvas-Koordinaten
+        if ($safe_zone) {
+            $safe_zone_scale_x = $current_canvas_width / $safe_zone['width'];
+            $safe_zone_scale_y = $current_canvas_height / $safe_zone['height'];
+            
+            $orig_x1 = ($start_point['x'] - $safe_zone['left']) * $safe_zone_scale_x;
+            $orig_y1 = ($start_point['y'] - $safe_zone['top']) * $safe_zone_scale_y;
+            $orig_x2 = ($end_point['x'] - $safe_zone['left']) * $safe_zone_scale_x;
+            $orig_y2 = ($end_point['y'] - $safe_zone['top']) * $safe_zone_scale_y;
+            
+            $debug_info[] = "🎯 SafeZone-Skalierung: {$safe_zone_scale_x} x {$safe_zone_scale_y}";
+            $debug_info[] = "🎯 Transformierte Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
+        } else {
+            // Fallback: Originale Koordinaten verwenden
+            $orig_x1 = $start_point['x'];
+            $orig_y1 = $start_point['y'];
+            $orig_x2 = $end_point['x'];
+            $orig_y2 = $end_point['y'];
+            $debug_info[] = "⚠️ Fallback: Verwende originale Template-Koordinaten";
+        }
+        
+        // ✅ FIX: SafeZone-basierte Koordinaten-Transformation (bereits oben implementiert)
         $debug_info[] = "🎯 SAFE ZONE ANALYSE:";
         if ($safe_zone) {
             $debug_info[] = "SafeZone gefunden: left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}";
@@ -175,13 +194,19 @@ class YPrint_Reference_Line_System {
             $scaled_x2 = ($relative_x2 / $safe_zone['width']) * $template_image_width;
             $scaled_y2 = ($relative_y2 / $safe_zone['height']) * $template_image_height;
             
-            // ✅ FIX: Begrenze Koordinaten auf sichtbaren Bereich
-            $scaled_x1 = max(0, min($template_image_width, $scaled_x1));
-            $scaled_y1 = max(0, min($template_image_height, $scaled_y1));
-            $scaled_x2 = max(0, min($template_image_width, $scaled_x2));
-            $scaled_y2 = max(0, min($template_image_height, $scaled_y2));
+            // ✅ FIX: Koordinaten OHNE Clipping (lasse sie auch außerhalb Canvas)
+            // Entferne das Clipping, damit Referenzlinien korrekt positioniert werden
+            // $scaled_x1 = max(0, min($template_image_width, $scaled_x1));
+            // $scaled_y1 = max(0, min($template_image_height, $scaled_y1));
+            // $scaled_x2 = max(0, min($template_image_width, $scaled_x2));
+            // $scaled_y2 = max(0, min($template_image_height, $scaled_y2));
             
-            $debug_info[] = "Koordinaten nach Begrenzung: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
+            $debug_info[] = "🔍 Koordinaten-Debug:";
+            $debug_info[] = "Original: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
+            $debug_info[] = "SafeZone-Scale: " . ($template_image_width / $safe_zone['width']) . " x " . ($template_image_height / $safe_zone['height']);
+            $debug_info[] = "Skaliert (unclipped): ({$scaled_x1},{$scaled_y1}) → ({$scaled_x2},{$scaled_y2})";
+            
+            $debug_info[] = "Koordinaten nach Transformation: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
             
             $debug_info[] = "Koordinaten relativ zur SafeZone: ({$relative_x1},{$relative_y1}) → ({$relative_x2},{$relative_y2})";
         } else {
