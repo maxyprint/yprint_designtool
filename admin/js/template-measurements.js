@@ -520,9 +520,6 @@ class YPrintTemplateMeasurements {
             const rect = targetImage.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
             
-            // SafeZone-Daten laden (identisch mit Speicher-Transformation)
-            const safeZone = this.getSafeZoneForView(viewId);
-            
             // ✅ ROOT CAUSE FIX: Verwende Original-Pixel-Koordinaten direkt
             // Berechne aktuelle Skalierung zwischen gespeicherter und aktueller Bildgröße
             const stored_rect = this.getStoredImageDimensions(viewId) || {width: rect.width, height: rect.height};
@@ -538,10 +535,11 @@ class YPrintTemplateMeasurements {
                 y: points[1].y * scale_y
             };
             
-            console.log('🎯 MASTER-DISPLAY-TRANSFORMATION:', {
+            console.log('🎯 ROOT CAUSE FIX - ORIGINAL-PIXEL-KOORDINATEN:', {
                 stored_points: points,
-                safeZone: safeZone,
-                rect_size: {width: rect.width, height: rect.height},
+                stored_rect: stored_rect,
+                current_rect: {width: rect.width, height: rect.height},
+                scale_factors: {x: scale_x, y: scale_y},
                 display_points: [display_point1, display_point2]
             });
             
@@ -832,7 +830,7 @@ class YPrintTemplateMeasurements {
     saveMeasurementWithType(measurementType, pixelDistance, color) {
         console.log('🎯 saveMeasurementWithType called:', { measurementType, pixelDistance, color });
         
-        // ✅ ROOT CAUSE FIX: Intelligente Messung mit Original-Pixel-Koordinaten
+        // ✅ NEU: Intelligente Messung mit Größen-spezifischen Faktoren
         const measurementData = {
             type: measurementType,
             measurement_type: measurementType,
@@ -841,9 +839,6 @@ class YPrintTemplateMeasurements {
             points: this.tempPoints,
             created_at: new Date().toISOString(),
             is_validated: true,
-            // ROOT CAUSE FIX: Original-Pixel-Koordinaten ohne Normalisierung
-            coordinate_system: 'original_pixels',
-            no_normalization: true,
             // NEU: Größen-spezifische Faktoren werden vom Backend berechnet
             size_scale_factors: {}, // Wird vom Backend gefüllt
             reference_sizes: [] // Wird vom Backend gefüllt
@@ -901,12 +896,12 @@ class YPrintTemplateMeasurements {
             computedStyle: canvas ? window.getComputedStyle(canvas) : null
         });
         
-            // ✅ ROOT CAUSE FIX: Keine Normalisierung - Speichere Original-Pixel-Koordinaten
-            console.log('✅ Speichere Original-Pixel-Koordinaten (keine Normalisierung):', JSON.stringify(measurementData.points, null, 2));
-            
-            // ✅ ROOT CAUSE FIX: Canvas-Kontextualisierung ohne Normalisierung
-            const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
-            console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
+        // ✅ ROOT CAUSE FIX: Keine Normalisierung - Speichere Original-Pixel-Koordinaten
+        console.log('✅ Speichere Original-Pixel-Koordinaten (keine Normalisierung):', JSON.stringify(measurementData.points, null, 2));
+        
+        // ✅ ROOT CAUSE FIX: Canvas-Kontextualisierung ohne Normalisierung
+        const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+        console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
         
         const templateId = this.getTemplateId();
         const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
@@ -1714,6 +1709,26 @@ class YPrintTemplateMeasurements {
     }
 
     /**
+     * ✅ ROOT CAUSE FIX: Speichere Bild-Kontext für konsistente Skalierung
+     */
+    getStoredImageDimensions(viewId) {
+        const key = `yprint_image_dimensions_${viewId}`;
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : null;
+    }
+
+    storeImageDimensions(viewId, rect) {
+        const key = `yprint_image_dimensions_${viewId}`;
+        const dimensions = {
+            width: rect.width,
+            height: rect.height,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(dimensions));
+        console.log('✅ Bild-Dimensionen gespeichert:', dimensions);
+    }
+
+    /**
      * ===========================
      * NEUE CANVAS-NORMALISIERUNG FRONTEND
      * Implementiert relative Koordinaten und Canvas-Kontextualisierung
@@ -1931,26 +1946,6 @@ class YPrintTemplateMeasurements {
         .catch(error => {
             console.error('YPrint Canvas: ❌ AJAX-Fehler beim Setzen der Master-Measurement:', error);
         });
-    }
-
-    /**
-     * ✅ ROOT CAUSE FIX: Speichere Bild-Kontext für konsistente Skalierung
-     */
-    getStoredImageDimensions(viewId) {
-        const key = `yprint_image_dimensions_${viewId}`;
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : null;
-    }
-
-    storeImageDimensions(viewId, rect) {
-        const key = `yprint_image_dimensions_${viewId}`;
-        const dimensions = {
-            width: rect.width,
-            height: rect.height,
-            timestamp: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(dimensions));
-        console.log('✅ Bild-Dimensionen gespeichert:', dimensions);
     }
 
     /**

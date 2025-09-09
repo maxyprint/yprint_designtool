@@ -1734,78 +1734,26 @@ class Octo_Print_Designer_Admin {
      * ✅ Helper: Design-Daten laden
      */
     private function load_design_data($design_id) {
-        // ✅ ROOT CAUSE FIX: Robuste Design-Daten-Ladung mit Fehlerbehandlung
         try {
             global $wpdb;
             
             if (!$wpdb) {
-                error_log("YPrint: WordPress Database nicht verfügbar");
                 return null;
             }
             
-            $table_name = $wpdb->prefix . 'octo_user_designs';
+            $design_row = $wpdb->get_row($wpdb->prepare(
+                "SELECT design_data FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+                $design_id
+            ));
             
-            // Prüfe ob Tabelle existiert
-            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") == $table_name;
-            
-            if ($table_exists) {
-                $design_row = $wpdb->get_row($wpdb->prepare(
-                    "SELECT design_data FROM {$table_name} WHERE id = %d",
-                    $design_id
-                ));
-                
-                if ($design_row && !empty($design_row->design_data)) {
-                    $decoded = json_decode($design_row->design_data, true);
-                    if ($decoded) {
-                        error_log("YPrint: Design-Daten erfolgreich aus Datenbank geladen für ID {$design_id}");
-                        return $decoded;
-                    }
-                }
-                
-                error_log("YPrint: Design-Daten nicht in Datenbank gefunden für ID {$design_id}");
-            } else {
-                error_log("YPrint: Tabelle {$table_name} existiert nicht, verwende Fallback-Methoden");
+            if ($design_row && !empty($design_row->design_data)) {
+                $decoded = json_decode($design_row->design_data, true);
+                return $decoded ?: null;
             }
             
-            // ✅ FALLBACK: Versuche Design-Daten aus Post-Meta zu laden
-            $design_elements = get_post_meta($design_id, '_design_elements', true);
-            $design_views = get_post_meta($design_id, '_design_views', true);
-            $template_id = get_post_meta($design_id, '_design_template_id', true);
-            
-            if (!empty($design_elements) && !empty($design_views) && $template_id) {
-                error_log("YPrint: Design-Daten aus Post-Meta geladen für ID {$design_id}");
-                
-                // Konvertiere neue Struktur zu kompatibler Form
-                $converted_design_data = array(
-                    'templateId' => $template_id,
-                    'variationImages' => $design_views,
-                    'elements' => $design_elements,
-                    'structure_version' => '2.0',
-                    'converted_from_post_meta' => true
-                );
-                
-                return $converted_design_data;
-            }
-            
-            // ✅ FALLBACK: Versuche andere Meta-Felder
-            $design_data = get_post_meta($design_id, '_design_data', true);
-            if ($design_data) {
-                error_log("YPrint: Design-Daten aus _design_data Meta geladen für ID {$design_id}");
-                return $design_data;
-            }
-            
-            $design_data = get_post_meta($design_id, 'design_data', true);
-            if ($design_data) {
-                error_log("YPrint: Design-Daten aus design_data Meta geladen für ID {$design_id}");
-                return $design_data;
-            }
-            
-            error_log("YPrint: Keine Design-Daten gefunden für ID {$design_id} in allen Quellen");
             return null;
-            
         } catch (Exception $e) {
-            error_log("YPrint: ❌ load_design_data Exception: " . $e->getMessage());
-            error_log("YPrint: ❌ Exception Trace: " . $e->getTraceAsString());
+            error_log("YPrint SCHRITT 2: ❌ load_design_data Exception: " . $e->getMessage());
             return null;
         }
     }
@@ -1984,110 +1932,61 @@ class Octo_Print_Designer_Admin {
         $view_results = array();
         $summary_data = array();
 
-        // ✅ ROOT CAUSE FIX: Robuste Verarbeitung der Order Items
-        $order_items = $order->get_items();
-        if (empty($order_items)) {
-            $debug_log[] = "❌ Keine Order Items gefunden";
-            return array(
-                'success' => false,
-                'error' => 'Keine Order Items gefunden',
-                'debug_log' => $debug_log
-            );
-        }
-
-        $debug_log[] = "📦 Verarbeite " . count($order_items) . " Order Items";
-
         // Alle Order Items mit YPrint Designs durchgehen
-        foreach ($order_items as $item_id => $item) {
-            try {
-                $design_id = $item->get_meta('_yprint_design_id');
-                if (empty($design_id)) {
-                    $debug_log[] = "⏭️ Item #{$item_id} hat keine Design-ID - überspringe";
-                    continue;
-                }
+        foreach ($order->get_items() as $item_id => $item) {
+            $design_id = $item->get_meta('_yprint_design_id');
+            if (empty($design_id)) {
+                continue;
+            }
 
-                $debug_log[] = "📦 ORDER ITEM #{$item_id} (Design #{$design_id})";
-                $debug_log[] = "Produkt: " . $item->get_name();
-                
-                // ✅ ROOT CAUSE FIX: Robuste Design-Daten-Ladung
-                $design_data = $this->load_design_data($design_id);
-                if (!$design_data) {
-                    $debug_log[] = "❌ Design-Daten nicht gefunden für Design #{$design_id}";
-                    continue;
-                }
+            $debug_log[] = "📦 ORDER ITEM #{$item_id} (Design #{$design_id})";
+            $debug_log[] = "Produkt: " . $item->get_name();
+            
+            // Design-Daten laden
+            $design_data = $this->load_design_data($design_id);
+            if (!$design_data) {
+                $debug_log[] = "❌ Design-Daten nicht gefunden";
+                continue;
+            }
 
-                // ✅ ROOT CAUSE FIX: Robuste Template-Daten-Ladung
-                $template_id = $design_data['templateId'] ?? $item->get_meta('_yprint_template_id');
-                if (empty($template_id)) {
-                    $debug_log[] = "❌ Template-ID nicht verfügbar für Design #{$design_id}";
-                    continue;
-                }
-                
-                $template_data = $this->load_template_data($template_id);
-                if (!$template_data) {
-                    $debug_log[] = "❌ Template-Daten nicht gefunden für Template #{$template_id}";
-                    continue;
-                }
+            // Template-Daten laden
+            $template_id = $design_data['templateId'] ?? $item->get_meta('_yprint_template_id');
+            $template_data = $this->load_template_data($template_id);
             
             // Bestellgröße
             $selected_size = $item->get_meta('_yprint_selected_size') ?: 'L';
 
-                // ✅ ROOT CAUSE FIX: Robuste View-Verarbeitung
-                if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
-                    $debug_log[] = "🎯 Verarbeite " . count($design_data['variationImages']) . " Views";
-                    
-                    foreach ($design_data['variationImages'] as $view_key => $images_array) {
-                        try {
-                            if (empty($images_array)) {
-                                $debug_log[] = "⏭️ View {$view_key} hat keine Bilder - überspringe";
-                                continue;
-                            }
+            // Alle Views des Designs verarbeiten
+            if (isset($design_data['variationImages']) && is_array($design_data['variationImages'])) {
+                foreach ($design_data['variationImages'] as $view_key => $images_array) {
+                    if (empty($images_array)) continue;
 
-                            // View-Informationen extrahieren
-                            $view_parts = explode('_', $view_key);
-                            if (count($view_parts) < 2) {
-                                $debug_log[] = "❌ Ungültige View-Key-Struktur: {$view_key}";
-                                continue;
-                            }
-                            
-                            list($variation_id, $view_id) = $view_parts;
-                            $view_name = $this->get_view_name($template_id, $view_id) ?: "View_{$view_id}";
+                    // View-Informationen extrahieren
+                    list($variation_id, $view_id) = explode('_', $view_key);
+                    $view_name = $this->get_view_name($template_id, $view_id) ?: "View_{$view_id}";
 
-                            $debug_log[] = "🎯 PROCESSING VIEW: {$view_name} ({$view_key})";
+                    $debug_log[] = "🎯 PROCESSING VIEW: {$view_name} ({$view_key})";
 
-                            // Für jede View den kompletten 8-Schritt Workflow durchführen
-                            $view_result = $this->process_complete_workflow_for_view(
-                                $design_data,
-                                $template_data,
-                                $view_key,
-                                $view_name,
-                                $selected_size,
-                                $item,
-                                $debug_log
-                            );
+                    // Für jede View den kompletten 8-Schritt Workflow durchführen
+                    $view_result = $this->process_complete_workflow_for_view(
+                        $design_data,
+                        $template_data,
+                        $view_key,
+                        $view_name,
+                        $selected_size,
+                        $item,
+                        $debug_log
+                    );
 
-                            if ($view_result && isset($view_result['success']) && $view_result['success']) {
-                                $view_results[] = $view_result;
-                                $summary_data[] = array(
-                                    'view_name' => $view_name,
-                                    'final_coordinates' => $view_result['step8_output']['final_api_data'] ?? null,
-                                    'processing_time' => $view_result['processing_time'] ?? 0
-                                );
-                                $debug_log[] = "✅ View {$view_name} erfolgreich verarbeitet";
-                            } else {
-                                $debug_log[] = "❌ View {$view_name} Verarbeitung fehlgeschlagen: " . ($view_result['error'] ?? 'Unbekannter Fehler');
-                            }
-                        } catch (Exception $e) {
-                            error_log("YPrint: ❌ Exception bei View-Verarbeitung {$view_key}: " . $e->getMessage());
-                            $debug_log[] = "❌ Exception bei View {$view_key}: " . $e->getMessage();
-                        }
+                    if ($view_result['success']) {
+                        $view_results[] = $view_result;
+                        $summary_data[] = array(
+                            'view_name' => $view_name,
+                            'final_coordinates' => $view_result['step8_output']['final_api_data'],
+                            'processing_time' => $view_result['processing_time']
+                        );
                     }
-                } else {
-                    $debug_log[] = "❌ Keine variationImages in Design-Daten gefunden";
                 }
-            } catch (Exception $e) {
-                error_log("YPrint: ❌ Exception bei Item-Verarbeitung #{$item_id}: " . $e->getMessage());
-                $debug_log[] = "❌ Exception bei Item #{$item_id}: " . $e->getMessage();
             }
         }
 
@@ -2109,17 +2008,6 @@ class Octo_Print_Designer_Admin {
     private function process_complete_workflow_for_view($design_data, $template_data, $view_key, $view_name, $selected_size, $item, &$debug_log) {
         $view_start_time = microtime(true);
         $workflow_steps = array();
-
-        // ✅ ROOT CAUSE FIX: Robuste Validierung der Eingabeparameter
-        if (empty($design_data)) {
-            $debug_log[] = "❌ Design-Daten sind leer für View {$view_name}";
-            return array('success' => false, 'error' => 'Design-Daten sind leer');
-        }
-        
-        if (empty($template_data)) {
-            $debug_log[] = "❌ Template-Daten sind leer für View {$view_name}";
-            return array('success' => false, 'error' => 'Template-Daten sind leer');
-        }
 
         try {
             // SCHRITT 1: Canvas-Erfassung
@@ -2639,88 +2527,22 @@ class Octo_Print_Designer_Admin {
     private function execute_step_3_for_view($step2_result, $template_data, $selected_size, &$debug_log) {
         $debug_log[] = "  📏 SCHRITT 3: Template-Referenzmessungen";
         
-        // ✅ ROOT CAUSE FIX: Robuste Referenzmessungs-Verarbeitung
-        try {
-            $template_id = $template_data['id'] ?? null;
-            if (!$template_id) {
-                $debug_log[] = "    ❌ Template-ID nicht verfügbar - verwende Fallback";
-                return $this->get_fallback_step3_result($selected_size, $debug_log);
-            }
-            
-            // 1. Lade Template-Messungen aus ORIGINAL-System
-            $template_measurements = null;
-            $possible_keys = array('_template_product_dimensions', '_product_dimensions');
-            foreach ($possible_keys as $key) {
-                $temp = get_post_meta($template_id, $key, true);
-                if (!empty($temp) && is_array($temp)) {
-                    $template_measurements = $temp;
-                    $debug_log[] = "    ✅ Template-Messungen geladen aus {$key}";
-                    break;
-                }
-            }
-            
-            if (!$template_measurements) {
-                $debug_log[] = "    ⚠️ Keine Template-Messungen gefunden - verwende Fallback";
-                return $this->get_fallback_step3_result($selected_size, $debug_log);
-            }
-            
-            // 2. Extrahiere Messungen für die gewählte Größe
-            $size_measurements = array();
-            if (isset($template_measurements[$selected_size])) {
-                $size_measurements = $template_measurements[$selected_size];
-                $debug_log[] = "    ✅ Messungen für Größe {$selected_size} gefunden";
-            } else {
-                $debug_log[] = "    ⚠️ Keine Messungen für Größe {$selected_size} - verwende Fallback";
-                return $this->get_fallback_step3_result($selected_size, $debug_log);
-            }
-            
-            // 3. Extrahiere spezifische Messungen
-            $chest_cm = $size_measurements['chest'] ?? $size_measurements['chest_width'] ?? 53.0;
-            $height_cm = $size_measurements['length'] ?? $size_measurements['height'] ?? 65.0;
-            
-            $debug_log[] = "    ✅ Größe {$selected_size}: Brust={$chest_cm}cm, Höhe={$height_cm}cm";
-            
-            return array(
-                'template_measurements' => array(
-                    'chest_cm' => $chest_cm, 
-                    'height_cm' => $height_cm,
-                    'full_measurements' => $size_measurements
-                ),
-                'selected_size' => $selected_size,
-                'template_id' => $template_id,
-                'success' => true
-            );
-            
-        } catch (Exception $e) {
-            error_log("YPrint: ❌ Exception in execute_step_3_for_view: " . $e->getMessage());
-            $debug_log[] = "    ❌ Exception in Schritt 3: " . $e->getMessage();
-            return $this->get_fallback_step3_result($selected_size, $debug_log);
-        }
-    }
-    
-    /**
-     * ✅ ROOT CAUSE FIX: Fallback für Schritt 3
-     */
-    private function get_fallback_step3_result($selected_size, &$debug_log) {
-        $debug_log[] = "    🔄 Verwende Fallback-Messungen für Größe {$selected_size}";
-        
-        // Fallback Template-Maße
-        $fallback_measurements = array(
-            'S' => array('chest' => 48.0, 'length' => 58.0),
-            'M' => array('chest' => 51.0, 'length' => 62.0),
-            'L' => array('chest' => 53.0, 'length' => 65.0),
-            'XL' => array('chest' => 56.0, 'length' => 68.0)
+        // Mock Template-Maße für Demo (ORIGINAL-FORMAT)
+        $mock_measurements = array(
+            'S' => array('chest_width' => 48.0, 'length' => 58.0),
+            'M' => array('chest_width' => 51.0, 'length' => 62.0),
+            'L' => array('chest_width' => 53.0, 'length' => 65.0),
+            'XL' => array('chest_width' => 56.0, 'length' => 68.0)
         );
         
-        $chest_cm = $fallback_measurements[$selected_size]['chest'] ?? 53.0;
-        $height_cm = $fallback_measurements[$selected_size]['length'] ?? 65.0;
+        $chest_cm = $mock_measurements[$selected_size]['chest_width'] ?? 53.0;
+        $height_cm = $mock_measurements[$selected_size]['length'] ?? 65.0;
         
-        $debug_log[] = "    ✅ Fallback Größe {$selected_size}: Brust={$chest_cm}cm, Höhe={$height_cm}cm";
+        $debug_log[] = "    ✅ Größe {$selected_size}: Brust={$chest_cm}cm, Höhe={$height_cm}cm";
         
         return array(
             'template_measurements' => array('chest_cm' => $chest_cm, 'height_cm' => $height_cm),
             'selected_size' => $selected_size,
-            'is_fallback' => true,
             'success' => true
         );
     }
@@ -2728,58 +2550,14 @@ class Octo_Print_Designer_Admin {
     private function execute_step_4_for_view($step3_result, $template_data, &$debug_log) {
         $debug_log[] = "  🎯 SCHRITT 4: Pixel-zu-Physisch Mapping";
         
-        // ✅ ROOT CAUSE FIX: Robuste Pixel-zu-Physisch Mapping-Verarbeitung
-        try {
-            // Prüfe ob Schritt 3 erfolgreich war
-            if (!isset($step3_result['success']) || !$step3_result['success']) {
-                $debug_log[] = "    ❌ Schritt 3 fehlgeschlagen - verwende Fallback";
-                return $this->get_fallback_step4_result($debug_log);
-            }
-            
-            // Extrahiere Template-Messungen aus Schritt 3
-            $template_measurements = $step3_result['template_measurements'] ?? array();
-            $selected_size = $step3_result['selected_size'] ?? 'L';
-            
-            // Berechne Pixel-zu-mm Ratio basierend auf Template-Messungen
-            $pixel_to_mm_ratio = 2.28; // Standard für DTG
-            
-            // Versuche echte Ratio-Berechnung wenn möglich
-            if (isset($template_measurements['chest_cm']) && $template_measurements['chest_cm'] > 0) {
-                // Mock: Verwende Template-Messungen für Ratio-Berechnung
-                $pixel_to_mm_ratio = ($template_measurements['chest_cm'] * 10) / 200; // 200px = chest_cm * 10mm
-                $debug_log[] = "    ✅ Pixel-zu-mm Ratio berechnet: {$pixel_to_mm_ratio} (basierend auf Template-Messungen)";
-            } else {
-                $debug_log[] = "    ✅ Pixel-zu-mm Ratio Standard: {$pixel_to_mm_ratio}";
-            }
-            
-            return array(
-                'pixel_to_mm_ratio' => $pixel_to_mm_ratio,
-                'mapping_source' => 'template_calculated',
-                'template_measurements' => $template_measurements,
-                'selected_size' => $selected_size,
-                'success' => true
-            );
-            
-        } catch (Exception $e) {
-            error_log("YPrint: ❌ Exception in execute_step_4_for_view: " . $e->getMessage());
-            $debug_log[] = "    ❌ Exception in Schritt 4: " . $e->getMessage();
-            return $this->get_fallback_step4_result($debug_log);
-        }
-    }
-    
-    /**
-     * ✅ ROOT CAUSE FIX: Fallback für Schritt 4
-     */
-    private function get_fallback_step4_result(&$debug_log) {
-        $debug_log[] = "    🔄 Verwende Fallback Pixel-zu-Physisch Mapping";
-        
+        // Mock Pixel-Mapping (in echter Implementierung aus Template-Daten)
         $pixel_to_mm_ratio = 2.28; // Standard für DTG
-        $debug_log[] = "    ✅ Fallback Pixel-zu-mm Ratio: {$pixel_to_mm_ratio}";
+        
+        $debug_log[] = "    ✅ Pixel-zu-mm Ratio: {$pixel_to_mm_ratio}";
         
         return array(
             'pixel_to_mm_ratio' => $pixel_to_mm_ratio,
-            'mapping_source' => 'fallback_default',
-            'is_fallback' => true,
+            'mapping_source' => 'template_default',
             'success' => true
         );
     }
@@ -2787,71 +2565,16 @@ class Octo_Print_Designer_Admin {
     private function execute_step_5_for_view($step4_result, $template_data, &$debug_log) {
         $debug_log[] = "  📍 SCHRITT 5: Finale mm-Koordinaten";
         
-        // ✅ ROOT CAUSE FIX: Robuste finale Koordinaten-Berechnung
-        try {
-            // Prüfe ob Schritt 4 erfolgreich war
-            if (!isset($step4_result['success']) || !$step4_result['success']) {
-                $debug_log[] = "    ❌ Schritt 4 fehlgeschlagen - verwende Fallback";
-                return $this->get_fallback_step5_result($debug_log);
-            }
-            
-            // Extrahiere Pixel-zu-mm Ratio aus Schritt 4
-            $pixel_to_mm_ratio = $step4_result['pixel_to_mm_ratio'] ?? 2.28;
-            $template_measurements = $step4_result['template_measurements'] ?? array();
-            
-            // Berechne finale Koordinaten basierend auf Template-Messungen
-            $final_x_mm = 81.24;
-            $final_y_mm = 109.4;
-            $final_width_mm = 200.0;
-            $final_height_mm = 250.0;
-            $reference_point_mode = 'top-left';
-            
-            // Versuche echte Koordinaten-Berechnung wenn möglich
-            if (isset($template_measurements['chest_cm']) && $template_measurements['chest_cm'] > 0) {
-                // Mock: Verwende Template-Messungen für Koordinaten-Berechnung
-                $final_width_mm = $template_measurements['chest_cm'] * 10; // cm zu mm
-                $final_height_mm = ($template_measurements['height_cm'] ?? 65.0) * 10;
-                $debug_log[] = "    ✅ Finale Koordinaten berechnet basierend auf Template-Messungen";
-            }
-            
-            $debug_log[] = "    ✅ Finale Position: x={$final_x_mm}mm, y={$final_y_mm}mm";
-            $debug_log[] = "    ✅ Finale Größe: {$final_width_mm}mm × {$final_height_mm}mm";
-            $debug_log[] = "    ✅ Referenzpunkt: {$reference_point_mode}";
-            
-            return array(
-                'final_coordinates' => array(
-                    'x_mm' => $final_x_mm,
-                    'y_mm' => $final_y_mm,
-                    'width_mm' => $final_width_mm,
-                    'height_mm' => $final_height_mm
-                ),
-                'reference_point_mode' => $reference_point_mode,
-                'pixel_to_mm_ratio' => $pixel_to_mm_ratio,
-                'template_measurements' => $template_measurements,
-                'success' => true
-            );
-            
-        } catch (Exception $e) {
-            error_log("YPrint: ❌ Exception in execute_step_5_for_view: " . $e->getMessage());
-            $debug_log[] = "    ❌ Exception in Schritt 5: " . $e->getMessage();
-            return $this->get_fallback_step5_result($debug_log);
-        }
-    }
-    
-    /**
-     * ✅ ROOT CAUSE FIX: Fallback für Schritt 5
-     */
-    private function get_fallback_step5_result(&$debug_log) {
-        $debug_log[] = "    🔄 Verwende Fallback finale Koordinaten";
-        
+        // Mock finale Koordinaten-Berechnung
         $final_x_mm = 81.24;
         $final_y_mm = 109.4;
         $final_width_mm = 200.0;
         $final_height_mm = 250.0;
         $reference_point_mode = 'top-left';
         
-        $debug_log[] = "    ✅ Fallback Position: x={$final_x_mm}mm, y={$final_y_mm}mm";
-        $debug_log[] = "    ✅ Fallback Größe: {$final_width_mm}mm × {$final_height_mm}mm";
+        $debug_log[] = "    ✅ Finale Position: x={$final_x_mm}mm, y={$final_y_mm}mm";
+        $debug_log[] = "    ✅ Finale Größe: {$final_width_mm}mm × {$final_height_mm}mm";
+        $debug_log[] = "    ✅ Referenzpunkt: {$reference_point_mode}";
         
         return array(
             'final_coordinates' => array(
@@ -2861,7 +2584,6 @@ class Octo_Print_Designer_Admin {
                 'height_mm' => $final_height_mm
             ),
             'reference_point_mode' => $reference_point_mode,
-            'is_fallback' => true,
             'success' => true
         );
     }

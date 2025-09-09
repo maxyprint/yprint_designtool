@@ -2033,17 +2033,6 @@ class Octo_Print_Designer_Template {
         $view_id = sanitize_text_field($_POST['view_id']);
         $measurement_data = json_decode(stripslashes($_POST['measurement_data']), true);
         
-        // ✅ ROOT CAUSE FIX: Debug-Logging für Original-Pixel-Koordinaten
-        error_log("YPrint ROOT CAUSE FIX: 📊 Empfangene Messungsdaten:");
-        error_log("YPrint ROOT CAUSE FIX: - Template ID: {$template_id}");
-        error_log("YPrint ROOT CAUSE FIX: - View ID: {$view_id}");
-        error_log("YPrint ROOT CAUSE FIX: - Measurement Data: " . json_encode($measurement_data, JSON_PRETTY_PRINT));
-        error_log("YPrint ROOT CAUSE FIX: - Coordinate System: " . ($measurement_data['coordinate_system'] ?? 'unknown'));
-        error_log("YPrint ROOT CAUSE FIX: - No Normalization: " . ($measurement_data['no_normalization'] ?? 'unknown'));
-        if (isset($measurement_data['points'])) {
-            error_log("YPrint ROOT CAUSE FIX: - Points: " . json_encode($measurement_data['points'], JSON_PRETTY_PRINT));
-        }
-        
         // ✅ NEU: Canvas-Kontext-Parameter
         $canvas_width = isset($_POST['canvas_width']) ? floatval($_POST['canvas_width']) : null;
         $canvas_height = isset($_POST['canvas_height']) ? floatval($_POST['canvas_height']) : null;
@@ -2192,7 +2181,7 @@ class Octo_Print_Designer_Template {
             // ✅ FALLBACK: Traditionelle Speicherung (erweitert)
             error_log("YPrint Canvas: 🔄 Verwende traditionelle Speicherung mit Canvas-Metadaten");
             
-            // ✅ ROOT CAUSE FIX: Erstelle vollständige Messungsdaten mit Original-Pixel-Koordinaten
+            // Erstelle vollständige Messungsdaten
             $complete_measurement_data = array(
                 'type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
                 'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
@@ -2202,10 +2191,7 @@ class Octo_Print_Designer_Template {
                 'created_at' => current_time('mysql'),
                 'is_validated' => true,
                 'size_scale_factors' => $size_scale_factors,
-                'reference_sizes' => $reference_sizes,
-                // ROOT CAUSE FIX: Markiere als Original-Pixel-Koordinaten
-                'coordinate_system' => $measurement_data['coordinate_system'] ?? 'original_pixels',
-                'no_normalization' => $measurement_data['no_normalization'] ?? true
+                'reference_sizes' => $reference_sizes
             );
             
             // ✅ NEU: Füge Canvas-Kontext hinzu falls verfügbar
