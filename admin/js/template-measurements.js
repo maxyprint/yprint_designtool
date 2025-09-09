@@ -91,6 +91,11 @@ class YPrintTemplateMeasurements {
         });
     }
     
+    // ✅ BROWSER-CACHE-FIX: Alias für die alte Funktion
+    loadMeasurementsFromDatabase() {
+        return this.loadSavedMeasurementsPromise();
+    }
+    
     // ✅ NEU: Promise-basierte Version für loadSavedMeasurements
     loadSavedMeasurementsPromise() {
         return new Promise((resolve, reject) => {
@@ -1104,7 +1109,7 @@ class YPrintTemplateMeasurements {
         });
         
         // Prüfe Database-State vs DOM-State
-        this.loadSavedMeasurementsPromise().then(dbMeasurements => {
+        this.loadMeasurementsFromDatabase().then(dbMeasurements => {
             const viewMeasurements = dbMeasurements[viewId] || {measurements: []};
             console.log('🔍 Database-Messungen für View ' + viewId + ':', viewMeasurements.measurements.length);
             console.log('🔍 DOM-Messungen für View ' + viewId + ':', existingElements.length);
