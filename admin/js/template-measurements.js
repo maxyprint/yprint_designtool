@@ -832,7 +832,7 @@ class YPrintTemplateMeasurements {
     saveMeasurementWithType(measurementType, pixelDistance, color) {
         console.log('🎯 saveMeasurementWithType called:', { measurementType, pixelDistance, color });
         
-        // ✅ NEU: Intelligente Messung mit Größen-spezifischen Faktoren
+        // ✅ ROOT CAUSE FIX: Intelligente Messung mit Original-Pixel-Koordinaten
         const measurementData = {
             type: measurementType,
             measurement_type: measurementType,
@@ -841,6 +841,9 @@ class YPrintTemplateMeasurements {
             points: this.tempPoints,
             created_at: new Date().toISOString(),
             is_validated: true,
+            // ROOT CAUSE FIX: Original-Pixel-Koordinaten ohne Normalisierung
+            coordinate_system: 'original_pixels',
+            no_normalization: true,
             // NEU: Größen-spezifische Faktoren werden vom Backend berechnet
             size_scale_factors: {}, // Wird vom Backend gefüllt
             reference_sizes: [] // Wird vom Backend gefüllt
