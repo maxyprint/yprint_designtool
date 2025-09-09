@@ -2235,20 +2235,40 @@ private function check_yprint_dependency() {
         $result[] = "----------------------------------------";
         
         error_log("🔍 Getting API Integration instance");
-        // Hole API-Integration Instanz für Größenextraktion
-        $api_integration = Octo_Print_API_Integration::get_instance();
-        error_log("✅ API Integration instance obtained");
+        // ✅ ROOT CAUSE FIX: Robuste API-Integration-Instanz-Erstellung
+        try {
+            $api_integration = Octo_Print_API_Integration::get_instance();
+            if (!$api_integration) {
+                throw new Exception("API Integration instance could not be created");
+            }
+            error_log("✅ API Integration instance obtained");
+        } catch (Exception $e) {
+            error_log("❌ Error getting API Integration instance: " . $e->getMessage());
+            $result[] = "   ❌ API-Integration nicht verfügbar: " . $e->getMessage();
+            $result[] = "   ⚠️ Test wird mit Fallback-Methoden fortgesetzt";
+            $api_integration = null;
+        }
         
         foreach ($design_items as $design_item) {
             $size_name = $design_item['size_name'];
             $result[] = "   Größe für '{$design_item['name']}': {$size_name}";
             
-            // Teste die Größenextraktion
-            $extracted_size = $api_integration->get_order_size_from_woocommerce($order);
-            if ($extracted_size) {
-                $result[] = "   ✅ Größenextraktion erfolgreich: {$extracted_size}";
+            // ✅ ROOT CAUSE FIX: Robuste Größenextraktion mit Fehlerbehandlung
+            if ($api_integration) {
+                try {
+                    $extracted_size = $api_integration->get_order_size_from_woocommerce($order);
+                    if ($extracted_size) {
+                        $result[] = "   ✅ Größenextraktion erfolgreich: {$extracted_size}";
+                    } else {
+                        $result[] = "   ⚠️ Größenextraktion fehlgeschlagen - verwende Item-Größe";
+                    }
+                } catch (Exception $e) {
+                    error_log("❌ Error in size extraction: " . $e->getMessage());
+                    $result[] = "   ❌ Größenextraktion-Fehler: " . $e->getMessage();
+                    $result[] = "   ⚠️ Verwende Item-Größe als Fallback";
+                }
             } else {
-                $result[] = "   ⚠️ Größenextraktion fehlgeschlagen - verwende Item-Größe";
+                $result[] = "   ⚠️ API-Integration nicht verfügbar - verwende Item-Größe";
             }
         }
         $result[] = "";
@@ -2320,22 +2340,32 @@ private function check_yprint_dependency() {
                         }
                     }
                     
-                    // Teste Skalierungsfaktor-Berechnung
-                    $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $size_name);
-                    if ($scale_factor) {
-                        $result[] = "     ✅ Skalierungsfaktor gefunden: {$scale_factor}";
-                        
-                        // Berechne umgerechnete Koordinaten
-                        $converted_x = round($test_coordinates['x'] * $scale_factor, 1);
-                        $converted_y = round($test_coordinates['y'] * $scale_factor, 1);
-                        $converted_width = round($test_coordinates['width'] * $scale_factor, 1);
-                        $converted_height = round($test_coordinates['height'] * $scale_factor, 1);
-                        
-                        $result[] = "     ✅ Umgerechnete Koordinaten:";
-                        $result[] = "       Position: ({$converted_x}, {$converted_y}) mm";
-                        $result[] = "       Dimensionen: {$converted_width} x {$converted_height} mm";
+                    // ✅ ROOT CAUSE FIX: Robuste Skalierungsfaktor-Berechnung mit Fehlerbehandlung
+                    if ($api_integration) {
+                        try {
+                            $scale_factor = $api_integration->get_size_specific_scale_factor($template_measurements, $size_name);
+                            if ($scale_factor) {
+                                $result[] = "     ✅ Skalierungsfaktor gefunden: {$scale_factor}";
+                                
+                                // Berechne umgerechnete Koordinaten
+                                $converted_x = round($test_coordinates['x'] * $scale_factor, 1);
+                                $converted_y = round($test_coordinates['y'] * $scale_factor, 1);
+                                $converted_width = round($test_coordinates['width'] * $scale_factor, 1);
+                                $converted_height = round($test_coordinates['height'] * $scale_factor, 1);
+                                
+                                $result[] = "     ✅ Umgerechnete Koordinaten:";
+                                $result[] = "       Position: ({$converted_x}, {$converted_y}) mm";
+                                $result[] = "       Dimensionen: {$converted_width} x {$converted_height} mm";
+                            } else {
+                                $result[] = "     ⚠️ Kein Skalierungsfaktor gefunden - verwende Fallback";
+                            }
+                        } catch (Exception $e) {
+                            error_log("❌ Error in scale factor calculation: " . $e->getMessage());
+                            $result[] = "     ❌ Skalierungsfaktor-Berechnung-Fehler: " . $e->getMessage();
+                            $result[] = "     ⚠️ Verwende Fallback-Skalierung";
+                        }
                     } else {
-                        $result[] = "     ⚠️ Kein Skalierungsfaktor gefunden - verwende Fallback";
+                        $result[] = "     ⚠️ API-Integration nicht verfügbar - verwende Fallback-Skalierung";
                     }
                 } else {
                     $result[] = "     ❌ Keine Template-Messungen verfügbar";
@@ -2418,24 +2448,36 @@ private function check_yprint_dependency() {
      * ✅ NEU: Hilfsfunktion zum Abrufen von Design-Daten aus der Datenbank
      */
     private function get_design_data_from_database($design_id) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'octo_user_designs';
-        
-        // Versuche Design-Daten aus der octo_user_designs Tabelle zu laden
-        $design = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT design_data FROM {$table_name} WHERE id = %d",
-                $design_id
-            ),
-            ARRAY_A
-        );
-        
-        if ($design && !empty($design['design_data'])) {
-            error_log("YPrint: Design data found for ID {$design_id} in octo_user_designs table");
-            return $design['design_data'];
+        // ✅ ROOT CAUSE FIX: Robuste Fehlerbehandlung für Design-Daten-Abruf
+        try {
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'octo_user_designs';
+            
+            // Prüfe ob Tabelle existiert
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") == $table_name;
+            
+            if ($table_exists) {
+                // Versuche Design-Daten aus der octo_user_designs Tabelle zu laden
+                $design = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT design_data FROM {$table_name} WHERE id = %d",
+                        $design_id
+                    ),
+                    ARRAY_A
+                );
+                
+                if ($design && !empty($design['design_data'])) {
+                    error_log("YPrint: Design data found for ID {$design_id} in octo_user_designs table");
+                    return $design['design_data'];
+                }
+                
+                error_log("YPrint: Design data NOT found for ID {$design_id} in octo_user_designs table");
+            } else {
+                error_log("YPrint: Table {$table_name} does not exist, skipping database lookup");
+            }
+        } catch (Exception $e) {
+            error_log("YPrint: Error accessing octo_user_designs table: " . $e->getMessage());
         }
-        
-        error_log("YPrint: Design data NOT found for ID {$design_id} in octo_user_designs table");
         
         // ✅ NEU: Versuche neue Design-Struktur zuerst
         $design_elements = get_post_meta($design_id, '_design_elements', true);
