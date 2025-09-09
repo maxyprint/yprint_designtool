@@ -849,10 +849,11 @@ class YPrintTemplateMeasurements {
                     console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
                     console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
                     
-                    // Normalisierungsberechnung mit Bild-Proportion-Korrektur
-                    const imageElement = canvas.previousElementSibling || canvas.parentElement.querySelector('img');
+                    // Verwende tatsächliche Bild-Dimensionen statt Canvas
+                    const imageElement = document.querySelector(`img[src*="${viewId === '189542' ? 'front' : 'back'}"]`);
                     const imageRect = imageElement ? imageElement.getBoundingClientRect() : canvasRect;
                     
+                    console.log('  Bild-Element gefunden:', !!imageElement);
                     console.log('  Bild-Dimensionen:', imageRect.width + 'x' + imageRect.height);
                     console.log('  Canvas-Dimensionen:', canvasRect.width + 'x' + canvasRect.height);
                     
@@ -904,6 +905,10 @@ class YPrintTemplateMeasurements {
                 
                 console.log('✅ Koordinaten erfolgreich normalisiert auf Template-Basis');
                 console.log('Neue pixel_distance:', measurementData.pixel_distance);
+                
+                // WICHTIG: Übernehme die normalisierten Daten zurück in measurementData
+                console.log('📝 Übernehme normalisierte Koordinaten in measurementData');
+                console.log('Vor Normalisierung:', JSON.stringify(measurementData.points, null, 2));
             }
             
             // ✅ REPARATUR: Jetzt erst die Canvas-Kontextualisierung
