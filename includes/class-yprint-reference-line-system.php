@@ -175,6 +175,14 @@ class YPrint_Reference_Line_System {
             $scaled_x2 = ($relative_x2 / $safe_zone['width']) * $template_image_width;
             $scaled_y2 = ($relative_y2 / $safe_zone['height']) * $template_image_height;
             
+            // ✅ FIX: Begrenze Koordinaten auf sichtbaren Bereich
+            $scaled_x1 = max(0, min($template_image_width, $scaled_x1));
+            $scaled_y1 = max(0, min($template_image_height, $scaled_y1));
+            $scaled_x2 = max(0, min($template_image_width, $scaled_x2));
+            $scaled_y2 = max(0, min($template_image_height, $scaled_y2));
+            
+            $debug_info[] = "Koordinaten nach Begrenzung: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
+            
             $debug_info[] = "Koordinaten relativ zur SafeZone: ({$relative_x1},{$relative_y1}) → ({$relative_x2},{$relative_y2})";
         } else {
             // Fallback: Direkte Skalierung (alte Methode)
