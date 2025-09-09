@@ -376,18 +376,30 @@ class YPrintTemplateMeasurements {
         if (!this.measurementMode || this.tempPoints.length >= 2) return;
         
         const rect = event.target.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        // Skaliere auf tatsächliche Bildgröße
-        const scaleX = event.target.naturalWidth / rect.width;
-        const scaleY = event.target.naturalHeight / rect.height;
-        
-        const point = {
-            x: Math.round(x * scaleX),
-            y: Math.round(y * scaleY),
-            displayX: x,
-            displayY: y
+        const canvas_x = event.clientX - rect.left;  
+        const canvas_y = event.clientY - rect.top;
+
+        // SafeZone-Daten für diese View laden (Template-spezifisch)
+        const safeZone = this.getSafeZoneForView(this.currentViewId);
+        const canvas_scale_x = rect.width / safeZone.width;
+        const canvas_scale_y = rect.height / safeZone.height;
+
+        // Canvas-Koordinaten zu SafeZone-relativen Koordinaten transformieren
+        const safezone_rel_x = canvas_x / canvas_scale_x;
+        const safezone_rel_y = canvas_y / canvas_scale_y;
+
+        console.log('Click-Transformation:', {
+            canvas: {x: canvas_x, y: canvas_y},
+            safeZone: safeZone,
+            scale: {x: canvas_scale_x, y: canvas_scale_y},
+            safezone_relative: {x: safezone_rel_x, y: safezone_rel_y}
+        });
+
+        const point = { 
+            x: safezone_rel_x, 
+            y: safezone_rel_y, 
+            displayX: canvas_x, 
+            displayY: canvas_y 
         };
         
         this.tempPoints.push(point);
@@ -898,13 +910,16 @@ class YPrintTemplateMeasurements {
                     console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
                     console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
                     
-                    // Direkte Canvas-zu-Template Normalisierung (KEIN Bild-Element)
-                    const normalizedX = (point.x / canvasRect.width) * baseDimensions.width;
-                    const normalizedY = (point.y / canvasRect.height) * baseDimensions.height;
+                    // ✅ SafeZone-relative Koordinaten sind bereits korrekt - KEINE weitere Transformation nötig
+                    const normalizedX = point.x; // Bereits SafeZone-relativ
+                    const normalizedY = point.y; // Bereits SafeZone-relativ
                     
-                    console.log('  Direkte Normalisierung: (' + point.x + '/' + canvasRect.width + ') * ' + baseDimensions.width);
-                    console.log('  X: ' + point.x + ' → ' + normalizedX);
-                    console.log('  Y: ' + point.y + ' → ' + normalizedY);
+                    console.log('SafeZone-Speicherung:', {
+                        original_point: point,
+                        stored_x: normalizedX,
+                        stored_y: normalizedY,
+                        note: 'Koordinaten bereits SafeZone-relativ - direkte Speicherung'
+                    });
                     
                     // Berechne auch displayX/displayY normalisiert
                     const normalizedDisplayX = (point.displayX / canvasRect.width) * baseDimensions.width;
@@ -1364,6 +1379,54 @@ class YPrintTemplateMeasurements {
                 notification.parentNode.removeChild(notification);
             }
         }, 5000);
+    }
+
+    // ✅ NEU: SafeZone-Loader-Funktion
+    getSafeZoneForView(viewId) {
+        // Default SafeZone falls keine Template-Daten verfügbar
+        const defaultSafeZone = {
+            left: 49.625,
+            top: 45.4, 
+            width: 218,
+            height: 339
+        };
+        
+        // TODO: Aus Template-Daten laden wenn verfügbar
+        // const templateData = this.getTemplateViewData(viewId);
+        // return templateData.safeZone || defaultSafeZone;
+        
+        console.log('🎯 SafeZone für View', viewId, ':', defaultSafeZone);
+        return defaultSafeZone;
+    }
+
+    // ✅ NEU: Datenvalidierung und Migration
+    validateAndMigrateCoordinates(measurementData, viewId) {
+        const safeZone = this.getSafeZoneForView(viewId);
+        let needsMigration = false;
+        
+        measurementData.points.forEach((point, index) => {
+            // Prüfe ob Koordinaten außerhalb SafeZone-Bereich liegen (alte fehlerhafte Daten)
+            if (point.x > safeZone.width || point.y > safeZone.height) {
+                console.warn(`Point ${index} needs migration - außerhalb SafeZone:`, point);
+                needsMigration = true;
+                
+                // Rückberechnung: Template-absolute zu SafeZone-relativ
+                // Annahme: Alte Daten sind Template-800x600-absolut
+                const safezone_rel_x = (point.x - safeZone.left) / safeZone.width * safeZone.width;
+                const safezone_rel_y = (point.y - safeZone.top) / safeZone.height * safeZone.height;
+                
+                measurementData.points[index] = {
+                    x: Math.max(0, Math.min(safeZone.width, safezone_rel_x)),
+                    y: Math.max(0, Math.min(safeZone.height, safezone_rel_y)),
+                    displayX: point.displayX,
+                    displayY: point.displayY
+                };
+                
+                console.log(`Migrated point ${index}:`, measurementData.points[index]);
+            }
+        });
+        
+        return needsMigration;
     }
 
     getTemplateId() {

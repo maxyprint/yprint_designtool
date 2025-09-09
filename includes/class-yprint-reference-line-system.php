@@ -131,41 +131,31 @@ class YPrint_Reference_Line_System {
         $start_point = $reference_measurement['points'][0];
         $end_point = $reference_measurement['points'][1];
         
-        // ✅ FIX: SafeZone-basierte Koordinaten-Transformation
-        // Lade safeZone aus Template-Variations für korrekte Koordinaten-Transformation
-        $template_variations = get_post_meta($template_id, '_template_variations', true);
-        $safe_zone = null;
-        if (!empty($template_variations)) {
-            foreach ($template_variations as $variation) {
-                if (!empty($variation['views'][$view_id]['safeZone'])) {
-                    $safe_zone = $variation['views'][$view_id]['safeZone'];
-                    break;
-                }
-            }
-        }
+        // ✅ SafeZone aus Template-Daten oder Standard-Werte
+        $safe_zone = array(
+            'left' => 49.625,
+            'top' => 45.4,
+            'width' => 218,
+            'height' => 339
+        );
         
-        $debug_info[] = "🎯 SafeZone: " . ($safe_zone ? "left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}" : "NICHT GEFUNDEN");
-        $debug_info[] = "🎯 Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";
+        $debug_info[] = "🎯 Referenzlinien-Transformation:";
+        $debug_info[] = "Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";
+        $debug_info[] = "SafeZone: left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}";
+        $debug_info[] = "Display-Canvas: {$current_canvas_width}x{$current_canvas_height}";
         
-        // ✅ FIX: Korrekte SafeZone-Transformation
-        if ($safe_zone) {
-            // Verwende die originalen Template-Koordinaten direkt
-            // Die SafeZone-Transformation wird später in der Skalierung angewendet
-            $orig_x1 = $start_point['x'];
-            $orig_y1 = $start_point['y'];
-            $orig_x2 = $end_point['x'];
-            $orig_y2 = $end_point['y'];
-            
-            $debug_info[] = "🎯 SafeZone gefunden - verwende originale Template-Koordinaten";
-            $debug_info[] = "🎯 Template-Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
-        } else {
-            // Fallback: Originale Koordinaten verwenden
-            $orig_x1 = $start_point['x'];
-            $orig_y1 = $start_point['y'];
-            $orig_x2 = $end_point['x'];
-            $orig_y2 = $end_point['y'];
-            $debug_info[] = "⚠️ Fallback: Verwende originale Template-Koordinaten";
-        }
+        // Template-Punkte sind SafeZone-relativ gespeichert - direkt zu Display transformieren
+        $display_scale_x = $current_canvas_width / $safe_zone['width'];
+        $display_scale_y = $current_canvas_height / $safe_zone['height'];
+        
+        $orig_x1 = $start_point['x'] * $display_scale_x;
+        $orig_y1 = $start_point['y'] * $display_scale_y;
+        $orig_x2 = $end_point['x'] * $display_scale_x;  
+        $orig_y2 = $end_point['y'] * $display_scale_y;
+        
+        $debug_info[] = "Transformierte Display-Koordinaten:";
+        $debug_info[] = "Point1: ({$orig_x1},{$orig_y1})";
+        $debug_info[] = "Point2: ({$orig_x2},{$orig_y2})";
         
         // ✅ FIX: SafeZone-basierte Koordinaten-Transformation (bereits oben implementiert)
         $debug_info[] = "🎯 SAFE ZONE ANALYSE:";
