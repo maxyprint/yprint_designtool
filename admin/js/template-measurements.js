@@ -817,7 +817,7 @@ class YPrintTemplateMeasurements {
         });
     }
     
-    // ✅ NEU: AJAX-Funktion zum Speichern in der Datenbank
+    // ✅ REPARIERT: AJAX-Funktion zum Speichern in der Datenbank
     saveMeasurementToDatabase(viewId, measurementData, callback) {
         console.log('🔍 KOORDINATEN-DEBUG: saveMeasurementToDatabase aufgerufen');
         console.log('View ID:', viewId);
@@ -833,16 +833,17 @@ class YPrintTemplateMeasurements {
             computedStyle: canvas ? window.getComputedStyle(canvas) : null
         });
         
-        // Original Template-Dimensionen aus Database
+        // ✅ REPARATUR: Warte auf Template-Basis-Dimensionen BEVOR Speicherung
         console.log('🎯 Template-Basis-Dimensionen aus _template_view_print_areas:');
         this.loadTemplateBaseDimensions(viewId).then(baseDimensions => {
             console.log('Basis-Dimensionen:', baseDimensions);
             
-            // Koordinaten-Normalisierung Debug
+            // ✅ REPARATUR: Koordinaten-Normalisierung mit tatsächlicher Anwendung
             if (measurementData.points && canvasRect && baseDimensions) {
                 console.log('🔄 KOORDINATEN-NORMALISIERUNG:');
                 
-                measurementData.points.forEach((point, index) => {
+                // Normalisiere alle Punkte und überschreibe measurementData
+                measurementData.points = measurementData.points.map((point, index) => {
                     console.log(`Punkt ${index + 1}:`);
                     console.log('  Original (Canvas):', point);
                     console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
@@ -852,62 +853,124 @@ class YPrintTemplateMeasurements {
                     const normalizedX = (point.x / canvasRect.width) * baseDimensions.width;
                     const normalizedY = (point.y / canvasRect.height) * baseDimensions.height;
                     
-                    console.log('  Normalisiert (Template):', {x: normalizedX, y: normalizedY});
+                    // Berechne auch displayX/displayY normalisiert
+                    const normalizedDisplayX = (point.displayX / canvasRect.width) * baseDimensions.width;
+                    const normalizedDisplayY = (point.displayY / canvasRect.height) * baseDimensions.height;
+                    
+                    const normalizedPoint = {
+                        x: Math.round(normalizedX),
+                        y: Math.round(normalizedY),
+                        displayX: normalizedDisplayX,
+                        displayY: normalizedDisplayY
+                    };
+                    
+                    console.log('  Normalisiert (Template):', normalizedPoint);
                     console.log('  Normalisierungs-Faktoren:', {
                         x: baseDimensions.width / canvasRect.width,
                         y: baseDimensions.height / canvasRect.height
                     });
+                    
+                    return normalizedPoint;
                 });
-            }
-        });
-        
-        // ✅ NEUE CANVAS-KONTEXTUALISIERUNG: Erweitere Messung mit Canvas-Kontext
-        const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
-        console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
-        
-        const templateId = this.getTemplateId();
-        const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
-        const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
-        
-        const formData = new FormData();
-        formData.append('action', 'save_measurement_to_database');
-        formData.append('nonce', nonce);
-        formData.append('template_id', templateId);
-        formData.append('view_id', viewId);
-        formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
-        
-        // ✅ NEU: Füge Canvas-Kontext als separate Parameter hinzu
-        formData.append('canvas_width', enrichedMeasurementData.canvas_width);
-        formData.append('canvas_height', enrichedMeasurementData.canvas_height);
-        formData.append('device_type', enrichedMeasurementData.device_type);
-        
-        fetch(ajaxUrl, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            console.log('🎯 Save measurement response status:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('🎯 Save measurement response data:', data);
-            if (data.success) {
-                console.log('✅ Measurement saved to database successfully');
                 
-                // ✅ NEU: Verarbeite Canvas-System Debug-Info aus der Response
-                if (data.data && data.data.debug_info) {
-                    console.log('YPrint Canvas: 📊 Canvas-System Response-Info:', data.data.debug_info);
+                // Normalisiere auch pixel_distance
+                const distanceScaleFactor = baseDimensions.width / canvasRect.width;
+                measurementData.pixel_distance = measurementData.pixel_distance * distanceScaleFactor;
+                
+                console.log('✅ Koordinaten erfolgreich normalisiert auf Template-Basis');
+                console.log('Neue pixel_distance:', measurementData.pixel_distance);
+            }
+            
+            // ✅ REPARATUR: Jetzt erst die Canvas-Kontextualisierung
+            const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+            console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
+            
+            const templateId = this.getTemplateId();
+            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+            
+            const formData = new FormData();
+            formData.append('action', 'save_measurement_to_database');
+            formData.append('nonce', nonce);
+            formData.append('template_id', templateId);
+            formData.append('view_id', viewId);
+            formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
+            
+            // ✅ NEU: Füge Canvas-Kontext als separate Parameter hinzu
+            formData.append('canvas_width', enrichedMeasurementData.canvas_width);
+            formData.append('canvas_height', enrichedMeasurementData.canvas_height);
+            formData.append('device_type', enrichedMeasurementData.device_type);
+            
+            fetch(ajaxUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('🎯 Save measurement response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('🎯 Save measurement response data:', data);
+                if (data.success) {
+                    console.log('✅ Measurement saved to database successfully');
+                    
+                    // ✅ NEU: Verarbeite Canvas-System Debug-Info aus der Response
+                    if (data.data && data.data.debug_info) {
+                        console.log('YPrint Canvas: 📊 Canvas-System Response-Info:', data.data.debug_info);
+                    }
+                    
+                    callback(true);
+                } else {
+                    console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
+                    callback(false);
                 }
-                
-                callback(true);
-            } else {
-                console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
+            })
+            .catch(error => {
+                console.error('❌ Error saving measurement to database:', error);
                 callback(false);
-            }
-        })
-        .catch(error => {
-            console.error('❌ Error saving measurement to database:', error);
-            callback(false);
+            });
+            
+        }).catch(error => {
+            console.error('❌ Error loading template base dimensions:', error);
+            // Fallback: Speichere ohne Normalisierung
+            console.log('🔄 Fallback: Speichere ohne Koordinaten-Normalisierung');
+            
+            const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+            console.log('🎯 Canvas-kontextualisierte Messungs-Daten (Fallback):', enrichedMeasurementData);
+            
+            const templateId = this.getTemplateId();
+            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+            
+            const formData = new FormData();
+            formData.append('action', 'save_measurement_to_database');
+            formData.append('nonce', nonce);
+            formData.append('template_id', templateId);
+            formData.append('view_id', viewId);
+            formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
+            
+            formData.append('canvas_width', enrichedMeasurementData.canvas_width);
+            formData.append('canvas_height', enrichedMeasurementData.canvas_height);
+            formData.append('device_type', enrichedMeasurementData.device_type);
+            
+            fetch(ajaxUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Measurement saved to database successfully (Fallback)');
+                    callback(true);
+                } else {
+                    console.error('❌ Failed to save measurement to database (Fallback):', data.data?.message || 'Unknown error');
+                    callback(false);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error saving measurement to database (Fallback):', error);
+                callback(false);
+            });
         });
     }
 
