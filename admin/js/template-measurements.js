@@ -849,20 +849,45 @@ class YPrintTemplateMeasurements {
                     console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
                     console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
                     
-                    // Normalisierungsberechnung
-                    const normalizedX = (point.x / canvasRect.width) * baseDimensions.width;
-                    const normalizedY = (point.y / canvasRect.height) * baseDimensions.height;
+                    // Normalisierungsberechnung mit Bild-Proportion-Korrektur
+                    const imageElement = canvas.previousElementSibling || canvas.parentElement.querySelector('img');
+                    const imageRect = imageElement ? imageElement.getBoundingClientRect() : canvasRect;
+                    
+                    console.log('  Bild-Dimensionen:', imageRect.width + 'x' + imageRect.height);
+                    console.log('  Canvas-Dimensionen:', canvasRect.width + 'x' + canvasRect.height);
+                    
+                    // Verwende Bild-Dimensionen statt Canvas für Normalisierung
+                    const normalizedX = (point.x / imageRect.width) * baseDimensions.width;
+                    const normalizedY = (point.y / imageRect.height) * baseDimensions.height;
                     
                     // Berechne auch displayX/displayY normalisiert
-                    const normalizedDisplayX = (point.displayX / canvasRect.width) * baseDimensions.width;
-                    const normalizedDisplayY = (point.displayY / canvasRect.height) * baseDimensions.height;
+                    const normalizedDisplayX = (point.displayX / imageRect.width) * baseDimensions.width;
+                    const normalizedDisplayY = (point.displayY / imageRect.height) * baseDimensions.height;
+                    
+                    console.log('  Normalisierungs-Basis: Bild ' + imageRect.width + 'x' + imageRect.height);
+                    console.log('  Y-Berechnung: ' + point.y + ' / ' + imageRect.height + ' * ' + baseDimensions.height);
+                    
+                    // Gültigkeitsprüfung für normalisierte Koordinaten
+                    if (normalizedX < 0 || normalizedX > baseDimensions.width) {
+                        console.warn('⚠️ Normalisierte X-Koordinate außerhalb Bereich:', normalizedX);
+                    }
+                    if (normalizedY < 0 || normalizedY > baseDimensions.height) {
+                        console.warn('⚠️ Normalisierte Y-Koordinate außerhalb Bereich:', normalizedY);
+                    }
+                    
+                    // Clamp Koordinaten auf gültigen Bereich
+                    const clampedX = Math.max(0, Math.min(baseDimensions.width, normalizedX));
+                    const clampedY = Math.max(0, Math.min(baseDimensions.height, normalizedY));
                     
                     const normalizedPoint = {
-                        x: Math.round(normalizedX),
-                        y: Math.round(normalizedY),
+                        x: Math.round(clampedX),
+                        y: Math.round(clampedY),
                         displayX: normalizedDisplayX,
                         displayY: normalizedDisplayY
                     };
+                    
+                    console.log('  Original normalisiert:', {x: normalizedX, y: normalizedY});
+                    console.log('  Nach Clamping:', normalizedPoint);
                     
                     console.log('  Normalisiert (Template):', normalizedPoint);
                     console.log('  Normalisierungs-Faktoren:', {
@@ -1039,7 +1064,7 @@ class YPrintTemplateMeasurements {
         });
         
         // Prüfe Database-State vs DOM-State
-        this.loadMeasurementsFromDatabase().then(dbMeasurements => {
+        this.loadSavedMeasurements().then(dbMeasurements => {
             const viewMeasurements = dbMeasurements[viewId] || {measurements: []};
             console.log('🔍 Database-Messungen für View ' + viewId + ':', viewMeasurements.measurements.length);
             console.log('🔍 DOM-Messungen für View ' + viewId + ':', existingElements.length);
