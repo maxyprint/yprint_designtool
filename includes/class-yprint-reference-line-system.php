@@ -137,16 +137,54 @@ class YPrint_Reference_Line_System {
         $orig_x2 = $end_point['x'];
         $orig_y2 = $end_point['y'];
         
-        // ✅ FIX: Korrekte Skalierung für Template-Bild (300x400px Vorschau)
-        // Das Template-Bild wird auf 300px Breite skaliert, daher müssen die Koordinaten entsprechend angepasst werden
+        // ✅ FIX: SafeZone-basierte Koordinaten-Transformation
+        // Lade safeZone aus Template-Variations für korrekte Koordinaten-Transformation
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
+        $safe_zone = null;
+        if (!empty($template_variations)) {
+            foreach ($template_variations as $variation) {
+                if (!empty($variation['views'][$view_id]['safeZone'])) {
+                    $safe_zone = $variation['views'][$view_id]['safeZone'];
+                    break;
+                }
+            }
+        }
+        
+        $debug_info[] = "🎯 SAFE ZONE ANALYSE:";
+        if ($safe_zone) {
+            $debug_info[] = "SafeZone gefunden: left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}";
+        } else {
+            $debug_info[] = "❌ Keine SafeZone gefunden - verwende Fallback-Skalierung";
+        }
+        
+        // Template-Bild-Größe für Vorschau
         $template_image_width = 300;  // Vorschau-Breite
         $template_image_height = 400; // Vorschau-Höhe
         
-        // Skaliere Koordinaten relativ zur Template-Bild-Größe
-        $scaled_x1 = ($orig_x1 / $original_canvas_width) * $template_image_width;
-        $scaled_y1 = ($orig_y1 / $original_canvas_height) * $template_image_height;
-        $scaled_x2 = ($orig_x2 / $original_canvas_width) * $template_image_width;
-        $scaled_y2 = ($orig_y2 / $original_canvas_height) * $template_image_height;
+        if ($safe_zone) {
+            // ✅ KORREKTE TRANSFORMATION: Koordinaten relativ zur SafeZone
+            // 1. Koordinaten relativ zur SafeZone machen
+            $relative_x1 = $orig_x1 - $safe_zone['left'];
+            $relative_y1 = $orig_y1 - $safe_zone['top'];
+            $relative_x2 = $orig_x2 - $safe_zone['left'];
+            $relative_y2 = $orig_y2 - $safe_zone['top'];
+            
+            // 2. Von SafeZone-Dimensionen auf Template-Bild-Dimensionen skalieren
+            $scaled_x1 = ($relative_x1 / $safe_zone['width']) * $template_image_width;
+            $scaled_y1 = ($relative_y1 / $safe_zone['height']) * $template_image_height;
+            $scaled_x2 = ($relative_x2 / $safe_zone['width']) * $template_image_width;
+            $scaled_y2 = ($relative_y2 / $safe_zone['height']) * $template_image_height;
+            
+            $debug_info[] = "Koordinaten relativ zur SafeZone: ({$relative_x1},{$relative_y1}) → ({$relative_x2},{$relative_y2})";
+        } else {
+            // Fallback: Direkte Skalierung (alte Methode)
+            $scaled_x1 = ($orig_x1 / $original_canvas_width) * $template_image_width;
+            $scaled_y1 = ($orig_y1 / $original_canvas_height) * $template_image_height;
+            $scaled_x2 = ($orig_x2 / $original_canvas_width) * $template_image_width;
+            $scaled_y2 = ($orig_y2 / $original_canvas_height) * $template_image_height;
+            
+            $debug_info[] = "Fallback: Direkte Canvas-Skalierung verwendet";
+        }
         
         // Finale physische Distanz
         $final_pixel_distance = $template_pixel_distance * ($template_image_width / $original_canvas_width);
