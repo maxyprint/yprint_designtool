@@ -840,12 +840,9 @@ class YPrintTemplateMeasurements {
                 
                 this.showNotification(successMessage, 'success');
                 
-                // **QUICK-FIX: Seite nach 2 Sekunden neu laden um DOM-Duplikate zu vermeiden**
-                setTimeout(() => {
-                    console.log('🔄 Reloading page to sync measurements and avoid DOM duplicates...');
-                    this.showNotification('🔄 Seite wird neu geladen...', 'info');
-                    window.location.reload();
-                }, 2000);
+                // ✅ FIX: Page-Reload komplett entfernt - DOM-Duplikate werden anders verhindert
+                console.log('💡 DOM element added - no page reload needed');
+                // Page reload komplett entfernt
                 
             } else {
                 this.showNotification('❌ Fehler beim Speichern der Messung in der Datenbank', 'error');
@@ -859,6 +856,13 @@ class YPrintTemplateMeasurements {
         console.log('🔍 KOORDINATEN-DEBUG: saveMeasurementToDatabase aufgerufen');
         console.log('View ID:', viewId);
         console.log('Original measurementData:', measurementData);
+        
+        // ✅ Verhindere doppelte Speicherung durch Race Condition Check
+        if (this.isSaving) {
+            console.warn('⚠️ Speicher-Prozess bereits aktiv - überspringe Duplikat');
+            return;
+        }
+        this.isSaving = true;
         
         // Canvas-Dimensionen erfassen
         const canvas = this.getCanvasForView(viewId);
@@ -886,24 +890,28 @@ class YPrintTemplateMeasurements {
                     console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
                     console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
                     
-                    // Verwende tatsächliche Bild-Dimensionen statt Canvas
-                    const imageElement = document.querySelector(`img[src*="${viewId === '189542' ? 'front' : 'back'}"]`);
-                    const imageRect = imageElement ? imageElement.getBoundingClientRect() : canvasRect;
+                    // ✅ KORRIGIERTE Koordinaten-Normalisierung
+                    // Problem: Klick-Koordinaten sind relativ zum Canvas (300x150), nicht zum Bild (304x304)
+                    // Lösung: Verwende Canvas-Dimensionen für Normalisierung
                     
-                    console.log('  Bild-Element gefunden:', !!imageElement);
-                    console.log('  Bild-Dimensionen:', imageRect.width + 'x' + imageRect.height);
-                    console.log('  Canvas-Dimensionen:', canvasRect.width + 'x' + canvasRect.height);
+                    console.log('🔧 KORRIGIERTE Koordinaten-Normalisierung:');
+                    console.log('  Canvas-Größe:', canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Template-Basis:', baseDimensions.width + 'x' + baseDimensions.height);
                     
-                    // Verwende Bild-Dimensionen statt Canvas für Normalisierung
-                    const normalizedX = (point.x / imageRect.width) * baseDimensions.width;
-                    const normalizedY = (point.y / imageRect.height) * baseDimensions.height;
+                    // Direkte Canvas-zu-Template Normalisierung (KEIN Bild-Element)
+                    const normalizedX = (point.x / canvasRect.width) * baseDimensions.width;
+                    const normalizedY = (point.y / canvasRect.height) * baseDimensions.height;
+                    
+                    console.log('  Direkte Normalisierung: (' + point.x + '/' + canvasRect.width + ') * ' + baseDimensions.width);
+                    console.log('  X: ' + point.x + ' → ' + normalizedX);
+                    console.log('  Y: ' + point.y + ' → ' + normalizedY);
                     
                     // Berechne auch displayX/displayY normalisiert
-                    const normalizedDisplayX = (point.displayX / imageRect.width) * baseDimensions.width;
-                    const normalizedDisplayY = (point.displayY / imageRect.height) * baseDimensions.height;
+                    const normalizedDisplayX = (point.displayX / canvasRect.width) * baseDimensions.width;
+                    const normalizedDisplayY = (point.displayY / canvasRect.height) * baseDimensions.height;
                     
-                    console.log('  Normalisierungs-Basis: Bild ' + imageRect.width + 'x' + imageRect.height);
-                    console.log('  Y-Berechnung: ' + point.y + ' / ' + imageRect.height + ' * ' + baseDimensions.height);
+                    console.log('  Normalisierungs-Basis: Canvas ' + canvasRect.width + 'x' + canvasRect.height);
+                    console.log('  Y-Berechnung: ' + point.y + ' / ' + canvasRect.height + ' * ' + baseDimensions.height);
                     
                     // Gültigkeitsprüfung für normalisierte Koordinaten
                     if (normalizedX < 0 || normalizedX > baseDimensions.width) {
@@ -936,9 +944,18 @@ class YPrintTemplateMeasurements {
                     return normalizedPoint;
                 });
                 
-                // Normalisiere auch pixel_distance
-                const distanceScaleFactor = baseDimensions.width / canvasRect.width;
-                measurementData.pixel_distance = measurementData.pixel_distance * distanceScaleFactor;
+                // ✅ KORRIGIERTE Pixel-Distance-Normalisierung
+                // Verwende die tatsächlich berechnete Distanz zwischen normalisierten Punkten
+                const originalPixelDistance = measurementData.pixel_distance;
+                const normalizedDistance = Math.sqrt(
+                    Math.pow(measurementData.points[1].x - measurementData.points[0].x, 2) + 
+                    Math.pow(measurementData.points[1].y - measurementData.points[0].y, 2)
+                );
+                measurementData.pixel_distance = normalizedDistance;
+                
+                console.log('🔧 Pixel-Distance korrigiert:');
+                console.log('  Original Distance:', originalPixelDistance);
+                console.log('  Berechnet aus normalisierten Punkten:', normalizedDistance);
                 
                 console.log('✅ Koordinaten erfolgreich normalisiert auf Template-Basis');
                 console.log('Neue pixel_distance:', measurementData.pixel_distance);
@@ -953,58 +970,64 @@ class YPrintTemplateMeasurements {
             }
             
             // ✅ REPARATUR: Jetzt erst die Canvas-Kontextualisierung
-            const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
-            console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
-            
-            const templateId = this.getTemplateId();
-            const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
-            const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
-            
-            const formData = new FormData();
-            formData.append('action', 'save_measurement_to_database');
-            formData.append('nonce', nonce);
-            formData.append('template_id', templateId);
-            formData.append('view_id', viewId);
-            formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
-            
-            // ✅ NEU: Füge Canvas-Kontext als separate Parameter hinzu
-            formData.append('canvas_width', enrichedMeasurementData.canvas_width);
-            formData.append('canvas_height', enrichedMeasurementData.canvas_height);
-            formData.append('device_type', enrichedMeasurementData.device_type);
-            
-            fetch(ajaxUrl, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                console.log('🎯 Save measurement response status:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('🎯 Save measurement response data:', data);
-                if (data.success) {
-                    console.log('✅ Measurement saved to database successfully');
-                    
-                    // ✅ NEU: Verarbeite Canvas-System Debug-Info aus der Response
-                    if (data.data && data.data.debug_info) {
-                        console.log('YPrint Canvas: 📊 Canvas-System Response-Info:', data.data.debug_info);
-                    }
-                    
-                    callback(true);
-                } else {
-                    console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
-                    callback(false);
+        const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
+        console.log('🎯 Canvas-kontextualisierte Messungs-Daten:', enrichedMeasurementData);
+        
+        const templateId = this.getTemplateId();
+        const nonce = window.templateMeasurementsAjax?.nonce || '813d90d822';
+        const ajaxUrl = window.templateMeasurementsAjax?.ajax_url || '/wp-admin/admin-ajax.php';
+        
+        const formData = new FormData();
+        formData.append('action', 'save_measurement_to_database');
+        formData.append('nonce', nonce);
+        formData.append('template_id', templateId);
+        formData.append('view_id', viewId);
+        formData.append('measurement_data', JSON.stringify(enrichedMeasurementData));
+        
+        // ✅ NEU: Füge Canvas-Kontext als separate Parameter hinzu
+        formData.append('canvas_width', enrichedMeasurementData.canvas_width);
+        formData.append('canvas_height', enrichedMeasurementData.canvas_height);
+        formData.append('device_type', enrichedMeasurementData.device_type);
+        
+        fetch(ajaxUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('🎯 Save measurement response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('🎯 Save measurement response data:', data);
+            if (data.success) {
+                console.log('✅ Measurement saved to database successfully');
+                
+                // ✅ NEU: Verarbeite Canvas-System Debug-Info aus der Response
+                if (data.data && data.data.debug_info) {
+                    console.log('YPrint Canvas: 📊 Canvas-System Response-Info:', data.data.debug_info);
                 }
-            })
-            .catch(error => {
-                console.error('❌ Error saving measurement to database:', error);
+                
+                callback(true);
+            } else {
+                console.error('❌ Failed to save measurement to database:', data.data?.message || 'Unknown error');
                 callback(false);
-            });
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error saving measurement to database:', error);
+            callback(false);
+        })
+        .finally(() => {
+            this.isSaving = false;
+            console.log('🔄 Speicher-Lock freigegeben');
+        });
             
         }).catch(error => {
             console.error('❌ Error loading template base dimensions:', error);
             // Fallback: Speichere ohne Normalisierung
             console.log('🔄 Fallback: Speichere ohne Koordinaten-Normalisierung');
+            this.isSaving = false;
+            console.log('🔄 Speicher-Lock freigegeben (Fallback)');
             
             const enrichedMeasurementData = this.enrichMeasurementWithCanvasContext(measurementData);
             console.log('🎯 Canvas-kontextualisierte Messungs-Daten (Fallback):', enrichedMeasurementData);
@@ -1150,8 +1173,8 @@ class YPrintTemplateMeasurements {
             
             console.log('✅ Measurement element successfully added to DOM');
             
-            // **HINWEIS: Page-Refresh wird automatisch nach 2 Sekunden ausgeführt**
-            console.log('💡 DOM element added - page will refresh in 2 seconds to sync with database');
+            // ✅ FIX: Page-Refresh entfernt - DOM-Synchronisation erfolgt direkt
+            console.log('💡 DOM element added - no page reload needed');
             
         } catch (error) {
             console.error('❌ Error creating visible measurement element:', error);
