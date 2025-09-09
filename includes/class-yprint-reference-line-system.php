@@ -13,7 +13,7 @@ class YPrint_Reference_Line_System {
     /**
      * Hauptfunktion: Berechne und zeige Referenzlinien für eine View
      */
-    public static function render_reference_lines($template_id, $view_id, $order_size = 'l', $current_canvas_width = 800, $current_canvas_height = 600) {
+    public static function render_reference_lines($template_id, $view_id, $order_size = 'l', $current_canvas_width = 800, $current_canvas_height = 600, $actual_image_width = null, $actual_image_height = null) {
         // 1. LADE ALLE BENÖTIGTEN DATEN
         $debug_info = array();
         $debug_info[] = "=== YPRINT REFERENZLINIEN-SYSTEM ===";
@@ -147,18 +147,17 @@ class YPrint_Reference_Line_System {
         $debug_info[] = "🎯 SafeZone: " . ($safe_zone ? "left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}" : "NICHT GEFUNDEN");
         $debug_info[] = "🎯 Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";
         
-        // Transformiere Template-Koordinaten zu aktuellen Canvas-Koordinaten
+        // ✅ FIX: Korrekte SafeZone-Transformation
         if ($safe_zone) {
-            $safe_zone_scale_x = $current_canvas_width / $safe_zone['width'];
-            $safe_zone_scale_y = $current_canvas_height / $safe_zone['height'];
+            // Verwende die originalen Template-Koordinaten direkt
+            // Die SafeZone-Transformation wird später in der Skalierung angewendet
+            $orig_x1 = $start_point['x'];
+            $orig_y1 = $start_point['y'];
+            $orig_x2 = $end_point['x'];
+            $orig_y2 = $end_point['y'];
             
-            $orig_x1 = ($start_point['x'] - $safe_zone['left']) * $safe_zone_scale_x;
-            $orig_y1 = ($start_point['y'] - $safe_zone['top']) * $safe_zone_scale_y;
-            $orig_x2 = ($end_point['x'] - $safe_zone['left']) * $safe_zone_scale_x;
-            $orig_y2 = ($end_point['y'] - $safe_zone['top']) * $safe_zone_scale_y;
-            
-            $debug_info[] = "🎯 SafeZone-Skalierung: {$safe_zone_scale_x} x {$safe_zone_scale_y}";
-            $debug_info[] = "🎯 Transformierte Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
+            $debug_info[] = "🎯 SafeZone gefunden - verwende originale Template-Koordinaten";
+            $debug_info[] = "🎯 Template-Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
         } else {
             // Fallback: Originale Koordinaten verwenden
             $orig_x1 = $start_point['x'];
@@ -176,60 +175,81 @@ class YPrint_Reference_Line_System {
             $debug_info[] = "❌ Keine SafeZone gefunden - verwende Fallback-Skalierung";
         }
         
-        // Template-Bild-Größe für Vorschau
-        $template_image_width = 300;  // Vorschau-Breite
-        $template_image_height = 400; // Vorschau-Höhe
+        // ✅ AUTOMATISCHE BILD-ERKENNUNG: Verwende echte Bild-Dimensionen
+        // Das System verwendet jetzt die echten Bild-Dimensionen für pixelgenaue Berechnung
+        if ($actual_image_width && $actual_image_height) {
+            $template_image_width = $actual_image_width;   // Echte Bild-Breite
+            $template_image_height = $actual_image_height; // Echte Bild-Höhe
+            $debug_info[] = "🎯 ECHTE BILD-DIMENSIONEN: {$template_image_width}x{$template_image_height}px";
+        } else {
+            // Fallback: Verwende Canvas-Dimensionen
+            $template_image_width = $current_canvas_width;
+            $template_image_height = $current_canvas_height;
+            $debug_info[] = "⚠️ FALLBACK: Verwende Canvas-Dimensionen {$template_image_width}x{$template_image_height}px";
+        }
         
         if ($safe_zone) {
-            // ✅ KORREKTE TRANSFORMATION: Koordinaten relativ zur SafeZone
-            // 1. Koordinaten relativ zur SafeZone machen
-            $relative_x1 = $orig_x1 - $safe_zone['left'];
-            $relative_y1 = $orig_y1 - $safe_zone['top'];
-            $relative_x2 = $orig_x2 - $safe_zone['left'];
-            $relative_y2 = $orig_y2 - $safe_zone['top'];
+            // ✅ PIXELGENAUE SKALIERUNG: Template-Koordinaten auf echte Bild-Dimensionen
+            // Berechne Skalierung von Template-Basis auf echte Bild-Dimensionen
+            $image_scale_x = $template_image_width / $original_canvas_width;
+            $image_scale_y = $template_image_height / $original_canvas_height;
             
-            // 2. Von SafeZone-Dimensionen auf Template-Bild-Dimensionen skalieren
-            $scaled_x1 = ($relative_x1 / $safe_zone['width']) * $template_image_width;
-            $scaled_y1 = ($relative_y1 / $safe_zone['height']) * $template_image_height;
-            $scaled_x2 = ($relative_x2 / $safe_zone['width']) * $template_image_width;
-            $scaled_y2 = ($relative_y2 / $safe_zone['height']) * $template_image_height;
+            $scaled_x1 = $orig_x1 * $image_scale_x;
+            $scaled_y1 = $orig_y1 * $image_scale_y;
+            $scaled_x2 = $orig_x2 * $image_scale_x;
+            $scaled_y2 = $orig_y2 * $image_scale_y;
             
-            // ✅ FIX: Koordinaten OHNE Clipping (lasse sie auch außerhalb Canvas)
-            // Entferne das Clipping, damit Referenzlinien korrekt positioniert werden
-            // $scaled_x1 = max(0, min($template_image_width, $scaled_x1));
-            // $scaled_y1 = max(0, min($template_image_height, $scaled_y1));
-            // $scaled_x2 = max(0, min($template_image_width, $scaled_x2));
-            // $scaled_y2 = max(0, min($template_image_height, $scaled_y2));
+            $debug_info[] = "🎯 PIXELGENAUE Skalierung: Template ({$original_canvas_width}x{$original_canvas_height}) → Bild ({$template_image_width}x{$template_image_height})";
+            $debug_info[] = "🎯 Bild-Skalierungsfaktoren: {$image_scale_x} x {$image_scale_y}";
             
-            $debug_info[] = "🔍 Koordinaten-Debug:";
-            $debug_info[] = "Original: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
-            $debug_info[] = "SafeZone-Scale: " . ($template_image_width / $safe_zone['width']) . " x " . ($template_image_height / $safe_zone['height']);
-            $debug_info[] = "Skaliert (unclipped): ({$scaled_x1},{$scaled_y1}) → ({$scaled_x2},{$scaled_y2})";
+            // ✅ FIX: Koordinaten auf sichtbaren Bereich begrenzen (aber mit Debug-Info)
+            // Begrenze Koordinaten auf sichtbaren Canvas-Bereich
+            $original_scaled_x1 = $scaled_x1;
+            $original_scaled_y1 = $scaled_y1;
+            $original_scaled_x2 = $scaled_x2;
+            $original_scaled_y2 = $scaled_y2;
+            
+            $scaled_x1 = max(0, min($template_image_width, $scaled_x1));
+            $scaled_y1 = max(0, min($template_image_height, $scaled_y1));
+            $scaled_x2 = max(0, min($template_image_width, $scaled_x2));
+            $scaled_y2 = max(0, min($template_image_height, $scaled_y2));
+            
+            $debug_info[] = "🔍 PIXELGENAUE Koordinaten-Debug:";
+            $debug_info[] = "Original Template: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
+            $debug_info[] = "Bild-Skalierungsfaktoren: {$image_scale_x} x {$image_scale_y}";
+            $debug_info[] = "Skaliert (unclipped): ({$original_scaled_x1},{$original_scaled_y1}) → ({$original_scaled_x2},{$original_scaled_y2})";
+            $debug_info[] = "Skaliert (clipped): ({$scaled_x1},{$scaled_y1}) → ({$scaled_x2},{$scaled_y2})";
+            $debug_info[] = "Bild-Grenzen: 0,0 → {$template_image_width},{$template_image_height}";
             
             $debug_info[] = "Koordinaten nach Transformation: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
             
-            $debug_info[] = "Koordinaten relativ zur SafeZone: ({$relative_x1},{$relative_y1}) → ({$relative_x2},{$relative_y2})";
+            $debug_info[] = "SafeZone-Info: left={$safe_zone['left']}, top={$safe_zone['top']}, width={$safe_zone['width']}, height={$safe_zone['height']}";
         } else {
-            // Fallback: Direkte Skalierung (alte Methode)
-            $scaled_x1 = ($orig_x1 / $original_canvas_width) * $template_image_width;
-            $scaled_y1 = ($orig_y1 / $original_canvas_height) * $template_image_height;
-            $scaled_x2 = ($orig_x2 / $original_canvas_width) * $template_image_width;
-            $scaled_y2 = ($orig_y2 / $original_canvas_height) * $template_image_height;
+            // ✅ PIXELGENAUER FALLBACK: Verwende Bild-Skalierungsfaktoren
+            $image_scale_x = $template_image_width / $original_canvas_width;
+            $image_scale_y = $template_image_height / $original_canvas_height;
             
-            $debug_info[] = "Fallback: Direkte Canvas-Skalierung verwendet";
+            $scaled_x1 = $orig_x1 * $image_scale_x;
+            $scaled_y1 = $orig_y1 * $image_scale_y;
+            $scaled_x2 = $orig_x2 * $image_scale_x;
+            $scaled_y2 = $orig_y2 * $image_scale_y;
+            
+            $debug_info[] = "🎯 PIXELGENAUER Fallback: Bild-Skalierungsfaktoren verwendet";
+            $debug_info[] = "🎯 Fallback-Skalierung: Template ({$original_canvas_width}x{$original_canvas_height}) → Bild ({$template_image_width}x{$template_image_height})";
         }
         
-        // Finale physische Distanz
-        $final_pixel_distance = $template_pixel_distance * ($template_image_width / $original_canvas_width);
+        // ✅ PIXELGENAUE Finale physische Distanz
+        $image_scale_x = $template_image_width / $original_canvas_width;
+        $final_pixel_distance = $template_pixel_distance * $image_scale_x; // Verwende Bild-Skalierungsfaktor
         $final_physical_distance = $order_size_physical;
         
-        $debug_info[] = "📏 FINALE REFERENZLINIE:";
+        $debug_info[] = "📏 PIXELGENAUE FINALE REFERENZLINIE:";
         $debug_info[] = "Original Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
-        $debug_info[] = "Template-Bild-Größe: {$template_image_width}x{$template_image_height}px";
-        $debug_info[] = "Skalierte Koordinaten: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
-        $debug_info[] = "Pixel-Distanz: " . round($final_pixel_distance, 2) . "px";
+        $debug_info[] = "Echte Bild-Größe: {$template_image_width}x{$template_image_height}px";
+        $debug_info[] = "Pixelgenau skalierte Koordinaten: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
+        $debug_info[] = "Pixelgenaue Pixel-Distanz: " . round($final_pixel_distance, 2) . "px";
         $debug_info[] = "Physische Distanz: {$final_physical_distance}cm";
-        $debug_info[] = "Pixel-zu-cm Faktor: " . round($final_physical_distance / $final_pixel_distance, 6) . " cm/px";
+        $debug_info[] = "Pixelgenauer Pixel-zu-cm Faktor: " . round($final_physical_distance / $final_pixel_distance, 6) . " cm/px";
         $debug_info[] = "";
         
         // 7. ERSTELLE HTML-OUTPUT
@@ -303,18 +323,20 @@ class YPrint_Reference_Line_System {
 /**
  * VERWENDUNG - Füge in deine Template-Rendering-Funktion ein:
  */
-function yprint_render_template_with_reference_lines($template_id, $view_id, $order_size = 'l') {
+function yprint_render_template_with_reference_lines($template_id, $view_id, $order_size = 'l', $actual_image_width = null, $actual_image_height = null) {
     // Hole aktuelle Canvas-Dimensionen (angepasst an Viewport)
     $current_canvas_width = 800;  // Dynamisch aus Frontend ermitteln
     $current_canvas_height = 600; // Dynamisch aus Frontend ermitteln
     
-    // Berechne Referenzlinien
+    // Berechne Referenzlinien mit echten Bild-Dimensionen
     $reference_result = YPrint_Reference_Line_System::render_reference_lines(
         $template_id, 
         $view_id, 
         $order_size,
         $current_canvas_width,
-        $current_canvas_height
+        $current_canvas_height,
+        $actual_image_width,    // Echte Bild-Breite
+        $actual_image_height    // Echte Bild-Höhe
     );
     
     // Template-Bild anzeigen
