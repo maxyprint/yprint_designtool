@@ -376,30 +376,34 @@ class YPrintTemplateMeasurements {
         if (!this.measurementMode || this.tempPoints.length >= 2) return;
         
         const rect = event.target.getBoundingClientRect();
-        const canvas_x = event.clientX - rect.left;  
-        const canvas_y = event.clientY - rect.top;
+        const click_x = event.clientX - rect.left;  
+        const click_y = event.clientY - rect.top;
 
-        // SafeZone-Daten für diese View laden (Template-spezifisch)
+        // ✅ MASTER SAFEZONE-SYSTEM: Einheitliche Koordinaten-Transformation
         const safeZone = this.getSafeZoneForView(this.currentViewId);
-        const canvas_scale_x = rect.width / safeZone.width;
-        const canvas_scale_y = rect.height / safeZone.height;
+        console.log('🎯 SafeZone für View', this.currentViewId, ':', safeZone);
+        
+        // Canvas-zu-SafeZone Transformation (Master-Koordinatensystem)
+        const master_x = (click_x / rect.width) * safeZone.width;
+        const master_y = (click_y / rect.height) * safeZone.height;
 
-        // Canvas-Koordinaten zu SafeZone-relativen Koordinaten transformieren
-        const safezone_rel_x = canvas_x / canvas_scale_x;
-        const safezone_rel_y = canvas_y / canvas_scale_y;
-
-        console.log('Click-Transformation:', {
-            canvas: {x: canvas_x, y: canvas_y},
+        console.log('🎯 MASTER-KOORDINATEN-TRANSFORMATION:', {
+            click: {x: click_x, y: click_y},
+            rect_size: {width: rect.width, height: rect.height},
             safeZone: safeZone,
-            scale: {x: canvas_scale_x, y: canvas_scale_y},
-            safezone_relative: {x: safezone_rel_x, y: safezone_rel_y}
+            master_coords: {x: master_x, y: master_y}
         });
 
+        // Speichere in Master-SafeZone-Koordinaten (einheitlich für alle Anzeigen)
         const point = { 
-            x: safezone_rel_x, 
-            y: safezone_rel_y, 
-            displayX: canvas_x, 
-            displayY: canvas_y 
+            x: master_x, 
+            y: master_y,
+            // Zusätzliche Validierung
+            _click_context: {
+                rect_width: rect.width,
+                rect_height: rect.height,
+                safezone_used: safeZone
+            }
         };
         
         this.tempPoints.push(point);
@@ -485,7 +489,7 @@ class YPrintTemplateMeasurements {
         });
     }
 
-    // ✅ REPARIERT: drawMeasurementLine mit div-Fallback statt SVG
+    // ✅ MASTER SAFEZONE-SYSTEM: Konsistente Linien-Anzeige
     drawMeasurementLine(viewId, points, color) {
         if (!points || points.length !== 2) return;
         
@@ -510,28 +514,34 @@ class YPrintTemplateMeasurements {
         }
         
         try {
-            // ✅ EINFACHE LÖSUNG: Verwende div-Elemente statt SVG
+            // ✅ MASTER SAFEZONE-SYSTEM: Konsistente Anzeige-Transformation
             const container = targetImage.parentElement;
             const rect = targetImage.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
             
-            // Berechne relative Positionen
+            // SafeZone-Daten laden (identisch mit Speicher-Transformation)
+            const safeZone = this.getSafeZoneForView(viewId);
+            
+            // Master-SafeZone-Koordinaten zu Display-Koordinaten transformieren
+            const display_point1 = {
+                x: (points[0].x / safeZone.width) * rect.width,
+                y: (points[0].y / safeZone.height) * rect.height
+            };
+            const display_point2 = {
+                x: (points[1].x / safeZone.width) * rect.width,
+                y: (points[1].y / safeZone.height) * rect.height
+            };
+            
+            console.log('🎯 MASTER-DISPLAY-TRANSFORMATION:', {
+                stored_points: points,
+                safeZone: safeZone,
+                rect_size: {width: rect.width, height: rect.height},
+                display_points: [display_point1, display_point2]
+            });
+            
+            // Container relativ positionieren
             const relativeX = rect.left - containerRect.left;
             const relativeY = rect.top - containerRect.top;
-            
-            // Berechne Skalierung
-            const scaleX = rect.width / (targetImage.naturalWidth || rect.width);
-            const scaleY = rect.height / (targetImage.naturalHeight || rect.height);
-            
-            // Skaliere Punkte
-            const displayPoint1 = {
-                x: points[0].x * scaleX,
-                y: points[0].y * scaleY
-            };
-            const displayPoint2 = {
-                x: points[1].x * scaleX,
-                y: points[1].y * scaleY
-            };
             
             // Erstelle Linie als div-Element
             const lineElement = document.createElement('div');
@@ -539,16 +549,16 @@ class YPrintTemplateMeasurements {
             lineElement.setAttribute('data-measurement-index', this.currentMeasurementIndex || 'temp');
             lineElement.setAttribute('data-measurement-overlay', 'true');
             
-            // Berechne Linien-Position und -Größe
-            const dx = displayPoint2.x - displayPoint1.x;
-            const dy = displayPoint2.y - displayPoint1.y;
+            // Berechne Linien-Geometrie
+            const dx = display_point2.x - display_point1.x;
+            const dy = display_point2.y - display_point1.y;
             const length = Math.sqrt(dx * dx + dy * dy);
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
             
             // Setze div-Styles für Linie
             lineElement.style.position = 'absolute';
-            lineElement.style.left = (relativeX + displayPoint1.x) + 'px';
-            lineElement.style.top = (relativeY + displayPoint1.y) + 'px';
+            lineElement.style.left = (relativeX + display_point1.x) + 'px';
+            lineElement.style.top = (relativeY + display_point1.y) + 'px';
             lineElement.style.width = length + 'px';
             lineElement.style.height = '2px';
             lineElement.style.background = color;
@@ -564,14 +574,10 @@ class YPrintTemplateMeasurements {
             
             container.appendChild(lineElement);
             
-            console.log('✅ Measurement line drawn successfully with div');
+            console.log('✅ MASTER-SYSTEM: Linie erfolgreich angezeigt');
             
         } catch (error) {
-            console.error('❌ Error in drawMeasurementLine:', error);
-            
-            // Fallback: Nur Punkte anzeigen
-            console.log('🔄 Using simple point display only');
-            this.showSimplePointsDisplay(targetImage, points, color);
+            console.error('❌ Fehler in Master-Display-System:', error);
         }
     }
     

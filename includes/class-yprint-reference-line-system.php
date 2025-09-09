@@ -131,13 +131,20 @@ class YPrint_Reference_Line_System {
         $start_point = $reference_measurement['points'][0];
         $end_point = $reference_measurement['points'][1];
         
-        // ✅ SafeZone aus Template-Daten oder Standard-Werte
-        $safe_zone = array(
-            'left' => 49.625,
-            'top' => 45.4,
-            'width' => 218,
-            'height' => 339
-        );
+        // ✅ MASTER SAFEZONE-SYSTEM: Zentrale SafeZone-Definition
+        $safe_zone = $this->get_master_safe_zone_for_template($template_id, $view_id);
+        if (!$safe_zone) {
+            $safe_zone = array(
+                'width' => 218,
+                'height' => 339,
+                'left' => 49.625,
+                'top' => 45.4,
+                'is_fallback' => true
+            );
+            $debug_info[] = "⚠️ SafeZone Fallback verwendet";
+        } else {
+            $debug_info[] = "✅ Master SafeZone geladen: {$safe_zone['width']}x{$safe_zone['height']}";
+        }
         
         $debug_info[] = "🎯 Referenzlinien-Transformation:";
         $debug_info[] = "Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";
@@ -292,6 +299,63 @@ class YPrint_Reference_Line_System {
         return 'm'; // Fallback auf Größe M
     }
     
+    /**
+     * ✅ MASTER SAFEZONE-SYSTEM: Zentrale SafeZone-Verwaltung
+     * Eliminiert Koordinatensystem-Chaos durch einheitliche SafeZone-Definition
+     */
+    private static function get_master_safe_zone_for_template($template_id, $view_id) {
+        // Versuche SafeZone aus Template-Daten zu laden
+        $template_meta = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if ($template_meta && isset($template_meta[$view_id])) {
+            $view_data = $template_meta[$view_id];
+            
+            return array(
+                'width' => intval($view_data['safe_zone_width'] ?? 218),
+                'height' => intval($view_data['safe_zone_height'] ?? 339),
+                'left' => floatval($view_data['safe_zone_left'] ?? 49.625),
+                'top' => floatval($view_data['safe_zone_top'] ?? 45.4),
+                'source' => 'template_meta'
+            );
+        }
+        
+        // Versuche aus globalen Template-Einstellungen
+        $global_safe_zone = get_option("yprint_template_{$template_id}_safe_zone", false);
+        if ($global_safe_zone) {
+            return array_merge($global_safe_zone, array('source' => 'global_options'));
+        }
+        
+        // Kein SafeZone gefunden
+        return false;
+    }
+
+    /**
+     * ✅ MASTER-KOORDINATEN-TRANSFORMATION: Einheitliche Pixel-zu-SafeZone-Konvertierung
+     */
+    public static function transform_coordinates_to_master_system($click_x, $click_y, $image_width, $image_height, $template_id, $view_id) {
+        $safe_zone = self::get_master_safe_zone_for_template($template_id, $view_id);
+        
+        if (!$safe_zone) {
+            // Fallback: Direkte Koordinaten verwenden
+            return array(
+                'x' => $click_x,
+                'y' => $click_y,
+                'warning' => 'No SafeZone found - using direct coordinates'
+            );
+        }
+        
+        // Master-SafeZone-Transformation
+        $master_x = ($click_x / $image_width) * $safe_zone['width'];
+        $master_y = ($click_y / $image_height) * $safe_zone['height'];
+        
+        return array(
+            'x' => $master_x,
+            'y' => $master_y,
+            'safe_zone' => $safe_zone,
+            'transformation_valid' => true
+        );
+    }
+
     /**
      * Ausgabe bei Fehlern
      */
