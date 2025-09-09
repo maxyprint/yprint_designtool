@@ -137,18 +137,24 @@ class YPrint_Reference_Line_System {
         $orig_x2 = $end_point['x'];
         $orig_y2 = $end_point['y'];
         
-        // Skalierte Koordinaten für aktuellen Canvas
-        $scaled_x1 = $orig_x1 * $canvas_scale_x;
-        $scaled_y1 = $orig_y1 * $canvas_scale_y;
-        $scaled_x2 = $orig_x2 * $canvas_scale_x;
-        $scaled_y2 = $orig_y2 * $canvas_scale_y;
+        // ✅ FIX: Korrekte Skalierung für Template-Bild (300x400px Vorschau)
+        // Das Template-Bild wird auf 300px Breite skaliert, daher müssen die Koordinaten entsprechend angepasst werden
+        $template_image_width = 300;  // Vorschau-Breite
+        $template_image_height = 400; // Vorschau-Höhe
+        
+        // Skaliere Koordinaten relativ zur Template-Bild-Größe
+        $scaled_x1 = ($orig_x1 / $original_canvas_width) * $template_image_width;
+        $scaled_y1 = ($orig_y1 / $original_canvas_height) * $template_image_height;
+        $scaled_x2 = ($orig_x2 / $original_canvas_width) * $template_image_width;
+        $scaled_y2 = ($orig_y2 / $original_canvas_height) * $template_image_height;
         
         // Finale physische Distanz
-        $final_pixel_distance = $template_pixel_distance * $canvas_scale_x;
+        $final_pixel_distance = $template_pixel_distance * ($template_image_width / $original_canvas_width);
         $final_physical_distance = $order_size_physical;
         
         $debug_info[] = "📏 FINALE REFERENZLINIE:";
         $debug_info[] = "Original Koordinaten: ({$orig_x1},{$orig_y1}) → ({$orig_x2},{$orig_y2})";
+        $debug_info[] = "Template-Bild-Größe: {$template_image_width}x{$template_image_height}px";
         $debug_info[] = "Skalierte Koordinaten: (" . round($scaled_x1,1) . "," . round($scaled_y1,1) . ") → (" . round($scaled_x2,1) . "," . round($scaled_y2,1) . ")";
         $debug_info[] = "Pixel-Distanz: " . round($final_pixel_distance, 2) . "px";
         $debug_info[] = "Physische Distanz: {$final_physical_distance}cm";

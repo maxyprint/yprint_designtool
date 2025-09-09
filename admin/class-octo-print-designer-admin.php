@@ -2851,10 +2851,10 @@ class Octo_Print_Designer_Admin {
                     ' . $reference_result['html'] . '
                 </div>';
                 
-                // Debug-Informationen hinzufügen
-                if (defined('WP_DEBUG') && WP_DEBUG && !empty($reference_result['debug'])) {
+                // Debug-Informationen hinzufügen (immer anzeigen für Referenzlinien)
+                if (!empty($reference_result['debug'])) {
                     $html .= '<div style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-left: 4px solid #0073aa; font-size: 11px;">
-                        <h4 style="margin: 0 0 5px 0; color: #0073aa;">🔍 Debug-Informationen:</h4>
+                        <h4 style="margin: 0 0 5px 0; color: #0073aa;">🔍 Referenzlinien Debug-Informationen:</h4>
                         <pre style="white-space: pre-line; font-family: monospace; font-size: 10px; margin: 0; overflow-x: auto;">';
                     $html .= implode("\n", $reference_result['debug']);
                     $html .= '</pre></div>';
