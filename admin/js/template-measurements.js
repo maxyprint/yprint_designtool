@@ -1,9 +1,9 @@
 /**
  * YPrint Template Measurements - REPARIERTE VERSION
- * VERSION: 2024-12-19-STRUCTURE-FIX
+ * VERSION: 2024-12-19-FUNCTION-FIX
  */
 
-console.log('🎯 YPrint Template Measurements JavaScript wird geladen... VERSION: 2024-12-19-STRUCTURE-FIX');
+console.log('🎯 YPrint Template Measurements JavaScript wird geladen... VERSION: 2024-12-19-FUNCTION-FIX');
 
 // Prüfe ob bereits geladen
 if (typeof window.YPrintTemplateMeasurements !== 'undefined') {
@@ -93,6 +93,7 @@ class YPrintTemplateMeasurements {
     
     // ✅ BROWSER-CACHE-FIX: Alias für die alte Funktion
     loadMeasurementsFromDatabase() {
+        console.log('🔧 loadMeasurementsFromDatabase aufgerufen - verwende loadSavedMeasurementsPromise');
         return this.loadSavedMeasurementsPromise();
     }
     
@@ -1109,7 +1110,9 @@ class YPrintTemplateMeasurements {
         });
         
         // Prüfe Database-State vs DOM-State
-        this.loadMeasurementsFromDatabase().then(dbMeasurements => {
+        // ✅ ROBUSTE LÖSUNG: Direkte Implementierung falls Funktion nicht existiert
+        const loadMeasurements = this.loadMeasurementsFromDatabase || this.loadSavedMeasurementsPromise || (() => Promise.resolve({}));
+        loadMeasurements.call(this).then(dbMeasurements => {
             const viewMeasurements = dbMeasurements[viewId] || {measurements: []};
             console.log('🔍 Database-Messungen für View ' + viewId + ':', viewMeasurements.measurements.length);
             console.log('🔍 DOM-Messungen für View ' + viewId + ':', existingElements.length);
@@ -1119,6 +1122,8 @@ class YPrintTemplateMeasurements {
                 console.warn('Database:', viewMeasurements.measurements);
                 console.warn('DOM Elements:', existingElements);
             }
+        }).catch(error => {
+            console.log('ℹ️ Database check skipped due to error:', error.message);
         });
         
         console.log('🎯 Creating visible measurement element:', measurement);
