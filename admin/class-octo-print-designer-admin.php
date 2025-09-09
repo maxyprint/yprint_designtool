@@ -12,7 +12,7 @@ class Octo_Print_Designer_Admin {
 
         // ✅ NEU: Lade die Octo_Print_API_Integration Klasse
         $this->load_api_integration();
-        
+
         // ✅ NEU: Lade das Referenzlinien-System
         $this->load_reference_line_system();
 

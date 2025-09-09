@@ -97,19 +97,24 @@ class YPrint_Reference_Line_System {
         $debug_info[] = "";
         
         // 4. BERECHNE SKALIERUNGSFAKTOR FÜR BESTELLGRÖSSE
-        if (!isset($product_dimensions[$order_size][$measurement_type])) {
-            $debug_info[] = "❌ FEHLER: Größe '{$order_size}' oder Messung '{$measurement_type}' nicht in Produktdimensionen gefunden!";
+        // ✅ FIX: Normalisiere Größe zu Kleinbuchstaben
+        $normalized_order_size = strtolower($order_size);
+        $debug_info[] = "Größen-Normalisierung: '{$order_size}' → '{$normalized_order_size}'";
+        
+        if (!isset($product_dimensions[$normalized_order_size][$measurement_type])) {
+            $debug_info[] = "❌ FEHLER: Größe '{$normalized_order_size}' oder Messung '{$measurement_type}' nicht in Produktdimensionen gefunden!";
+            $debug_info[] = "Verfügbare Messungen für Größe '{$normalized_order_size}': " . (isset($product_dimensions[$normalized_order_size]) ? implode(', ', array_keys($product_dimensions[$normalized_order_size])) : 'KEINE');
             return self::output_debug_and_error($debug_info);
         }
         
-        $order_size_physical = $product_dimensions[$order_size][$measurement_type];
+        $order_size_physical = $product_dimensions[$normalized_order_size][$measurement_type];
         $template_size_physical = $product_dimensions[$template_shows_size][$measurement_type];
         
         $size_scale_factor = $order_size_physical / $template_size_physical;
         
         $debug_info[] = "🎯 GRÖSSENSKALIERUNG:";
         $debug_info[] = "Template Größe '{$template_shows_size}': {$template_size_physical}cm";
-        $debug_info[] = "Bestellte Größe '{$order_size}': {$order_size_physical}cm";
+        $debug_info[] = "Bestellte Größe '{$normalized_order_size}': {$order_size_physical}cm";
         $debug_info[] = "Skalierungsfaktor: {$order_size_physical} ÷ {$template_size_physical} = " . round($size_scale_factor, 4);
         $debug_info[] = "";
         
