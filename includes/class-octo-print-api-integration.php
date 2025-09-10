@@ -3658,95 +3658,117 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Calculate design coordinates for specific order size
+     * ✅ VEREINFACHT: Lineare Koordinatenberechnung ohne komplexe Workflow-Schritte
      * 
      * @param int $design_id Design ID
      * @param string $order_size Order size (e.g., 'L')
      * @return array|false Calculated coordinates or false on failure
      */
     public function calculate_design_coordinates_for_size($design_id, $order_size) {
-        error_log("YPrint API: 🎯 Berechne Design-Koordinaten für Größe {$order_size}");
+        error_log("YPrint LINEAR API: 🎯 Berechne Koordinaten für Design {$design_id}, Größe {$order_size}");
         
-        // Hole Design-Daten
+        // Design-Daten laden
         $design_elements = get_post_meta($design_id, '_design_elements', true);
-        $design_views = get_post_meta($design_id, '_design_views', true);
         $template_id = get_post_meta($design_id, '_design_template_id', true);
         
-        if (empty($design_elements) || empty($design_views) || !$template_id) {
-            error_log("YPrint API: ❌ Unvollständige Design-Daten");
+        if (empty($design_elements)) {
+            error_log("YPrint LINEAR API: ❌ Keine Design-Elemente gefunden für Design {$design_id}");
             return false;
         }
         
-        // Normalisiere Größenbezeichnung
-        $normalized_size = $this->normalize_size_designation($order_size);
+        // ✅ VEREINFACHT: Eine Methode für finale Koordinaten
+        $final_coordinates = $this->calculate_final_coordinates_linear(
+            $design_elements, 
+            $order_size, 
+            $template_id
+        );
         
-        // Hole Produktdimensionen für die Bestellgröße
-        $product_dimensions = $this->get_standard_product_dimensions();
-        if (!isset($product_dimensions[$normalized_size])) {
-            error_log("YPrint API: ❌ Größe {$normalized_size} nicht in Produktdimensionen gefunden");
+        if (empty($final_coordinates)) {
+            error_log("YPrint LINEAR API: ❌ Koordinatenberechnung fehlgeschlagen für Design {$design_id}");
             return false;
         }
         
-        $size_dimensions = $product_dimensions[$normalized_size];
-        error_log("YPrint API: ✅ Produktdimensionen für Größe {$normalized_size} geladen");
+        // Erfolgreiches Ergebnis loggen
+        $element_count = count($final_coordinates);
+        $first_element = reset($final_coordinates);
+        error_log("YPrint LINEAR API: ✅ {$element_count} Elemente berechnet - Erstes Element: x={$first_element['x']}mm, y={$first_element['y']}mm");
         
-        // Berechne Koordinaten für jedes Design-Element
-        $calculated_coordinates = array();
+        return $final_coordinates;
+    }
+    
+    /**
+     * ✅ LINEARE Berechnung: Faktor × Größe = Millimeter
+     * 
+     * @param array $elements Design-Elemente mit physischen Faktoren
+     * @param string $ordered_size Bestellgröße
+     * @param int $template_id Template-ID
+     * @return array Berechnete Koordinaten
+     */
+    private function calculate_final_coordinates_linear($elements, $ordered_size, $template_id) {
+        // Größentabelle laden
+        $size_measurements = $this->get_standard_size_measurements_linear();
+        $ordered_size_cm = $size_measurements[$ordered_size] ?? 51;  // Fallback zu M
+        $results = array();
         
-        foreach ($design_elements as $element_id => $element_data) {
-            $view_id = $element_data['template_view_id'];
-            $view_data = $design_views[$view_id] ?? null;
-            
-            if (!$view_data || !isset($view_data['reference_measurement'])) {
-                error_log("YPrint API: ⚠️ Keine Referenzmessung für View {$view_id}");
+        foreach ($elements as $element_id => $element) {
+            // Prüfe ob Element bereits neue Struktur hat
+            if (isset($element['x_physical_factor']) && isset($element['y_physical_factor'])) {
+                // ✅ NEUE STRUKTUR: Direkte physische Faktoren
+                $results[$element_id] = array(
+                    'x' => round($element['x_physical_factor'] * $ordered_size_cm * 10, 2),
+                    'y' => round($element['y_physical_factor'] * $ordered_size_cm * 10, 2),
+                    'width' => round($element['width_physical_factor'] * $ordered_size_cm * 10, 2),
+                    'height' => round($element['height_physical_factor'] * $ordered_size_cm * 10, 2),
+                    'content' => $element['content'] ?? '',
+                    'element_type' => $element['element_type'] ?? 'text',
+                    'font_size_mm' => round($element['font_size_physical_factor'] * $ordered_size_cm * 10, 2),
+                    
+                    // Berechnungsmetadata
+                    'physical_factor_x' => $element['x_physical_factor'],
+                    'physical_factor_y' => $element['y_physical_factor'],
+                    'ordered_size_cm' => $ordered_size_cm,
+                    'calculation' => "Linear: {$element['x_physical_factor']} × {$ordered_size_cm}cm × 10"
+                );
+            } else if (isset($element['position_x_factor']) && isset($element['position_y_factor'])) {
+                // ✅ MIGRATION: Alte relative Faktoren zu physischen Faktoren
+                $results[$element_id] = array(
+                    'x' => round($element['position_x_factor'] * $ordered_size_cm * 10, 2),
+                    'y' => round($element['position_y_factor'] * $ordered_size_cm * 10, 2),
+                    'width' => round(($element['width_factor'] ?? 0.5) * $ordered_size_cm * 10, 2),
+                    'height' => round(($element['height_factor'] ?? 0.3) * $ordered_size_cm * 10, 2),
+                    'content' => $element['content'] ?? '',
+                    'element_type' => $element['element_type'] ?? 'text',
+                    'font_size_mm' => round(($element['font_size_factor'] ?? 0.1) * $ordered_size_cm * 10, 2),
+                    
+                    // Berechnungsmetadata
+                    'physical_factor_x' => $element['position_x_factor'],
+                    'physical_factor_y' => $element['position_y_factor'],
+                    'ordered_size_cm' => $ordered_size_cm,
+                    'calculation' => "Migration: {$element['position_x_factor']} × {$ordered_size_cm}cm × 10",
+                    'migration_source' => 'relative_factors'
+                );
+            } else {
+                error_log("YPrint LINEAR API: ⚠️ Element {$element_id} hat keine gültigen Faktoren - überspringe");
                 continue;
             }
-            
-            $reference_measurement = $view_data['reference_measurement'];
-            $measurement_type = $reference_measurement['measurement_type'];
-            $reference_pixel_distance = $reference_measurement['pixel_distance'];
-            
-            // Hole physische Dimension für die Messung
-            $physical_dimension_cm = $size_dimensions[$measurement_type] ?? 0;
-            if ($physical_dimension_cm <= 0) {
-                error_log("YPrint API: ⚠️ Keine physische Dimension für {$measurement_type} in Größe {$normalized_size}");
-                continue;
-            }
-            
-            // Berechne Skalierungsfaktor
-            $scale_factor = $physical_dimension_cm / ($reference_pixel_distance / 10);
-            
-            // Berechne absolute Koordinaten in mm
-            $position_x_mm = ($element_data['position_x_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
-            $position_y_mm = ($element_data['position_y_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
-            $width_mm = ($element_data['width_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
-            $height_mm = ($element_data['height_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10;
-            
-            $calculated_coordinates[$element_id] = array(
-                'x' => round($position_x_mm, 2),
-                'y' => round($position_y_mm, 2),
-                'width' => round($width_mm, 2),
-                'height' => round($height_mm, 2),
-                'content' => $element_data['content'],
-                'element_type' => $element_data['element_type'],
-                'font_size_mm' => round(($element_data['font_size_factor'] * $reference_pixel_distance / 10) * $scale_factor * 10, 2),
-                'view_id' => $view_id,
-                'measurement_type' => $measurement_type,
-                'scale_factor' => round($scale_factor, 4),
-                'reference_distance_px' => $reference_pixel_distance,
-                'physical_dimension_cm' => $physical_dimension_cm
-            );
-            
-            error_log("YPrint API: ✅ Element {$element_id} berechnet: {$position_x_mm}mm x {$position_y_mm}mm, {$width_mm}mm x {$height_mm}mm");
         }
         
-        if (empty($calculated_coordinates)) {
-            error_log("YPrint API: ❌ Keine Koordinaten berechnet");
-            return false;
-        }
-        
-        error_log("YPrint API: ✅ Erfolgreich " . count($calculated_coordinates) . " Elemente für Größe {$normalized_size} berechnet");
-        return $calculated_coordinates;
+        return $results;
+    }
+    
+    /**
+     * ✅ Konsistente Größentabelle (Brustweite in cm)
+     * Größe M als feste Referenz
+     * 
+     * @return array Größentabelle
+     */
+    private function get_standard_size_measurements_linear() {
+        return array(
+            'S' => 49,   // 96% von M
+            'M' => 51,   // Referenz-Basis
+            'L' => 53,   // 104% von M  
+            'XL' => 55   // 108% von M
+        );
     }
 
     /**

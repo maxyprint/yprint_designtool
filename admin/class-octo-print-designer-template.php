@@ -2478,10 +2478,12 @@ class Octo_Print_Designer_Template {
             );
         }
         
-        // Erstelle das Referenzmaß
+        // ✅ VEREINFACHT: Größe M als feste Referenz
         $reference_measurement = array(
             'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
             'pixel_distance' => floatval($measurement_data['pixel_distance']),
+            'physical_size_cm' => 51.0,  // FESTE Referenz: Größe M
+            'reference_size' => 'M',     // Konsistente Basis
             'reference_points' => array(
                 array(
                     'x' => intval($measurement_data['points'][0]['x']),
@@ -2492,6 +2494,7 @@ class Octo_Print_Designer_Template {
                     'y' => intval($measurement_data['points'][1]['y'])
                 )
             ),
+            'template_id' => $template_id,
             'created_at' => current_time('mysql'),
             'is_reference' => true
         );
@@ -2505,10 +2508,10 @@ class Octo_Print_Designer_Template {
         $result = update_post_meta($template_id, '_template_view_print_areas', $view_print_areas);
         
         if ($result) {
-            error_log("YPrint: ✅ Referenzmaß erfolgreich gespeichert");
+            error_log("YPrint LINEAR: ✅ Referenzmessung gespeichert - {$measurement_data['pixel_distance']}px = 51cm (Größe M)");
             return true;
         } else {
-            error_log("YPrint: ❌ Fehler beim Speichern des Referenzmaßes");
+            error_log("YPrint LINEAR: ❌ Fehler beim Speichern der Referenzmessung");
             return false;
         }
     }
