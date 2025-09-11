@@ -5281,37 +5281,75 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ NEU: Template-Bild-URL laden
+     * ✅ KORRIGIERT: Template-Bild-URL mit korrekter Meta-Key-Suche
      */
     private function get_template_image_url($template_id) {
-        // Versuche verschiedene Wege, das Template-Bild zu finden
-        $template_image_url = null;
+        error_log("🎨 Loading template image for template {$template_id}");
         
-        // Methode 1: Direkte Attachment-ID aus Template-Meta
-        $template_image_id = get_post_meta($template_id, '_template_image_id', true);
-        if ($template_image_id) {
-            $template_image_url = wp_get_attachment_url($template_image_id);
-            if ($template_image_url) {
-                error_log("🎨 Template Image found via direct attachment ID: {$template_image_url}");
-                return $template_image_url;
-            }
-        }
-        
-        // Methode 2: Template-Variations durchsuchen
+        // PRIORITÄT 1: Template Variations (korrekte Meta-Key-Struktur)
         $template_variations = get_post_meta($template_id, '_template_variations', true);
         if (!empty($template_variations) && is_array($template_variations)) {
-            foreach ($template_variations as $variation) {
-                if (isset($variation['image_id']) && $variation['image_id']) {
-                    $template_image_url = wp_get_attachment_url($variation['image_id']);
-                    if ($template_image_url) {
-                        error_log("🎨 Template Image found via variations: {$template_image_url}");
-                        return $template_image_url;
+            foreach ($template_variations as $variation_id => $variation) {
+                if (!empty($variation['views']) && is_array($variation['views'])) {
+                    foreach ($variation['views'] as $view_id => $view) {
+                        // Korrekte Meta-Key-Suche: 'image' oder 'attachment_id'
+                        $image_key = $view['image'] ?? $view['attachment_id'] ?? null;
+                        if ($image_key) {
+                            $attachment_id = intval($image_key);
+                            if ($attachment_id > 0) {
+                                $image_url = wp_get_attachment_url($attachment_id);
+                                if ($image_url) {
+                                    error_log("🎨 Template Image found via variations - Attachment {$attachment_id}: {$image_url}");
+                                    return $image_url;
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
         
-        // Methode 3: Fallback - Standard Template-Bild
+        // PRIORITÄT 2: Template Image Path
+        $image_path = get_post_meta($template_id, '_template_image_path', true);
+        if ($image_path) {
+            $image_url = plugin_dir_url(__FILE__) . '../public/img/' . $image_path;
+            if (file_exists(plugin_dir_path(__FILE__) . '../public/img/' . $image_path)) {
+                error_log("🎨 Template Image found via image path: {$image_url}");
+                return $image_url;
+            }
+        }
+        
+        // PRIORITÄT 3: Direkte Attachment-ID
+        $template_image_id = get_post_meta($template_id, '_template_image_id', true);
+        if ($template_image_id) {
+            $image_url = wp_get_attachment_url($template_image_id);
+            if ($image_url) {
+                error_log("🎨 Template Image found via direct attachment ID: {$image_url}");
+                return $image_url;
+            }
+        }
+        
+        // NOTFALL: Datenbank-Suche nach "template" Pattern
+        global $wpdb;
+        $template_images = $wpdb->get_results($wpdb->prepare(
+            "SELECT ID, post_title FROM {$wpdb->posts} 
+             WHERE post_type = 'attachment' 
+             AND (post_title LIKE %s OR post_title LIKE %s) 
+             ORDER BY post_date DESC LIMIT 5",
+            '%template%', '%kaan%'
+        ));
+        
+        if (!empty($template_images)) {
+            foreach ($template_images as $img) {
+                $image_url = wp_get_attachment_url($img->ID);
+                if ($image_url) {
+                    error_log("🎨 Template Image found via database search - {$img->post_title}: {$image_url}");
+                    return $image_url;
+                }
+            }
+        }
+        
+        // FALLBACK: Standard Template-Bild
         $fallback_url = plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
         error_log("🎨 Using fallback template image: {$fallback_url}");
         return $fallback_url;
@@ -5374,7 +5412,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
         // KORREKTE dynamische Skalierung basierend auf Produktmaßen
-        $product_dimensions = $this->get_product_dimensions_for_size($order_size);
+        $product_dimensions = $this->get_product_dimensions_for_size($order_size, $template_id);
         $preview_width_px = 400;
         $preview_height_px = 500;
         
@@ -5420,7 +5458,7 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ NEU: Lade gespeicherte Referenzmessungen aus der Datenbank
+     * ✅ KORRIGIERT: Lade echte gespeicherte Referenzmessungen aus _template_view_print_areas
      */
     private function load_saved_reference_measurements($template_id) {
         error_log("🎨 Loading saved reference measurements for template {$template_id}");
@@ -5444,15 +5482,22 @@ private function build_print_provider_email_content($order, $design_items, $note
                 error_log("  Physical Size: " . ($ref_measurement['physical_size_cm'] ?? 'unknown') . " cm");
                 error_log("  Reference Points: " . json_encode($ref_measurement['reference_points'] ?? array()));
                 
+                // Echte Pixel-Koordinaten aus reference_points
+                $pixel_start = $ref_measurement['reference_points'][0] ?? array('x' => 200, 'y' => 300);
+                $pixel_end = $ref_measurement['reference_points'][1] ?? array('x' => 400, 'y' => 300);
+                
                 return array(
-                    'type' => $ref_measurement['measurement_type'] ?? 'Brust',
+                    'type' => $ref_measurement['measurement_type'] ?? 'chest',
                     'size_cm' => $ref_measurement['physical_size_cm'] ?? '51.0',
                     'pixel_distance' => $ref_measurement['pixel_distance'] ?? 200,
-                    'pixel_start' => $ref_measurement['reference_points'][0] ?? array('x' => 200, 'y' => 300),
-                    'pixel_end' => $ref_measurement['reference_points'][1] ?? array('x' => 400, 'y' => 300),
+                    'pixel_start' => $pixel_start,
+                    'pixel_end' => $pixel_end,
                     'reference_size' => $ref_measurement['reference_size'] ?? 'M',
                     'template_id' => $template_id,
-                    'view_id' => $view_id
+                    'view_id' => $view_id,
+                    'canvas_width' => $view_data['canvas_width'] ?? 800,
+                    'canvas_height' => $view_data['canvas_height'] ?? 600,
+                    'source' => 'database'
                 );
             }
         }
@@ -5462,14 +5507,49 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ NEU: Lade finale Druckkoordinaten aus dem Workflow
+     * ✅ KORRIGIERT: Lade echte finale Druckkoordinaten aus Workflow-Schritten
      */
     private function load_final_print_coordinates($order_id) {
         error_log("🎨 Loading final print coordinates for order {$order_id}");
         
-        // Lade Order-Meta für finale Koordinaten
-        $final_coordinates = get_post_meta($order_id, '_yprint_final_coordinates', true);
+        // PRIORITÄT 1: Workflow-Schritt 6 (finale API-Koordinaten)
+        $workflow_data = get_post_meta($order_id, '_yprint_workflow_data', true);
+        if (!empty($workflow_data) && isset($workflow_data['workflow_steps']['step6']['final_coordinates'])) {
+            $final_coords = $workflow_data['workflow_steps']['step6']['final_coordinates'];
+            error_log("🎨 Found final coordinates in workflow step 6:");
+            error_log("  X: " . ($final_coords['x_mm'] ?? 'unknown') . " mm");
+            error_log("  Y: " . ($final_coords['y_mm'] ?? 'unknown') . " mm");
+            error_log("  Width: " . ($final_coords['width_mm'] ?? 'unknown') . " mm");
+            error_log("  Height: " . ($final_coords['height_mm'] ?? 'unknown') . " mm");
+            
+            return array(
+                'x_mm' => floatval($final_coords['x_mm'] ?? 0),
+                'y_mm' => floatval($final_coords['y_mm'] ?? 0),
+                'width_mm' => floatval($final_coords['width_mm'] ?? 0),
+                'height_mm' => floatval($final_coords['height_mm'] ?? 0),
+                'dpi' => floatval($final_coords['dpi'] ?? 74),
+                'source' => 'workflow_step6'
+            );
+        }
         
+        // PRIORITÄT 2: Workflow-Schritt 5 (finale Koordinaten)
+        if (!empty($workflow_data) && isset($workflow_data['workflow_steps']['step5']['final_coordinates'])) {
+            $final_coords = $workflow_data['workflow_steps']['step5']['final_coordinates'];
+            error_log("🎨 Found final coordinates in workflow step 5:");
+            error_log("  Coordinates: " . json_encode($final_coords));
+            
+            return array(
+                'x_mm' => floatval($final_coords['x_mm'] ?? 0),
+                'y_mm' => floatval($final_coords['y_mm'] ?? 0),
+                'width_mm' => floatval($final_coords['width_mm'] ?? 0),
+                'height_mm' => floatval($final_coords['height_mm'] ?? 0),
+                'dpi' => floatval($final_coords['dpi'] ?? 74),
+                'source' => 'workflow_step5'
+            );
+        }
+        
+        // PRIORITÄT 3: Order-Meta für finale Koordinaten
+        $final_coordinates = get_post_meta($order_id, '_yprint_final_coordinates', true);
         if (!empty($final_coordinates) && is_array($final_coordinates)) {
             error_log("🎨 Found final coordinates in order meta:");
             error_log("  X: " . ($final_coordinates['x_mm'] ?? 'unknown') . " mm");
@@ -5487,7 +5567,7 @@ private function build_print_provider_email_content($order, $design_items, $note
             );
         }
         
-        // Fallback: Suche in Order-Items
+        // PRIORITÄT 4: Order-Items
         $order = wc_get_order($order_id);
         if ($order) {
             foreach ($order->get_items() as $item) {
@@ -5563,35 +5643,64 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ NEU: Produktdimensionen für Größe laden
+     * ✅ KORRIGIERT: Produktdimensionen aus Template-Meta-Feldern laden
      */
-    private function get_product_dimensions_for_size($size) {
-        // Standard-Produktdimensionen (T-Shirt)
-        $product_dimensions = array(
-            'S' => array(
+    private function get_product_dimensions_for_size($size, $template_id = null) {
+        error_log("🎨 Loading product dimensions for size {$size}, template {$template_id}");
+        
+        // PRIORITÄT 1: Template-spezifische Produktdimensionen
+        if ($template_id) {
+            $possible_meta_keys = array(
+                '_template_product_dimensions', // HAUPT-QUELLE
+                '_product_dimensions',
+                '_template_measurements_table',
+                '_template_sizes_with_dimensions'
+            );
+            
+            foreach ($possible_meta_keys as $meta_key) {
+                $product_dimensions = get_post_meta($template_id, $meta_key, true);
+                if (!empty($product_dimensions) && is_array($product_dimensions)) {
+                    error_log("🎨 Found product dimensions in {$meta_key} for template {$template_id}");
+                    
+                    $normalized_size = strtolower(trim($size));
+                    if (isset($product_dimensions[$normalized_size])) {
+                        $dimensions = $product_dimensions[$normalized_size];
+                        error_log("🎨 Product dimensions for size {$size}: " . json_encode($dimensions));
+                        return $dimensions;
+                    }
+                }
+            }
+        }
+        
+        // PRIORITÄT 2: Standard-Produktdimensionen (T-Shirt)
+        $standard_dimensions = array(
+            's' => array(
                 'chest' => 47.0,  // cm
-                'height' => 70.0,
+                'height_from_shoulder' => 70.0,
                 'shoulder' => 45.0
             ),
-            'M' => array(
+            'm' => array(
                 'chest' => 50.0,
-                'height' => 72.0,
+                'height_from_shoulder' => 72.0,
                 'shoulder' => 47.0
             ),
-            'L' => array(
+            'l' => array(
                 'chest' => 53.0,
-                'height' => 74.0,
+                'height_from_shoulder' => 74.0,
                 'shoulder' => 49.0
             ),
-            'XL' => array(
+            'xl' => array(
                 'chest' => 56.0,
-                'height' => 76.0,
+                'height_from_shoulder' => 76.0,
                 'shoulder' => 51.0
             )
         );
         
-        $normalized_size = strtoupper(trim($size));
-        return $product_dimensions[$normalized_size] ?? $product_dimensions['M'];
+        $normalized_size = strtolower(trim($size));
+        $dimensions = $standard_dimensions[$normalized_size] ?? $standard_dimensions['m'];
+        
+        error_log("🎨 Using standard product dimensions for size {$size}: " . json_encode($dimensions));
+        return $dimensions;
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
