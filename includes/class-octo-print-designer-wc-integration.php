@@ -1455,31 +1455,78 @@ private function check_yprint_dependency() {
                                     $('#yprint-preview-content').hide();
                                     $('#yprint-preview-error').hide();
                                     
-                                    // Erstelle eine einfache Vorschau mit den Workflow-Ergebnissen
-                                    setTimeout(function() {
-                                        $('#yprint-preview-loading').hide();
-                                        
-                                        // Zeige die Workflow-Ergebnisse im Modal
-                                        var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
-                                        $('#yprint-preview-image-container').html(
-                                            '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
-                                            '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
-                                            '<pre style="white-space: pre-wrap; margin: 0;">' + workflowResults + '</pre>' +
-                                            '</div>'
-                                        );
-                                        
-                                        // Debug-Informationen
-                                        $('#yprint-preview-debug-content').html(
-                                            '<div style="font-size: 12px;">' +
-                                            '<p><strong>Bestellung:</strong> #' + orderId + '</p>' +
-                                            '<p><strong>Zeitstempel:</strong> ' + new Date().toLocaleString() + '</p>' +
-                                            '<p><strong>Status:</strong> Alle 6 Schritte erfolgreich abgeschlossen</p>' +
-                                            '<p><strong>Bereit für:</strong> API-Export</p>' +
-                                            '</div>'
-                                        );
-                                        
-                                        $('#yprint-preview-content').show();
-                                    }, 1000);
+                                    // Lade die echten Template-Bilder über den yprint_preview_modal AJAX-Handler
+                                    $.ajax({
+                                        url: ajaxurl,
+                                        type: 'POST',
+                                        data: {
+                                            action: 'yprint_preview_modal',
+                                            order_id: orderId,
+                                            view_key: 'workflow_result',
+                                            preview_type: 'dual_visualization',
+                                            view_name: 'Workflow Ergebnisse',
+                                            nonce: $('#octo_print_provider_nonce').val()
+                                        },
+                                        timeout: 30000,
+                                        success: function(previewResponse) {
+                                            console.log('YPrint Preview Response:', previewResponse);
+                                            
+                                            if (previewResponse.success) {
+                                                var data = previewResponse.data;
+                                                console.log('YPrint Preview Data:', data);
+                                                
+                                                // Prüfe ob es HTML oder ein Bild ist
+                                                if (data.image_url && data.image_url.startsWith('data:text/html')) {
+                                                    // HTML-Inhalt direkt anzeigen (Doppel-Visualisierung mit beiden Bildern)
+                                                    var htmlContent = atob(data.image_url.split(',')[1]);
+                                                    $('#yprint-preview-image-container').html(htmlContent);
+                                                } else if (data.image_url) {
+                                                    // Normales Bild anzeigen
+                                                    $('#yprint-preview-image-container').html('<img src="' + data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">');
+                                                } else {
+                                                    // Fallback: Workflow-Ergebnisse anzeigen
+                                                    var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
+                                                    $('#yprint-preview-image-container').html(
+                                                        '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                        '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                        '<pre style="white-space: pre-wrap; margin: 0;">' + workflowResults + '</pre>' +
+                                                        '</div>'
+                                                    );
+                                                }
+                                                
+                                                // Debug-Informationen
+                                                $('#yprint-preview-debug-content').html(data.debug_info || 'Keine Debug-Informationen verfügbar');
+                                                $('#yprint-preview-content').show();
+                                                
+                                            } else {
+                                                // Fallback bei Fehler
+                                                var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
+                                                $('#yprint-preview-image-container').html(
+                                                    '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                    '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                    '<pre style="white-space: pre-wrap; margin: 0;">' + workflowResults + '</pre>' +
+                                                    '</div>'
+                                                );
+                                                $('#yprint-preview-debug-content').html('Preview-Daten nicht verfügbar');
+                                                $('#yprint-preview-content').show();
+                                            }
+                                        },
+                                        error: function() {
+                                            // Fallback bei AJAX-Fehler
+                                            var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
+                                            $('#yprint-preview-image-container').html(
+                                                '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                '<pre style="white-space: pre-wrap; margin: 0;">' + workflowResults + '</pre>' +
+                                                '</div>'
+                                            );
+                                            $('#yprint-preview-debug-content').html('Fehler beim Laden der Template-Vorschau');
+                                            $('#yprint-preview-content').show();
+                                        },
+                                        complete: function() {
+                                            $('#yprint-preview-loading').hide();
+                                        }
+                                    });
                                     
                                 }, 3000); // 3 Sekunden warten, damit der Benutzer die Erfolgsmeldung und Scroll-Animation sieht
                                 
@@ -1499,31 +1546,78 @@ private function check_yprint_dependency() {
                                         $('#yprint-preview-content').hide();
                                         $('#yprint-preview-error').hide();
                                         
-                                        // Lade die aktuellen Workflow-Ergebnisse
-                                        setTimeout(function() {
-                                            $('#yprint-preview-loading').hide();
-                                            
-                                            // Hole die aktuellen Ergebnisse aus dem Result-Container
-                                            var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
-                                            $('#yprint-preview-image-container').html(
-                                                '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
-                                                '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
-                                                '<pre style="white-space: pre-wrap; margin: 0;">' + currentResults + '</pre>' +
-                                                '</div>'
-                                            );
-                                            
-                                            // Debug-Informationen
-                                            $('#yprint-preview-debug-content').html(
-                                                '<div style="font-size: 12px;">' +
-                                                '<p><strong>Bestellung:</strong> #' + orderId + '</p>' +
-                                                '<p><strong>Zeitstempel:</strong> ' + new Date().toLocaleString() + '</p>' +
-                                                '<p><strong>Status:</strong> Workflow-Ergebnisse geladen</p>' +
-                                                '<p><strong>Modal:</strong> Manuell geöffnet</p>' +
-                                                '</div>'
-                                            );
-                                            
-                                            $('#yprint-preview-content').show();
-                                        }, 500);
+                                        // Lade die echten Template-Bilder über den yprint_preview_modal AJAX-Handler
+                                        $.ajax({
+                                            url: ajaxurl,
+                                            type: 'POST',
+                                            data: {
+                                                action: 'yprint_preview_modal',
+                                                order_id: orderId,
+                                                view_key: 'workflow_result',
+                                                preview_type: 'dual_visualization',
+                                                view_name: 'Workflow Ergebnisse',
+                                                nonce: $('#octo_print_provider_nonce').val()
+                                            },
+                                            timeout: 30000,
+                                            success: function(previewResponse) {
+                                                console.log('YPrint Preview Response (Manual):', previewResponse);
+                                                
+                                                if (previewResponse.success) {
+                                                    var data = previewResponse.data;
+                                                    console.log('YPrint Preview Data (Manual):', data);
+                                                    
+                                                    // Prüfe ob es HTML oder ein Bild ist
+                                                    if (data.image_url && data.image_url.startsWith('data:text/html')) {
+                                                        // HTML-Inhalt direkt anzeigen (Doppel-Visualisierung mit beiden Bildern)
+                                                        var htmlContent = atob(data.image_url.split(',')[1]);
+                                                        $('#yprint-preview-image-container').html(htmlContent);
+                                                    } else if (data.image_url) {
+                                                        // Normales Bild anzeigen
+                                                        $('#yprint-preview-image-container').html('<img src="' + data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">');
+                                                    } else {
+                                                        // Fallback: Workflow-Ergebnisse anzeigen
+                                                        var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
+                                                        $('#yprint-preview-image-container').html(
+                                                            '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                            '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                            '<pre style="white-space: pre-wrap; margin: 0;">' + currentResults + '</pre>' +
+                                                            '</div>'
+                                                        );
+                                                    }
+                                                    
+                                                    // Debug-Informationen
+                                                    $('#yprint-preview-debug-content').html(data.debug_info || 'Keine Debug-Informationen verfügbar');
+                                                    $('#yprint-preview-content').show();
+                                                    
+                                                } else {
+                                                    // Fallback bei Fehler
+                                                    var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
+                                                    $('#yprint-preview-image-container').html(
+                                                        '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                        '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                        '<pre style="white-space: pre-wrap; margin: 0;">' + currentResults + '</pre>' +
+                                                        '</div>'
+                                                    );
+                                                    $('#yprint-preview-debug-content').html('Preview-Daten nicht verfügbar');
+                                                    $('#yprint-preview-content').show();
+                                                }
+                                            },
+                                            error: function() {
+                                                // Fallback bei AJAX-Fehler
+                                                var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
+                                                $('#yprint-preview-image-container').html(
+                                                    '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                    '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                    '<pre style="white-space: pre-wrap; margin: 0;">' + currentResults + '</pre>' +
+                                                    '</div>'
+                                                );
+                                                $('#yprint-preview-debug-content').html('Fehler beim Laden der Template-Vorschau');
+                                                $('#yprint-preview-content').show();
+                                            },
+                                            complete: function() {
+                                                $('#yprint-preview-loading').hide();
+                                            }
+                                        });
                                     });
                                     
                                     // Button nach der Erfolgsmeldung einfügen
