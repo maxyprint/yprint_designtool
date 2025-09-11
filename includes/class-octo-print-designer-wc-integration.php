@@ -5318,77 +5318,102 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ NEU: Doppel-Visualisierung HTML generieren
+     * ✅ KORRIGIERT: Doppel-Visualisierung HTML mit korrekter dynamischer Skalierung
      */
     private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
-        // Lade echte gespeicherte Referenzmessungen
-        $reference_measurements = $this->load_saved_reference_measurements($template_id);
+        // Lade Order-Daten für Größe
+        $order = wc_get_order($order_id);
+        $order_size = 'M'; // Fallback
+        if ($order) {
+            foreach ($order->get_items() as $item) {
+                $item_size = $item->get_meta('_yprint_size');
+                if ($item_size) {
+                    $order_size = $item_size;
+                    break;
+                }
+            }
+        }
         
-        // Lade echte finale Druckkoordinaten aus dem Workflow
+        // Lade echte finale Druckkoordinaten
         $final_coordinates = $this->load_final_print_coordinates($order_id);
         
         $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
         
-        // LINKS: Referenzmaß-Visualisierung mit echten gespeicherten Daten
+        // LINKS: Verwende YPrint_Reference_Line_System für korrekte Skalierung
         $html .= '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
-        // Echte Referenzlinie mit gespeicherten Pixel-Koordinaten
-        $start_x = $reference_measurements['pixel_start']['x'];
-        $start_y = $reference_measurements['pixel_start']['y'];
-        $end_x = $reference_measurements['pixel_end']['x'];
-        $end_y = $reference_measurements['pixel_end']['y'];
-        
-        $html .= '<div style="position: absolute; left: ' . $start_x . 'px; top: ' . $start_y . 'px; width: ' . ($end_x - $start_x) . 'px; height: 4px; background: #dc3545; border-radius: 2px;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($start_x - 8) . 'px; top: ' . ($start_y - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($end_x - 8) . 'px; top: ' . ($end_y - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
-        
-        // Messung-Label mit echten Daten
-        $html .= '<div style="position: absolute; left: ' . ($start_x - 50) . 'px; top: ' . ($start_y - 30) . 'px; width: 100px; height: 25px; background: rgba(220,53,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $reference_measurements['size_cm'] . ' cm</div>';
+        // Verwende das bestehende Referenzlinien-System für korrekte Skalierung
+        $view_id = $this->get_first_available_view_id($template_id);
+        if ($view_id) {
+            $reference_result = YPrint_Reference_Line_System::render_reference_lines(
+                $template_id, 
+                $view_id, 
+                $order_size,
+                400, // Vorschau-Container-Breite
+                500, // Vorschau-Container-Höhe
+                null, // Echte Bild-Dimensionen werden automatisch ermittelt
+                null
+            );
+            
+            if ($reference_result && isset($reference_result['html'])) {
+                $html .= $reference_result['html'];
+            }
+        }
         
         $html .= '</div>';
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type']) . ': ' . esc_html($reference_measurements['size_cm']) . ' cm (Größe ' . esc_html($reference_measurements['reference_size']) . ')</p>';
-        $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Quelle:</strong> ' . esc_html($reference_measurements['source']) . '</p>';
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($order_size) . ' | <strong>System:</strong> YPrint Reference Line System</p>';
         $html .= '</div>';
         
-        // RECHTS: Design-Platzierung-Visualisierung mit echten finalen Koordinaten
+        // RECHTS: Design-Platzierung mit korrekter dynamischer Skalierung
         $html .= '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
-        // Millimeter-zu-Pixel-Skalierung für Vorschau-Container
-        // Container: 400x500px, Skalierungsfaktor: 1mm = 2px (für bessere Sichtbarkeit)
-        $mm_to_px_scale = 2.0;
-        $container_offset_x = 50; // Offset vom Container-Rand
-        $container_offset_y = 50;
+        // KORREKTE dynamische Skalierung basierend auf Produktmaßen
+        $product_dimensions = $this->get_product_dimensions_for_size($order_size);
+        $preview_width_px = 400;
+        $preview_height_px = 500;
         
-        // Echte finale Koordinaten in Pixel umrechnen
-        $design_x = $container_offset_x + ($final_coordinates['x_mm'] * $mm_to_px_scale);
-        $design_y = $container_offset_y + ($final_coordinates['y_mm'] * $mm_to_px_scale);
-        $design_width = $final_coordinates['width_mm'] * $mm_to_px_scale;
-        $design_height = $final_coordinates['height_mm'] * $mm_to_px_scale;
-        
-        // Design-Rahmen mit echten Koordinaten
-        $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
-        
-        // Eckpunkte markieren
-        $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-        
-        // Koordinaten-Label mit echten Daten
-        $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
+        if ($product_dimensions && isset($product_dimensions['chest'])) {
+            // Berechne Skalierungsfaktor basierend auf echter Produktbreite
+            $product_width_mm = $product_dimensions['chest'] * 10; // cm zu mm
+            $scale_factor = $preview_width_px / $product_width_mm;
+            
+            // Skaliere finale Koordinaten korrekt
+            $design_x = $final_coordinates['x_mm'] * $scale_factor;
+            $design_y = $final_coordinates['y_mm'] * $scale_factor;
+            $design_width = $final_coordinates['width_mm'] * $scale_factor;
+            $design_height = $final_coordinates['height_mm'] * $scale_factor;
+            
+            // Design-Rahmen mit korrekt skalierten Koordinaten
+            $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
+            
+            // Eckpunkte markieren
+            $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+            $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+            $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+            $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+            
+            // Koordinaten-Label
+            $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
+            
+            $html .= '</div>';
+            $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Position:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+            $html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($final_coordinates['width_mm']) . 'mm × ' . esc_html($final_coordinates['height_mm']) . 'mm</p>';
+            $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Skalierung:</strong> ' . round($scale_factor, 4) . ' px/mm | <strong>Produktbreite:</strong> ' . $product_width_mm . 'mm</p>';
+        } else {
+            // Fallback bei fehlenden Produktdimensionen
+            $html .= '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #999; text-align: center;">';
+            $html .= '<p>Produktdimensionen für Größe ' . esc_html($order_size) . ' nicht gefunden</p>';
+            $html .= '<p style="font-size: 11px;">Koordinaten: ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+            $html .= '</div>';
+        }
         
         $html .= '</div>';
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Position:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
-        $html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($final_coordinates['width_mm']) . 'mm × ' . esc_html($final_coordinates['height_mm']) . 'mm</p>';
-        $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Quelle:</strong> ' . esc_html($final_coordinates['source']) . ' | DPI: ' . esc_html($final_coordinates['dpi']) . '</p>';
-        $html .= '</div>';
-        
         $html .= '</div>';
         
         return $html;
@@ -5514,6 +5539,59 @@ private function build_print_provider_email_content($order, $design_items, $note
             'dpi' => 74,
             'source' => 'fallback'
         );
+    }
+
+    /**
+     * ✅ NEU: Erste verfügbare View-ID für Template finden
+     */
+    private function get_first_available_view_id($template_id) {
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if (empty($view_print_areas) || !is_array($view_print_areas)) {
+            return null;
+        }
+        
+        // Suche nach der ersten View mit Messungen
+        foreach ($view_print_areas as $view_id => $view_data) {
+            if (isset($view_data['measurements']) && !empty($view_data['measurements'])) {
+                return $view_id;
+            }
+        }
+        
+        // Fallback: Erste verfügbare View-ID
+        return array_keys($view_print_areas)[0] ?? null;
+    }
+
+    /**
+     * ✅ NEU: Produktdimensionen für Größe laden
+     */
+    private function get_product_dimensions_for_size($size) {
+        // Standard-Produktdimensionen (T-Shirt)
+        $product_dimensions = array(
+            'S' => array(
+                'chest' => 47.0,  // cm
+                'height' => 70.0,
+                'shoulder' => 45.0
+            ),
+            'M' => array(
+                'chest' => 50.0,
+                'height' => 72.0,
+                'shoulder' => 47.0
+            ),
+            'L' => array(
+                'chest' => 53.0,
+                'height' => 74.0,
+                'shoulder' => 49.0
+            ),
+            'XL' => array(
+                'chest' => 56.0,
+                'height' => 76.0,
+                'shoulder' => 51.0
+            )
+        );
+        
+        $normalized_size = strtoupper(trim($size));
+        return $product_dimensions[$normalized_size] ?? $product_dimensions['M'];
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
