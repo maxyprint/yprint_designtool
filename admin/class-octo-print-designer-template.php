@@ -322,8 +322,8 @@ class Octo_Print_Designer_Template {
                  
                  foreach ($_POST['view_print_areas'] as $view_id => $config) {
                      $view_print_areas[sanitize_text_field($view_id)] = array(
-                         'canvas_width' => intval($config['canvas_width'] ?? 0),
-                         'canvas_height' => intval($config['canvas_height'] ?? 0),
+                         'canvas_width' => 800,  // ✅ CRITICAL FIX: Normalisiere alle Canvas-Größen auf 800x600
+                         'canvas_height' => 600, // FIXIERT
                          'photo_width_px' => intval($config['photo_width_px'] ?? 0),
                          'photo_height_px' => intval($config['photo_height_px'] ?? 0)
                      );
@@ -1355,8 +1355,13 @@ class Octo_Print_Designer_Template {
                             $view_name = $view['name'] ?? __('View', 'octo-print-designer');
                             $view_config = $view_print_areas[$view_id] ?? array();
                             
-                            $canvas_width = $view_config['canvas_width'] ?? 800;
-                            $canvas_height = $view_config['canvas_height'] ?? 600;
+                            // ✅ CRITICAL FIX: Canvas-Dimensionen IMMER auf 800x600 fixieren
+                            $canvas_width = 800;  // FIXIERT - nicht mehr benutzerkonfigurierbar
+                            $canvas_height = 600; // FIXIERT - nicht mehr benutzerkonfigurierbar
+
+                            // Speichere fixierte Werte zurück ins System
+                            $view_config['canvas_width'] = 800;
+                            $view_config['canvas_height'] = 600;
                             $photo_width_px = $view_config['photo_width_px'] ?? 0;
                             $photo_height_px = $view_config['photo_height_px'] ?? 0;
                             ?>
@@ -1443,11 +1448,13 @@ class Octo_Print_Designer_Template {
                                                           class="measurement-image" 
                                                           data-view-id="<?php echo esc_attr($view_id); ?>"
                                                           data-image-id="<?php echo esc_attr($view['image']); ?>"
+                                                          width="800" height="600"
                                                           style="max-width: 400px; height: auto; display: block; border-radius: 6px;">
                                                      
                                                      <!-- Mess-Overlay für Punkte und Linien -->
                                                      <canvas class="measurement-overlay" 
                                                              data-view-id="<?php echo esc_attr($view_id); ?>"
+                                                             width="800" height="600"
                                                              style="position: absolute; top: 0; left: 0; pointer-events: none; border-radius: 6px;"></canvas>
                                                  </div>
                                                  

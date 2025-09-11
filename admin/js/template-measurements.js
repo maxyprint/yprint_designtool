@@ -1849,20 +1849,19 @@ class YPrintTemplateMeasurements {
      * 1. Canvas-Dimensionen erfassen
      */
     getCurrentCanvasDimensions() {
-        const canvas = document.querySelector('.fabric-canvas-wrapper canvas') || 
-                      document.querySelector('canvas') ||
-                      document.querySelector('.design-canvas');
+        const canvas = document.querySelector('.measurement-image') || 
+                      document.querySelector('.fabric-canvas-wrapper canvas') || 
+                      document.querySelector('canvas');
         
         if (canvas) {
-            const width = canvas.offsetWidth || canvas.width || 800;
-            const height = canvas.offsetHeight || canvas.height || 600;
+            // ✅ NUR DIESE ZEILE ÄNDERN: Verwende IMMER interne Attribute
+            const width = parseInt(canvas.getAttribute('width')) || 800;
+            const height = parseInt(canvas.getAttribute('height')) || 600;
             
-            console.log(`YPrint Canvas: 🎯 Canvas-Dimensionen erfasst: ${width}x${height}`);
-            
+            console.log(`YPrint Canvas: ✅ FIXIERTE Canvas-Dimensionen: ${width}x${height}`);
             return { width, height, element: canvas };
         }
         
-        console.warn('YPrint Canvas: ⚠️ Canvas-Element nicht gefunden, verwende Fallback-Dimensionen');
         return { width: 800, height: 600, element: null };
     }
 
