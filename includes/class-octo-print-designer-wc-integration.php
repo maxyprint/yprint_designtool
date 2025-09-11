@@ -51,6 +51,7 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_test_step_6_quality_export', array($this, 'ajax_test_step_6_quality_export'));
         add_action('wp_ajax_test_complete_workflow', array($this, 'ajax_test_complete_workflow'));
         add_action('wp_ajax_test_complete_yprint_workflow', array($this, 'ajax_test_complete_yprint_workflow'));
+        add_action('wp_ajax_yprint_preview_modal', array($this, 'ajax_yprint_preview_modal'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -5199,6 +5200,191 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("❌ YPRINT WORKFLOW Stack trace: " . $e->getTraceAsString());
             wp_send_json_error('YPrint Workflow fatal error: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für YPrint Preview Modal
+     */
+    public function ajax_yprint_preview_modal() {
+        error_log("🎨 YPRINT PREVIEW MODAL: AJAX Preview Modal started");
+        
+        try {
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
+                error_log("❌ Security check failed in YPrint Preview Modal");
+                wp_send_json_error('Security check failed');
+            }
+            
+            // Permission check
+            if (!current_user_can('edit_shop_orders')) {
+                error_log("❌ Permission check failed in YPrint Preview Modal");
+                wp_send_json_error('Insufficient permissions');
+            }
+            
+            $order_id = intval($_POST['order_id']);
+            $view_key = sanitize_text_field($_POST['view_key']);
+            $preview_type = sanitize_text_field($_POST['preview_type']);
+            $view_name = sanitize_text_field($_POST['view_name']);
+            
+            error_log("🎨 YPrint Preview: Loading preview for Order {$order_id}, View {$view_key}, Type {$preview_type}");
+            
+            // Order laden
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_send_json_error('Order not found');
+            }
+            
+            // Template-ID aus Order-Items extrahieren
+            $template_id = null;
+            foreach ($order->get_items() as $item) {
+                $item_template_id = $item->get_meta('_yprint_template_id');
+                if ($item_template_id) {
+                    $template_id = intval($item_template_id);
+                    break;
+                }
+            }
+            
+            if (!$template_id) {
+                wp_send_json_error('Template ID not found in order');
+            }
+            
+            error_log("🎨 YPrint Preview: Found Template ID: {$template_id}");
+            
+            // Template-Bild-URL laden
+            $template_image_url = $this->get_template_image_url($template_id);
+            
+            if (!$template_image_url) {
+                wp_send_json_error('Template image not found');
+            }
+            
+            error_log("🎨 YPrint Preview: Template Image URL: {$template_image_url}");
+            
+            // Doppel-Visualisierung generieren
+            $dual_html = $this->generate_dual_visualization_html($template_id, $template_image_url, $order_id);
+            
+            $preview_data = array(
+                'view_name' => $view_name,
+                'view_key' => $view_key,
+                'preview_type' => $preview_type,
+                'template_image_url' => $template_image_url,
+                'template_id' => $template_id,
+                'image_url' => 'data:text/html;base64,' . base64_encode($dual_html),
+                'debug_info' => "Doppel-Visualisierung für {$view_name} - Template ID: {$template_id}"
+            );
+            
+            wp_send_json_success($preview_data);
+            
+        } catch (Exception $e) {
+            error_log("❌ YPRINT PREVIEW MODAL Error: " . $e->getMessage());
+            wp_send_json_error('Preview failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: Template-Bild-URL laden
+     */
+    private function get_template_image_url($template_id) {
+        // Versuche verschiedene Wege, das Template-Bild zu finden
+        $template_image_url = null;
+        
+        // Methode 1: Direkte Attachment-ID aus Template-Meta
+        $template_image_id = get_post_meta($template_id, '_template_image_id', true);
+        if ($template_image_id) {
+            $template_image_url = wp_get_attachment_url($template_image_id);
+            if ($template_image_url) {
+                error_log("🎨 Template Image found via direct attachment ID: {$template_image_url}");
+                return $template_image_url;
+            }
+        }
+        
+        // Methode 2: Template-Variations durchsuchen
+        $template_variations = get_post_meta($template_id, '_template_variations', true);
+        if (!empty($template_variations) && is_array($template_variations)) {
+            foreach ($template_variations as $variation) {
+                if (isset($variation['image_id']) && $variation['image_id']) {
+                    $template_image_url = wp_get_attachment_url($variation['image_id']);
+                    if ($template_image_url) {
+                        error_log("🎨 Template Image found via variations: {$template_image_url}");
+                        return $template_image_url;
+                    }
+                }
+            }
+        }
+        
+        // Methode 3: Fallback - Standard Template-Bild
+        $fallback_url = plugin_dir_url(__FILE__) . '../public/img/shirt_front_template.jpg';
+        error_log("🎨 Using fallback template image: {$fallback_url}");
+        return $fallback_url;
+    }
+
+    /**
+     * ✅ NEU: Doppel-Visualisierung HTML generieren
+     */
+    private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
+        // Simuliere Referenzmessungen
+        $reference_measurements = array(
+            'type' => 'Brust',
+            'size_cm' => '50',
+            'pixel_start' => array('x' => 200, 'y' => 300),
+            'pixel_end' => array('x' => 400, 'y' => 300)
+        );
+        
+        // Simuliere finale Koordinaten
+        $final_coordinates = array(
+            'x_mm' => 81.24,
+            'y_mm' => 109.4,
+            'width_mm' => 200.0,
+            'height_mm' => 250.0
+        );
+        
+        $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
+        
+        // LINKS: Referenzmaß-Visualisierung
+        $html .= '<div style="flex: 1; text-align: center;">';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
+        $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
+        $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
+        
+        // Referenzlinie
+        $html .= '<div style="position: absolute; left: ' . $reference_measurements['pixel_start']['x'] . 'px; top: ' . $reference_measurements['pixel_start']['y'] . 'px; width: ' . ($reference_measurements['pixel_end']['x'] - $reference_measurements['pixel_start']['x']) . 'px; height: 4px; background: #dc3545; border-radius: 2px;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_start']['x'] - 8) . 'px; top: ' . ($reference_measurements['pixel_start']['y'] - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_end']['x'] - 8) . 'px; top: ' . ($reference_measurements['pixel_end']['y'] - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
+        
+        // Messung-Label
+        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_start']['x'] - 50) . 'px; top: ' . ($reference_measurements['pixel_start']['y'] - 30) . 'px; width: 100px; height: 25px; background: rgba(220,53,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $reference_measurements['size_cm'] . ' cm</div>';
+        
+        $html .= '</div>';
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type']) . ': ' . esc_html($reference_measurements['size_cm']) . ' cm</p>';
+        $html .= '</div>';
+        
+        // RECHTS: Design-Platzierung-Visualisierung
+        $html .= '<div style="flex: 1; text-align: center;">';
+        $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung</h4>';
+        $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
+        $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
+        
+        // Design-Platzierung (vereinfacht)
+        $design_x = 150;
+        $design_y = 200;
+        $design_width = 100;
+        $design_height = 100;
+        
+        $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+        
+        // Koordinaten-Label
+        $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
+        
+        $html .= '</div>';
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Koordinaten:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm, ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+        $html .= '</div>';
+        
+        $html .= '</div>';
+        
+        return $html;
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
