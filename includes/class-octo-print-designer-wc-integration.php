@@ -697,6 +697,46 @@ private function check_yprint_dependency() {
             </div>
         </div>
         
+        <!-- YPrint Preview Modal -->
+        <div id="yprint-preview-modal" style="display: none; position: fixed; z-index: 999999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+            <div style="position: relative; margin: 2% auto; background: white; border-radius: 8px; max-width: 95%; max-height: 95%; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                <!-- Modal Header -->
+                <div style="padding: 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="yprint-preview-title" style="margin: 0; color: #23282d;">🎨 YPrint Template-Vorschau</h3>
+                    <button type="button" id="yprint-preview-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+                </div>
+                
+                <!-- Modal Content -->
+                <div style="padding: 20px;">
+                    <!-- Loading Indicator -->
+                    <div id="yprint-preview-loading" style="text-align: center; padding: 40px;">
+                        <div class="spinner is-active" style="float: none; margin: 0 auto;"></div>
+                        <p>Lade Template-Vorschau...</p>
+                    </div>
+                    
+                    <!-- Preview Content -->
+                    <div id="yprint-preview-content" style="display: none;">
+                        <!-- Template Image/HTML Content -->
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div id="yprint-preview-image-container" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;"></div>
+                        </div>
+                        
+                        <!-- Debug Information -->
+                        <div id="yprint-preview-debug" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                            <h4>🔍 Debug-Informationen</h4>
+                            <div id="yprint-preview-debug-content"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Error Message -->
+                    <div id="yprint-preview-error" style="display: none; text-align: center; padding: 40px; color: #dc3545;">
+                        <h4>❌ Fehler beim Laden der Vorschau</h4>
+                        <p id="yprint-preview-error-message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <script>
             jQuery(document).ready(function($) {
                 // Ensure ajaxurl is available
@@ -1406,62 +1446,41 @@ private function check_yprint_dependency() {
                                 
                                 // YPrint Preview Modal automatisch öffnen nach erfolgreichem Workflow
                                 setTimeout(function() {
-                                    // Prüfe ob das YPrint Preview Modal existiert
-                                    if ($('#yprint-preview-modal').length > 0) {
-                                        // Simuliere einen Klick auf den ersten verfügbaren Preview-Button
-                                        var firstPreviewButton = $('.yprint-preview-button').first();
-                                        if (firstPreviewButton.length > 0) {
-                                            console.log('🎯 Opening YPrint Preview Modal automatically...');
-                                            firstPreviewButton.trigger('click');
-                                        } else {
-                                            // Alternativ: Öffne das Modal direkt mit Standard-Parametern
-                                            console.log('🎯 Opening YPrint Preview Modal directly...');
-                                            $('#yprint-preview-modal').show();
-                                            $('#yprint-preview-title').text('YPrint Workflow Ergebnisse');
-                                            $('#yprint-preview-loading').show();
-                                            $('#yprint-preview-content').hide();
-                                            $('#yprint-preview-error').hide();
-                                            
-                                            // AJAX-Call um Preview-Daten zu laden
-                                            $.ajax({
-                                                url: ajaxurl,
-                                                type: 'POST',
-                                                data: {
-                                                    action: 'yprint_preview_modal',
-                                                    order_id: orderId,
-                                                    view_key: 'workflow_result',
-                                                    preview_type: 'complete',
-                                                    view_name: 'Workflow Ergebnisse',
-                                                    nonce: $('#octo_print_provider_nonce').val()
-                                                },
-                                                success: function(previewResponse) {
-                                                    if (previewResponse.success) {
-                                                        $('#yprint-preview-image-container').html(previewResponse.data.image_url ? 
-                                                            '<img src="' + previewResponse.data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">' : 
-                                                            '<p>Keine Vorschau verfügbar</p>');
-                                                        $('#yprint-preview-debug-content').html(previewResponse.data.debug_info || 'Keine Debug-Informationen');
-                                                        $('#yprint-preview-content').show();
-                                                    } else {
-                                                        $('#yprint-preview-error-message').text('Keine Vorschau-Daten verfügbar');
-                                                        $('#yprint-preview-error').show();
-                                                    }
-                                                },
-                                                error: function() {
-                                                    $('#yprint-preview-error-message').text('Fehler beim Laden der Vorschau');
-                                                    $('#yprint-preview-error').show();
-                                                },
-                                                complete: function() {
-                                                    $('#yprint-preview-loading').hide();
-                                                }
-                                            });
-                                        }
-                                    } else {
-                                        // Falls das Modal nicht existiert, zeige eine Benachrichtigung
-                                        console.log('ℹ️ YPrint Preview Modal not found');
-                                        createStatusMessage('info', 'ℹ️ YPrint Preview verfügbar', 
-                                            'Klicken Sie auf "Vollständiger Workflow & Debug" um die Template-Vorschau zu öffnen.')
-                                            .insertBefore(button.parent());
-                                    }
+                                    console.log('🎯 Opening YPrint Preview Modal automatically...');
+                                    
+                                    // Öffne das Modal direkt
+                                    $('#yprint-preview-modal').show();
+                                    $('#yprint-preview-title').text('🎨 YPrint Workflow Ergebnisse');
+                                    $('#yprint-preview-loading').show();
+                                    $('#yprint-preview-content').hide();
+                                    $('#yprint-preview-error').hide();
+                                    
+                                    // Erstelle eine einfache Vorschau mit den Workflow-Ergebnissen
+                                    setTimeout(function() {
+                                        $('#yprint-preview-loading').hide();
+                                        
+                                        // Zeige die Workflow-Ergebnisse im Modal
+                                        var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
+                                        $('#yprint-preview-image-container').html(
+                                            '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                            '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                            '<pre style="white-space: pre-wrap; margin: 0;">' + workflowResults + '</pre>' +
+                                            '</div>'
+                                        );
+                                        
+                                        // Debug-Informationen
+                                        $('#yprint-preview-debug-content').html(
+                                            '<div style="font-size: 12px;">' +
+                                            '<p><strong>Bestellung:</strong> #' + orderId + '</p>' +
+                                            '<p><strong>Zeitstempel:</strong> ' + new Date().toLocaleString() + '</p>' +
+                                            '<p><strong>Status:</strong> Alle 6 Schritte erfolgreich abgeschlossen</p>' +
+                                            '<p><strong>Bereit für:</strong> API-Export</p>' +
+                                            '</div>'
+                                        );
+                                        
+                                        $('#yprint-preview-content').show();
+                                    }, 1000);
+                                    
                                 }, 3000); // 3 Sekunden warten, damit der Benutzer die Erfolgsmeldung und Scroll-Animation sieht
                                 
                                 // Zusätzlicher Button zum manuellen Öffnen der Template-Vorschau
@@ -1471,14 +1490,40 @@ private function check_yprint_dependency() {
                                         '🎨 Template-Vorschau öffnen</button>');
                                     
                                     previewButton.on('click', function() {
-                                        var firstPreviewButton = $('.yprint-preview-button').first();
-                                        if (firstPreviewButton.length > 0) {
-                                            firstPreviewButton.trigger('click');
-                                        } else {
-                                            createStatusMessage('info', 'ℹ️ Template-Vorschau', 
-                                                'Keine Preview-Buttons gefunden. Bitte verwenden Sie "Vollständiger Workflow & Debug".')
-                                                .insertBefore(button.parent());
-                                        }
+                                        console.log('🎯 Opening YPrint Preview Modal manually...');
+                                        
+                                        // Öffne das Modal direkt
+                                        $('#yprint-preview-modal').show();
+                                        $('#yprint-preview-title').text('🎨 YPrint Template-Vorschau');
+                                        $('#yprint-preview-loading').show();
+                                        $('#yprint-preview-content').hide();
+                                        $('#yprint-preview-error').hide();
+                                        
+                                        // Lade die aktuellen Workflow-Ergebnisse
+                                        setTimeout(function() {
+                                            $('#yprint-preview-loading').hide();
+                                            
+                                            // Hole die aktuellen Ergebnisse aus dem Result-Container
+                                            var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
+                                            $('#yprint-preview-image-container').html(
+                                                '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.4; text-align: left; max-height: 400px; overflow-y: auto;">' +
+                                                '<h4 style="color: #007cba; margin-top: 0;">📋 YPrint Workflow Ergebnisse</h4>' +
+                                                '<pre style="white-space: pre-wrap; margin: 0;">' + currentResults + '</pre>' +
+                                                '</div>'
+                                            );
+                                            
+                                            // Debug-Informationen
+                                            $('#yprint-preview-debug-content').html(
+                                                '<div style="font-size: 12px;">' +
+                                                '<p><strong>Bestellung:</strong> #' + orderId + '</p>' +
+                                                '<p><strong>Zeitstempel:</strong> ' + new Date().toLocaleString() + '</p>' +
+                                                '<p><strong>Status:</strong> Workflow-Ergebnisse geladen</p>' +
+                                                '<p><strong>Modal:</strong> Manuell geöffnet</p>' +
+                                                '</div>'
+                                            );
+                                            
+                                            $('#yprint-preview-content').show();
+                                        }, 500);
                                     });
                                     
                                     // Button nach der Erfolgsmeldung einfügen
