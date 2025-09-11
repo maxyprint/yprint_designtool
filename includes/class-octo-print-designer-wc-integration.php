@@ -1380,13 +1380,134 @@ private function check_yprint_dependency() {
                                 resultContent.text(response.data);
                                 resultContainer.show();
                                 
+                                // Automatisch zur Visualisierung scrollen und hervorheben
+                                $('html, body').animate({
+                                    scrollTop: resultContainer.offset().top - 100
+                                }, 800, function() {
+                                    // Visualisierung kurz hervorheben
+                                    resultContainer.css({
+                                        'border': '3px solid #28a745',
+                                        'box-shadow': '0 0 20px rgba(40, 167, 69, 0.5)',
+                                        'transition': 'all 0.3s ease'
+                                    });
+                                    
+                                    // Nach 3 Sekunden Hervorhebung entfernen
+                                    setTimeout(function() {
+                                        resultContainer.css({
+                                            'border': '1px solid #ddd',
+                                            'box-shadow': 'none'
+                                        });
+                                    }, 3000);
+                                });
+                                
                                 createStatusMessage('success', '🎉 YPRINT VOLLSTÄNDIGER WORKFLOW erfolgreich', 
-                                    'Alle 6 Schritte wurden erfolgreich durchgeführt. Bestellung ist bereit für API-Export!')
+                                    'Alle 6 Schritte wurden erfolgreich durchgeführt. Bestellung ist bereit für API-Export! Ergebnisse sind unten sichtbar.')
                                     .insertBefore(button.parent());
+                                
+                                // YPrint Preview Modal automatisch öffnen nach erfolgreichem Workflow
+                                setTimeout(function() {
+                                    // Prüfe ob das YPrint Preview Modal existiert
+                                    if ($('#yprint-preview-modal').length > 0) {
+                                        // Simuliere einen Klick auf den ersten verfügbaren Preview-Button
+                                        var firstPreviewButton = $('.yprint-preview-button').first();
+                                        if (firstPreviewButton.length > 0) {
+                                            console.log('🎯 Opening YPrint Preview Modal automatically...');
+                                            firstPreviewButton.trigger('click');
+                                        } else {
+                                            // Alternativ: Öffne das Modal direkt mit Standard-Parametern
+                                            console.log('🎯 Opening YPrint Preview Modal directly...');
+                                            $('#yprint-preview-modal').show();
+                                            $('#yprint-preview-title').text('YPrint Workflow Ergebnisse');
+                                            $('#yprint-preview-loading').show();
+                                            $('#yprint-preview-content').hide();
+                                            $('#yprint-preview-error').hide();
+                                            
+                                            // AJAX-Call um Preview-Daten zu laden
+                                            $.ajax({
+                                                url: ajaxurl,
+                                                type: 'POST',
+                                                data: {
+                                                    action: 'yprint_preview_modal',
+                                                    order_id: orderId,
+                                                    view_key: 'workflow_result',
+                                                    preview_type: 'complete',
+                                                    view_name: 'Workflow Ergebnisse',
+                                                    nonce: $('#octo_print_provider_nonce').val()
+                                                },
+                                                success: function(previewResponse) {
+                                                    if (previewResponse.success) {
+                                                        $('#yprint-preview-image-container').html(previewResponse.data.image_url ? 
+                                                            '<img src="' + previewResponse.data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">' : 
+                                                            '<p>Keine Vorschau verfügbar</p>');
+                                                        $('#yprint-preview-debug-content').html(previewResponse.data.debug_info || 'Keine Debug-Informationen');
+                                                        $('#yprint-preview-content').show();
+                                                    } else {
+                                                        $('#yprint-preview-error-message').text('Keine Vorschau-Daten verfügbar');
+                                                        $('#yprint-preview-error').show();
+                                                    }
+                                                },
+                                                error: function() {
+                                                    $('#yprint-preview-error-message').text('Fehler beim Laden der Vorschau');
+                                                    $('#yprint-preview-error').show();
+                                                },
+                                                complete: function() {
+                                                    $('#yprint-preview-loading').hide();
+                                                }
+                                            });
+                                        }
+                                    } else {
+                                        // Falls das Modal nicht existiert, zeige eine Benachrichtigung
+                                        console.log('ℹ️ YPrint Preview Modal not found');
+                                        createStatusMessage('info', 'ℹ️ YPrint Preview verfügbar', 
+                                            'Klicken Sie auf "Vollständiger Workflow & Debug" um die Template-Vorschau zu öffnen.')
+                                            .insertBefore(button.parent());
+                                    }
+                                }, 3000); // 3 Sekunden warten, damit der Benutzer die Erfolgsmeldung und Scroll-Animation sieht
+                                
+                                // Zusätzlicher Button zum manuellen Öffnen der Template-Vorschau
+                                setTimeout(function() {
+                                    var previewButton = $('<button class="button button-primary" style="margin-left: 10px; background: #28a745; margin-top: 10px;">' +
+                                        '<span class="dashicons dashicons-visibility" style="margin-right: 5px;"></span>' +
+                                        '🎨 Template-Vorschau öffnen</button>');
+                                    
+                                    previewButton.on('click', function() {
+                                        var firstPreviewButton = $('.yprint-preview-button').first();
+                                        if (firstPreviewButton.length > 0) {
+                                            firstPreviewButton.trigger('click');
+                                        } else {
+                                            createStatusMessage('info', 'ℹ️ Template-Vorschau', 
+                                                'Keine Preview-Buttons gefunden. Bitte verwenden Sie "Vollständiger Workflow & Debug".')
+                                                .insertBefore(button.parent());
+                                        }
+                                    });
+                                    
+                                    // Button nach der Erfolgsmeldung einfügen
+                                    $('.notice').last().after(previewButton);
+                                }, 1000);
                                 
                             } else {
                                 resultContent.text('❌ YPRINT WORKFLOW FEHLER: ' + (response.data ? response.data : 'Unbekannter Fehler'));
                                 resultContainer.show();
+                                
+                                // Auch bei Fehlern zur Visualisierung scrollen und hervorheben
+                                $('html, body').animate({
+                                    scrollTop: resultContainer.offset().top - 100
+                                }, 800, function() {
+                                    // Visualisierung mit roter Hervorhebung für Fehler
+                                    resultContainer.css({
+                                        'border': '3px solid #dc3545',
+                                        'box-shadow': '0 0 20px rgba(220, 53, 69, 0.5)',
+                                        'transition': 'all 0.3s ease'
+                                    });
+                                    
+                                    // Nach 3 Sekunden Hervorhebung entfernen
+                                    setTimeout(function() {
+                                        resultContainer.css({
+                                            'border': '1px solid #ddd',
+                                            'box-shadow': 'none'
+                                        });
+                                    }, 3000);
+                                });
                                 
                                 createStatusMessage('error', '❌ YPRINT WORKFLOW fehlgeschlagen', 
                                     response.data || 'Unbekannter Fehler beim Testen des vollständigen YPrint-Workflows')
@@ -1396,6 +1517,26 @@ private function check_yprint_dependency() {
                         error: function(xhr, status, error) {
                             resultContent.text('❌ AJAX FEHLER: ' + error);
                             resultContainer.show();
+                            
+                            // Auch bei Netzwerkfehlern zur Visualisierung scrollen und hervorheben
+                            $('html, body').animate({
+                                scrollTop: resultContainer.offset().top - 100
+                            }, 800, function() {
+                                // Visualisierung mit roter Hervorhebung für Netzwerkfehler
+                                resultContainer.css({
+                                    'border': '3px solid #dc3545',
+                                    'box-shadow': '0 0 20px rgba(220, 53, 69, 0.5)',
+                                    'transition': 'all 0.3s ease'
+                                });
+                                
+                                // Nach 3 Sekunden Hervorhebung entfernen
+                                setTimeout(function() {
+                                    resultContainer.css({
+                                        'border': '1px solid #ddd',
+                                        'box-shadow': 'none'
+                                    });
+                                }, 3000);
+                            });
                             
                             createStatusMessage('error', '❌ YPRINT WORKFLOW Netzwerkfehler', 
                                 'Verbindung zum Server fehlgeschlagen: ' + error)
