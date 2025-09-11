@@ -5321,70 +5321,199 @@ private function build_print_provider_email_content($order, $design_items, $note
      * ✅ NEU: Doppel-Visualisierung HTML generieren
      */
     private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
-        // Simuliere Referenzmessungen
-        $reference_measurements = array(
-            'type' => 'Brust',
-            'size_cm' => '50',
-            'pixel_start' => array('x' => 200, 'y' => 300),
-            'pixel_end' => array('x' => 400, 'y' => 300)
-        );
+        // Lade echte gespeicherte Referenzmessungen
+        $reference_measurements = $this->load_saved_reference_measurements($template_id);
         
-        // Simuliere finale Koordinaten
-        $final_coordinates = array(
-            'x_mm' => 81.24,
-            'y_mm' => 109.4,
-            'width_mm' => 200.0,
-            'height_mm' => 250.0
-        );
+        // Lade echte finale Druckkoordinaten aus dem Workflow
+        $final_coordinates = $this->load_final_print_coordinates($order_id);
         
         $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
         
-        // LINKS: Referenzmaß-Visualisierung
+        // LINKS: Referenzmaß-Visualisierung mit echten gespeicherten Daten
         $html .= '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
-        // Referenzlinie
-        $html .= '<div style="position: absolute; left: ' . $reference_measurements['pixel_start']['x'] . 'px; top: ' . $reference_measurements['pixel_start']['y'] . 'px; width: ' . ($reference_measurements['pixel_end']['x'] - $reference_measurements['pixel_start']['x']) . 'px; height: 4px; background: #dc3545; border-radius: 2px;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_start']['x'] - 8) . 'px; top: ' . ($reference_measurements['pixel_start']['y'] - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
-        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_end']['x'] - 8) . 'px; top: ' . ($reference_measurements['pixel_end']['y'] - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
+        // Echte Referenzlinie mit gespeicherten Pixel-Koordinaten
+        $start_x = $reference_measurements['pixel_start']['x'];
+        $start_y = $reference_measurements['pixel_start']['y'];
+        $end_x = $reference_measurements['pixel_end']['x'];
+        $end_y = $reference_measurements['pixel_end']['y'];
         
-        // Messung-Label
-        $html .= '<div style="position: absolute; left: ' . ($reference_measurements['pixel_start']['x'] - 50) . 'px; top: ' . ($reference_measurements['pixel_start']['y'] - 30) . 'px; width: 100px; height: 25px; background: rgba(220,53,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $reference_measurements['size_cm'] . ' cm</div>';
+        $html .= '<div style="position: absolute; left: ' . $start_x . 'px; top: ' . $start_y . 'px; width: ' . ($end_x - $start_x) . 'px; height: 4px; background: #dc3545; border-radius: 2px;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($start_x - 8) . 'px; top: ' . ($start_y - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
+        $html .= '<div style="position: absolute; left: ' . ($end_x - 8) . 'px; top: ' . ($end_y - 8) . 'px; width: 16px; height: 16px; background: #dc3545; border-radius: 50%;"></div>';
+        
+        // Messung-Label mit echten Daten
+        $html .= '<div style="position: absolute; left: ' . ($start_x - 50) . 'px; top: ' . ($start_y - 30) . 'px; width: 100px; height: 25px; background: rgba(220,53,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $reference_measurements['size_cm'] . ' cm</div>';
         
         $html .= '</div>';
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type']) . ': ' . esc_html($reference_measurements['size_cm']) . ' cm</p>';
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Messung:</strong> ' . esc_html($reference_measurements['type']) . ': ' . esc_html($reference_measurements['size_cm']) . ' cm (Größe ' . esc_html($reference_measurements['reference_size']) . ')</p>';
+        $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Quelle:</strong> ' . esc_html($reference_measurements['source']) . '</p>';
         $html .= '</div>';
         
-        // RECHTS: Design-Platzierung-Visualisierung
+        // RECHTS: Design-Platzierung-Visualisierung mit echten finalen Koordinaten
         $html .= '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
-        // Design-Platzierung (vereinfacht)
-        $design_x = 150;
-        $design_y = 200;
-        $design_width = 100;
-        $design_height = 100;
+        // Millimeter-zu-Pixel-Skalierung für Vorschau-Container
+        // Container: 400x500px, Skalierungsfaktor: 1mm = 2px (für bessere Sichtbarkeit)
+        $mm_to_px_scale = 2.0;
+        $container_offset_x = 50; // Offset vom Container-Rand
+        $container_offset_y = 50;
         
+        // Echte finale Koordinaten in Pixel umrechnen
+        $design_x = $container_offset_x + ($final_coordinates['x_mm'] * $mm_to_px_scale);
+        $design_y = $container_offset_y + ($final_coordinates['y_mm'] * $mm_to_px_scale);
+        $design_width = $final_coordinates['width_mm'] * $mm_to_px_scale;
+        $design_height = $final_coordinates['height_mm'] * $mm_to_px_scale;
+        
+        // Design-Rahmen mit echten Koordinaten
         $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
+        
+        // Eckpunkte markieren
         $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
         $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
         $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
         $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
         
-        // Koordinaten-Label
+        // Koordinaten-Label mit echten Daten
         $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
         
         $html .= '</div>';
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Koordinaten:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm, ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Position:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+        $html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($final_coordinates['width_mm']) . 'mm × ' . esc_html($final_coordinates['height_mm']) . 'mm</p>';
+        $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Quelle:</strong> ' . esc_html($final_coordinates['source']) . ' | DPI: ' . esc_html($final_coordinates['dpi']) . '</p>';
         $html .= '</div>';
         
         $html .= '</div>';
         
         return $html;
+    }
+
+    /**
+     * ✅ NEU: Lade gespeicherte Referenzmessungen aus der Datenbank
+     */
+    private function load_saved_reference_measurements($template_id) {
+        error_log("🎨 Loading saved reference measurements for template {$template_id}");
+        
+        // Lade Template-View-Print-Areas aus der Datenbank
+        $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+        
+        if (empty($view_print_areas) || !is_array($view_print_areas)) {
+            error_log("🎨 No view print areas found for template {$template_id}");
+            return $this->get_fallback_reference_measurements();
+        }
+        
+        // Suche nach der ersten verfügbaren Referenzmessung
+        foreach ($view_print_areas as $view_id => $view_data) {
+            if (isset($view_data['measurements']['reference_measurement'])) {
+                $ref_measurement = $view_data['measurements']['reference_measurement'];
+                
+                error_log("🎨 Found reference measurement for view {$view_id}:");
+                error_log("  Type: " . ($ref_measurement['measurement_type'] ?? 'unknown'));
+                error_log("  Pixel Distance: " . ($ref_measurement['pixel_distance'] ?? 'unknown'));
+                error_log("  Physical Size: " . ($ref_measurement['physical_size_cm'] ?? 'unknown') . " cm");
+                error_log("  Reference Points: " . json_encode($ref_measurement['reference_points'] ?? array()));
+                
+                return array(
+                    'type' => $ref_measurement['measurement_type'] ?? 'Brust',
+                    'size_cm' => $ref_measurement['physical_size_cm'] ?? '51.0',
+                    'pixel_distance' => $ref_measurement['pixel_distance'] ?? 200,
+                    'pixel_start' => $ref_measurement['reference_points'][0] ?? array('x' => 200, 'y' => 300),
+                    'pixel_end' => $ref_measurement['reference_points'][1] ?? array('x' => 400, 'y' => 300),
+                    'reference_size' => $ref_measurement['reference_size'] ?? 'M',
+                    'template_id' => $template_id,
+                    'view_id' => $view_id
+                );
+            }
+        }
+        
+        error_log("🎨 No reference measurements found, using fallback");
+        return $this->get_fallback_reference_measurements();
+    }
+
+    /**
+     * ✅ NEU: Lade finale Druckkoordinaten aus dem Workflow
+     */
+    private function load_final_print_coordinates($order_id) {
+        error_log("🎨 Loading final print coordinates for order {$order_id}");
+        
+        // Lade Order-Meta für finale Koordinaten
+        $final_coordinates = get_post_meta($order_id, '_yprint_final_coordinates', true);
+        
+        if (!empty($final_coordinates) && is_array($final_coordinates)) {
+            error_log("🎨 Found final coordinates in order meta:");
+            error_log("  X: " . ($final_coordinates['x_mm'] ?? 'unknown') . " mm");
+            error_log("  Y: " . ($final_coordinates['y_mm'] ?? 'unknown') . " mm");
+            error_log("  Width: " . ($final_coordinates['width_mm'] ?? 'unknown') . " mm");
+            error_log("  Height: " . ($final_coordinates['height_mm'] ?? 'unknown') . " mm");
+            
+            return array(
+                'x_mm' => floatval($final_coordinates['x_mm'] ?? 0),
+                'y_mm' => floatval($final_coordinates['y_mm'] ?? 0),
+                'width_mm' => floatval($final_coordinates['width_mm'] ?? 0),
+                'height_mm' => floatval($final_coordinates['height_mm'] ?? 0),
+                'dpi' => floatval($final_coordinates['dpi'] ?? 74),
+                'source' => 'order_meta'
+            );
+        }
+        
+        // Fallback: Suche in Order-Items
+        $order = wc_get_order($order_id);
+        if ($order) {
+            foreach ($order->get_items() as $item) {
+                $item_coordinates = $item->get_meta('_yprint_final_coordinates');
+                if (!empty($item_coordinates)) {
+                    error_log("🎨 Found final coordinates in order item:");
+                    error_log("  Coordinates: " . json_encode($item_coordinates));
+                    
+                    return array(
+                        'x_mm' => floatval($item_coordinates['x_mm'] ?? 0),
+                        'y_mm' => floatval($item_coordinates['y_mm'] ?? 0),
+                        'width_mm' => floatval($item_coordinates['width_mm'] ?? 0),
+                        'height_mm' => floatval($item_coordinates['height_mm'] ?? 0),
+                        'dpi' => floatval($item_coordinates['dpi'] ?? 74),
+                        'source' => 'order_item'
+                    );
+                }
+            }
+        }
+        
+        error_log("🎨 No final coordinates found, using fallback");
+        return $this->get_fallback_final_coordinates();
+    }
+
+    /**
+     * ✅ NEU: Fallback-Referenzmessungen
+     */
+    private function get_fallback_reference_measurements() {
+        return array(
+            'type' => 'Brust',
+            'size_cm' => '51.0',
+            'pixel_distance' => 200,
+            'pixel_start' => array('x' => 200, 'y' => 300),
+            'pixel_end' => array('x' => 400, 'y' => 300),
+            'reference_size' => 'M',
+            'source' => 'fallback'
+        );
+    }
+
+    /**
+     * ✅ NEU: Fallback-finale Koordinaten
+     */
+    private function get_fallback_final_coordinates() {
+        return array(
+            'x_mm' => 81.24,
+            'y_mm' => 109.4,
+            'width_mm' => 200.0,
+            'height_mm' => 250.0,
+            'dpi' => 74,
+            'source' => 'fallback'
+        );
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
