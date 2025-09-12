@@ -700,8 +700,8 @@ private function check_yprint_dependency() {
                     </div>
                 </div>
             </div>
-        </div>
-        
+                    </div>
+                    
         <!-- YPrint Preview Modal -->
         <div id="yprint-preview-modal" style="display: none; position: fixed; z-index: 999999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
             <div style="position: relative; margin: 2% auto; background: white; border-radius: 8px; max-width: 95%; max-height: 95%; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
@@ -734,17 +734,17 @@ private function check_yprint_dependency() {
                             <div style="margin-bottom: 15px;">
                                 <button type="button" id="debug-order-meta-btn" class="button button-secondary" style="width: 100%; margin-bottom: 10px;">
                                     <span class="dashicons dashicons-search"></span> Order Meta-Felder anzeigen
-                                </button>
+                        </button>
                                 
                                 <div id="debug-order-meta-result" style="display: none; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px; margin-top: 10px;">
                                     <p><em>Lade Order Meta-Felder...</em></p>
-                                </div>
-                                
+                    </div>
+                    
                                 <div style="margin-top: 10px; font-size: 11px; color: #666;">
                                     <p><strong>Hinweis:</strong> Zeigt alle Meta-Felder für diese Bestellung an. Nützlich um zu verstehen, welche YPrint-Daten verfügbar sind.</p>
-                                </div>
-                            </div>
-                            
+                    </div>
+                    </div>
+                    
                             <div id="yprint-preview-debug-content"></div>
                         </div>
                     </div>
