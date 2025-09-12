@@ -458,8 +458,11 @@ private function check_yprint_dependency() {
         $order_id = $post->ID;
         $order = wc_get_order($order_id);
         
-        // Check if order has any design products
+        // Check if order has any design products OR if it's a YPrint order
         $has_design_products = false;
+        $is_yprint_order = false;
+        
+        // Prüfe Order-Items auf Design-Produkte
         foreach ($order->get_items() as $item) {
             if (
                 $item->get_meta('_design_id') ||
@@ -472,9 +475,67 @@ private function check_yprint_dependency() {
             }
         }
         
-        if (!$has_design_products) {
+        // ✅ NEU: Prüfe auch Order-Meta auf YPrint-Daten (für Bestellungen ohne Items)
+        $yprint_meta_fields = array(
+            '_yprint_final_coordinates',
+            '_yprint_workflow_data', 
+            '_yprint_template_id',
+            '_yprint_design_id',
+            '_yprint_canvas_data',
+            '_yprint_template_measurements'
+        );
+        
+        foreach ($yprint_meta_fields as $meta_field) {
+            if (get_post_meta($order_id, $meta_field, true)) {
+                $is_yprint_order = true;
+                break;
+            }
+        }
+        
+        // ✅ NEU: Prüfe auch auf potentielle YPrint-Bestellungen (ohne Items aber mit Design-Daten in DB)
+        if (!$has_design_products && !$is_yprint_order) {
+            global $wpdb;
+            
+            // Prüfe ob es Design-Daten für diesen Kunden gibt
+            $customer_id = $order->get_customer_id();
+            $designs_count = $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(*) FROM {$wpdb->prefix}octo_user_designs 
+                WHERE user_id = %d
+            ", $customer_id));
+            
+            if ($designs_count > 0) {
+                $is_yprint_order = true;
+            }
+        }
+        
+        // ✅ NEU: UNIVERSAL FALLBACK - Zeige Meta-Box für ALLE Bestellungen (für Debug/Reparatur)
+        // Dies ermöglicht es, auch kaputte Bestellungen wie #5371 zu reparieren
+        if (!$has_design_products && !$is_yprint_order) {
+            // Prüfe ob es überhaupt Design-Daten in der Datenbank gibt
+            global $wpdb;
+            $total_designs = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}octo_user_designs");
+            
+            if ($total_designs > 0) {
+                $is_yprint_order = true;
+                echo '<div style="background: #d1ecf1; border: 1px solid #bee5eb; padding: 10px; margin-bottom: 15px; border-radius: 4px;">';
+                echo '<strong>🔧 YPrint-Reparatur-Modus:</strong><br>';
+                echo 'Diese Bestellung hat keine Order-Items, aber es gibt Design-Daten in der Datenbank. Der Workflow-Button kann verwendet werden, um fehlende Koordinaten zu erstellen oder zu reparieren.';
+                echo '</div>';
+            }
+        }
+        
+        // Zeige Meta-Box wenn Design-Produkte ODER YPrint-Daten vorhanden sind
+        if (!$has_design_products && !$is_yprint_order) {
             echo '<p>' . __('No design products in this order.', 'octo-print-designer') . '</p>';
             return;
+        }
+        
+        // ✅ NEU: Zeige Hinweis für YPrint-Orders ohne Items
+        if (!$has_design_products && $is_yprint_order) {
+            echo '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin-bottom: 15px; border-radius: 4px;">';
+            echo '<strong>⚠️ YPrint-Bestellung ohne Order-Items:</strong><br>';
+            echo 'Diese Bestellung hat keine Order-Items, aber es wurden Design-Daten für den Kunden gefunden. Der Workflow-Button kann verwendet werden, um die fehlenden Koordinaten zu erstellen.';
+            echo '</div>';
         }
         
         // Analyze print data status for all design items
