@@ -447,6 +447,159 @@ class YPrint_Unified_Visualization_System {
     }
     
     /**
+     * 🔧 DEBUG-ENHANCED: Vollständig instrumentierte Koordinaten-Transformation
+     * 
+     * Zeigt jeden Berechnungsschritt mit mathematischen Formeln und Debug-Informationen
+     */
+    private static function create_debug_coordinate_transformer($data, $coordinates) {
+        $order_id = $data['order_id'] ?? 0;
+        $real_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
+        
+        // Debug-Log-Struktur
+        $debug = array(
+            'input_data' => array(),
+            'calculations' => array(),
+            'transformations' => array(),
+            'final_values' => array()
+        );
+        
+        // SCHRITT 1: Input-Daten sammeln
+        $editor_canvas_width = 656;  // Default
+        $editor_canvas_height = 420;
+        $template_width = $coordinates['template']['width_px'];
+        $template_height = $coordinates['template']['height_px'];
+        $container_width = 400;
+        $container_height = 500;
+        $product_width_mm = $coordinates['product']['width_mm'];
+        $product_height_mm = $coordinates['product']['height_mm'];
+        
+        $debug['input_data'] = array(
+            'editor_canvas' => "{$editor_canvas_width}x{$editor_canvas_height}px",
+            'template_size' => "{$template_width}x{$template_height}px", 
+            'container_size' => "{$container_width}x{$container_height}px",
+            'product_size' => "{$product_width_mm}x{$product_height_mm}mm",
+            'reference_points' => $coordinates['reference']['points'] ?? 'FEHLT',
+            'real_coordinates_count' => is_array($real_coordinates) ? count($real_coordinates) : 0
+        );
+        
+        // SCHRITT 2: Template-Container-Skalierung
+        $scale_x = $container_width / $template_width;
+        $scale_y = $container_height / $template_height;
+        $template_scale = min($scale_x, $scale_y);
+        $scaled_template_width = $template_width * $template_scale;
+        $scaled_template_height = $template_height * $template_scale;
+        $template_offset_x = ($container_width - $scaled_template_width) / 2;
+        $template_offset_y = ($container_height - $scaled_template_height) / 2;
+        
+        $debug['calculations']['template_scaling'] = array(
+            'scale_x' => $scale_x,
+            'scale_y' => $scale_y,
+            'chosen_scale' => $template_scale,
+            'scaled_template' => "{$scaled_template_width}x{$scaled_template_height}px",
+            'offsets' => "x={$template_offset_x}px, y={$template_offset_y}px"
+        );
+        
+        // SCHRITT 3: Referenzlinie-Transformation (falls vorhanden)
+        if (isset($coordinates['reference']['points']) && count($coordinates['reference']['points']) >= 2) {
+            $ref_points = $coordinates['reference']['points'];
+            $ref_start_template_x = $ref_points[0]['x'];
+            $ref_start_template_y = $ref_points[0]['y'];
+            $ref_end_template_x = $ref_points[1]['x'];
+            $ref_end_template_y = $ref_points[1]['y'];
+            
+            // Template → Container
+            $ref_start_container_x = $template_offset_x + ($ref_start_template_x * $template_scale);
+            $ref_start_container_y = $template_offset_y + ($ref_start_template_y * $template_scale);
+            $ref_end_container_x = $template_offset_x + ($ref_end_template_x * $template_scale);
+            $ref_end_container_y = $template_offset_y + ($ref_end_template_y * $template_scale);
+            
+            $ref_length_template = sqrt(pow($ref_end_template_x - $ref_start_template_x, 2) + pow($ref_end_template_y - $ref_start_template_y, 2));
+            $ref_length_container = sqrt(pow($ref_end_container_x - $ref_start_container_x, 2) + pow($ref_end_container_y - $ref_start_container_y, 2));
+            
+            $debug['transformations']['reference_line'] = array(
+                'template_start' => "({$ref_start_template_x}, {$ref_start_template_y})",
+                'template_end' => "({$ref_end_template_x}, {$ref_end_template_y})",
+                'template_length' => "{$ref_length_template}px",
+                'container_start' => "({$ref_start_container_x}, {$ref_start_container_y})",
+                'container_end' => "({$ref_end_container_x}, {$ref_end_container_y})",
+                'container_length' => "{$ref_length_container}px",
+                'physical_cm' => $coordinates['reference']['physical_cm'] ?? 'FEHLT'
+            );
+        }
+        
+        // SCHRITT 4: Design-Element-Transformationen
+        if (!empty($real_coordinates) && is_array($real_coordinates)) {
+            foreach ($real_coordinates as $index => $element) {
+                $elem_debug = array();
+                
+                // Input-Werte
+                $x_mm = $element['x_mm'] ?? 0;
+                $y_mm = $element['y_mm'] ?? 0;
+                $width_mm = $element['width_mm'] ?? 0;
+                $height_mm = $element['height_mm'] ?? 0;
+                $x_px_original = $element['x_px'] ?? 0;
+                $y_px_original = $element['y_px'] ?? 0;
+                
+                $elem_debug['input'] = array(
+                    'mm_coordinates' => "({$x_mm}, {$y_mm}) {$width_mm}x{$height_mm}mm",
+                    'original_px' => "({$x_px_original}, {$y_px_original})",
+                    'url' => $element['url'] ?? 'FEHLT'
+                );
+                
+                // MM zu Template-Pixel (über Produktdimensionen)
+                $x_template_via_mm = ($x_mm / $product_width_mm) * $template_width;
+                $y_template_via_mm = ($y_mm / $product_height_mm) * $template_height;
+                $width_template_via_mm = ($width_mm / $product_width_mm) * $template_width;
+                $height_template_via_mm = ($height_mm / $product_height_mm) * $template_height;
+                
+                $elem_debug['mm_to_template'] = array(
+                    'calculation' => "({$x_mm}/{$product_width_mm}) * {$template_width} = {$x_template_via_mm}",
+                    'template_coords' => "({$x_template_via_mm}, {$y_template_via_mm}) {$width_template_via_mm}x{$height_template_via_mm}px"
+                );
+                
+                // Template zu Container
+                $x_final = $template_offset_x + ($x_template_via_mm * $template_scale);
+                $y_final = $template_offset_y + ($y_template_via_mm * $template_scale);
+                $width_final = $width_template_via_mm * $template_scale;
+                $height_final = $height_template_via_mm * $template_scale;
+                
+                $elem_debug['template_to_container'] = array(
+                    'calculation' => "{$template_offset_x} + ({$x_template_via_mm} * {$template_scale}) = {$x_final}",
+                    'container_coords' => "({$x_final}, {$y_final}) {$width_final}x{$height_final}px"
+                );
+                
+                // Alternative: Direkte Pixel-Transformation (zum Vergleich)
+                $x_direct = $template_offset_x + ($x_px_original * $template_scale);
+                $y_direct = $template_offset_y + ($y_px_original * $template_scale);
+                
+                $elem_debug['direct_pixel_transform'] = array(
+                    'calculation' => "{$template_offset_x} + ({$x_px_original} * {$template_scale}) = {$x_direct}",
+                    'direct_coords' => "({$x_direct}, {$y_direct})",
+                    'difference_to_mm_method' => "x_diff=" . ($x_final - $x_direct) . ", y_diff=" . ($y_final - $y_direct)
+                );
+                
+                $debug['transformations']['elements'][$index] = $elem_debug;
+            }
+        }
+        
+        // DEBUG-OUTPUT
+        error_log("YPrint Debug Coordinate Transform:");
+        error_log("=====================================");
+        error_log("INPUT DATA: " . print_r($debug['input_data'], true));
+        error_log("CALCULATIONS: " . print_r($debug['calculations'], true));
+        error_log("TRANSFORMATIONS: " . print_r($debug['transformations'], true));
+        error_log("=====================================");
+        
+        return array_merge($debug, array(
+            'template_scale' => $template_scale,
+            'template_offset_x' => $template_offset_x,
+            'template_offset_y' => $template_offset_y,
+            'product_width_mm' => $product_width_mm,
+            'product_height_mm' => $product_height_mm
+        ));
+    }
+
+    /**
      * ✅ NEU: Präzise Koordinaten-Transformation mit echten Canvas-Dimensionen
      * 
      * Löst die spezifischen Rendering-Fehler:
@@ -516,60 +669,71 @@ class YPrint_Unified_Visualization_System {
     }
 
     /**
-     * ✅ NEU: Template-Referenz mit mathematisch korrekter Referenzlinie-Transformation
+     * 🔧 DEBUG-ENHANCED: Template-Referenz mit vollständiger Debug-Information
      */
     private static function render_template_reference($data, $coordinates) {
-        $transformer = self::create_precise_coordinate_transformer($data, $coordinates);
-        
-        error_log("YPrint Unified: 🎨 render_template_reference aufgerufen (MATHEMATISCH KORREKT)");
-        error_log("YPrint Unified: 📊 Template-Image-URL: " . ($data['template_image_url'] ?? 'FEHLEND'));
-        error_log("YPrint Unified: 📊 Reference-Points: " . json_encode($coordinates['reference']['points'] ?? 'FEHLEND'));
+        $transformer = self::create_debug_coordinate_transformer($data, $coordinates);
         
         $html = '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
+        
+        // DEBUG-INFO-BOX
+        $html .= '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin-bottom: 10px; font-size: 11px; text-align: left;">';
+        $html .= '<strong>Debug Referenzlinie:</strong><br>';
+        if (isset($transformer['transformations']['reference_line'])) {
+            $ref_debug = $transformer['transformations']['reference_line'];
+            $html .= 'Template: ' . $ref_debug['template_start'] . ' → ' . $ref_debug['template_end'] . ' (Länge: ' . $ref_debug['template_length'] . ')<br>';
+            $html .= 'Container: ' . $ref_debug['container_start'] . ' → ' . $ref_debug['container_end'] . ' (Länge: ' . $ref_debug['container_length'] . ')<br>';
+            $html .= 'Physisch: ' . $ref_debug['physical_cm'] . '<br>';
+            $html .= 'Template-Scale: ' . $transformer['template_scale'] . ', Offset: (' . $transformer['template_offset_x'] . ', ' . $transformer['template_offset_y'] . ')';
+        } else {
+            $html .= 'KEINE REFERENZPUNKTE GEFUNDEN';
+        }
+        $html .= '</div>';
+        
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #f8f9fa;">';
         
-        // Template-Bild mit exakter Positionierung
+        // Template-Bild
         if (!empty($data['template_image_url'])) {
             $img_width = 800 * $transformer['template_scale'];
             $img_height = 600 * $transformer['template_scale'];
             
             $html .= '<img src="' . esc_attr($data['template_image_url']) . '" style="position: absolute; left: ' . $transformer['template_offset_x'] . 'px; top: ' . $transformer['template_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; object-fit: contain;" alt="Template">';
+            
+            // DEBUG: Template-Outline anzeigen
+            $html .= '<div style="position: absolute; left: ' . $transformer['template_offset_x'] . 'px; top: ' . $transformer['template_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; border: 1px dashed #007bff; pointer-events: none;"></div>';
         }
         
-        // MATHEMATISCH KORREKTE Referenzlinie
-        if (isset($coordinates['reference']['points']) && count($coordinates['reference']['points']) >= 2) {
-            error_log("YPrint Unified: ✅ Referenzlinie wird gerendert (MATHEMATISCH KORREKT)");
-            $points = $coordinates['reference']['points'];
+        // Referenzlinie mit Debug-Informationen
+        if (isset($transformer['transformations']['reference_line'])) {
+            $ref_debug = $transformer['transformations']['reference_line'];
             
-            // Template-Koordinaten (800x600) zu Container-Koordinaten (400x500)
-            $start_x = $transformer['template_offset_x'] + ($points[0]['x'] * $transformer['template_scale']);
-            $start_y = $transformer['template_offset_y'] + ($points[0]['y'] * $transformer['template_scale']);
-            $end_x = $transformer['template_offset_x'] + ($points[1]['x'] * $transformer['template_scale']);
-            $end_y = $transformer['template_offset_y'] + ($points[1]['y'] * $transformer['template_scale']);
+            // Extrahiere Koordinaten aus Debug-Strings
+            preg_match('/\(([^,]+),\s*([^)]+)\)/', $ref_debug['container_start'], $start_matches);
+            preg_match('/\(([^,]+),\s*([^)]+)\)/', $ref_debug['container_end'], $end_matches);
             
-            $html .= '<svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">';
-            
-            // Referenzlinie mit korrekten Koordinaten
-            $html .= '<line x1="' . $start_x . '" y1="' . $start_y . '" x2="' . $end_x . '" y2="' . $end_y . '" stroke="#dc3545" stroke-width="4" stroke-dasharray="8,4"/>';
-            
-            // Endpunkt-Marker
-            $html .= '<circle cx="' . $start_x . '" cy="' . $start_y . '" r="5" fill="#dc3545"/>';
-            $html .= '<circle cx="' . $end_x . '" cy="' . $end_y . '" r="5" fill="#dc3545"/>';
-            
-            // Label (mathematisch zentriert)
-            $mid_x = ($start_x + $end_x) / 2;
-            $mid_y = ($start_y + $end_y) / 2;
-            
-            // Label-Box
-            $html .= '<rect x="' . ($mid_x - 20) . '" y="' . ($mid_y - 10) . '" width="40" height="20" fill="#dc3545" rx="4"/>';
-            $html .= '<text x="' . $mid_x . '" y="' . ($mid_y + 3) . '" text-anchor="middle" fill="white" font-size="11" font-weight="bold">' . $coordinates['reference']['physical_cm'] . 'cm</text>';
-            $html .= '</svg>';
+            if ($start_matches && $end_matches) {
+                $start_x = floatval($start_matches[1]);
+                $start_y = floatval($start_matches[2]);
+                $end_x = floatval($end_matches[1]);
+                $end_y = floatval($end_matches[2]);
+                
+                $html .= '<svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">';
+                $html .= '<line x1="' . $start_x . '" y1="' . $start_y . '" x2="' . $end_x . '" y2="' . $end_y . '" stroke="#dc3545" stroke-width="4" stroke-dasharray="8,4"/>';
+                $html .= '<circle cx="' . $start_x . '" cy="' . $start_y . '" r="6" fill="#dc3545"/>';
+                $html .= '<circle cx="' . $end_x . '" cy="' . $end_y . '" r="6" fill="#dc3545"/>';
+                
+                // Debug-Koordinaten als Text
+                $html .= '<text x="' . ($start_x + 10) . '" y="' . ($start_y - 10) . '" fill="#dc3545" font-size="10">Start: (' . round($start_x) . ',' . round($start_y) . ')</text>';
+                $html .= '<text x="' . ($end_x + 10) . '" y="' . ($end_y + 15) . '" fill="#dc3545" font-size="10">End: (' . round($end_x) . ',' . round($end_y) . ')</text>';
+                
+                $html .= '</svg>';
+            }
         }
         
         $html .= '</div>';
         $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;">';
-        $html .= '<strong>Größe:</strong> ' . esc_html($coordinates['product']['order_size']) . ' | <strong>Referenz:</strong> ' . $coordinates['reference']['physical_cm'] . 'cm';
+        $html .= '<strong>Größe:</strong> ' . $coordinates['product']['order_size'] . ' | <strong>Referenz:</strong> ' . ($coordinates['reference']['physical_cm'] ?? 'N/A') . 'cm';
         $html .= '</p></div>';
         
         return $html;
