@@ -156,10 +156,15 @@ class YPrint_Unified_Visualization_System {
         if (!empty($data['reference_measurements'])) {
             $ref = $data['reference_measurements'];
             $ref_pixel_distance = $ref['pixel_distance'] ?? 0;
-            $ref_physical_cm = $ref['physical_size_cm'] ?? 0;
+            $ref_physical_cm = $ref['physical_size_cm'] ?? $ref['real_distance_cm'] ?? 0;
             
             // Berechne Referenz-Skalierungsfaktor
-            $ref_scale_cm_to_px = $ref_pixel_distance / $ref_physical_cm;
+            if ($ref_physical_cm > 0) {
+                $ref_scale_cm_to_px = $ref_pixel_distance / $ref_physical_cm;
+            } else {
+                $ref_scale_cm_to_px = 0;
+                error_log("YPrint Unified: ⚠️ Referenz-Physical-Size ist 0, verwende Fallback");
+            }
             
             error_log("YPrint Unified: 📏 Referenzmessungen:");
             error_log("  Pixel Distance: {$ref_pixel_distance}px");
@@ -172,6 +177,18 @@ class YPrint_Unified_Visualization_System {
                 'physical_cm' => $ref_physical_cm,
                 'scale_cm_to_px' => $ref_scale_cm_to_px,
                 'points' => $ref['reference_points'] ?? array()
+            );
+        } else {
+            // Fallback für fehlende Referenzmessung
+            error_log("YPrint Unified: ⚠️ Keine Referenzmessung gefunden, verwende Fallback");
+            $coordinates['reference'] = array(
+                'pixel_distance' => 200, // Standard-Pixel-Distanz
+                'physical_cm' => 50,     // Standard-Physical-Size (Größe M)
+                'scale_cm_to_px' => 4,   // Standard-Skalierung (200px / 50cm)
+                'points' => array(
+                    array('x' => 200, 'y' => 300),
+                    array('x' => 400, 'y' => 300)
+                )
             );
         }
         
@@ -199,6 +216,19 @@ class YPrint_Unified_Visualization_System {
                 'y_px' => $final_y_px,
                 'width_px' => $final_width_px,
                 'height_px' => $final_height_px
+            );
+        } else {
+            // Fallback für fehlende finale Koordinaten
+            error_log("YPrint Unified: ⚠️ Keine finalen Druckkoordinaten gefunden, verwende Fallback");
+            $coordinates['final'] = array(
+                'x_mm' => 50,   // Standard X-Position
+                'y_mm' => 50,   // Standard Y-Position
+                'width_mm' => 200,  // Standard-Breite
+                'height_mm' => 250, // Standard-Höhe
+                'x_px' => 50 * $scale_mm_to_px,
+                'y_px' => 50 * $scale_mm_to_px,
+                'width_px' => 200 * $scale_mm_to_px,
+                'height_px' => 250 * $scale_mm_to_px
             );
         }
         
@@ -447,30 +477,118 @@ class YPrint_Unified_Visualization_System {
     }
     
     private static function get_reference_measurements($template_id) {
+        error_log("YPrint Unified: 🔍 Suche Referenzmessungen für Template {$template_id}");
+        
         $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
-        if (!empty($view_print_areas)) {
-            foreach ($view_print_areas as $view_data) {
-                if (isset($view_data['measurements']['reference_measurement'])) {
-                    return $view_data['measurements']['reference_measurement'];
+        
+        if (empty($view_print_areas) || !is_array($view_print_areas)) {
+            error_log("YPrint Unified: ❌ Keine _template_view_print_areas gefunden");
+            return null;
+        }
+        
+        error_log("YPrint Unified: 📊 Gefundene View-IDs: " . implode(', ', array_keys($view_print_areas)));
+        
+        // Durchsuche alle Views nach Referenzmessungen
+        foreach ($view_print_areas as $view_id => $view_data) {
+            error_log("YPrint Unified: 🔍 Prüfe View {$view_id}");
+            
+            if (!isset($view_data['measurements']) || !is_array($view_data['measurements'])) {
+                error_log("YPrint Unified: ⚠️ View {$view_id} hat keine measurements");
+                continue;
+            }
+            
+            // Methode 1: Suche nach 'reference_measurement' Key
+            if (isset($view_data['measurements']['reference_measurement'])) {
+                $ref_measurement = $view_data['measurements']['reference_measurement'];
+                error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (reference_measurement key)");
+                error_log("  Type: " . ($ref_measurement['measurement_type'] ?? 'unknown'));
+                error_log("  Pixel Distance: " . ($ref_measurement['pixel_distance'] ?? 'unknown'));
+                error_log("  Physical Size: " . ($ref_measurement['physical_size_cm'] ?? 'unknown') . " cm");
+                return $ref_measurement;
+            }
+            
+            // Methode 2: Suche nach Messungen mit 'is_reference' = true
+            foreach ($view_data['measurements'] as $measurement) {
+                if (isset($measurement['is_reference']) && $measurement['is_reference'] === true) {
+                    error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (is_reference = true)");
+                    error_log("  Type: " . ($measurement['measurement_type'] ?? 'unknown'));
+                    error_log("  Pixel Distance: " . ($measurement['pixel_distance'] ?? 'unknown'));
+                    error_log("  Physical Size: " . ($measurement['physical_size_cm'] ?? 'unknown') . " cm");
+                    return $measurement;
+                }
+            }
+            
+            // Methode 3: Suche nach Messungen mit 'type' = 'chest' oder 'height_from_shoulder'
+            foreach ($view_data['measurements'] as $measurement) {
+                if (isset($measurement['type']) && in_array($measurement['type'], ['chest', 'height_from_shoulder', 'chest_width'])) {
+                    error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (type: " . $measurement['type'] . ")");
+                    error_log("  Type: " . ($measurement['type'] ?? 'unknown'));
+                    error_log("  Pixel Distance: " . ($measurement['pixel_distance'] ?? 'unknown'));
+                    error_log("  Physical Size: " . ($measurement['physical_size_cm'] ?? $measurement['real_distance_cm'] ?? 'unknown') . " cm");
+                    return $measurement;
                 }
             }
         }
         
+        error_log("YPrint Unified: ❌ Keine Referenzmessung in allen Views gefunden");
         return null;
     }
     
     private static function get_final_coordinates($order_id) {
-        // Versuche verschiedene Quellen
+        error_log("YPrint Unified: 🔍 Suche finale Druckkoordinaten für Order {$order_id}");
+        
+        // Methode 1: Workflow-Daten (Schritt 6)
         $workflow_data = get_post_meta($order_id, '_yprint_workflow_data', true);
-        if (!empty($workflow_data) && isset($workflow_data['step6']['final_coordinates'])) {
-            return $workflow_data['step6']['final_coordinates'];
+        if (!empty($workflow_data)) {
+            error_log("YPrint Unified: 📊 Workflow-Daten gefunden");
+            
+            // Prüfe Schritt 6
+            if (isset($workflow_data['step6']['final_coordinates'])) {
+                $coords = $workflow_data['step6']['final_coordinates'];
+                error_log("YPrint Unified: ✅ Finale Koordinaten aus Schritt 6 gefunden");
+                error_log("  X: " . ($coords['x_mm'] ?? 'unknown') . " mm");
+                error_log("  Y: " . ($coords['y_mm'] ?? 'unknown') . " mm");
+                error_log("  Width: " . ($coords['width_mm'] ?? 'unknown') . " mm");
+                error_log("  Height: " . ($coords['height_mm'] ?? 'unknown') . " mm");
+                return $coords;
+            }
+            
+            // Prüfe Schritt 5 als Fallback
+            if (isset($workflow_data['step5']['output']['final_coordinates'])) {
+                $coords = $workflow_data['step5']['output']['final_coordinates'];
+                error_log("YPrint Unified: ✅ Finale Koordinaten aus Schritt 5 gefunden");
+                error_log("  X: " . ($coords['x_mm'] ?? 'unknown') . " mm");
+                error_log("  Y: " . ($coords['y_mm'] ?? 'unknown') . " mm");
+                error_log("  Width: " . ($coords['width_mm'] ?? 'unknown') . " mm");
+                error_log("  Height: " . ($coords['height_mm'] ?? 'unknown') . " mm");
+                return $coords;
+            }
         }
         
+        // Methode 2: Direkte Meta-Felder
         $final_coordinates = get_post_meta($order_id, '_yprint_final_coordinates', true);
         if (!empty($final_coordinates)) {
+            error_log("YPrint Unified: ✅ Finale Koordinaten aus _yprint_final_coordinates gefunden");
+            error_log("  X: " . ($final_coordinates['x_mm'] ?? 'unknown') . " mm");
+            error_log("  Y: " . ($final_coordinates['y_mm'] ?? 'unknown') . " mm");
+            error_log("  Width: " . ($final_coordinates['width_mm'] ?? 'unknown') . " mm");
+            error_log("  Height: " . ($final_coordinates['height_mm'] ?? 'unknown') . " mm");
             return $final_coordinates;
         }
         
+        // Methode 3: Order Items
+        $order = wc_get_order($order_id);
+        if ($order) {
+            foreach ($order->get_items() as $item) {
+                $item_coords = $item->get_meta('_yprint_final_coordinates');
+                if (!empty($item_coords)) {
+                    error_log("YPrint Unified: ✅ Finale Koordinaten aus Order Item gefunden");
+                    return $item_coords;
+                }
+            }
+        }
+        
+        error_log("YPrint Unified: ❌ Keine finalen Druckkoordinaten gefunden");
         return null;
     }
     
