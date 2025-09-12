@@ -1,4 +1,7 @@
 <?php
+// Lade YPrint Unified Visualization System
+require_once plugin_dir_path(__FILE__) . 'class-yprint-unified-visualization-system.php';
+
 class Octo_Print_Designer_WC_Integration {
     private static $instance;
     
@@ -5359,6 +5362,19 @@ private function build_print_provider_email_content($order, $design_items, $note
      * ✅ KORRIGIERT: Doppel-Visualisierung HTML mit gemeinsamen Referenzrahmen
      */
     private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
+        // ✅ NEU: Verwende das einheitliche Visualisierungssystem
+        if (class_exists('YPrint_Unified_Visualization_System')) {
+            return YPrint_Unified_Visualization_System::create_unified_visualization($template_id, $template_image_url, $order_id);
+        }
+        
+        // Fallback: Alte Implementierung
+        return $this->generate_dual_visualization_html_legacy($template_id, $template_image_url, $order_id);
+    }
+    
+    /**
+     * Legacy duale Visualisierung HTML (Fallback)
+     */
+    private function generate_dual_visualization_html_legacy($template_id, $template_image_url, $order_id) {
         // Lade Order-Daten für Größe
         $order = wc_get_order($order_id);
         $order_size = 'M'; // Fallback
