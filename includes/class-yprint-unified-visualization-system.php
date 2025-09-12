@@ -336,7 +336,22 @@ class YPrint_Unified_Visualization_System {
         error_log("YPrint Unified: 📊 Koordinaten-Daten: " . json_encode($coordinates));
         error_log("YPrint Unified: 📊 Validierung-Daten: " . json_encode($validation));
         
-        $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
+        // ✅ DEBUG-BOX: Zeige alle Rohdaten an
+        $html = '<div style="font-family: monospace; background: #fffbe6; border: 1px solid #ffecb3; padding: 15px; margin: 10px; border-radius: 4px; color: #664d03;">';
+        $html .= '<h3 style="margin-top: 0; color: #664d03;">[DEBUG] Rohdaten für die Visualisierung</h3>';
+        
+        $html .= '<h4>$data (Geladene Rohdaten):</h4>';
+        $html .= '<pre style="white-space: pre-wrap; word-wrap: break-word; background: #fff; padding: 10px; border-radius: 4px;">' . esc_html(print_r($data, true)) . '</pre>';
+        
+        $html .= '<h4>$coordinates (Transformierte Koordinaten):</h4>';
+        $html .= '<pre style="white-space: pre-wrap; word-wrap: break-word; background: #fff; padding: 10px; border-radius: 4px;">' . esc_html(print_r($coordinates, true)) . '</pre>';
+        
+        $html .= '<h4>$validation (Ergebnis der Konsistenzprüfung):</h4>';
+        $html .= '<pre style="white-space: pre-wrap; word-wrap: break-word; background: #fff; padding: 10px; border-radius: 4px;">' . esc_html(print_r($validation, true)) . '</pre>';
+        
+        $html .= '</div>';
+        
+        $html .= '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
         
         // LINKS: Template-Referenzbild mit korrekter Referenzlinie
         error_log("YPrint Unified: 🎨 Rendere Template-Referenzbild...");
