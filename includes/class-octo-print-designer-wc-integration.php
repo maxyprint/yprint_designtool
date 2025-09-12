@@ -2081,7 +2081,7 @@ private function check_yprint_dependency() {
     }
     
     /**
-     * ✅ NEU: STUFE 1 - Direkte Order-Meta Suche
+     * ✅ NEU: STUFE 1 - Direkte Order-Meta Suche (KORRIGIERT)
      */
     private function find_design_data_for_order($order_id) {
         global $wpdb;
@@ -2100,12 +2100,21 @@ private function check_yprint_dependency() {
         $found_designs = array();
         
         foreach ($design_ids as $design_id) {
+            // ✅ KORREKTUR: Lade Design-Daten direkt per Design-ID (IGNORIERE Customer-ID)
             $design = $wpdb->get_row($wpdb->prepare("
                 SELECT * FROM {$wpdb->prefix}octo_user_designs WHERE id = %d
             ", $design_id));
             
-            if ($design && $this->validate_design_data($design)) {
-                $found_designs[] = $design;
+            if ($design) {
+                error_log("YPrint: Design {$design_id} gefunden - User: {$design->user_id}, Template: {$design->template_id}");
+                
+                if ($this->validate_design_data($design)) {
+                    $found_designs[] = $design;
+                } else {
+                    error_log("YPrint: Design {$design_id} gefunden aber nicht valide");
+                }
+            } else {
+                error_log("YPrint: Design {$design_id} nicht in Datenbank gefunden");
             }
         }
         
@@ -2286,6 +2295,60 @@ private function check_yprint_dependency() {
     }
     
     /**
+     * ✅ NEU: Echte Koordinaten aus Design-Daten extrahieren (KORRIGIERT)
+     */
+    private function extract_real_coordinates_from_design($design_data) {
+        $json = json_decode($design_data, true);
+        
+        if (!$json || !isset($json['variationImages'])) {
+            error_log("YPrint: Design-Daten können nicht geparst werden oder variationImages fehlen");
+            return array();
+        }
+        
+        $coordinates = array();
+        
+        foreach ($json['variationImages'] as $variation_key => $images) {
+            foreach ($images as $image) {
+                if (isset($image['transform'])) {
+                    $transform = $image['transform'];
+                    
+                    // Canvas-Koordinaten zu Millimeter (basierend auf Canvas-Größe)
+                    $canvas_width = $json['design_metadata']['actual_canvas_size']['width'] ?? 656;
+                    $canvas_height = $json['design_metadata']['actual_canvas_size']['height'] ?? 420;
+                    
+                    // Template-Dimensionen in mm (für Template 3657)
+                    $template_width_mm = 500; // 50cm
+                    $template_height_mm = 680; // 68cm
+                    
+                    // Skalierungsfaktor
+                    $scale_x = $template_width_mm / $canvas_width;
+                    $scale_y = $template_height_mm / $canvas_height;
+                    
+                    $coordinates[] = array(
+                        'element_id' => $image['id'] ?? 'unknown',
+                        'url' => $image['url'] ?? '',
+                        'x_mm' => round($transform['left'] * $scale_x, 2),
+                        'y_mm' => round($transform['top'] * $scale_y, 2),
+                        'width_mm' => round($transform['width'] * $transform['scaleX'] * $scale_x, 2),
+                        'height_mm' => round($transform['height'] * $transform['scaleY'] * $scale_y, 2),
+                        'rotation' => $transform['angle'] ?? 0,
+                        'x_px' => $transform['left'],
+                        'y_px' => $transform['top'],
+                        'width_px' => $transform['width'],
+                        'height_px' => $transform['height'],
+                        'scale_x' => $transform['scaleX'],
+                        'scale_y' => $transform['scaleY'],
+                        'source' => 'real_design_data_converted'
+                    );
+                }
+            }
+        }
+        
+        error_log("YPrint: " . count($coordinates) . " Koordinaten aus Design-Daten extrahiert");
+        return $coordinates;
+    }
+    
+    /**
      * ✅ NEU: Bild-URLs aus Design extrahieren
      */
     private function extract_image_urls_from_design($design_data) {
@@ -2382,27 +2445,43 @@ private function check_yprint_dependency() {
             $result[] = "✅ ECHTE Design-Daten erfolgreich geladen:";
             $result[] = "   Variation Images: " . count($design_data['variationImages']) . " gefunden";
             
-            // Extrahiere echte Koordinaten
-            $real_coordinates = array();
-            foreach ($design_data['variationImages'] as $idx => $image) {
-                if (isset($image['transform'])) {
-                    $t = $image['transform'];
-                    
-                    $result[] = "   Bild " . ($idx + 1) . ":";
-                    $result[] = "      Position: x=" . ($t['left'] ?? 0) . ", y=" . ($t['top'] ?? 0) . "px";
-                    $result[] = "      Größe: " . ($t['width'] ?? 0) . "x" . ($t['height'] ?? 0) . "px";
-                    $result[] = "      Scale: X=" . ($t['scaleX'] ?? 1) . ", Y=" . ($t['scaleY'] ?? 1);
-                    
-                    $real_coordinates[] = array(
-                        'x_px' => floatval($t['left'] ?? 0),
-                        'y_px' => floatval($t['top'] ?? 0),
-                        'width_px' => floatval($t['width'] ?? 0),
-                        'height_px' => floatval($t['height'] ?? 0),
-                        'scale_x' => floatval($t['scaleX'] ?? 1),
-                        'scale_y' => floatval($t['scaleY'] ?? 1),
-                        'rotation' => floatval($t['angle'] ?? 0),
-                        'source' => 'real_design_data'
-                    );
+            // ✅ KORREKTUR: Extrahiere echte Koordinaten mit Millimeter-Konvertierung
+            $real_coordinates = $this->extract_real_coordinates_from_design($design->design_data);
+            
+            if (!empty($real_coordinates)) {
+                $result[] = "   ✅ Koordinaten erfolgreich extrahiert:";
+                foreach ($real_coordinates as $idx => $coord) {
+                    $result[] = "   Element " . ($idx + 1) . ":";
+                    $result[] = "      ID: " . $coord['element_id'];
+                    $result[] = "      Position: x=" . $coord['x_mm'] . "mm, y=" . $coord['y_mm'] . "mm";
+                    $result[] = "      Größe: " . $coord['width_mm'] . "x" . $coord['height_mm'] . "mm";
+                    $result[] = "      Rotation: " . $coord['rotation'] . "°";
+                }
+            } else {
+                $result[] = "   ❌ Keine Koordinaten extrahiert - Fallback zu Pixel-Daten";
+                
+                // Fallback: Extrahiere Pixel-Koordinaten
+                foreach ($design_data['variationImages'] as $idx => $image) {
+                    if (isset($image['transform'])) {
+                        $t = $image['transform'];
+                        
+                        $result[] = "   Bild " . ($idx + 1) . " (Pixel):";
+                        $result[] = "      Position: x=" . ($t['left'] ?? 0) . ", y=" . ($t['top'] ?? 0) . "px";
+                        $result[] = "      Größe: " . ($t['width'] ?? 0) . "x" . ($t['height'] ?? 0) . "px";
+                        $result[] = "      Scale: X=" . ($t['scaleX'] ?? 1) . ", Y=" . ($t['scaleY'] ?? 1);
+                        
+                        $real_coordinates[] = array(
+                            'element_id' => $image['id'] ?? 'unknown',
+                            'x_px' => floatval($t['left'] ?? 0),
+                            'y_px' => floatval($t['top'] ?? 0),
+                            'width_px' => floatval($t['width'] ?? 0),
+                            'height_px' => floatval($t['height'] ?? 0),
+                            'scale_x' => floatval($t['scaleX'] ?? 1),
+                            'scale_y' => floatval($t['scaleY'] ?? 1),
+                            'rotation' => floatval($t['angle'] ?? 0),
+                            'source' => 'real_design_data_pixel_fallback'
+                        );
+                    }
                 }
             }
             
@@ -6095,18 +6174,18 @@ private function build_print_provider_email_content($order, $design_items, $note
                 error_log("🎨 YPRINT WORKFLOW: Starting Step 1 - Canvas Capture with found design");
                 try {
                     $step1_result = $this->perform_step_1_canvas_capture_with_design($order, $best_design_match['design']);
-                    $step_results[1] = $step1_result;
-                    $combined_result .= "✅ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
-                    $combined_result .= "   Status: Erfolgreich\n";
+                $step_results[1] = $step1_result;
+                $combined_result .= "✅ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
+                $combined_result .= "   Status: Erfolgreich\n";
                     $combined_result .= "   Design verwendet: ID " . $best_design_match['design']->id . "\n";
                     $combined_result .= "   Ergebnis: Canvas-Daten aus echten Design-Daten erfasst\n\n";
                     error_log("✅ YPRINT WORKFLOW: Step 1 completed successfully with real design data");
-                } catch (Exception $e) {
-                    $all_steps_successful = false;
-                    $combined_result .= "❌ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
-                    $combined_result .= "   Status: FEHLGESCHLAGEN\n";
-                    $combined_result .= "   Fehler: " . $e->getMessage() . "\n\n";
-                    error_log("❌ YPRINT WORKFLOW: Step 1 failed: " . $e->getMessage());
+        } catch (Exception $e) {
+                $all_steps_successful = false;
+                $combined_result .= "❌ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
+                $combined_result .= "   Status: FEHLGESCHLAGEN\n";
+                $combined_result .= "   Fehler: " . $e->getMessage() . "\n\n";
+                error_log("❌ YPRINT WORKFLOW: Step 1 failed: " . $e->getMessage());
                 }
             }
             
