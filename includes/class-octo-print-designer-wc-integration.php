@@ -55,6 +55,7 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_test_complete_workflow', array($this, 'ajax_test_complete_workflow'));
         add_action('wp_ajax_test_complete_yprint_workflow', array($this, 'ajax_test_complete_yprint_workflow'));
         add_action('wp_ajax_yprint_preview_modal', array($this, 'ajax_yprint_preview_modal'));
+        add_action('wp_ajax_yprint_debug_order_meta_fields', array($this, 'ajax_debug_order_meta_fields'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
@@ -728,6 +729,22 @@ private function check_yprint_dependency() {
                         <!-- Debug Information -->
                         <div id="yprint-preview-debug" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px;">
                             <h4>🔍 Debug-Informationen</h4>
+                            
+                            <!-- Order Meta-Felder Debug Button -->
+                            <div style="margin-bottom: 15px;">
+                                <button type="button" id="debug-order-meta-btn" class="button button-secondary" style="width: 100%; margin-bottom: 10px;">
+                                    <span class="dashicons dashicons-search"></span> Order Meta-Felder anzeigen
+                                </button>
+                                
+                                <div id="debug-order-meta-result" style="display: none; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px; margin-top: 10px;">
+                                    <p><em>Lade Order Meta-Felder...</em></p>
+                                </div>
+                                
+                                <div style="margin-top: 10px; font-size: 11px; color: #666;">
+                                    <p><strong>Hinweis:</strong> Zeigt alle Meta-Felder für diese Bestellung an. Nützlich um zu verstehen, welche YPrint-Daten verfügbar sind.</p>
+                                </div>
+                            </div>
+                            
                             <div id="yprint-preview-debug-content"></div>
                         </div>
                     </div>
@@ -1453,7 +1470,7 @@ private function check_yprint_dependency() {
                                     console.log('🎯 Opening YPrint Preview Modal automatically...');
                                     
                                     // Öffne das Modal direkt
-                                    $('#yprint-preview-modal').show();
+                                    $('#yprint-preview-modal').data('order-id', orderId).show();
                                     $('#yprint-preview-title').text('🎨 YPrint Workflow Ergebnisse');
                                     $('#yprint-preview-loading').show();
                                     $('#yprint-preview-content').hide();
@@ -1544,7 +1561,7 @@ private function check_yprint_dependency() {
                                         console.log('🎯 Opening YPrint Preview Modal manually...');
                                         
                                         // Öffne das Modal direkt
-                                        $('#yprint-preview-modal').show();
+                                        $('#yprint-preview-modal').data('order-id', orderId).show();
                                         $('#yprint-preview-title').text('🎨 YPrint Template-Vorschau');
                                         $('#yprint-preview-loading').show();
                                         $('#yprint-preview-content').hide();
@@ -1785,7 +1802,7 @@ private function check_yprint_dependency() {
                     var nonce = $('#octo_print_provider_nonce').val();
                     
                     // Modal öffnen
-                    $('#yprint-preview-modal').show();
+                    $('#yprint-preview-modal').data('order-id', orderId).show();
                     $('#yprint-preview-title').text('Vollbild-Vorschau: ' + viewName);
                     $('#yprint-preview-loading').show();
                     $('#yprint-preview-content').hide();
@@ -1900,9 +1917,187 @@ private function check_yprint_dependency() {
                     }
                 });
                 
+                // Order Meta-Felder Debug Button
+                $('#debug-order-meta-btn').on('click', function() {
+                    var $btn = $(this);
+                    var $result = $('#debug-order-meta-result');
+                    
+                    $btn.prop('disabled', true).html('<span class="dashicons dashicons-update"></span> Lade...');
+                    $result.show().html('<p><em>Lade Order Meta-Felder...</em></p>');
+                    
+                    // Hole die aktuelle Order-ID aus dem Modal
+                    var orderId = $('#yprint-preview-modal').data('order-id');
+                    if (!orderId) {
+                        $result.html('<p style="color: red;">❌ Fehler: Order-ID nicht gefunden</p>');
+                        $btn.prop('disabled', false).html('<span class="dashicons dashicons-search"></span> Order Meta-Felder anzeigen');
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'yprint_debug_order_meta_fields',
+                            order_id: orderId,
+                            nonce: '<?php echo wp_create_nonce('yprint_debug_order_meta'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $result.html(response.data.html);
+                            } else {
+                                $result.html('<p style="color: red;">❌ Fehler: ' + (response.data || 'Unbekannter Fehler') + '</p>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            $result.html('<p style="color: red;">❌ AJAX-Fehler: ' + error + '</p>');
+                        },
+                        complete: function() {
+                            $btn.prop('disabled', false).html('<span class="dashicons dashicons-search"></span> Order Meta-Felder anzeigen');
+                        }
+                    });
+                });
+                
             });
         </script>
         <?php
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für Order Meta-Felder Debug
+     */
+    public function ajax_debug_order_meta_fields() {
+        // Nonce-Verifikation
+        if (!wp_verify_nonce($_POST['nonce'], 'yprint_debug_order_meta')) {
+            wp_send_json_error('Nonce-Verifikation fehlgeschlagen');
+            return;
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        if (!$order_id) {
+            wp_send_json_error('Ungültige Order-ID');
+            return;
+        }
+        
+        error_log("🔍 YPrint Debug Order Meta Fields für Order ID: {$order_id}");
+        
+        // Hole alle Meta-Felder für die Bestellung
+        $all_meta = get_post_meta($order_id);
+        
+        $html = '<div style="font-family: monospace; font-size: 12px;">';
+        $html .= '<h4 style="color: #0073aa; margin-top: 0;">📋 Alle Meta-Felder für Bestellung #' . $order_id . '</h4>';
+        
+        if (empty($all_meta)) {
+            $html .= '<p style="color: #dc3545;">❌ Keine Meta-Felder gefunden!</p>';
+        } else {
+            $html .= '<p style="color: #28a745;">✅ ' . count($all_meta) . ' Meta-Felder gefunden:</p>';
+            
+            // Sortiere Meta-Felder nach Relevanz
+            $yprint_meta = array();
+            $other_meta = array();
+            
+            foreach ($all_meta as $key => $values) {
+                if (strpos($key, 'yprint') !== false || strpos($key, '_yprint') !== false) {
+                    $yprint_meta[$key] = $values;
+                } else {
+                    $other_meta[$key] = $values;
+                }
+            }
+            
+            // Zeige YPrint-relevante Meta-Felder zuerst
+            if (!empty($yprint_meta)) {
+                $html .= '<h5 style="color: #0073aa; margin-top: 15px;">🎯 YPrint-relevante Meta-Felder:</h5>';
+                foreach ($yprint_meta as $key => $values) {
+                    $html .= $this->format_meta_field($key, $values, true);
+                }
+            }
+            
+            // Zeige andere Meta-Felder
+            if (!empty($other_meta)) {
+                $html .= '<h5 style="color: #666; margin-top: 15px;">📝 Andere Meta-Felder:</h5>';
+                foreach ($other_meta as $key => $values) {
+                    $html .= $this->format_meta_field($key, $values, false);
+                }
+            }
+            
+            // Spezielle Analyse für fehlende YPrint-Daten
+            $html .= '<h5 style="color: #dc3545; margin-top: 20px;">🔍 Analyse fehlender YPrint-Daten:</h5>';
+            
+            $missing_keys = array();
+            if (!isset($yprint_meta['_yprint_workflow_data'])) {
+                $missing_keys[] = '_yprint_workflow_data';
+            }
+            if (!isset($yprint_meta['_yprint_final_coordinates'])) {
+                $missing_keys[] = '_yprint_final_coordinates';
+            }
+            
+            if (!empty($missing_keys)) {
+                $html .= '<p style="color: #dc3545;">❌ <strong>Fehlende kritische Meta-Keys:</strong></p>';
+                $html .= '<ul style="color: #dc3545;">';
+                foreach ($missing_keys as $key) {
+                    $html .= '<li><code>' . esc_html($key) . '</code> - ' . $this->get_meta_key_description($key) . '</li>';
+                }
+                $html .= '</ul>';
+            } else {
+                $html .= '<p style="color: #28a745;">✅ Alle kritischen YPrint Meta-Keys sind vorhanden!</p>';
+            }
+        }
+        
+        $html .= '</div>';
+        
+        wp_send_json_success(array('html' => $html));
+    }
+    
+    /**
+     * Hilfsfunktion: Formatiert ein Meta-Feld für die Anzeige
+     */
+    private function format_meta_field($key, $values, $is_yprint = false) {
+        $html = '<div style="margin: 8px 0; padding: 8px; border: 1px solid ' . ($is_yprint ? '#0073aa' : '#ddd') . '; border-radius: 4px; background: ' . ($is_yprint ? '#f0f8ff' : '#f9f9f9') . ';">';
+        $html .= '<strong style="color: ' . ($is_yprint ? '#0073aa' : '#333') . ';">' . esc_html($key) . '</strong>';
+        
+        if (is_array($values) && count($values) === 1) {
+            $value = $values[0];
+            $html .= '<br><span style="color: #666;">Wert:</span> ';
+            
+            // Prüfe ob es serialisierte Daten sind
+            if (is_serialized($value)) {
+                $unserialized = maybe_unserialize($value);
+                $html .= '<em style="color: #0073aa;">(Serialisiert)</em><br>';
+                $html .= '<pre style="background: #fff; padding: 5px; border-radius: 3px; overflow-x: auto; font-size: 11px;">' . esc_html(print_r($unserialized, true)) . '</pre>';
+            } else {
+                $html .= '<code style="background: #fff; padding: 2px 4px; border-radius: 3px;">' . esc_html($value) . '</code>';
+            }
+        } else {
+            $html .= '<br><span style="color: #666;">Werte (' . count($values) . '):</span>';
+            foreach ($values as $i => $value) {
+                $html .= '<br><span style="color: #666;">[' . $i . ']:</span> ';
+                if (is_serialized($value)) {
+                    $unserialized = maybe_unserialize($value);
+                    $html .= '<em style="color: #0073aa;">(Serialisiert)</em><br>';
+                    $html .= '<pre style="background: #fff; padding: 5px; border-radius: 3px; overflow-x: auto; font-size: 11px;">' . esc_html(print_r($unserialized, true)) . '</pre>';
+                } else {
+                    $html .= '<code style="background: #fff; padding: 2px 4px; border-radius: 3px;">' . esc_html($value) . '</code>';
+                }
+            }
+        }
+        
+        $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * Hilfsfunktion: Beschreibung für Meta-Keys
+     */
+    private function get_meta_key_description($key) {
+        $descriptions = array(
+            '_yprint_workflow_data' => 'Enthält die Ergebnisse aller 6 Workflow-Schritte, inklusive finale Koordinaten in step6',
+            '_yprint_final_coordinates' => 'Alternative Speicherung der finalen Druckkoordinaten',
+            '_yprint_template_id' => 'ID des verwendeten Templates',
+            '_yprint_order_size' => 'Bestellte Größe (S, M, L, XL)',
+            '_yprint_design_data' => 'Design-spezifische Daten',
+            '_yprint_measurements' => 'Messdaten für das Design'
+        );
+        
+        return isset($descriptions[$key]) ? $descriptions[$key] : 'Unbekannter Meta-Key';
     }
 
     /**
