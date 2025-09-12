@@ -43,9 +43,11 @@ class YPrint_Unified_Visualization_System {
             error_log("YPrint Unified: ✅ Konsistenz validiert: " . ($validation['is_consistent'] ? 'KONSISTENT' : 'INKONSISTENT'));
             
             // 4. ERSTELLE VISUALISIERUNG
+            error_log("YPrint Unified: 🎨 Rendere Visualisierung...");
             $result = self::render_unified_visualization($data, $unified_coordinates, $validation);
             
-            error_log("YPrint Unified: ✅ Visualisierung erfolgreich erstellt");
+            error_log("YPrint Unified: ✅ Visualisierung erfolgreich erstellt, HTML-Länge: " . strlen($result));
+            error_log("YPrint Unified: 📄 HTML-Start: " . substr($result, 0, 200) . "...");
             return $result;
             
         } catch (Exception $e) {

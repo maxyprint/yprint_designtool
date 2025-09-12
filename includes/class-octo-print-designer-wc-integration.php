@@ -5263,7 +5263,17 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("🎨 YPrint Preview: Template Image URL: {$template_image_url}");
             
             // Doppel-Visualisierung generieren
+            error_log("🎨 YPrint Preview: Generiere Doppel-Visualisierung...");
             $dual_html = $this->generate_dual_visualization_html($template_id, $template_image_url, $order_id);
+            
+            // ✅ NEU: Debug-Logging für HTML-Generierung
+            error_log("🎨 YPrint Preview: HTML-Länge: " . strlen($dual_html));
+            error_log("🎨 YPrint Preview: HTML-Start: " . substr($dual_html, 0, 200) . "...");
+            
+            if (empty($dual_html)) {
+                error_log("🎨 YPrint Preview: ❌ HTML ist leer!");
+                $dual_html = '<div style="padding: 20px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px;">❌ Fehler: Visualisierung konnte nicht generiert werden</div>';
+            }
             
             $preview_data = array(
                 'view_name' => $view_name,
@@ -5272,7 +5282,9 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'template_image_url' => $template_image_url,
                 'template_id' => $template_id,
                 'image_url' => 'data:text/html;base64,' . base64_encode($dual_html),
-                'debug_info' => "Doppel-Visualisierung für {$view_name} - Template ID: {$template_id}"
+                'debug_info' => "Doppel-Visualisierung für {$view_name} - Template ID: {$template_id}",
+                'html_length' => strlen($dual_html),
+                'html_preview' => substr($dual_html, 0, 200) . "..."
             );
             
             wp_send_json_success($preview_data);
@@ -5362,11 +5374,17 @@ private function build_print_provider_email_content($order, $design_items, $note
      * ✅ KORRIGIERT: Doppel-Visualisierung HTML mit gemeinsamen Referenzrahmen
      */
     private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
+        error_log("🎨 YPrint Preview: generate_dual_visualization_html aufgerufen für Template {$template_id}");
+        
         // ✅ NEU: Verwende das einheitliche Visualisierungssystem
         if (class_exists('YPrint_Unified_Visualization_System')) {
-            return YPrint_Unified_Visualization_System::create_unified_visualization($template_id, $template_image_url, $order_id);
+            error_log("🎨 YPrint Preview: Verwende YPrint_Unified_Visualization_System");
+            $result = YPrint_Unified_Visualization_System::create_unified_visualization($template_id, $template_image_url, $order_id);
+            error_log("🎨 YPrint Preview: YPrint_Unified_Visualization_System Ergebnis-Länge: " . strlen($result));
+            return $result;
         }
         
+        error_log("🎨 YPrint Preview: YPrint_Unified_Visualization_System nicht verfügbar, verwende Legacy");
         // Fallback: Alte Implementierung
         return $this->generate_dual_visualization_html_legacy($template_id, $template_image_url, $order_id);
     }
