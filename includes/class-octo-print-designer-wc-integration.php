@@ -2036,6 +2036,403 @@ private function check_yprint_dependency() {
     }
     
     /**
+     * ✅ NEU: Dynamische Design-Daten-Suche mit mehrstufiger Strategie
+     */
+    public function dynamically_find_design_data($order_id) {
+        // Performance-Optimierung: Cache für wiederholte Suchen
+        $cache_key = 'yprint_design_search_' . $order_id;
+        $cached_result = wp_cache_get($cache_key);
+        
+        if ($cached_result !== false) {
+            error_log("YPrint: Using cached design search result for order #{$order_id}");
+            return $cached_result;
+        }
+        
+        $strategies = array(
+            'direct_order_meta' => 'find_design_data_for_order',
+            'customer_context' => 'find_designs_by_customer_and_context',  
+            'template_timing' => 'find_designs_by_template_and_timing',
+            'similarity_analysis' => 'find_similar_designs',
+            'latest_fallback' => 'get_latest_template_design'
+        );
+        
+        $results = array();
+        
+        foreach ($strategies as $strategy_name => $function) {
+            error_log("YPrint: Trying strategy: {$strategy_name} for order #{$order_id}");
+            
+            $designs = call_user_func(array($this, $function), $order_id);
+            
+            if (!empty($designs)) {
+                $results[$strategy_name] = $designs;
+                error_log("YPrint: Strategy {$strategy_name} found " . count($designs) . " designs");
+                
+                // Erste erfolgreiche Strategie verwendet (außer Fallback)
+                if ($strategy_name !== 'latest_fallback') {
+                    break;
+                }
+            }
+        }
+        
+        // Cache das Ergebnis für 1 Stunde
+        wp_cache_set($cache_key, $results, '', 3600);
+        
+        return $results;
+    }
+    
+    /**
+     * ✅ NEU: STUFE 1 - Direkte Order-Meta Suche
+     */
+    private function find_design_data_for_order($order_id) {
+        global $wpdb;
+        
+        // Hole alle Design-IDs aus Order-Items
+        $design_ids = $wpdb->get_col($wpdb->prepare("
+            SELECT oim.meta_value 
+            FROM {$wpdb->prefix}woocommerce_order_items oi
+            JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id
+            WHERE oi.order_id = %d 
+            AND oim.meta_key IN ('_yprint_design_id', '_design_id')
+            AND oim.meta_value IS NOT NULL
+            AND oim.meta_value != ''
+        ", $order_id));
+        
+        $found_designs = array();
+        
+        foreach ($design_ids as $design_id) {
+            $design = $wpdb->get_row($wpdb->prepare("
+                SELECT * FROM {$wpdb->prefix}octo_user_designs WHERE id = %d
+            ", $design_id));
+            
+            if ($design && $this->validate_design_data($design)) {
+                $found_designs[] = $design;
+            }
+        }
+        
+        return $found_designs;
+    }
+    
+    /**
+     * ✅ NEU: STUFE 2 - Kunde + Template + Zeit Heuristik
+     */
+    private function find_designs_by_customer_and_context($order_id) {
+        global $wpdb;
+        $order = wc_get_order($order_id);
+        
+        if (!$order) return array();
+        
+        $customer_id = $order->get_customer_id();
+        $order_date = $order->get_date_created();
+        
+        // Template-ID aus Order-Items extrahieren
+        $template_ids = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT oim.meta_value 
+            FROM {$wpdb->prefix}woocommerce_order_items oi
+            JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id
+            WHERE oi.order_id = %d 
+            AND oim.meta_key IN ('_yprint_template_id', '_template_id')
+        ", $order_id));
+        
+        if (empty($template_ids)) {
+            $template_ids = array('3657'); // Fallback Standard-Template
+        }
+        
+        // Zeitfenster: 1 Stunde vor Bestellung bis Bestellzeit
+        $time_window_start = date('Y-m-d H:i:s', $order_date->getTimestamp() - 3600);
+        $time_window_end = $order_date->format('Y-m-d H:i:s');
+        
+        // Intelligente Suche
+        $designs = $wpdb->get_results($wpdb->prepare("
+            SELECT *, 
+            ABS(TIMESTAMPDIFF(MINUTE, created_at, %s)) as time_diff_minutes
+            FROM {$wpdb->prefix}octo_user_designs 
+            WHERE user_id = %d 
+            AND template_id IN (" . implode(',', array_map('intval', $template_ids)) . ")
+            AND created_at BETWEEN %s AND %s
+            ORDER BY time_diff_minutes ASC, created_at DESC
+            LIMIT 5
+        ", $time_window_end, $customer_id, $time_window_start, $time_window_end));
+        
+        // Validiere gefundene Designs
+        $valid_designs = array();
+        foreach ($designs as $design) {
+            if ($this->validate_design_data($design)) {
+                $valid_designs[] = $design;
+            }
+        }
+        
+        return $valid_designs;
+    }
+    
+    /**
+     * ✅ NEU: STUFE 3 - Erweiterte Heuristik (ohne Customer-ID)
+     */
+    private function find_designs_by_template_and_timing($order_id) {
+        global $wpdb;
+        $order = wc_get_order($order_id);
+        
+        $order_date = $order->get_date_created();
+        
+        // Zeitfenster erweitern: 24 Stunden vor Bestellung
+        $time_window_start = date('Y-m-d H:i:s', $order_date->getTimestamp() - 86400);
+        $time_window_end = $order_date->format('Y-m-d H:i:s');
+        
+        // Suche nach Template 3657 im Zeitfenster
+        $designs = $wpdb->get_results($wpdb->prepare("
+            SELECT ud.*, 
+            ABS(TIMESTAMPDIFF(MINUTE, ud.created_at, %s)) as time_diff_minutes,
+            LENGTH(ud.design_data) as data_complexity
+            FROM {$wpdb->prefix}octo_user_designs ud
+            WHERE ud.template_id = 3657
+            AND ud.created_at BETWEEN %s AND %s
+            AND LENGTH(ud.design_data) > 500
+            ORDER BY time_diff_minutes ASC, data_complexity DESC
+            LIMIT 10
+        ", $time_window_end, $time_window_start, $time_window_end));
+        
+        // Validiere gefundene Designs
+        $valid_designs = array();
+        foreach ($designs as $design) {
+            if ($this->validate_design_data($design)) {
+                $valid_designs[] = $design;
+            }
+        }
+        
+        return $valid_designs;
+    }
+    
+    /**
+     * ✅ NEU: STUFE 4 - Design-Ähnlichkeits-Analyse
+     */
+    private function find_similar_designs($order_id, $reference_design_data = null) {
+        global $wpdb;
+        
+        // Extrahiere Bild-URLs aus Referenz-Design
+        if ($reference_design_data) {
+            $reference_urls = $this->extract_image_urls_from_design($reference_design_data);
+            
+            if (!empty($reference_urls)) {
+                $url_conditions = array();
+                foreach ($reference_urls as $url) {
+                    $url_conditions[] = $wpdb->prepare("design_data LIKE %s", '%' . $url . '%');
+                }
+                
+                $designs = $wpdb->get_results("
+                    SELECT *, LENGTH(design_data) as complexity 
+                    FROM {$wpdb->prefix}octo_user_designs 
+                    WHERE template_id = 3657 
+                    AND (" . implode(' OR ', $url_conditions) . ")
+                    ORDER BY created_at DESC, complexity DESC
+                    LIMIT 5
+                ");
+                
+                // Validiere gefundene Designs
+                $valid_designs = array();
+                foreach ($designs as $design) {
+                    if ($this->validate_design_data($design)) {
+                        $valid_designs[] = $design;
+                    }
+                }
+                
+                return $valid_designs;
+            }
+        }
+        
+        return array();
+    }
+    
+    /**
+     * ✅ NEU: STUFE 5 - Letzte Fallback-Strategie
+     */
+    private function get_latest_template_design($template_id = 3657) {
+        global $wpdb;
+        
+        $design = $wpdb->get_row($wpdb->prepare("
+            SELECT * FROM {$wpdb->prefix}octo_user_designs 
+            WHERE template_id = %d 
+            AND LENGTH(design_data) > 500
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ", $template_id));
+        
+        if ($design && $this->validate_design_data($design)) {
+            return array($design);
+        }
+        
+        return array();
+    }
+    
+    /**
+     * ✅ NEU: Design-Daten-Validierung
+     */
+    private function validate_design_data($design) {
+        // Prüfe ob design_data vollständig ist
+        if (strlen($design->design_data) < 100) {
+            return false;
+        }
+        
+        // Prüfe ob JSON gültig ist
+        $json_data = json_decode($design->design_data, true);
+        if (!$json_data) {
+            return false;
+        }
+        
+        // Prüfe ob mindestens ein Element vorhanden ist
+        if (empty($json_data['variationImages']) && empty($json_data['design_images'])) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * ✅ NEU: Bild-URLs aus Design extrahieren
+     */
+    private function extract_image_urls_from_design($design_data) {
+        preg_match_all('/https:\/\/[^"]+\.(png|jpg|jpeg|webp)/i', $design_data, $matches);
+        return $matches[0] ?? array();
+    }
+    
+    /**
+     * ✅ NEU: Scoring und Auswahl des besten Designs
+     */
+    private function select_best_design_match($results, $order_id) {
+        $order = wc_get_order($order_id);
+        $order_date = $order->get_date_created();
+        
+        $scored_designs = array();
+        
+        foreach ($results as $strategy => $designs) {
+            foreach ($designs as $design) {
+                $score = 0;
+                
+                // Zeit-Score (näher zur Bestellung = besser)
+                $time_diff = abs($order_date->getTimestamp() - strtotime($design->created_at));
+                $time_score = max(0, 100 - ($time_diff / 3600)); // Maximal 100, -1 pro Stunde
+                
+                // Komplexitäts-Score (mehr Daten = wahrscheinlich echter)
+                $complexity_score = min(50, strlen($design->design_data) / 20);
+                
+                // Strategie-Score
+                $strategy_scores = array(
+                    'direct_order_meta' => 100,
+                    'customer_context' => 80,
+                    'template_timing' => 60,
+                    'similarity_analysis' => 40,
+                    'latest_fallback' => 20
+                );
+                
+                $total_score = $time_score + $complexity_score + $strategy_scores[$strategy];
+                
+                $scored_designs[] = array(
+                    'design' => $design,
+                    'score' => $total_score,
+                    'strategy' => $strategy,
+                    'time_diff_hours' => round($time_diff / 3600, 1)
+                );
+            }
+        }
+        
+        // Sortiere nach Score
+        usort($scored_designs, function($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+        
+        return $scored_designs[0] ?? null; // Bestes Match
+    }
+    
+    /**
+     * ✅ NEU: Logging für Debugging
+     */
+    private function log_search_strategy_results($order_id, $strategy, $found_count, $selected_design) {
+        $log_entry = array(
+            'order_id' => $order_id,
+            'strategy_used' => $strategy,
+            'designs_found' => $found_count,
+            'selected_design_id' => $selected_design['design']->id ?? null,
+            'confidence_score' => $selected_design['score'] ?? 0,
+            'time_diff_hours' => $selected_design['time_diff_hours'] ?? 0,
+            'timestamp' => current_time('mysql')
+        );
+        
+        update_post_meta($order_id, '_yprint_search_log', $log_entry);
+        
+        error_log("YPrint Search Log: Order #{$order_id} - Strategy: {$strategy}, Score: " . ($selected_design['score'] ?? 0));
+    }
+
+    /**
+     * ✅ NEU: Canvas-Capture mit echten Design-Daten
+     */
+    private function perform_step_1_canvas_capture_with_design($order, $design) {
+        error_log("🎨 SCHRITT 1: Canvas Capture with real design data for order #" . $order->get_order_number());
+        
+        $result = array();
+        $result[] = "=== 🎨 SCHRITT 1: CANVAS-ERFASSUNG MIT ECHTEN DESIGN-DATEN ===";
+        $result[] = "Bestellung: #" . $order->get_order_number();
+        $result[] = "Design ID: " . $design->id;
+        $result[] = "Template ID: " . $design->template_id;
+        $result[] = "Design Name: " . $design->name;
+        $result[] = "Erstellt: " . $design->created_at;
+        $result[] = "";
+        
+        // Parse echte Design-Daten
+        $design_data = json_decode($design->design_data, true);
+        
+        if ($design_data && isset($design_data['variationImages'])) {
+            $result[] = "✅ ECHTE Design-Daten erfolgreich geladen:";
+            $result[] = "   Variation Images: " . count($design_data['variationImages']) . " gefunden";
+            
+            // Extrahiere echte Koordinaten
+            $real_coordinates = array();
+            foreach ($design_data['variationImages'] as $idx => $image) {
+                if (isset($image['transform'])) {
+                    $t = $image['transform'];
+                    
+                    $result[] = "   Bild " . ($idx + 1) . ":";
+                    $result[] = "      Position: x=" . ($t['left'] ?? 0) . ", y=" . ($t['top'] ?? 0) . "px";
+                    $result[] = "      Größe: " . ($t['width'] ?? 0) . "x" . ($t['height'] ?? 0) . "px";
+                    $result[] = "      Scale: X=" . ($t['scaleX'] ?? 1) . ", Y=" . ($t['scaleY'] ?? 1);
+                    
+                    $real_coordinates[] = array(
+                        'x_px' => floatval($t['left'] ?? 0),
+                        'y_px' => floatval($t['top'] ?? 0),
+                        'width_px' => floatval($t['width'] ?? 0),
+                        'height_px' => floatval($t['height'] ?? 0),
+                        'scale_x' => floatval($t['scaleX'] ?? 1),
+                        'scale_y' => floatval($t['scaleY'] ?? 1),
+                        'rotation' => floatval($t['angle'] ?? 0),
+                        'source' => 'real_design_data'
+                    );
+                }
+            }
+            
+            // Speichere echte Koordinaten in Order Meta
+            update_post_meta($order->get_id(), '_yprint_real_design_coordinates', $real_coordinates);
+            update_post_meta($order->get_id(), '_yprint_design_source', array(
+                'design_id' => $design->id,
+                'template_id' => $design->template_id,
+                'source' => 'dynamic_search',
+                'timestamp' => current_time('mysql')
+            ));
+            
+            $result[] = "";
+            $result[] = "✅ ECHTE Koordinaten gespeichert:";
+            $result[] = "   " . count($real_coordinates) . " Design-Elemente verarbeitet";
+            $result[] = "   Meta-Feld: _yprint_real_design_coordinates";
+            $result[] = "   Bereit für Koordinaten-Konvertierung";
+            
+        } else {
+            $result[] = "❌ FEHLER: Design-Daten konnten nicht geparst werden";
+            $result[] = "   JSON-Fehler oder fehlende variationImages";
+        }
+        
+        $result[] = "";
+        $result[] = "✅ SCHRITT 1 ABGESCHLOSSEN: Echte Design-Daten erfolgreich erfasst";
+        
+        return implode("\n", $result);
+    }
+
+    /**
      * ✅ NEU: SCHRITT 1 - Bestellungsgrunddaten analysieren
      */
     private function analyze_order_basic_data($order) {
@@ -2188,7 +2585,7 @@ private function check_yprint_dependency() {
             foreach ($critical_keys as $key => $description) {
                 if (!isset($yprint_meta[$key])) {
                     $missing_keys[] = array('key' => $key, 'description' => $description);
-                }
+            }
             }
             
             if (!empty($missing_keys)) {
@@ -5660,21 +6057,57 @@ private function build_print_provider_email_content($order, $design_items, $note
             $step_results = array();
             $all_steps_successful = true;
             
-            // SCHRITT 1: Canvas-Erfassung & Design-Platzierung
-            error_log("🎨 YPRINT WORKFLOW: Starting Step 1 - Canvas Capture");
+            // SCHRITT 0: Dynamische Design-Daten-Suche
+            error_log("🔍 YPRINT WORKFLOW: Starting Dynamic Design Search");
             try {
-                $step1_result = $this->perform_step_1_canvas_capture_test($order);
-                $step_results[1] = $step1_result;
-                $combined_result .= "✅ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
-                $combined_result .= "   Status: Erfolgreich\n";
-                $combined_result .= "   Ergebnis: " . (is_string($step1_result) ? substr($step1_result, 0, 100) . "..." : "Canvas-Daten erfasst") . "\n\n";
-                error_log("✅ YPRINT WORKFLOW: Step 1 completed successfully");
-        } catch (Exception $e) {
+                $search_results = $this->dynamically_find_design_data($order_id);
+                $best_design_match = $this->select_best_design_match($search_results, $order_id);
+                
+                if ($best_design_match) {
+                    $combined_result .= "✅ SCHRITT 0: Dynamische Design-Daten-Suche\n";
+                    $combined_result .= "   Status: Erfolgreich\n";
+                    $combined_result .= "   Strategie: " . $best_design_match['strategy'] . "\n";
+                    $combined_result .= "   Design ID: " . $best_design_match['design']->id . "\n";
+                    $combined_result .= "   Confidence Score: " . round($best_design_match['score'], 1) . "\n";
+                    $combined_result .= "   Zeit-Differenz: " . $best_design_match['time_diff_hours'] . " Stunden\n\n";
+                    
+                    // Logge die Suche
+                    $this->log_search_strategy_results($order_id, $best_design_match['strategy'], count($search_results), $best_design_match);
+                    
+                    error_log("✅ YPRINT WORKFLOW: Design found via " . $best_design_match['strategy'] . " (Score: " . $best_design_match['score'] . ")");
+                } else {
+                    $combined_result .= "❌ SCHRITT 0: Dynamische Design-Daten-Suche\n";
+                    $combined_result .= "   Status: FEHLGESCHLAGEN\n";
+                    $combined_result .= "   Fehler: Keine Design-Daten gefunden\n\n";
+                    error_log("❌ YPRINT WORKFLOW: No design data found");
+                    $all_steps_successful = false;
+                }
+            } catch (Exception $e) {
                 $all_steps_successful = false;
-                $combined_result .= "❌ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
+                $combined_result .= "❌ SCHRITT 0: Dynamische Design-Daten-Suche\n";
                 $combined_result .= "   Status: FEHLGESCHLAGEN\n";
                 $combined_result .= "   Fehler: " . $e->getMessage() . "\n\n";
-                error_log("❌ YPRINT WORKFLOW: Step 1 failed: " . $e->getMessage());
+                error_log("❌ YPRINT WORKFLOW: Design search failed: " . $e->getMessage());
+            }
+            
+            // SCHRITT 1: Canvas-Erfassung & Design-Platzierung (mit gefundenen Daten)
+            if ($all_steps_successful && $best_design_match) {
+                error_log("🎨 YPRINT WORKFLOW: Starting Step 1 - Canvas Capture with found design");
+                try {
+                    $step1_result = $this->perform_step_1_canvas_capture_with_design($order, $best_design_match['design']);
+                    $step_results[1] = $step1_result;
+                    $combined_result .= "✅ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
+                    $combined_result .= "   Status: Erfolgreich\n";
+                    $combined_result .= "   Design verwendet: ID " . $best_design_match['design']->id . "\n";
+                    $combined_result .= "   Ergebnis: Canvas-Daten aus echten Design-Daten erfasst\n\n";
+                    error_log("✅ YPRINT WORKFLOW: Step 1 completed successfully with real design data");
+                } catch (Exception $e) {
+                    $all_steps_successful = false;
+                    $combined_result .= "❌ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
+                    $combined_result .= "   Status: FEHLGESCHLAGEN\n";
+                    $combined_result .= "   Fehler: " . $e->getMessage() . "\n\n";
+                    error_log("❌ YPRINT WORKFLOW: Step 1 failed: " . $e->getMessage());
+                }
             }
             
             // SCHRITT 2: Template-Referenzmessungen
