@@ -2485,12 +2485,38 @@ class Octo_Print_Designer_Template {
             );
         }
         
-        // ✅ VEREINFACHT: Größe M als feste Referenz
+        // ✅ KORRIGIERT: Lade korrekten physical_size_cm aus Produktdimensionen
+        $measurement_type = $measurement_data['measurement_type'] ?? $measurement_data['type'] ?? 'unknown';
+        $reference_size = $measurement_data['reference_size'] ?? 'M'; // Fallback
+        
+        // SCHRITT 1: Lade Produktdimensionen, um den korrekten physischen Wert zu finden
+        $product_dimensions = get_post_meta($template_id, '_template_product_dimensions', true);
+        $physical_size_cm = 0;
+        
+        // Prüfen, ob die Produktdimensionen für den Messungstyp und die Referenzgröße existieren
+        if (
+            !empty($product_dimensions) &&
+            isset($product_dimensions[$reference_size]) &&
+            isset($product_dimensions[$reference_size][$measurement_type])
+        ) {
+            $physical_size_cm = floatval($product_dimensions[$reference_size][$measurement_type]);
+            error_log("YPrint: ✅ Dynamischer physical_size_cm Wert aus _template_product_dimensions geladen: " . $physical_size_cm . "cm für {$measurement_type} Größe {$reference_size}");
+        } else {
+            // Fallback-Werte basierend auf Messungstyp
+            $fallback_sizes = array(
+                'height_from_shoulder' => 64.0, // Größe M
+                'chest' => 50.0,
+                'shoulder' => 47.0
+            );
+            $physical_size_cm = $fallback_sizes[$measurement_type] ?? 50.0;
+            error_log("YPrint: ⚠️ physical_size_cm konnte nicht aus Produktdimensionen geladen werden. Verwende Fallback-Wert: " . $physical_size_cm . "cm für {$measurement_type}");
+        }
+        
         $reference_measurement = array(
-            'measurement_type' => $measurement_data['measurement_type'] ?? $measurement_data['type'],
+            'measurement_type' => $measurement_type,
             'pixel_distance' => floatval($measurement_data['pixel_distance']),
-            'physical_size_cm' => 51.0,  // FESTE Referenz: Größe M
-            'reference_size' => 'M',     // Konsistente Basis
+            'physical_size_cm' => $physical_size_cm,  // ✅ KORRIGIERT: Dynamischer Wert
+            'reference_size' => $reference_size,     // Konsistente Basis
             'reference_points' => array(
                 array(
                     'x' => intval($measurement_data['points'][0]['x']),
@@ -2503,7 +2529,16 @@ class Octo_Print_Designer_Template {
             ),
             'template_id' => $template_id,
             'created_at' => current_time('mysql'),
-            'is_reference' => true
+            'is_reference' => true,
+            // ✅ NEU: Debug-Informationen für Validierung
+            'debug_info' => array(
+                'product_dimensions_loaded' => !empty($product_dimensions),
+                'product_dimensions_count' => is_array($product_dimensions) ? count($product_dimensions) : 0,
+                'calculation_method' => !empty($product_dimensions) && isset($product_dimensions[$reference_size][$measurement_type]) ? 'product_dimensions' : 'fallback',
+                'fallback_used' => empty($product_dimensions) || !isset($product_dimensions[$reference_size][$measurement_type]),
+                'calculated_ratio' => $physical_size_cm / floatval($measurement_data['pixel_distance']),
+                'ratio_status' => (($physical_size_cm / floatval($measurement_data['pixel_distance'])) >= 0.05 && ($physical_size_cm / floatval($measurement_data['pixel_distance'])) <= 0.5) ? 'valid' : 'warning'
+            )
         );
         
         // Speichere nur das Referenzmaß (überschreibe alle vorherigen)
@@ -2514,8 +2549,21 @@ class Octo_Print_Designer_Template {
         // Speichere in der Datenbank
         $result = update_post_meta($template_id, '_template_view_print_areas', $view_print_areas);
         
+        // ✅ NEU: Validierung der gespeicherten Daten
+        $calculated_ratio = $physical_size_cm / floatval($measurement_data['pixel_distance']);
+        error_log("YPrint: 🎯 Referenzmessung gespeichert:");
+        error_log("  Template ID: {$template_id}");
+        error_log("  View ID: {$view_id}");
+        error_log("  Measurement Type: {$measurement_type}");
+        error_log("  Reference Size: {$reference_size}");
+        error_log("  Pixel Distance: " . floatval($measurement_data['pixel_distance']) . "px");
+        error_log("  Physical Size: {$physical_size_cm}cm");
+        error_log("  Calculated Ratio: " . round($calculated_ratio, 6));
+        error_log("  Ratio Status: " . (($calculated_ratio >= 0.05 && $calculated_ratio <= 0.5) ? 'VALID' : 'WARNING'));
+        error_log("  Data Source: " . (!empty($product_dimensions) && isset($product_dimensions[$reference_size][$measurement_type]) ? 'product_dimensions' : 'fallback'));
+        
         if ($result) {
-            error_log("YPrint LINEAR: ✅ Referenzmessung gespeichert - {$measurement_data['pixel_distance']}px = 51cm (Größe M)");
+            error_log("YPrint LINEAR: ✅ Referenzmessung gespeichert - {$measurement_data['pixel_distance']}px = {$physical_size_cm}cm (Größe {$reference_size})");
             return true;
         } else {
             error_log("YPrint LINEAR: ❌ Fehler beim Speichern der Referenzmessung");
