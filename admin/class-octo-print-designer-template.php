@@ -104,6 +104,16 @@ class Octo_Print_Designer_Template {
             'high'
         );
 
+        // ✅ NEU: Debug Meta-Box für alle gespeicherten Meta-Felder
+        add_meta_box(
+            'template_debug_meta_fields',
+            __('🔍 Debug: Alle Meta-Felder', 'octo-print-designer'),
+            array($this, 'render_debug_meta_fields_meta_box'),
+            'design_template',
+            'side',
+            'low'
+        );
+
         // ❌ ENTFERNT: Doppelte SCHRITT 2 Meta-Boxen (verwende Original-System)
         // "Detailed Product Measurements per Size" → _template_product_dimensions
         // "View-Specific Configuration" → _template_view_print_areas
@@ -2590,6 +2600,66 @@ class Octo_Print_Designer_Template {
         }
         
         return $view_print_areas[$view_id]['measurements']['reference_measurement'];
+    }
+    
+    /**
+     * ✅ NEU: Render Debug Meta-Fields Meta-Box
+     * Zeigt alle verfügbaren gespeicherten Meta-Felder mit Feldnamen und Werten
+     */
+    public function render_debug_meta_fields_meta_box($post) {
+        ?>
+        <div class="template-debug-meta-fields-wrapper">
+            <p><strong>🔍 Alle gespeicherten Meta-Felder für Template ID: <?php echo esc_html($post->ID); ?></strong></p>
+            
+            <button type="button" id="debug-meta-fields-btn" class="button button-primary" style="width: 100%; margin-bottom: 10px;">
+                <span class="dashicons dashicons-search"></span> Meta-Felder anzeigen
+            </button>
+            
+            <div id="debug-meta-fields-result" style="display: none; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                <p><em>Lade Meta-Felder...</em></p>
+            </div>
+            
+            <div style="margin-top: 10px; font-size: 11px; color: #666;">
+                <p><strong>Hinweis:</strong> Diese Funktion zeigt alle in der Datenbank gespeicherten Meta-Felder für dieses Template an. Nützlich für Debugging und Übersicht.</p>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            $('#debug-meta-fields-btn').on('click', function() {
+                var $btn = $(this);
+                var $result = $('#debug-meta-fields-result');
+                
+                $btn.prop('disabled', true).text('Lade...');
+                $result.show().html('<p><em>Lade Meta-Felder...</em></p>');
+                
+                // AJAX-Call zum Laden der Meta-Felder
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'get_template_meta_fields_debug',
+                        template_id: <?php echo intval($post->ID); ?>,
+                        nonce: '<?php echo wp_create_nonce('template_meta_fields_debug'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $result.html(response.data.html);
+                        } else {
+                            $result.html('<p style="color: red;">❌ Fehler: ' + response.data + '</p>');
+                        }
+                    },
+                    error: function() {
+                        $result.html('<p style="color: red;">❌ AJAX-Fehler beim Laden der Meta-Felder</p>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).html('<span class="dashicons dashicons-search"></span> Meta-Felder anzeigen');
+                    }
+                });
+            });
+        });
+        </script>
+        <?php
     }
     
     // ❌ ENTFERNT: render_template_measurements_table_meta_box() - verwende Original-System

@@ -140,6 +140,10 @@ class Octo_Print_Designer_Admin {
         add_action('wp_ajax_yprint_update_reference_lines', array($this, 'ajax_update_reference_lines'));
         add_action('wp_ajax_nopriv_yprint_update_reference_lines', array($this, 'ajax_update_reference_lines'));
         
+        // ✅ NEU: AJAX handler für Debug Meta-Felder
+        add_action('wp_ajax_get_template_meta_fields_debug', array($this, 'ajax_get_template_meta_fields_debug'));
+        add_action('wp_ajax_nopriv_get_template_meta_fields_debug', array($this, 'ajax_get_template_meta_fields_debug'));
+        
         // Zusätzlich: Instanz-basierte Registrierung für Kompatibilität
         $this->template_manager->init_ajax_handlers();
         
@@ -3793,6 +3797,114 @@ class Octo_Print_Designer_Admin {
             'pixel_distance' => 200.0,
             'physical_distance_cm' => 51.0
         );
+    }
+
+    /**
+     * ✅ NEU: AJAX Handler für Debug Meta-Felder
+     * Zeigt alle verfügbaren gespeicherten Meta-Felder mit Feldnamen und Werten
+     */
+    public function ajax_get_template_meta_fields_debug() {
+        // Security check
+        if (!wp_verify_nonce($_POST['nonce'], 'template_meta_fields_debug')) {
+            wp_send_json_error('Security check failed');
+            return;
+        }
+        
+        // Permission check
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+        
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error('Invalid template ID');
+            return;
+        }
+        
+        try {
+            global $wpdb;
+            
+            // Lade alle Meta-Felder für das Template
+            $meta_fields = $wpdb->get_results($wpdb->prepare("
+                SELECT meta_key, meta_value 
+                FROM {$wpdb->postmeta} 
+                WHERE post_id = %d 
+                ORDER BY meta_key
+            ", $template_id));
+            
+            if (empty($meta_fields)) {
+                wp_send_json_success(array(
+                    'html' => '<p style="color: #666; font-style: italic;">Keine Meta-Felder gefunden für Template ID: ' . $template_id . '</p>'
+                ));
+                return;
+            }
+            
+            // Generiere HTML-Tabelle
+            $html = '<div style="font-family: monospace; font-size: 12px;">';
+            $html .= '<h4 style="margin: 0 0 10px 0; color: #333;">📊 Meta-Felder für Template ID: ' . $template_id . '</h4>';
+            $html .= '<table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">';
+            $html .= '<thead>';
+            $html .= '<tr style="background: #f8f9fa;">';
+            $html .= '<th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Meta Key</th>';
+            $html .= '<th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Meta Value</th>';
+            $html .= '<th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Type</th>';
+            $html .= '</tr>';
+            $html .= '</thead>';
+            $html .= '<tbody>';
+            
+            foreach ($meta_fields as $field) {
+                $meta_key = esc_html($field->meta_key);
+                $meta_value = $field->meta_value;
+                
+                // Bestimme den Datentyp
+                $value_type = gettype($meta_value);
+                if (is_serialized($meta_value)) {
+                    $unserialized = maybe_unserialize($meta_value);
+                    $value_type = 'serialized (' . gettype($unserialized) . ')';
+                    $display_value = is_array($unserialized) ? 
+                        'Array mit ' . count($unserialized) . ' Elementen' : 
+                        'Serialized Data';
+                } else {
+                    $display_value = strlen($meta_value) > 100 ? 
+                        substr($meta_value, 0, 100) . '...' : 
+                        $meta_value;
+                }
+                
+                // Farbkodierung basierend auf Meta-Key
+                $row_color = '';
+                if (strpos($meta_key, '_template_') === 0) {
+                    $row_color = 'background: #e8f5e8;'; // Grün für Template-Felder
+                } elseif (strpos($meta_key, '_yprint_') === 0) {
+                    $row_color = 'background: #e8f0ff;'; // Blau für YPrint-Felder
+                } elseif (strpos($meta_key, '_') === 0) {
+                    $row_color = 'background: #fff8e8;'; // Gelb für andere Custom-Felder
+                }
+                
+                $html .= '<tr style="' . $row_color . '">';
+                $html .= '<td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">' . $meta_key . '</td>';
+                $html .= '<td style="padding: 6px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">' . esc_html($display_value) . '</td>';
+                $html .= '<td style="padding: 6px; border: 1px solid #ddd; font-size: 10px; color: #666;">' . $value_type . '</td>';
+                $html .= '</tr>';
+            }
+            
+            $html .= '</tbody>';
+            $html .= '</table>';
+            $html .= '<div style="margin-top: 10px; font-size: 10px; color: #666;">';
+            $html .= '<p><strong>Legende:</strong></p>';
+            $html .= '<p>🟢 Grün: Template-spezifische Felder (_template_*)</p>';
+            $html .= '<p>🔵 Blau: YPrint-spezifische Felder (_yprint_*)</p>';
+            $html .= '<p>🟡 Gelb: Andere Custom-Felder (_*)</p>';
+            $html .= '<p><strong>Gefunden:</strong> ' . count($meta_fields) . ' Meta-Felder</p>';
+            $html .= '</div>';
+            $html .= '</div>';
+            
+            wp_send_json_success(array('html' => $html));
+            
+        } catch (Exception $e) {
+            error_log("YPrint Debug Meta Fields Error: " . $e->getMessage());
+            wp_send_json_error('Fehler beim Laden der Meta-Felder: ' . $e->getMessage());
+        }
     }
 
 }
