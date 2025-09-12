@@ -14,21 +14,49 @@ class YPrint_Unified_Visualization_System {
      * Hauptfunktion: Erstelle einheitliche Visualisierung mit korrekter Skalierung
      */
     public static function create_unified_visualization($template_id, $template_image_url, $order_id) {
-        // 1. LADE ALLE BENÖTIGTEN DATEN
-        $data = self::load_all_visualization_data($template_id, $order_id);
-        
-        if (!$data['success']) {
-            return self::create_error_visualization($data['error']);
+        try {
+            error_log("YPrint Unified: 🚀 Starte einheitliche Visualisierung für Template {$template_id}, Order {$order_id}");
+            
+            // 1. LADE ALLE BENÖTIGTEN DATEN
+            $data = self::load_all_visualization_data($template_id, $order_id);
+            
+            if (!$data['success']) {
+                error_log("YPrint Unified: ❌ Fehler beim Laden der Daten: " . $data['error']);
+                return self::create_error_visualization($data['error']);
+            }
+            
+            error_log("YPrint Unified: ✅ Daten erfolgreich geladen");
+            
+            // 2. ERSTELLE EINHEITLICHES KOORDINATENSYSTEM
+            $unified_coordinates = self::create_unified_coordinate_system($data);
+            
+            if (empty($unified_coordinates)) {
+                error_log("YPrint Unified: ❌ Fehler beim Erstellen des Koordinatensystems");
+                return self::create_error_visualization('Fehler beim Erstellen des Koordinatensystems');
+            }
+            
+            error_log("YPrint Unified: ✅ Koordinatensystem erfolgreich erstellt");
+            
+            // 3. VALIDIERE KONSISTENZ
+            $validation = self::validate_consistency($unified_coordinates);
+            
+            error_log("YPrint Unified: ✅ Konsistenz validiert: " . ($validation['is_consistent'] ? 'KONSISTENT' : 'INKONSISTENT'));
+            
+            // 4. ERSTELLE VISUALISIERUNG
+            $result = self::render_unified_visualization($data, $unified_coordinates, $validation);
+            
+            error_log("YPrint Unified: ✅ Visualisierung erfolgreich erstellt");
+            return $result;
+            
+        } catch (Exception $e) {
+            error_log("YPrint Unified: ❌ FATALER FEHLER: " . $e->getMessage());
+            error_log("YPrint Unified: ❌ Stack Trace: " . $e->getTraceAsString());
+            return self::create_error_visualization('Fataler Fehler: ' . $e->getMessage());
+        } catch (Error $e) {
+            error_log("YPrint Unified: ❌ PHP-FEHLER: " . $e->getMessage());
+            error_log("YPrint Unified: ❌ Stack Trace: " . $e->getTraceAsString());
+            return self::create_error_visualization('PHP-Fehler: ' . $e->getMessage());
         }
-        
-        // 2. ERSTELLE EINHEITLICHES KOORDINATENSYSTEM
-        $unified_coordinates = self::create_unified_coordinate_system($data);
-        
-        // 3. VALIDIERE KONSISTENZ
-        $validation = self::validate_consistency($unified_coordinates);
-        
-        // 4. ERSTELLE VISUALISIERUNG
-        return self::render_unified_visualization($data, $unified_coordinates, $validation);
     }
     
     /**
@@ -42,6 +70,8 @@ class YPrint_Unified_Visualization_System {
         );
         
         try {
+            error_log("YPrint Unified: 📊 Lade Visualisierungsdaten für Template {$template_id}, Order {$order_id}");
+            
             // Order-Daten
             $order = wc_get_order($order_id);
             if (!$order) {
@@ -57,30 +87,50 @@ class YPrint_Unified_Visualization_System {
                 }
             }
             $data['order_size'] = $order_size;
+            error_log("YPrint Unified: ✅ Order-Größe: {$order_size}");
             
             // Template-Bild
             $data['template_image_url'] = self::get_template_image_url($template_id);
             if (!$data['template_image_url']) {
                 throw new Exception('Template-Bild nicht gefunden');
             }
+            error_log("YPrint Unified: ✅ Template-Bild gefunden");
             
             // Template-Dimensionen
             $data['template_dimensions'] = self::get_template_dimensions($template_id);
+            error_log("YPrint Unified: ✅ Template-Dimensionen geladen");
             
             // Produktdimensionen
             $data['product_dimensions'] = self::get_product_dimensions($template_id);
+            error_log("YPrint Unified: ✅ Produktdimensionen geladen");
             
             // Referenzmessungen
             $data['reference_measurements'] = self::get_reference_measurements($template_id);
+            if ($data['reference_measurements']) {
+                error_log("YPrint Unified: ✅ Referenzmessungen gefunden");
+            } else {
+                error_log("YPrint Unified: ⚠️ Keine Referenzmessungen gefunden");
+            }
             
             // Finale Druckkoordinaten
             $data['final_coordinates'] = self::get_final_coordinates($order_id);
+            if ($data['final_coordinates']) {
+                error_log("YPrint Unified: ✅ Finale Druckkoordinaten gefunden");
+            } else {
+                error_log("YPrint Unified: ⚠️ Keine finalen Druckkoordinaten gefunden");
+            }
             
             $data['success'] = true;
+            error_log("YPrint Unified: ✅ Alle Visualisierungsdaten erfolgreich geladen");
             
         } catch (Exception $e) {
             $data['error'] = $e->getMessage();
-            error_log("YPrint Unified Visualization Error: " . $e->getMessage());
+            error_log("YPrint Unified: ❌ Exception beim Laden der Daten: " . $e->getMessage());
+            error_log("YPrint Unified: ❌ Stack Trace: " . $e->getTraceAsString());
+        } catch (Error $e) {
+            $data['error'] = 'PHP-Fehler: ' . $e->getMessage();
+            error_log("YPrint Unified: ❌ PHP-Fehler beim Laden der Daten: " . $e->getMessage());
+            error_log("YPrint Unified: ❌ Stack Trace: " . $e->getTraceAsString());
         }
         
         return $data;
@@ -492,14 +542,28 @@ class YPrint_Unified_Visualization_System {
         foreach ($view_print_areas as $view_id => $view_data) {
             error_log("YPrint Unified: 🔍 Prüfe View {$view_id}");
             
-            if (!isset($view_data['measurements']) || !is_array($view_data['measurements'])) {
-                error_log("YPrint Unified: ⚠️ View {$view_id} hat keine measurements");
+            // ✅ SICHERHEIT: Prüfe ob $view_data ein Array ist
+            if (!is_array($view_data)) {
+                error_log("YPrint Unified: ⚠️ View {$view_id} ist kein Array: " . gettype($view_data));
                 continue;
             }
+            
+            // ✅ SICHERHEIT: Prüfe ob measurements existiert und ein Array ist
+            if (!isset($view_data['measurements']) || !is_array($view_data['measurements'])) {
+                error_log("YPrint Unified: ⚠️ View {$view_id} hat keine measurements oder ist kein Array");
+                continue;
+            }
+            
+            error_log("YPrint Unified: 📊 View {$view_id} hat " . count($view_data['measurements']) . " measurements");
             
             // Methode 1: Suche nach 'reference_measurement' Key
             if (isset($view_data['measurements']['reference_measurement'])) {
                 $ref_measurement = $view_data['measurements']['reference_measurement'];
+                // ✅ SICHERHEIT: Prüfe ob reference_measurement ein Array ist
+                if (!is_array($ref_measurement)) {
+                    error_log("YPrint Unified: ⚠️ reference_measurement in View {$view_id} ist kein Array: " . gettype($ref_measurement));
+                    continue;
+                }
                 error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (reference_measurement key)");
                 error_log("  Type: " . ($ref_measurement['measurement_type'] ?? 'unknown'));
                 error_log("  Pixel Distance: " . ($ref_measurement['pixel_distance'] ?? 'unknown'));
@@ -508,7 +572,13 @@ class YPrint_Unified_Visualization_System {
             }
             
             // Methode 2: Suche nach Messungen mit 'is_reference' = true
-            foreach ($view_data['measurements'] as $measurement) {
+            foreach ($view_data['measurements'] as $measurement_key => $measurement) {
+                // ✅ SICHERHEIT: Prüfe ob measurement ein Array ist
+                if (!is_array($measurement)) {
+                    error_log("YPrint Unified: ⚠️ Measurement {$measurement_key} in View {$view_id} ist kein Array: " . gettype($measurement));
+                    continue;
+                }
+                
                 if (isset($measurement['is_reference']) && $measurement['is_reference'] === true) {
                     error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (is_reference = true)");
                     error_log("  Type: " . ($measurement['measurement_type'] ?? 'unknown'));
@@ -519,7 +589,13 @@ class YPrint_Unified_Visualization_System {
             }
             
             // Methode 3: Suche nach Messungen mit 'type' = 'chest' oder 'height_from_shoulder'
-            foreach ($view_data['measurements'] as $measurement) {
+            foreach ($view_data['measurements'] as $measurement_key => $measurement) {
+                // ✅ SICHERHEIT: Prüfe ob measurement ein Array ist
+                if (!is_array($measurement)) {
+                    error_log("YPrint Unified: ⚠️ Measurement {$measurement_key} in View {$view_id} ist kein Array: " . gettype($measurement));
+                    continue;
+                }
+                
                 if (isset($measurement['type']) && in_array($measurement['type'], ['chest', 'height_from_shoulder', 'chest_width'])) {
                     error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (type: " . $measurement['type'] . ")");
                     error_log("  Type: " . ($measurement['type'] ?? 'unknown'));
