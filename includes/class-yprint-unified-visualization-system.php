@@ -332,19 +332,27 @@ class YPrint_Unified_Visualization_System {
      * Rendere die einheitliche Visualisierung
      */
     private static function render_unified_visualization($data, $coordinates, $validation) {
+        error_log("YPrint Unified: 🎨 render_unified_visualization aufgerufen");
+        error_log("YPrint Unified: 📊 Koordinaten-Daten: " . json_encode($coordinates));
+        error_log("YPrint Unified: 📊 Validierung-Daten: " . json_encode($validation));
+        
         $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
         
         // LINKS: Template-Referenzbild mit korrekter Referenzlinie
+        error_log("YPrint Unified: 🎨 Rendere Template-Referenzbild...");
         $html .= self::render_template_reference($data, $coordinates);
         
         // RECHTS: Finale Druckplatzierung mit korrekter Skalierung
+        error_log("YPrint Unified: 🎨 Rendere finale Druckplatzierung...");
         $html .= self::render_final_placement($data, $coordinates);
         
         $html .= '</div>';
         
         // VALIDIERUNG
+        error_log("YPrint Unified: 🎨 Rendere Validierungs-Info...");
         $html .= self::render_validation_info($validation, $coordinates);
         
+        error_log("YPrint Unified: ✅ render_unified_visualization abgeschlossen, HTML-Länge: " . strlen($html));
         return $html;
     }
     
@@ -352,6 +360,10 @@ class YPrint_Unified_Visualization_System {
      * Rendere Template-Referenzbild
      */
     private static function render_template_reference($data, $coordinates) {
+        error_log("YPrint Unified: 🎨 render_template_reference aufgerufen");
+        error_log("YPrint Unified: 📊 Template-Image-URL: " . ($data['template_image_url'] ?? 'FEHLEND'));
+        error_log("YPrint Unified: 📊 Reference-Points: " . json_encode($coordinates['reference']['points'] ?? 'FEHLEND'));
+        
         $html = '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
@@ -359,6 +371,7 @@ class YPrint_Unified_Visualization_System {
         
         // Referenzlinie mit korrekter Skalierung
         if (isset($coordinates['reference']['points']) && count($coordinates['reference']['points']) >= 2) {
+            error_log("YPrint Unified: ✅ Referenzlinie wird gerendert");
             $points = $coordinates['reference']['points'];
             $start = $points[0];
             $end = $points[1];
@@ -392,13 +405,25 @@ class YPrint_Unified_Visualization_System {
      * Rendere finale Druckplatzierung
      */
     private static function render_final_placement($data, $coordinates) {
+        error_log("YPrint Unified: 🎨 render_final_placement aufgerufen");
+        error_log("YPrint Unified: 📊 Product-Daten: " . json_encode($coordinates['product'] ?? 'FEHLEND'));
+        error_log("YPrint Unified: 📊 Template-Daten: " . json_encode($coordinates['template'] ?? 'FEHLEND'));
+        error_log("YPrint Unified: 📊 Final-Daten: " . json_encode($coordinates['final'] ?? 'FEHLEND'));
+        
         $html = '<div style="flex: 1; text-align: center;">';
         $html .= '<h4 style="margin: 0 0 10px 0; color: #28a745;">🎯 Finale Druckplatzierung</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #f8f9fa;">';
         
         // Produkt-Outline
-        $product_width_px = $coordinates['product']['width_mm'] * $coordinates['template']['scale_mm_to_px'];
-        $product_height_px = $coordinates['product']['height_mm'] * $coordinates['template']['scale_mm_to_px'];
+        if (isset($coordinates['product']['width_mm']) && isset($coordinates['template']['scale_mm_to_px'])) {
+            $product_width_px = $coordinates['product']['width_mm'] * $coordinates['template']['scale_mm_to_px'];
+            $product_height_px = $coordinates['product']['height_mm'] * $coordinates['template']['scale_mm_to_px'];
+            error_log("YPrint Unified: ✅ Produkt-Outline wird gerendert: {$product_width_px}x{$product_height_px}px");
+        } else {
+            error_log("YPrint Unified: ❌ Produkt-Daten fehlen für Outline");
+            $product_width_px = 400;
+            $product_height_px = 500;
+        }
         
         // Skaliere auf 400px Breite
         $scale_factor = 400 / $coordinates['template']['width_px'];
