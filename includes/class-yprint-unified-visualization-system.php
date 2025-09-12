@@ -526,8 +526,36 @@ class YPrint_Unified_Visualization_System {
         
         $html .= '<rect x="' . $product_x . '" y="' . $product_y . '" width="' . $scaled_product_width . '" height="' . $scaled_product_height . '" fill="none" stroke="#6c757d" stroke-width="2" stroke-dasharray="3,3"/>';
         
-        // Druckbereich
-        if (isset($coordinates['final'])) {
+        // ✅ NEU: Multi-Element-Rendering aus _yprint_real_design_coordinates
+        $order_id = $data['order_id'] ?? 0;
+        $real_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
+        
+        if (!empty($real_coordinates) && is_array($real_coordinates)) {
+            error_log("YPrint Unified: 🎨 Rendering " . count($real_coordinates) . " Design-Elemente in SVG");
+            
+            foreach ($real_coordinates as $index => $element) {
+                $elem_x_px = ($element['x_mm'] ?? 0) * $coordinates['template']['scale_mm_to_px'] * $scale_factor;
+                $elem_y_px = ($element['y_mm'] ?? 0) * $coordinates['template']['scale_mm_to_px'] * $scale_factor;
+                $elem_width_px = ($element['width_mm'] ?? 0) * $coordinates['template']['scale_mm_to_px'] * $scale_factor;
+                $elem_height_px = ($element['height_mm'] ?? 0) * $coordinates['template']['scale_mm_to_px'] * $scale_factor;
+                
+                $color = $index === 0 ? 'rgba(255,0,0,0.3)' : 'rgba(0,255,0,0.3)';
+                $stroke_color = $index === 0 ? '#dc3545' : '#28a745';
+                
+                // Design-Element-Rahmen
+                $html .= '<rect x="' . $elem_x_px . '" y="' . $elem_y_px . '" width="' . $elem_width_px . '" height="' . $elem_height_px . '" fill="' . $color . '" stroke="' . $stroke_color . '" stroke-width="2" rx="3"/>';
+                
+                // Element-Label
+                $html .= '<rect x="' . ($elem_x_px + 5) . '" y="' . ($elem_y_px - 20) . '" width="80" height="15" fill="' . $stroke_color . '" rx="2"/>';
+                $html .= '<text x="' . ($elem_x_px + 45) . '" y="' . ($elem_y_px - 8) . '" text-anchor="middle" fill="white" font-size="10" font-weight="bold">Element ' . ($index + 1) . '</text>';
+                
+                // Koordinaten-Label
+                $html .= '<text x="' . ($elem_x_px + $elem_width_px / 2) . '" y="' . ($elem_y_px + $elem_height_px / 2) . '" text-anchor="middle" fill="' . $stroke_color . '" font-size="10" font-weight="bold">';
+                $html .= round($element['width_mm'], 1) . '×' . round($element['height_mm'], 1) . 'mm';
+                $html .= '</text>';
+            }
+        } else if (isset($coordinates['final'])) {
+            // Fallback für einzelnes Element (alte Logik)
             $final_x = $coordinates['final']['x_px'] * $scale_factor;
             $final_y = $coordinates['final']['y_px'] * $scale_factor;
             $final_width = $coordinates['final']['width_px'] * $scale_factor;

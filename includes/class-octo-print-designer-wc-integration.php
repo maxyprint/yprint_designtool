@@ -6638,17 +6638,50 @@ private function build_print_provider_email_content($order, $design_items, $note
             $design_width = $final_coordinates['width_mm'] * $scale_factor;
             $design_height = $final_coordinates['height_mm'] * $scale_factor;
             
-            // Design-Rahmen mit korrekt skalierten Koordinaten
-            $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
+            // ✅ NEU: Multi-Element-Rendering aus _yprint_real_design_coordinates
+            $real_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
             
-            // Eckpunkte markieren
-            $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-            $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-            $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-            $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
-            
-            // Koordinaten-Label
-            $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
+            if (!empty($real_coordinates) && is_array($real_coordinates)) {
+                error_log("🎨 Rendering " . count($real_coordinates) . " Design-Elemente");
+                
+                foreach ($real_coordinates as $index => $element) {
+                    $elem_x_px = ($element['x_mm'] ?? 0) * $scale_factor;
+                    $elem_y_px = ($element['y_mm'] ?? 0) * $scale_factor;
+                    $elem_width_px = ($element['width_mm'] ?? 0) * $scale_factor;
+                    $elem_height_px = ($element['height_mm'] ?? 0) * $scale_factor;
+                    
+                    $color = $index === 0 ? 'rgba(255,0,0,0.3)' : 'rgba(0,255,0,0.3)';
+                    $stroke_color = $index === 0 ? '#dc3545' : '#28a745';
+                    $border_color = $index === 0 ? '#dc3545' : '#28a745';
+                    
+                    // Design-Element-Rahmen
+                    $html .= '<div style="position: absolute; left: ' . $elem_x_px . 'px; top: ' . $elem_y_px . 'px; width: ' . $elem_width_px . 'px; height: ' . $elem_height_px . 'px; border: 3px solid ' . $border_color . '; border-radius: 8px; background: ' . $color . ';"></div>';
+                    
+                    // Eckpunkte markieren
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px - 8) . 'px; top: ' . ($elem_y_px - 8) . 'px; width: 16px; height: 16px; background: ' . $border_color . '; border-radius: 50%;"></div>';
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px + $elem_width_px - 8) . 'px; top: ' . ($elem_y_px - 8) . 'px; width: 16px; height: 16px; background: ' . $border_color . '; border-radius: 50%;"></div>';
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px - 8) . 'px; top: ' . ($elem_y_px + $elem_height_px - 8) . 'px; width: 16px; height: 16px; background: ' . $border_color . '; border-radius: 50%;"></div>';
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px + $elem_width_px - 8) . 'px; top: ' . ($elem_y_px + $elem_height_px - 8) . 'px; width: 16px; height: 16px; background: ' . $border_color . '; border-radius: 50%;"></div>';
+                    
+                    // Element-Label
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px + 5) . 'px; top: ' . ($elem_y_px - 25) . 'px; width: 120px; height: 20px; background: ' . $border_color . '; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">Element ' . ($index + 1) . '</div>';
+                    
+                    // Koordinaten-Label
+                    $html .= '<div style="position: absolute; left: ' . ($elem_x_px - 50) . 'px; top: ' . ($elem_y_px + $elem_height_px + 5) . 'px; width: 180px; height: 20px; background: rgba(0,0,0,0.8); border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px;">' . round($element['x_mm'], 1) . 'mm, ' . round($element['y_mm'], 1) . 'mm</div>';
+                }
+            } else {
+                // Fallback für einzelnes Element (alte Logik)
+                $html .= '<div style="position: absolute; left: ' . $design_x . 'px; top: ' . $design_y . 'px; width: ' . $design_width . 'px; height: ' . $design_height . 'px; border: 3px solid #28a745; border-radius: 8px; background: rgba(40,167,69,0.2);"></div>';
+                
+                // Eckpunkte markieren
+                $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+                $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+                $html .= '<div style="position: absolute; left: ' . ($design_x - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+                $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width - 10) . 'px; top: ' . ($design_y + $design_height - 10) . 'px; width: 20px; height: 20px; background: #28a745; border-radius: 50%;"></div>';
+                
+                // Koordinaten-Label
+                $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
+            }
             
             // ✅ NEU: Validierungsanzeige für rechte Seite
             $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width + 10) . 'px; top: ' . $design_y . 'px; width: 150px; height: 60px; background: rgba(40,167,69,0.9); border-radius: 5px; padding: 5px; color: white; font-size: 10px;">';
