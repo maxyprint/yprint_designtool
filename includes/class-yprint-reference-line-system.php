@@ -131,13 +131,29 @@ class YPrint_Reference_Line_System {
         $start_point = $reference_measurement['points'][0];
         $end_point = $reference_measurement['points'][1];
         
-        // ✅ SafeZone aus Template-Daten oder Standard-Werte
-        $safe_zone = array(
-            'left' => 49.625,
-            'top' => 45.4,
-            'width' => 218,
-            'height' => 339
-        );
+        // ✅ KORRIGIERT: SafeZone aus echten Template-Daten statt statische Werte
+        $safe_zone = null;
+        
+        // Versuche SafeZone aus Template-Daten zu laden
+        if (isset($template_measurements[$view_id]['canvas_dimensions'])) {
+            $canvas_dims = $template_measurements[$view_id]['canvas_dimensions'];
+            $safe_zone = array(
+                'left' => $canvas_dims['safe_zone_left'] ?? 0,
+                'top' => $canvas_dims['safe_zone_top'] ?? 0,
+                'width' => $canvas_dims['safe_zone_width'] ?? $original_canvas_width,
+                'height' => $canvas_dims['safe_zone_height'] ?? $original_canvas_height
+            );
+            $debug_info[] = "✅ SafeZone aus Template-Daten geladen";
+        } else {
+            // Fallback: Verwende gesamten Canvas als SafeZone
+            $safe_zone = array(
+                'left' => 0,
+                'top' => 0,
+                'width' => $original_canvas_width,
+                'height' => $original_canvas_height
+            );
+            $debug_info[] = "⚠️ Fallback: Verwende gesamten Canvas als SafeZone";
+        }
         
         $debug_info[] = "🎯 Referenzlinien-Transformation:";
         $debug_info[] = "Template-Punkte: ({$start_point['x']},{$start_point['y']}) → ({$end_point['x']},{$end_point['y']})";

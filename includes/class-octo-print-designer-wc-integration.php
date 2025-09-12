@@ -5356,7 +5356,7 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * ✅ KORRIGIERT: Doppel-Visualisierung HTML mit korrekter dynamischer Skalierung
+     * ✅ KORRIGIERT: Doppel-Visualisierung HTML mit gemeinsamen Referenzrahmen
      */
     private function generate_dual_visualization_html($template_id, $template_image_url, $order_id) {
         // Lade Order-Daten für Größe
@@ -5374,6 +5374,9 @@ private function build_print_provider_email_content($order, $design_items, $note
         
         // Lade echte finale Druckkoordinaten
         $final_coordinates = $this->load_final_print_coordinates($order_id);
+        
+        // ✅ NEU: Gemeinsamer Referenzrahmen für beide Ansichten
+        $unified_reference_data = $this->create_unified_reference_frame($template_id, $order_size, $final_coordinates);
         
         $html = '<div style="display: flex; gap: 20px; margin: 20px 0; background: #f8f9fa; padding: 20px; border-radius: 8px;">';
         
@@ -5402,7 +5405,16 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         
         $html .= '</div>';
-        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($order_size) . ' | <strong>System:</strong> YPrint Reference Line System</p>';
+        
+        // ✅ NEU: Validierungsanzeige für Konsistenz
+        $consistency_status = $unified_reference_data['scale_factors']['is_consistent'] ? '✅ Konsistent' : '⚠️ Inkonsistent';
+        $consistency_color = $unified_reference_data['scale_factors']['is_consistent'] ? '#28a745' : '#ffc107';
+        
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;">';
+        $html .= '<strong>Größe:</strong> ' . esc_html($order_size) . ' | ';
+        $html .= '<strong>System:</strong> YPrint Reference Line System | ';
+        $html .= '<strong style="color: ' . $consistency_color . ';">Validierung:</strong> ' . $consistency_status;
+        $html .= '</p>';
         $html .= '</div>';
         
         // RECHTS: Design-Platzierung mit korrekter dynamischer Skalierung
@@ -5411,17 +5423,12 @@ private function build_print_provider_email_content($order, $design_items, $note
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;">';
         $html .= '<img src="' . esc_attr($template_image_url) . '" style="width: 100%; height: 100%; object-fit: contain;" alt="Template Bild">';
         
-        // KORREKTE dynamische Skalierung basierend auf Produktmaßen
-        $product_dimensions = $this->get_product_dimensions_for_size($order_size, $template_id);
-        $preview_width_px = 400;
-        $preview_height_px = 500;
+        // ✅ KORRIGIERT: Verwende gemeinsamen Referenzrahmen für konsistente Skalierung
+        $scale_factor = $unified_reference_data['scale_factors']['mm_to_px'];
+        $is_consistent = $unified_reference_data['scale_factors']['is_consistent'];
         
-        if ($product_dimensions && isset($product_dimensions['chest'])) {
-            // Berechne Skalierungsfaktor basierend auf echter Produktbreite
-            $product_width_mm = $product_dimensions['chest'] * 10; // cm zu mm
-            $scale_factor = $preview_width_px / $product_width_mm;
-            
-            // Skaliere finale Koordinaten korrekt
+        if ($is_consistent) {
+            // Skaliere finale Koordinaten mit konsistentem Faktor
             $design_x = $final_coordinates['x_mm'] * $scale_factor;
             $design_y = $final_coordinates['y_mm'] * $scale_factor;
             $design_width = $final_coordinates['width_mm'] * $scale_factor;
@@ -5439,17 +5446,34 @@ private function build_print_provider_email_content($order, $design_items, $note
             // Koordinaten-Label
             $html .= '<div style="position: absolute; left: ' . ($design_x - 50) . 'px; top: ' . ($design_y - 30) . 'px; width: 200px; height: 25px; background: rgba(40,167,69,0.9); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">' . $final_coordinates['x_mm'] . 'mm, ' . $final_coordinates['y_mm'] . 'mm</div>';
             
+            // ✅ NEU: Validierungsanzeige für rechte Seite
+            $html .= '<div style="position: absolute; left: ' . ($design_x + $design_width + 10) . 'px; top: ' . $design_y . 'px; width: 150px; height: 60px; background: rgba(40,167,69,0.9); border-radius: 5px; padding: 5px; color: white; font-size: 10px;">';
+            $html .= '<div><strong>Skalierung:</strong> ' . round($scale_factor, 4) . ' px/mm</div>';
+            $html .= '<div><strong>Konsistenz:</strong> ' . ($is_consistent ? '✅' : '⚠️') . '</div>';
+            $html .= '<div><strong>Quelle:</strong> ' . $final_coordinates['source'] . '</div>';
             $html .= '</div>';
-            $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Position:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
-            $html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($final_coordinates['width_mm']) . 'mm × ' . esc_html($final_coordinates['height_mm']) . 'mm</p>';
-            $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Skalierung:</strong> ' . round($scale_factor, 4) . ' px/mm | <strong>Produktbreite:</strong> ' . $product_width_mm . 'mm</p>';
+            
         } else {
-            // Fallback bei fehlenden Produktdimensionen
-            $html .= '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #999; text-align: center;">';
-            $html .= '<p>Produktdimensionen für Größe ' . esc_html($order_size) . ' nicht gefunden</p>';
-            $html .= '<p style="font-size: 11px;">Koordinaten: ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm</p>';
+            // ✅ FALLBACK: Inkonsistente Daten - zeige Warnung
+            $html .= '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,193,7,0.9); border: 2px solid #ffc107; border-radius: 8px; padding: 20px; text-align: center; color: #856404;">';
+            $html .= '<h4 style="margin: 0 0 10px 0;">⚠️ Inkonsistente Daten</h4>';
+            $html .= '<p style="margin: 0; font-size: 12px;">Die Referenzmessungen und Produktdimensionen sind nicht konsistent.</p>';
+            $html .= '<p style="margin: 5px 0 0 0; font-size: 11px;">Skalierungsverhältnis: ' . round($unified_reference_data['scale_factors']['ratio'], 3) . '</p>';
             $html .= '</div>';
         }
+        
+        $html .= '</div>';
+        
+        // ✅ NEU: Validierungsanzeige für rechte Seite
+        $validation_status = $is_consistent ? '✅ Validiert' : '⚠️ Inkonsistent';
+        $validation_color = $is_consistent ? '#28a745' : '#ffc107';
+        
+        $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;">';
+        $html .= '<strong>Position:</strong> ' . esc_html($final_coordinates['x_mm']) . 'mm × ' . esc_html($final_coordinates['y_mm']) . 'mm | ';
+        $html .= '<strong style="color: ' . $validation_color . ';">Validierung:</strong> ' . $validation_status;
+        $html .= '</p>';
+        $html .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;"><strong>Größe:</strong> ' . esc_html($final_coordinates['width_mm']) . 'mm × ' . esc_html($final_coordinates['height_mm']) . 'mm</p>';
+        $html .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #999;"><strong>Skalierung:</strong> ' . round($scale_factor, 4) . ' px/mm | <strong>Produktbreite:</strong> ' . $unified_reference_data['validation']['product_width_mm'] . 'mm</p>';
         
         $html .= '</div>';
         $html .= '</div>';
@@ -5701,6 +5725,74 @@ private function build_print_provider_email_content($order, $design_items, $note
         
         error_log("🎨 Using standard product dimensions for size {$size}: " . json_encode($dimensions));
         return $dimensions;
+    }
+
+    /**
+     * ✅ NEU: Gemeinsamer Referenzrahmen für beide Ansichten
+     * 
+     * Diese Methode schafft einen einheitlichen Referenzrahmen zwischen der linken
+     * (Referenzmessungen) und rechten (Druckplatzierung) Ansicht, um die Validierung
+     * zu ermöglichen.
+     */
+    private function create_unified_reference_frame($template_id, $order_size, $final_coordinates) {
+        error_log("🎨 Creating unified reference frame for template {$template_id}, size {$order_size}");
+        
+        // 1. Lade Referenzmessungen
+        $reference_measurements = $this->load_saved_reference_measurements($template_id);
+        
+        // 2. Lade Produktdimensionen
+        $product_dimensions = $this->get_product_dimensions_for_size($order_size, $template_id);
+        
+        // 3. Berechne gemeinsame Skalierungsfaktoren
+        $preview_width_px = 400;
+        $preview_height_px = 500;
+        
+        // Skalierungsfaktor basierend auf Produktbreite
+        $product_width_mm = $product_dimensions['chest'] * 10; // cm zu mm
+        $scale_factor_mm_to_px = $preview_width_px / $product_width_mm;
+        
+        // Skalierungsfaktor basierend auf Referenzmessung
+        $reference_physical_cm = floatval($reference_measurements['size_cm']);
+        $reference_pixel_distance = $reference_measurements['pixel_distance'];
+        $scale_factor_cm_to_px = $reference_pixel_distance / $reference_physical_cm;
+        
+        // 4. Validiere Konsistenz zwischen beiden Skalierungsfaktoren
+        $scale_ratio = $scale_factor_mm_to_px / ($scale_factor_cm_to_px * 10); // cm zu mm
+        $is_consistent = abs($scale_ratio - 1.0) < 0.1; // 10% Toleranz
+        
+        error_log("🎨 Unified reference frame:");
+        error_log("  Product width: {$product_width_mm}mm");
+        error_log("  Reference physical: {$reference_physical_cm}cm");
+        error_log("  Scale factor (mm→px): {$scale_factor_mm_to_px}");
+        error_log("  Scale factor (cm→px): {$scale_factor_cm_to_px}");
+        error_log("  Scale ratio: {$scale_ratio}");
+        error_log("  Is consistent: " . ($is_consistent ? 'YES' : 'NO'));
+        
+        return array(
+            'template_id' => $template_id,
+            'order_size' => $order_size,
+            'reference_measurements' => $reference_measurements,
+            'product_dimensions' => $product_dimensions,
+            'final_coordinates' => $final_coordinates,
+            'preview_dimensions' => array(
+                'width_px' => $preview_width_px,
+                'height_px' => $preview_height_px
+            ),
+            'scale_factors' => array(
+                'mm_to_px' => $scale_factor_mm_to_px,
+                'cm_to_px' => $scale_factor_cm_to_px,
+                'ratio' => $scale_ratio,
+                'is_consistent' => $is_consistent
+            ),
+            'validation' => array(
+                'reference_physical_cm' => $reference_physical_cm,
+                'product_width_mm' => $product_width_mm,
+                'final_x_mm' => $final_coordinates['x_mm'],
+                'final_y_mm' => $final_coordinates['y_mm'],
+                'final_width_mm' => $final_coordinates['width_mm'],
+                'final_height_mm' => $final_coordinates['height_mm']
+            )
+        );
     }
 
     // HILFSMETHODEN FÜR ECHTE TEMPLATE-DATEN
