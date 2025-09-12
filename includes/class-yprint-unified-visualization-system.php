@@ -108,18 +108,23 @@ class YPrint_Unified_Visualization_System {
             
             // Referenzmessungen
             $data['reference_measurements'] = self::get_reference_measurements($template_id);
-            if ($data['reference_measurements']) {
-                error_log("YPrint Unified: ✅ Referenzmessungen gefunden");
-            } else {
-                error_log("YPrint Unified: ⚠️ Keine Referenzmessungen gefunden");
-            }
             
             // Finale Druckkoordinaten
             $data['final_coordinates'] = self::get_final_coordinates($order_id);
-            if ($data['final_coordinates']) {
-                error_log("YPrint Unified: ✅ Finale Druckkoordinaten gefunden");
+            
+            // Validiere kritische Daten
+            error_log("YPrint Unified: 🔍 Validiere Referenzmessung:");
+            if (empty($data['reference_measurements'])) {
+                error_log("YPrint Unified: ⚠️ Keine Referenzmessung gefunden");
             } else {
-                error_log("YPrint Unified: ⚠️ Keine finalen Druckkoordinaten gefunden");
+                error_log("YPrint Unified: ✅ Referenzmessung vorhanden: " . print_r($data['reference_measurements'], true));
+            }
+            
+            error_log("YPrint Unified: 🔍 Validiere finale Koordinaten:");
+            if (empty($data['final_coordinates'])) {
+                error_log("YPrint Unified: ⚠️ Keine finalen Koordinaten gefunden");
+            } else {
+                error_log("YPrint Unified: ✅ Finale Koordinaten vorhanden: " . print_r($data['final_coordinates'], true));
             }
             
             $data['success'] = true;
@@ -178,19 +183,24 @@ class YPrint_Unified_Visualization_System {
         error_log("  Chest: " . ($size_specific_dimensions['chest'] ?? 50) . "cm = {$product_width_mm}mm");
         error_log("  Height from Shoulder: " . ($size_specific_dimensions['height_from_shoulder'] ?? 68) . "cm = {$product_height_mm}mm");
         
-        // 3. SKALIERUNGSFAKTOREN (KORRIGIERT)
-        $scale_mm_to_px_x = $template_width_px / $product_width_mm;
-        $scale_mm_to_px_y = $template_height_px / $product_height_mm;
-        
-        // Verwende den kleineren Faktor für konsistente Skalierung
-        $scale_mm_to_px = min($scale_mm_to_px_x, $scale_mm_to_px_y);
-        
-        error_log("YPrint Unified: 🎯 Skalierungsberechnung:");
-        error_log("  Template: {$template_width_px}×{$template_height_px}px");
-        error_log("  Produkt: {$product_width_mm}×{$product_height_mm}mm");
-        error_log("  Skalierung X: " . round($scale_mm_to_px_x, 6) . " px/mm");
-        error_log("  Skalierung Y: " . round($scale_mm_to_px_y, 6) . " px/mm");
-        error_log("  Finale Skalierung: " . round($scale_mm_to_px, 6) . " px/mm");
+        // 3. SKALIERUNGSFAKTOREN (mit Division-by-Zero-Schutz)
+        if ($product_width_mm > 0 && $product_height_mm > 0 && $template_width_px > 0 && $template_height_px > 0) {
+            $scale_mm_to_px_x = $template_width_px / $product_width_mm;
+            $scale_mm_to_px_y = $template_height_px / $product_height_mm;
+            $scale_mm_to_px = min($scale_mm_to_px_x, $scale_mm_to_px_y);
+            
+            error_log("YPrint Unified: ✅ Skalierungsfaktoren berechnet:");
+            error_log("  Template: {$template_width_px}×{$template_height_px}px");
+            error_log("  Produkt: {$product_width_mm}×{$product_height_mm}mm");
+            error_log("  X-Skalierung: " . round($scale_mm_to_px_x, 6) . " px/mm");
+            error_log("  Y-Skalierung: " . round($scale_mm_to_px_y, 6) . " px/mm");
+            error_log("  Finale Skalierung: " . round($scale_mm_to_px, 6) . " px/mm");
+        } else {
+            // Fallback-Skalierung
+            $scale_mm_to_px = 1.0;
+            error_log("YPrint Unified: ⚠️ Invalide Dimensionen für Skalierung, verwende Fallback: 1.0 px/mm");
+            error_log("YPrint Unified: 📊 Debug - Template: {$template_width_px}x{$template_height_px}px, Produkt: {$product_width_mm}x{$product_height_mm}mm");
+        }
         
         $coordinates['template'] = array(
             'width_px' => $template_width_px,
@@ -210,12 +220,12 @@ class YPrint_Unified_Visualization_System {
             $ref_pixel_distance = $ref['pixel_distance'] ?? 0;
             $ref_physical_cm = $ref['physical_size_cm'] ?? $ref['real_distance_cm'] ?? 0;
             
-            // Berechne Referenz-Skalierungsfaktor
-            if ($ref_physical_cm > 0) {
+            // Division-by-Zero-Schutz
+            if ($ref_physical_cm > 0 && $ref_pixel_distance > 0) {
                 $ref_scale_cm_to_px = $ref_pixel_distance / $ref_physical_cm;
             } else {
                 $ref_scale_cm_to_px = 0;
-                error_log("YPrint Unified: ⚠️ Referenz-Physical-Size ist 0, verwende Fallback");
+                error_log("YPrint Unified: ⚠️ Invalide Referenzmessung (physical_size_cm: {$ref_physical_cm}, pixel_distance: {$ref_pixel_distance}), verwende Fallback");
             }
             
             error_log("YPrint Unified: 📏 Referenzmessungen:");
@@ -224,12 +234,26 @@ class YPrint_Unified_Visualization_System {
             error_log("  Referenz-Skalierung: " . round($ref_scale_cm_to_px, 6) . " px/cm");
             error_log("  Referenz-Skalierung (mm): " . round($ref_scale_cm_to_px * 10, 6) . " px/mm");
             
-            $coordinates['reference'] = array(
-                'pixel_distance' => $ref_pixel_distance,
-                'physical_cm' => $ref_physical_cm,
-                'scale_cm_to_px' => $ref_scale_cm_to_px,
-                'points' => $ref['reference_points'] ?? array()
-            );
+            if ($ref_scale_cm_to_px > 0) {
+                $coordinates['reference'] = array(
+                    'pixel_distance' => $ref_pixel_distance,
+                    'physical_cm' => $ref_physical_cm,
+                    'scale_cm_to_px' => $ref_scale_cm_to_px,
+                    'points' => $ref['reference_points'] ?? array()
+                );
+            } else {
+                // Fallback für invalide Referenzdaten
+                error_log("YPrint Unified: ⚠️ Invalide Referenzmessung, verwende Fallback");
+                $coordinates['reference'] = array(
+                    'pixel_distance' => 200, // Standard-Pixel-Distanz
+                    'physical_cm' => 50,     // Standard-Physical-Size (Größe M)
+                    'scale_cm_to_px' => 4,   // Standard-Skalierung (200px / 50cm)
+                    'points' => array(
+                        array('x' => 200, 'y' => 300),
+                        array('x' => 400, 'y' => 300)
+                    )
+                );
+            }
         } else {
             // Fallback für fehlende Referenzmessung
             error_log("YPrint Unified: ⚠️ Keine Referenzmessung gefunden, verwende Fallback");
