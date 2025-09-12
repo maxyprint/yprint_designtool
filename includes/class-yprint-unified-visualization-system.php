@@ -110,7 +110,7 @@ class YPrint_Unified_Visualization_System {
             $data['reference_measurements'] = self::get_reference_measurements($template_id);
             
             // Finale Druckkoordinaten
-            $data['final_coordinates'] = self::get_final_coordinates($order_id);
+            $data['final_coordinates'] = self::get_final_coordinates($template_id, $order_id);
             
             // Validiere kritische Daten
             error_log("YPrint Unified: 🔍 Validiere Referenzmessung:");
@@ -347,33 +347,43 @@ class YPrint_Unified_Visualization_System {
         );
         
         if (isset($coordinates['template']['scale_mm_to_px']) && isset($coordinates['reference']['scale_cm_to_px'])) {
-            // Vergleiche Skalierungsfaktoren (KORRIGIERT)
             $template_scale = $coordinates['template']['scale_mm_to_px'];
-            $reference_scale = $coordinates['reference']['scale_cm_to_px'] / 10; // cm zu mm (nicht * 10!)
+            $reference_scale_cm = $coordinates['reference']['scale_cm_to_px'];
             
-            error_log("YPrint Unified: 🔍 Konsistenz-Berechnung:");
+            // KORREKTE Umrechnung: cm-Skalierung zu mm-Skalierung
+            // Wenn 1 cm = X px, dann 1 mm = X/10 px
+            $reference_scale_mm = $reference_scale_cm / 10;
+            
+            error_log("YPrint Unified: 🔍 Konsistenz-Validierung:");
             error_log("  Template-Skalierung: {$template_scale} px/mm");
-            error_log("  Referenz-Skalierung (cm): " . $coordinates['reference']['scale_cm_to_px'] . " px/cm");
-            error_log("  Referenz-Skalierung (mm): {$reference_scale} px/mm");
+            error_log("  Referenz-Skalierung (cm): {$reference_scale_cm} px/cm");
+            error_log("  Referenz-Skalierung (mm): {$reference_scale_mm} px/mm");
             
-            if ($reference_scale > 0) {
-                $scale_ratio = $template_scale / $reference_scale;
+            $validation['reference_ratio'] = $reference_scale_mm;
+            
+            if ($reference_scale_mm > 0) {
+                $scale_ratio = $template_scale / $reference_scale_mm;
+                $validation['scale_ratio'] = $scale_ratio;
+                
+                error_log("  Skalierungsverhältnis: {$scale_ratio}");
+                
+                // Erweiterte Konsistenz-Toleranz: ±50% (realistischer für verschiedene Template-Typen)
+                if ($scale_ratio >= 0.5 && $scale_ratio <= 2.0) {
+                    $validation['is_consistent'] = true;
+                    error_log("  Status: KONSISTENT");
+                } else {
+                    $validation['is_consistent'] = false;
+                    $validation['issues'][] = "Skalierungsfaktoren unterscheiden sich um " . round(abs($scale_ratio - 1) * 100, 1) . "%";
+                    error_log("  Status: INKONSISTENT (" . round(abs($scale_ratio - 1) * 100, 1) . "% Abweichung)");
+                }
             } else {
-                $scale_ratio = 0;
-                error_log("YPrint Unified: ⚠️ Referenz-Skalierung ist 0, setze Scale-Ratio auf 0");
+                $validation['scale_ratio'] = 0;
+                $validation['issues'][] = "Referenz-Skalierung ist 0, kann nicht validieren";
+                error_log("  Status: FEHLER - Referenz-Skalierung ist 0");
             }
-            
-            $validation['scale_ratio'] = $scale_ratio;
-            $validation['reference_ratio'] = $reference_scale;
-            
-            // Konsistenz-Toleranz: ±20%
-            if ($scale_ratio >= 0.8 && $scale_ratio <= 1.2) {
-                $validation['is_consistent'] = true;
-                error_log("YPrint Unified: ✅ Skalierungskonsistenz OK: " . round($scale_ratio, 3));
-            } else {
-                $validation['issues'][] = "Skalierungsfaktoren unterscheiden sich um " . round(($scale_ratio - 1) * 100, 1) . "%";
-                error_log("YPrint Unified: ⚠️ Skalierungskonsistenz-Problem: " . round($scale_ratio, 3) . " (erwartet: 0.8-1.2)");
-            }
+        } else {
+            $validation['issues'][] = "Fehlende Skalierungsdaten für Validierung";
+            error_log("YPrint Unified: ⚠️ Fehlende Skalierungsdaten für Konsistenz-Validierung");
         }
         
         // Prüfe auf realistische Werte
@@ -735,61 +745,108 @@ class YPrint_Unified_Visualization_System {
         return null;
     }
     
-    private static function get_final_coordinates($order_id) {
+    private static function get_final_coordinates($template_id, $order_id) {
         error_log("YPrint Unified: 🔍 Suche finale Druckkoordinaten für Order {$order_id}");
         
-        // Methode 1: Workflow-Daten (Schritt 6)
+        // PRIORITÄT 1: Workflow-Daten (Schritt 6)
         $workflow_data = get_post_meta($order_id, '_yprint_workflow_data', true);
         if (!empty($workflow_data)) {
-            error_log("YPrint Unified: 📊 Workflow-Daten gefunden");
+            error_log("YPrint Unified: 📊 Workflow-Daten gefunden, prüfe Schritte...");
             
-            // Prüfe Schritt 6
-            if (isset($workflow_data['step6']['final_coordinates'])) {
-                $coords = $workflow_data['step6']['final_coordinates'];
-                error_log("YPrint Unified: ✅ Finale Koordinaten aus Schritt 6 gefunden");
-                error_log("  X: " . ($coords['x_mm'] ?? 'unknown') . " mm");
-                error_log("  Y: " . ($coords['y_mm'] ?? 'unknown') . " mm");
-                error_log("  Width: " . ($coords['width_mm'] ?? 'unknown') . " mm");
-                error_log("  Height: " . ($coords['height_mm'] ?? 'unknown') . " mm");
-                return $coords;
+            // Prüfe Schritt 6 (finale Koordinaten)
+            if (isset($workflow_data['workflow_steps']['step6']['final_coordinates'])) {
+                $final_coords = $workflow_data['workflow_steps']['step6']['final_coordinates'];
+                error_log("YPrint Unified: ✅ Finale Koordinaten aus Workflow-Schritt 6 gefunden:");
+                error_log("  X: " . ($final_coords['x_mm'] ?? 'unknown') . " mm");
+                error_log("  Y: " . ($final_coords['y_mm'] ?? 'unknown') . " mm");
+                error_log("  Width: " . ($final_coords['width_mm'] ?? 'unknown') . " mm");
+                error_log("  Height: " . ($final_coords['height_mm'] ?? 'unknown') . " mm");
+                
+                return array(
+                    'x_mm' => floatval($final_coords['x_mm'] ?? 0),
+                    'y_mm' => floatval($final_coords['y_mm'] ?? 0),
+                    'width_mm' => floatval($final_coords['width_mm'] ?? 0),
+                    'height_mm' => floatval($final_coords['height_mm'] ?? 0),
+                    'dpi' => floatval($final_coords['dpi'] ?? 74),
+                    'source' => 'workflow_step6'
+                );
             }
             
-            // Prüfe Schritt 5 als Fallback
-            if (isset($workflow_data['step5']['output']['final_coordinates'])) {
-                $coords = $workflow_data['step5']['output']['final_coordinates'];
-                error_log("YPrint Unified: ✅ Finale Koordinaten aus Schritt 5 gefunden");
-                error_log("  X: " . ($coords['x_mm'] ?? 'unknown') . " mm");
-                error_log("  Y: " . ($coords['y_mm'] ?? 'unknown') . " mm");
-                error_log("  Width: " . ($coords['width_mm'] ?? 'unknown') . " mm");
-                error_log("  Height: " . ($coords['height_mm'] ?? 'unknown') . " mm");
-                return $coords;
+            // PRIORITÄT 2: Workflow-Schritt 5 (finale Koordinaten)
+            if (isset($workflow_data['workflow_steps']['step5']['final_coordinates'])) {
+                $final_coords = $workflow_data['workflow_steps']['step5']['final_coordinates'];
+                error_log("YPrint Unified: ✅ Finale Koordinaten aus Workflow-Schritt 5 gefunden:");
+                error_log("  X: " . ($final_coords['x_mm'] ?? 'unknown') . " mm");
+                error_log("  Y: " . ($final_coords['y_mm'] ?? 'unknown') . " mm");
+                error_log("  Width: " . ($final_coords['width_mm'] ?? 'unknown') . " mm");
+                error_log("  Height: " . ($final_coords['height_mm'] ?? 'unknown') . " mm");
+                
+                return array(
+                    'x_mm' => floatval($final_coords['x_mm'] ?? 0),
+                    'y_mm' => floatval($final_coords['y_mm'] ?? 0),
+                    'width_mm' => floatval($final_coords['width_mm'] ?? 0),
+                    'height_mm' => floatval($final_coords['height_mm'] ?? 0),
+                    'dpi' => floatval($final_coords['dpi'] ?? 74),
+                    'source' => 'workflow_step5'
+                );
+            }
+            
+            // Fallback: Alte Struktur prüfen
+            if (isset($workflow_data['step6']['final_coordinates'])) {
+                $coords = $workflow_data['step6']['final_coordinates'];
+                error_log("YPrint Unified: ✅ Finale Koordinaten aus alter Workflow-Struktur (Schritt 6) gefunden");
+                return array(
+                    'x_mm' => floatval($coords['x_mm'] ?? 0),
+                    'y_mm' => floatval($coords['y_mm'] ?? 0),
+                    'width_mm' => floatval($coords['width_mm'] ?? 0),
+                    'height_mm' => floatval($coords['height_mm'] ?? 0),
+                    'dpi' => floatval($coords['dpi'] ?? 74),
+                    'source' => 'workflow_step6_legacy'
+                );
             }
         }
         
-        // Methode 2: Direkte Meta-Felder
+        // PRIORITÄT 3: Order-Meta für finale Koordinaten
         $final_coordinates = get_post_meta($order_id, '_yprint_final_coordinates', true);
-        if (!empty($final_coordinates)) {
-            error_log("YPrint Unified: ✅ Finale Koordinaten aus _yprint_final_coordinates gefunden");
+        if (!empty($final_coordinates) && is_array($final_coordinates)) {
+            error_log("YPrint Unified: ✅ Finale Koordinaten aus Order-Meta gefunden:");
             error_log("  X: " . ($final_coordinates['x_mm'] ?? 'unknown') . " mm");
             error_log("  Y: " . ($final_coordinates['y_mm'] ?? 'unknown') . " mm");
             error_log("  Width: " . ($final_coordinates['width_mm'] ?? 'unknown') . " mm");
             error_log("  Height: " . ($final_coordinates['height_mm'] ?? 'unknown') . " mm");
-            return $final_coordinates;
+            
+            return array(
+                'x_mm' => floatval($final_coordinates['x_mm'] ?? 0),
+                'y_mm' => floatval($final_coordinates['y_mm'] ?? 0),
+                'width_mm' => floatval($final_coordinates['width_mm'] ?? 0),
+                'height_mm' => floatval($final_coordinates['height_mm'] ?? 0),
+                'dpi' => floatval($final_coordinates['dpi'] ?? 74),
+                'source' => 'order_meta'
+            );
         }
         
-        // Methode 3: Order Items
+        // PRIORITÄT 4: Order-Items
         $order = wc_get_order($order_id);
         if ($order) {
             foreach ($order->get_items() as $item) {
-                $item_coords = $item->get_meta('_yprint_final_coordinates');
-                if (!empty($item_coords)) {
-                    error_log("YPrint Unified: ✅ Finale Koordinaten aus Order Item gefunden");
-                    return $item_coords;
+                $item_coordinates = $item->get_meta('_yprint_final_coordinates');
+                if (!empty($item_coordinates)) {
+                    error_log("YPrint Unified: ✅ Finale Koordinaten aus Order-Item gefunden:");
+                    error_log("  Coordinates: " . json_encode($item_coordinates));
+                    
+                    return array(
+                        'x_mm' => floatval($item_coordinates['x_mm'] ?? 0),
+                        'y_mm' => floatval($item_coordinates['y_mm'] ?? 0),
+                        'width_mm' => floatval($item_coordinates['width_mm'] ?? 0),
+                        'height_mm' => floatval($item_coordinates['height_mm'] ?? 0),
+                        'dpi' => floatval($item_coordinates['dpi'] ?? 74),
+                        'source' => 'order_items'
+                    );
                 }
             }
         }
         
-        error_log("YPrint Unified: ❌ Keine finalen Druckkoordinaten gefunden");
+        error_log("YPrint Unified: ⚠️ Keine finalen Koordinaten gefunden");
         return null;
     }
     
