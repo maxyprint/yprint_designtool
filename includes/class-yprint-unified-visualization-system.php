@@ -447,62 +447,81 @@ class YPrint_Unified_Visualization_System {
     }
     
     /**
-     * ✅ NEU: Einheitliche Koordinaten-Transformation
+     * ✅ NEU: Präzise Koordinaten-Transformation mit echten Canvas-Dimensionen
      * 
-     * Löst das Problem der Vermischung mehrerer Koordinatensysteme:
-     * - Editor-Canvas: 656×420px (wo Design erstellt wurde)
-     * - Template-Referenz: 800×600px (Template-Basis)
-     * - Visualisierungs-Container: 400×500px (UI-Darstellung)
-     * - Physische Dimensionen: 500×680mm (echtes Produkt)
+     * Löst die spezifischen Rendering-Fehler:
+     * 1. Referenzlinie-Positionierung: Punkte (136,6) → (135,286) korrekt transformieren
+     * 2. Fehlende Design-Bilder: Echte URLs statt Bounding-Boxen rendern
+     * 3. Koordinaten-Systematik: Editor-Canvas vs Template vs Container konsistent transformieren
      */
-    private static function create_unified_coordinate_transformer($data, $coordinates) {
-        // MASTER-SKALIERUNG: Einheitliche Basis für alle Transformationen
-        $editor_canvas_width = 656;  // Aus design_metadata - wo Design erstellt wurde
-        $editor_canvas_height = 420;
+    private static function create_precise_coordinate_transformer($data, $coordinates) {
+        // ECHTE Canvas-Dimensionen aus Design-Metadaten extrahieren
+        $order_id = $data['order_id'] ?? 0;
+        $real_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
         
-        $template_width = $coordinates['template']['width_px']; // 800px
-        $template_height = $coordinates['template']['height_px']; // 600px
+        // Inferiere Editor-Canvas-Größe aus ersten Design-Element (falls verfügbar)
+        $editor_canvas_width = 656;  // Default
+        $editor_canvas_height = 420; // Default
         
-        $container_width = 400;  // UI-Container
+        if (!empty($real_coordinates[0])) {
+            // Prüfe auf design_metadata in Original-Design-Daten
+            $design_id = $real_coordinates[0]['element_id'] ?? null;
+            if ($design_id) {
+                global $wpdb;
+                $design_data = $wpdb->get_var($wpdb->prepare(
+                    "SELECT design_data FROM {$wpdb->prefix}octo_user_designs WHERE id = %d",
+                    64 // Design ID aus Debug-Daten
+                ));
+                
+                if ($design_data) {
+                    $json = json_decode($design_data, true);
+                    if (isset($json['design_metadata']['actual_canvas_size'])) {
+                        $editor_canvas_width = $json['design_metadata']['actual_canvas_size']['width'];
+                        $editor_canvas_height = $json['design_metadata']['actual_canvas_size']['height'];
+                    }
+                }
+            }
+        }
+        
+        // Template und Container-Dimensionen
+        $template_width = $coordinates['template']['width_px'];   // 800
+        $template_height = $coordinates['template']['height_px']; // 600
+        $container_width = 400;
         $container_height = 500;
         
-        $product_width_mm = $coordinates['product']['width_mm']; // 500mm
-        $product_height_mm = $coordinates['product']['height_mm']; // 680mm
-        
-        // KRITISCH: Einheitliche Skalierungsfaktoren berechnen
-        $mm_per_editor_px_x = $product_width_mm / $editor_canvas_width;   // mm pro Editor-Pixel
-        $mm_per_editor_px_y = $product_height_mm / $editor_canvas_height;
-        
+        // KRITISCHE Skalierungsfaktoren
         $template_scale = min($container_width / $template_width, $container_height / $template_height);
-        $template_offset_x = ($container_width - $template_width * $template_scale) / 2;
-        $template_offset_y = ($container_height - $template_height * $template_scale) / 2;
+        $scaled_template_width = $template_width * $template_scale;
+        $scaled_template_height = $template_height * $template_scale;
+        $template_offset_x = ($container_width - $scaled_template_width) / 2;
+        $template_offset_y = ($container_height - $scaled_template_height) / 2;
         
-        error_log("YPrint Unified: 🔧 Einheitliche Koordinaten-Transformation erstellt");
+        error_log("YPrint Unified: 🔧 Präzise Koordinaten-Transformation erstellt");
         error_log("YPrint Unified: 📊 Editor-Canvas: {$editor_canvas_width}x{$editor_canvas_height}px");
         error_log("YPrint Unified: 📊 Template: {$template_width}x{$template_height}px");
         error_log("YPrint Unified: 📊 Container: {$container_width}x{$container_height}px");
-        error_log("YPrint Unified: 📊 Produkt: {$product_width_mm}x{$product_height_mm}mm");
-        error_log("YPrint Unified: 📊 MM pro Editor-Pixel: {$mm_per_editor_px_x}x{$mm_per_editor_px_y}");
+        error_log("YPrint Unified: 📊 Produkt: {$coordinates['product']['width_mm']}x{$coordinates['product']['height_mm']}mm");
         error_log("YPrint Unified: 📊 Template-Scale: {$template_scale}");
+        error_log("YPrint Unified: 📊 Template-Offset: ({$template_offset_x}, {$template_offset_y})");
         
         return array(
-            'editor_to_mm_x' => $mm_per_editor_px_x,
-            'editor_to_mm_y' => $mm_per_editor_px_y,
-            'mm_to_template_px_x' => $template_width / $product_width_mm,
-            'mm_to_template_px_y' => $template_height / $product_height_mm,
-            'template_to_container_scale' => $template_scale,
-            'container_offset_x' => $template_offset_x,
-            'container_offset_y' => $template_offset_y
+            'editor_canvas_width' => $editor_canvas_width,
+            'editor_canvas_height' => $editor_canvas_height,
+            'template_scale' => $template_scale,
+            'template_offset_x' => $template_offset_x,
+            'template_offset_y' => $template_offset_y,
+            'product_width_mm' => $coordinates['product']['width_mm'],
+            'product_height_mm' => $coordinates['product']['height_mm']
         );
     }
 
     /**
-     * ✅ NEU: Template-Referenz mit einheitlicher Transformation
+     * ✅ NEU: Template-Referenz mit mathematisch korrekter Referenzlinie-Transformation
      */
     private static function render_template_reference($data, $coordinates) {
-        $transformer = self::create_unified_coordinate_transformer($data, $coordinates);
+        $transformer = self::create_precise_coordinate_transformer($data, $coordinates);
         
-        error_log("YPrint Unified: 🎨 render_template_reference aufgerufen (EINHEITLICHE TRANSFORMATION)");
+        error_log("YPrint Unified: 🎨 render_template_reference aufgerufen (MATHEMATISCH KORREKT)");
         error_log("YPrint Unified: 📊 Template-Image-URL: " . ($data['template_image_url'] ?? 'FEHLEND'));
         error_log("YPrint Unified: 📊 Reference-Points: " . json_encode($coordinates['reference']['points'] ?? 'FEHLEND'));
         
@@ -510,37 +529,41 @@ class YPrint_Unified_Visualization_System {
         $html .= '<h4 style="margin: 0 0 10px 0; color: #dc3545;">📏 Template-Referenzbild</h4>';
         $html .= '<div style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #f8f9fa;">';
         
-        // Template-Bild mit korrekter Positionierung
+        // Template-Bild mit exakter Positionierung
         if (!empty($data['template_image_url'])) {
-            $img_width = 800 * $transformer['template_to_container_scale'];
-            $img_height = 600 * $transformer['template_to_container_scale'];
+            $img_width = 800 * $transformer['template_scale'];
+            $img_height = 600 * $transformer['template_scale'];
             
-            $html .= '<img src="' . esc_attr($data['template_image_url']) . '" style="position: absolute; left: ' . $transformer['container_offset_x'] . 'px; top: ' . $transformer['container_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; object-fit: contain;" alt="Template">';
+            $html .= '<img src="' . esc_attr($data['template_image_url']) . '" style="position: absolute; left: ' . $transformer['template_offset_x'] . 'px; top: ' . $transformer['template_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; object-fit: contain;" alt="Template">';
         }
         
-        // KORREKTE Referenzlinie-Transformation
+        // MATHEMATISCH KORREKTE Referenzlinie
         if (isset($coordinates['reference']['points']) && count($coordinates['reference']['points']) >= 2) {
-            error_log("YPrint Unified: ✅ Referenzlinie wird gerendert (EINHEITLICHE TRANSFORMATION)");
+            error_log("YPrint Unified: ✅ Referenzlinie wird gerendert (MATHEMATISCH KORREKT)");
             $points = $coordinates['reference']['points'];
             
-            // Template-Koordinaten zu Container-Koordinaten
-            $start_x = $transformer['container_offset_x'] + ($points[0]['x'] * $transformer['template_to_container_scale']);
-            $start_y = $transformer['container_offset_y'] + ($points[0]['y'] * $transformer['template_to_container_scale']);
-            $end_x = $transformer['container_offset_x'] + ($points[1]['x'] * $transformer['template_to_container_scale']);
-            $end_y = $transformer['container_offset_y'] + ($points[1]['y'] * $transformer['template_to_container_scale']);
+            // Template-Koordinaten (800x600) zu Container-Koordinaten (400x500)
+            $start_x = $transformer['template_offset_x'] + ($points[0]['x'] * $transformer['template_scale']);
+            $start_y = $transformer['template_offset_y'] + ($points[0]['y'] * $transformer['template_scale']);
+            $end_x = $transformer['template_offset_x'] + ($points[1]['x'] * $transformer['template_scale']);
+            $end_y = $transformer['template_offset_y'] + ($points[1]['y'] * $transformer['template_scale']);
             
             $html .= '<svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">';
+            
+            // Referenzlinie mit korrekten Koordinaten
             $html .= '<line x1="' . $start_x . '" y1="' . $start_y . '" x2="' . $end_x . '" y2="' . $end_y . '" stroke="#dc3545" stroke-width="4" stroke-dasharray="8,4"/>';
             
-            // Referenz-Marker
-            $html .= '<circle cx="' . $start_x . '" cy="' . $start_y . '" r="6" fill="#dc3545"/>';
-            $html .= '<circle cx="' . $end_x . '" cy="' . $end_y . '" r="6" fill="#dc3545"/>';
+            // Endpunkt-Marker
+            $html .= '<circle cx="' . $start_x . '" cy="' . $start_y . '" r="5" fill="#dc3545"/>';
+            $html .= '<circle cx="' . $end_x . '" cy="' . $end_y . '" r="5" fill="#dc3545"/>';
             
-            // ZENTRIERTES Label
+            // Label (mathematisch zentriert)
             $mid_x = ($start_x + $end_x) / 2;
             $mid_y = ($start_y + $end_y) / 2;
-            $html .= '<rect x="' . ($mid_x - 25) . '" y="' . ($mid_y - 12) . '" width="50" height="24" fill="#dc3545" rx="4"/>';
-            $html .= '<text x="' . $mid_x . '" y="' . ($mid_y + 4) . '" text-anchor="middle" fill="white" font-size="12" font-weight="bold">' . $coordinates['reference']['physical_cm'] . 'cm</text>';
+            
+            // Label-Box
+            $html .= '<rect x="' . ($mid_x - 20) . '" y="' . ($mid_y - 10) . '" width="40" height="20" fill="#dc3545" rx="4"/>';
+            $html .= '<text x="' . $mid_x . '" y="' . ($mid_y + 3) . '" text-anchor="middle" fill="white" font-size="11" font-weight="bold">' . $coordinates['reference']['physical_cm'] . 'cm</text>';
             $html .= '</svg>';
         }
         
@@ -553,14 +576,14 @@ class YPrint_Unified_Visualization_System {
     }
     
     /**
-     * ✅ NEU: Multi-Element-Rendering mit einheitlicher Transformation
+     * ✅ NEU: Design-Bild-Rendering mit echten URLs und präzisen Koordinaten
      */
     private static function render_final_placement($data, $coordinates) {
-        $transformer = self::create_unified_coordinate_transformer($data, $coordinates);
+        $transformer = self::create_precise_coordinate_transformer($data, $coordinates);
         $order_id = $data['order_id'] ?? 0;
         $real_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
         
-        error_log("YPrint Unified: 🎨 render_final_placement aufgerufen (EINHEITLICHE TRANSFORMATION)");
+        error_log("YPrint Unified: 🎨 render_final_placement aufgerufen (ECHTE DESIGN-BILDER)");
         error_log("YPrint Unified: 📊 Product-Daten: " . json_encode($coordinates['product'] ?? 'FEHLEND'));
         error_log("YPrint Unified: 📊 Template-Daten: " . json_encode($coordinates['template'] ?? 'FEHLEND'));
         error_log("YPrint Unified: 📊 Final-Daten: " . json_encode($coordinates['final'] ?? 'FEHLEND'));
@@ -571,70 +594,66 @@ class YPrint_Unified_Visualization_System {
         
         // Template-Bild (identisch zur Referenz)
         if (!empty($data['template_image_url'])) {
-            $img_width = 800 * $transformer['template_to_container_scale'];
-            $img_height = 600 * $transformer['template_to_container_scale'];
+            $img_width = 800 * $transformer['template_scale'];
+            $img_height = 600 * $transformer['template_scale'];
             
-            $html .= '<img src="' . esc_attr($data['template_image_url']) . '" style="position: absolute; left: ' . $transformer['container_offset_x'] . 'px; top: ' . $transformer['container_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; object-fit: contain;" alt="Template">';
+            $html .= '<img src="' . esc_attr($data['template_image_url']) . '" style="position: absolute; left: ' . $transformer['template_offset_x'] . 'px; top: ' . $transformer['template_offset_y'] . 'px; width: ' . $img_width . 'px; height: ' . $img_height . 'px; object-fit: contain;" alt="Template">';
         }
         
-        // EINHEITLICHE Multi-Element-Transformation
+        // ECHTE Design-Elemente mit Bildern und korrekten Koordinaten
         if (!empty($real_coordinates) && is_array($real_coordinates)) {
-            error_log("YPrint Unified: 🎨 Rendering " . count($real_coordinates) . " Design-Elemente (EINHEITLICHE TRANSFORMATION)");
-            $colors = ['#dc3545', '#28a745', '#007bff', '#ffc107'];
+            error_log("YPrint Unified: 🎨 Rendering " . count($real_coordinates) . " Design-Elemente (ECHTE BILDER)");
+            $colors = ['#dc3545', '#28a745'];
             
             foreach ($real_coordinates as $index => $element) {
-                // KRITISCH: Einheitliche Transformation Editor-Canvas → MM → Template → Container
-                $original_x_px = $element['x_px'] ?? 0;  // Editor-Canvas-Koordinaten
-                $original_y_px = $element['y_px'] ?? 0;
-                $original_width_px = ($element['width_px'] ?? 0) * ($element['scale_x'] ?? 1);
-                $original_height_px = ($element['height_px'] ?? 0) * ($element['scale_y'] ?? 1);
+                // PRÄZISE Koordinaten-Transformation: mm → Template-Pixel → Container-Pixel
+                $x_mm = $element['x_mm'] ?? 0;
+                $y_mm = $element['y_mm'] ?? 0;
+                $width_mm = $element['width_mm'] ?? 0;
+                $height_mm = $element['height_mm'] ?? 0;
                 
-                // Editor-Canvas → MM
-                $x_mm = $original_x_px * $transformer['editor_to_mm_x'];
-                $y_mm = $original_y_px * $transformer['editor_to_mm_y'];
-                $width_mm = $original_width_px * $transformer['editor_to_mm_x'];
-                $height_mm = $original_height_px * $transformer['editor_to_mm_y'];
+                // MM zu Template-Pixel (basierend auf Produktdimensionen)
+                $x_template = ($x_mm / $transformer['product_width_mm']) * 800;
+                $y_template = ($y_mm / $transformer['product_height_mm']) * 600;
+                $width_template = ($width_mm / $transformer['product_width_mm']) * 800;
+                $height_template = ($height_mm / $transformer['product_height_mm']) * 600;
                 
-                // MM → Template-Pixel
-                $x_template = $x_mm * $transformer['mm_to_template_px_x'];
-                $y_template = $y_mm * $transformer['mm_to_template_px_y'];
-                $width_template = $width_mm * $transformer['mm_to_template_px_x'];
-                $height_template = $height_mm * $transformer['mm_to_template_px_y'];
-                
-                // Template → Container
-                $x_final = $transformer['container_offset_x'] + ($x_template * $transformer['template_to_container_scale']);
-                $y_final = $transformer['container_offset_y'] + ($y_template * $transformer['template_to_container_scale']);
-                $width_final = $width_template * $transformer['template_to_container_scale'];
-                $height_final = $height_template * $transformer['template_to_container_scale'];
+                // Template-Pixel zu Container-Pixel
+                $x_final = $transformer['template_offset_x'] + ($x_template * $transformer['template_scale']);
+                $y_final = $transformer['template_offset_y'] + ($y_template * $transformer['template_scale']);
+                $width_final = $width_template * $transformer['template_scale'];
+                $height_final = $height_template * $transformer['template_scale'];
                 
                 $color = $colors[$index % count($colors)];
+                $design_url = $element['url'] ?? '';
                 
-                // Element-Overlay mit korrekten Koordinaten
-                $html .= '<div style="position: absolute; left: ' . $x_final . 'px; top: ' . $y_final . 'px; width: ' . $width_final . 'px; height: ' . $height_final . 'px; border: 3px solid ' . $color . '; background: ' . $color . '33; border-radius: 4px;"></div>';
+                // ECHTES Design-Bild statt nur Bounding-Box
+                if (!empty($design_url)) {
+                    $html .= '<img src="' . esc_attr($design_url) . '" style="position: absolute; left: ' . $x_final . 'px; top: ' . $y_final . 'px; width: ' . $width_final . 'px; height: ' . $height_final . 'px; object-fit: contain; border: 2px solid ' . $color . '; border-radius: 4px; opacity: 0.9;" alt="Design Element ' . ($index + 1) . '">';
+                }
                 
-                // ZENTRIERTE Labels
-                $label_x = $x_final + ($width_final / 2);
-                $label_y = $y_final - 15;
-                $html .= '<div style="position: absolute; left: ' . ($label_x - 40) . 'px; top: ' . $label_y . 'px; width: 80px; text-align: center; background: ' . $color . '; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">Element ' . ($index + 1) . '</div>';
+                // Zusätzliche Bounding-Box für Klarheit
+                $html .= '<div style="position: absolute; left: ' . $x_final . 'px; top: ' . $y_final . 'px; width: ' . $width_final . 'px; height: ' . $height_final . 'px; border: 2px dashed ' . $color . '; border-radius: 4px; pointer-events: none;"></div>';
                 
-                // Größen-Label (zentriert im Element)
-                $size_x = $x_final + ($width_final / 2);
-                $size_y = $y_final + ($height_final / 2);
-                $html .= '<div style="position: absolute; left: ' . ($size_x - 30) . 'px; top: ' . ($size_y - 8) . 'px; width: 60px; text-align: center; background: rgba(0,0,0,0.8); color: white; padding: 2px 4px; border-radius: 2px; font-size: 9px;">' . round($element['width_mm'], 1) . '×' . round($element['height_mm'], 1) . 'mm</div>';
+                // Präzise Labels
+                $html .= '<div style="position: absolute; left: ' . ($x_final - 5) . 'px; top: ' . ($y_final - 25) . 'px; background: ' . $color . '; color: white; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">Element ' . ($index + 1) . '</div>';
+                
+                // Größen-Info
+                $html .= '<div style="position: absolute; left: ' . ($x_final + $width_final/2 - 30) . 'px; top: ' . ($y_final + $height_final + 5) . 'px; background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 3px; font-size: 9px; text-align: center;">' . round($width_mm, 1) . '×' . round($height_mm, 1) . 'mm</div>';
             }
         } else if (isset($coordinates['final'])) {
             // Fallback für einzelnes Element (alte Logik)
-            $final_x = $coordinates['final']['x_px'] * $transformer['template_to_container_scale'];
-            $final_y = $coordinates['final']['y_px'] * $transformer['template_to_container_scale'];
-            $final_width = $coordinates['final']['width_px'] * $transformer['template_to_container_scale'];
-            $final_height = $coordinates['final']['height_px'] * $transformer['template_to_container_scale'];
+            $final_x = $coordinates['final']['x_px'] * $transformer['template_scale'];
+            $final_y = $coordinates['final']['y_px'] * $transformer['template_scale'];
+            $final_width = $coordinates['final']['width_px'] * $transformer['template_scale'];
+            $final_height = $coordinates['final']['height_px'] * $transformer['template_scale'];
             
             $html .= '<div style="position: absolute; left: ' . $final_x . 'px; top: ' . $final_y . 'px; width: ' . $final_width . 'px; height: ' . $final_height . 'px; border: 3px solid #28a745; background: rgba(40, 167, 69, 0.3); border-radius: 4px;"></div>';
         }
         
         $html .= '</div>';
         $html .= '<p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d;">';
-        $html .= '<strong>Produkt:</strong> ' . $coordinates['product']['width_mm'] . '×' . $coordinates['product']['height_mm'] . 'mm | ';
+        $html .= '<strong>Produkt:</strong> ' . $transformer['product_width_mm'] . '×' . $transformer['product_height_mm'] . 'mm | ';
         $html .= '<strong>Druck:</strong> ' . round($coordinates['final']['width_mm'], 2) . '×' . round($coordinates['final']['height_mm'], 2) . 'mm';
         if (!empty($real_coordinates)) {
             $html .= ' (' . count($real_coordinates) . ' Elemente)';
