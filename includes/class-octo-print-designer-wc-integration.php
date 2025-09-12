@@ -2000,13 +2000,128 @@ private function check_yprint_dependency() {
             return;
         }
         
-        error_log("🔍 YPrint Debug Order Meta Fields für Order ID: {$order_id}");
+        error_log("🔍 YPrint VOLLSTÄNDIGE Bestellungsanalyse für Order ID: {$order_id}");
         
-        // Hole alle Meta-Felder für die Bestellung
-        $all_meta = get_post_meta($order_id);
+        // Hole Bestellung
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error('Bestellung nicht gefunden');
+            return;
+        }
         
         $html = '<div style="font-family: monospace; font-size: 12px;">';
-        $html .= '<h4 style="color: #0073aa; margin-top: 0;">📋 Alle Meta-Felder für Bestellung #' . $order_id . '</h4>';
+        $html .= '<h4 style="color: #0073aa; margin-top: 0;">🔍 VOLLSTÄNDIGE BESTELLUNGSANALYSE #' . $order_id . '</h4>';
+        
+        // SCHRITT 1: Bestellungsgrunddaten
+        $html .= $this->analyze_order_basic_data($order);
+        
+        // SCHRITT 2: Order Items Analyse
+        $html .= $this->analyze_order_items($order);
+        
+        // SCHRITT 3: Meta-Felder Analyse
+        $html .= $this->analyze_order_meta_fields($order_id);
+        
+        // SCHRITT 4: Design-Koordinaten-Suche
+        $html .= $this->search_design_coordinates($order);
+        
+        // SCHRITT 5: Datenbank-Suche
+        $html .= $this->search_database_for_designs($order);
+        
+        // SCHRITT 6: Beratung und Lösungsvorschläge
+        $html .= $this->provide_advice_and_solutions($order_id, $order);
+        
+        $html .= '</div>';
+        
+        wp_send_json_success(array('html' => $html));
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 1 - Bestellungsgrunddaten analysieren
+     */
+    private function analyze_order_basic_data($order) {
+        $html = '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #0073aa; margin-top: 0;">📋 SCHRITT 1: Bestellungsgrunddaten</h5>';
+        
+        $html .= '<table style="width: 100%; border-collapse: collapse; font-size: 11px;">';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #e9ecef; font-weight: bold;">Bestellungs-ID:</td><td style="padding: 5px; border: 1px solid #ddd;">#' . $order->get_order_number() . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #e9ecef; font-weight: bold;">Status:</td><td style="padding: 5px; border: 1px solid #ddd;">' . wc_get_order_status_name($order->get_status()) . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #e9ecef; font-weight: bold;">Kunde ID:</td><td style="padding: 5px; border: 1px solid #ddd;">' . $order->get_customer_id() . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #e9ecef; font-weight: bold;">Erstellt:</td><td style="padding: 5px; border: 1px solid #ddd;">' . $order->get_date_created()->format('d.m.Y H:i:s') . '</td></tr>';
+        $html .= '<tr><td style="padding: 5px; border: 1px solid #ddd; background: #e9ecef; font-weight: bold;">Total Items:</td><td style="padding: 5px; border: 1px solid #ddd;">' . count($order->get_items()) . '</td></tr>';
+        $html .= '</table>';
+        
+        $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 2 - Order Items analysieren
+     */
+    private function analyze_order_items($order) {
+        $html = '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #856404; margin-top: 0;">🛒 SCHRITT 2: Order Items Analyse</h5>';
+        
+        $items = $order->get_items();
+        $design_items_found = 0;
+        $yprint_items_found = 0;
+        
+        if (empty($items)) {
+            $html .= '<p style="color: #dc3545; font-weight: bold;">❌ KEINE ORDER ITEMS GEFUNDEN!</p>';
+            $html .= '<p style="color: #dc3545;">Das ist das Hauptproblem - die Bestellung hat keine Produkte.</p>';
+        } else {
+            $html .= '<p style="color: #28a745;">✅ ' . count($items) . ' Order Items gefunden:</p>';
+            
+            foreach ($items as $item_id => $item) {
+                $html .= '<div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">';
+                $html .= '<strong>Item #' . $item_id . ':</strong> ' . $item->get_name() . '<br>';
+                
+                // Prüfe auf Design-relevante Meta-Felder
+                $design_meta_found = false;
+                $meta_keys_to_check = array(
+                    '_yprint_design_id', '_design_id', '_octo_print_design_data', 
+                    '_print_design', '_design_data', '_template_id', '_octo_print_template_id'
+                );
+                
+                foreach ($meta_keys_to_check as $meta_key) {
+                    $meta_value = $item->get_meta($meta_key);
+                    if (!empty($meta_value)) {
+                        $design_meta_found = true;
+                        $design_items_found++;
+                        $html .= '<span style="color: #28a745;">✅ ' . $meta_key . ': ' . (is_array($meta_value) ? '[Array]' : substr($meta_value, 0, 50)) . '</span><br>';
+                        
+                        if (strpos($meta_key, 'yprint') !== false) {
+                            $yprint_items_found++;
+                        }
+                    }
+                }
+                
+                if (!$design_meta_found) {
+                    $html .= '<span style="color: #dc3545;">❌ Keine Design-Meta-Felder gefunden</span><br>';
+                }
+                
+                $html .= '</div>';
+            }
+        }
+        
+        $html .= '<div style="margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 4px;">';
+        $html .= '<strong>Zusammenfassung:</strong><br>';
+        $html .= '• Design-Items gefunden: ' . $design_items_found . '<br>';
+        $html .= '• YPrint-Items gefunden: ' . $yprint_items_found . '<br>';
+        $html .= '• Total Items: ' . count($items) . '<br>';
+        $html .= '</div>';
+        
+        $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 3 - Meta-Felder analysieren
+     */
+    private function analyze_order_meta_fields($order_id) {
+        $html = '<div style="background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #0c5460; margin-top: 0;">📋 SCHRITT 3: Meta-Felder Analyse</h5>';
+        
+        $all_meta = get_post_meta($order_id);
         
         if (empty($all_meta)) {
             $html .= '<p style="color: #dc3545;">❌ Keine Meta-Felder gefunden!</p>';
@@ -2015,58 +2130,323 @@ private function check_yprint_dependency() {
             
             // Sortiere Meta-Felder nach Relevanz
             $yprint_meta = array();
+            $design_meta = array();
             $other_meta = array();
             
             foreach ($all_meta as $key => $values) {
                 if (strpos($key, 'yprint') !== false || strpos($key, '_yprint') !== false) {
                     $yprint_meta[$key] = $values;
+                } elseif (strpos($key, 'design') !== false || strpos($key, 'octo') !== false || strpos($key, 'template') !== false) {
+                    $design_meta[$key] = $values;
                 } else {
                     $other_meta[$key] = $values;
                 }
             }
             
-            // Zeige YPrint-relevante Meta-Felder zuerst
+            // Zeige YPrint-relevante Meta-Felder
             if (!empty($yprint_meta)) {
-                $html .= '<h5 style="color: #0073aa; margin-top: 15px;">🎯 YPrint-relevante Meta-Felder:</h5>';
+                $html .= '<h6 style="color: #0073aa; margin-top: 15px;">🎯 YPrint-relevante Meta-Felder:</h6>';
                 foreach ($yprint_meta as $key => $values) {
                     $html .= $this->format_meta_field($key, $values, true);
                 }
             }
             
-            // Zeige andere Meta-Felder
-            if (!empty($other_meta)) {
-                $html .= '<h5 style="color: #666; margin-top: 15px;">📝 Andere Meta-Felder:</h5>';
-                foreach ($other_meta as $key => $values) {
+            // Zeige Design-relevante Meta-Felder
+            if (!empty($design_meta)) {
+                $html .= '<h6 style="color: #856404; margin-top: 15px;">🎨 Design-relevante Meta-Felder:</h6>';
+                foreach ($design_meta as $key => $values) {
                     $html .= $this->format_meta_field($key, $values, false);
                 }
             }
             
-            // Spezielle Analyse für fehlende YPrint-Daten
-            $html .= '<h5 style="color: #dc3545; margin-top: 20px;">🔍 Analyse fehlender YPrint-Daten:</h5>';
+            // Zeige andere Meta-Felder (begrenzt)
+            if (!empty($other_meta)) {
+                $html .= '<h6 style="color: #666; margin-top: 15px;">📝 Andere Meta-Felder (erste 10):</h6>';
+                $count = 0;
+                foreach ($other_meta as $key => $values) {
+                    if ($count >= 10) break;
+                    $html .= $this->format_meta_field($key, $values, false);
+                    $count++;
+                }
+                if (count($other_meta) > 10) {
+                    $html .= '<p style="color: #666; font-style: italic;">... und ' . (count($other_meta) - 10) . ' weitere</p>';
+                }
+            }
+            
+            // Analyse fehlender kritischer Meta-Felder
+            $html .= '<h6 style="color: #dc3545; margin-top: 20px;">🔍 Fehlende kritische Meta-Felder:</h6>';
+            
+            $critical_keys = array(
+                '_yprint_workflow_data' => 'Enthält die Ergebnisse aller 6 Workflow-Schritte',
+                '_yprint_final_coordinates' => 'Finale Druckkoordinaten für die Visualisierung',
+                '_yprint_template_id' => 'Template-ID für die Design-Verarbeitung',
+                '_yprint_template_image_url' => 'URL des Template-Bildes',
+                '_yprint_product_dimensions' => 'Produktdimensionen für die Größenberechnung'
+            );
             
             $missing_keys = array();
-            if (!isset($yprint_meta['_yprint_workflow_data'])) {
-                $missing_keys[] = '_yprint_workflow_data';
-            }
-            if (!isset($yprint_meta['_yprint_final_coordinates'])) {
-                $missing_keys[] = '_yprint_final_coordinates';
+            foreach ($critical_keys as $key => $description) {
+                if (!isset($yprint_meta[$key])) {
+                    $missing_keys[] = array('key' => $key, 'description' => $description);
+                }
             }
             
             if (!empty($missing_keys)) {
-                $html .= '<p style="color: #dc3545;">❌ <strong>Fehlende kritische Meta-Keys:</strong></p>';
                 $html .= '<ul style="color: #dc3545;">';
-                foreach ($missing_keys as $key) {
-                    $html .= '<li><code>' . esc_html($key) . '</code> - ' . $this->get_meta_key_description($key) . '</li>';
+                foreach ($missing_keys as $missing) {
+                    $html .= '<li><code>' . esc_html($missing['key']) . '</code> - ' . $missing['description'] . '</li>';
                 }
                 $html .= '</ul>';
             } else {
-                $html .= '<p style="color: #28a745;">✅ Alle kritischen YPrint Meta-Keys sind vorhanden!</p>';
+                $html .= '<p style="color: #28a745;">✅ Alle kritischen YPrint Meta-Felder sind vorhanden!</p>';
             }
         }
         
         $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 4 - Design-Koordinaten suchen
+     */
+    private function search_design_coordinates($order) {
+        $html = '<div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #721c24; margin-top: 0;">🎨 SCHRITT 4: Design-Koordinaten-Suche</h5>';
         
-        wp_send_json_success(array('html' => $html));
+        $customer_id = $order->get_customer_id();
+        $html .= '<p><strong>Suche nach Design-Koordinaten für Kunde ID:</strong> ' . $customer_id . '</p>';
+        
+        // Suche in verschiedenen Meta-Feldern
+        $coordinate_sources = array();
+        
+        // 1. Suche in Order Meta-Feldern
+        $order_meta = get_post_meta($order->get_id());
+        foreach ($order_meta as $key => $values) {
+            if (strpos($key, 'coordinate') !== false || strpos($key, 'position') !== false || strpos($key, 'transform') !== false) {
+                $coordinate_sources[] = array(
+                    'source' => 'Order Meta: ' . $key,
+                    'data' => $values[0] ?? '',
+                    'type' => 'meta'
+                );
+            }
+        }
+        
+        // 2. Suche in Order Items
+        foreach ($order->get_items() as $item_id => $item) {
+            $item_meta = get_metadata('order_item', $item_id);
+            foreach ($item_meta as $key => $values) {
+                if (strpos($key, 'coordinate') !== false || strpos($key, 'position') !== false || strpos($key, 'transform') !== false || strpos($key, 'design_data') !== false) {
+                    $coordinate_sources[] = array(
+                        'source' => 'Item #' . $item_id . ': ' . $key,
+                        'data' => $values[0] ?? '',
+                        'type' => 'item_meta'
+                    );
+                }
+            }
+        }
+        
+        if (!empty($coordinate_sources)) {
+            $html .= '<p style="color: #28a745;">✅ ' . count($coordinate_sources) . ' Koordinaten-Quellen gefunden:</p>';
+            foreach ($coordinate_sources as $source) {
+                $html .= '<div style="margin: 5px 0; padding: 5px; background: #fff; border-radius: 3px;">';
+                $html .= '<strong>' . esc_html($source['source']) . '</strong><br>';
+                $html .= '<span style="color: #666;">' . esc_html(substr($source['data'], 0, 100)) . (strlen($source['data']) > 100 ? '...' : '') . '</span>';
+                $html .= '</div>';
+            }
+        } else {
+            $html .= '<p style="color: #dc3545;">❌ Keine Design-Koordinaten in Meta-Feldern gefunden</p>';
+        }
+        
+        $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 5 - Datenbank-Suche
+     */
+    private function search_database_for_designs($order) {
+        global $wpdb;
+        
+        $html = '<div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #155724; margin-top: 0;">🗄️ SCHRITT 5: Datenbank-Suche nach Designs</h5>';
+        
+        $customer_id = $order->get_customer_id();
+        $html .= '<p><strong>Suche in Datenbank für Kunde ID:</strong> ' . $customer_id . '</p>';
+        
+        // Suche in verschiedenen Tabellen
+        $tables_to_search = array(
+            'octo_user_designs' => 'Haupttabelle für User-Designs',
+            'user_designs' => 'Alternative User-Designs Tabelle',
+            'designs' => 'Allgemeine Designs Tabelle',
+            'yprint_designs' => 'YPrint-spezifische Designs',
+            'wp_designs' => 'WordPress Designs Tabelle'
+        );
+        
+        $found_designs = array();
+        
+        foreach ($tables_to_search as $table_name => $description) {
+            $full_table_name = $wpdb->prefix . $table_name;
+            
+            // Prüfe ob Tabelle existiert
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$full_table_name}'");
+            
+            if ($table_exists) {
+                $html .= '<div style="margin: 10px 0; padding: 10px; background: #fff; border-radius: 4px;">';
+                $html .= '<strong>✅ Tabelle gefunden:</strong> ' . $full_table_name . ' (' . $description . ')<br>';
+                
+                // Zähle Einträge für diesen Kunden
+                $count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$full_table_name} WHERE user_id = %d", $customer_id));
+                $html .= '<span style="color: #28a745;">Designs für Kunde: ' . $count . '</span><br>';
+                
+                if ($count > 0) {
+                    // Hole die neuesten Designs
+                    $designs = $wpdb->get_results($wpdb->prepare("
+                        SELECT id, template_id, name, created_at 
+                        FROM {$full_table_name} 
+                        WHERE user_id = %d 
+                        ORDER BY created_at DESC 
+                        LIMIT 5
+                    ", $customer_id));
+                    
+                    $html .= '<strong>Neueste Designs:</strong><br>';
+                    foreach ($designs as $design) {
+                        $html .= '• ID: ' . $design->id . ', Template: ' . $design->template_id . ', Name: ' . $design->name . ', Datum: ' . $design->created_at . '<br>';
+                        $found_designs[] = array(
+                            'table' => $full_table_name,
+                            'id' => $design->id,
+                            'template_id' => $design->template_id,
+                            'name' => $design->name,
+                            'created_at' => $design->created_at
+                        );
+                    }
+                }
+                
+                $html .= '</div>';
+            } else {
+                $html .= '<div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
+                $html .= '<span style="color: #6c757d;">❌ Tabelle nicht gefunden:</span> ' . $full_table_name . '<br>';
+                $html .= '</div>';
+            }
+        }
+        
+        if (!empty($found_designs)) {
+            $html .= '<div style="margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 4px;">';
+            $html .= '<strong>🎯 GEFUNDENE DESIGNS:</strong><br>';
+            $html .= 'Total: ' . count($found_designs) . ' Designs gefunden<br>';
+            $html .= 'Diese Designs können als Quelle für die Koordinaten verwendet werden.';
+            $html .= '</div>';
+        } else {
+            $html .= '<div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">';
+            $html .= '<strong>❌ KEINE DESIGNS GEFUNDEN:</strong><br>';
+            $html .= 'Der Kunde hat keine Designs in der Datenbank erstellt.';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        return $html;
+    }
+    
+    /**
+     * ✅ NEU: SCHRITT 6 - Beratung und Lösungsvorschläge
+     */
+    private function provide_advice_and_solutions($order_id, $order) {
+        $html = '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">';
+        $html .= '<h5 style="color: #856404; margin-top: 0;">💡 SCHRITT 6: Beratung und Lösungsvorschläge</h5>';
+        
+        $customer_id = $order->get_customer_id();
+        $items_count = count($order->get_items());
+        $yprint_meta = array();
+        
+        // Sammle YPrint Meta-Felder
+        $all_meta = get_post_meta($order_id);
+        foreach ($all_meta as $key => $values) {
+            if (strpos($key, 'yprint') !== false || strpos($key, '_yprint') !== false) {
+                $yprint_meta[$key] = $values;
+            }
+        }
+        
+        $html .= '<div style="background: #fff; padding: 10px; border-radius: 4px; margin: 10px 0;">';
+        $html .= '<h6 style="color: #0073aa; margin-top: 0;">🔍 PROBLEM-ANALYSE:</h6>';
+        
+        if ($items_count === 0) {
+            $html .= '<p style="color: #dc3545; font-weight: bold;">❌ HAUPTPROBLEM: Bestellung hat keine Order Items</p>';
+            $html .= '<ul style="color: #dc3545;">';
+            $html .= '<li>Die Bestellung wurde ohne Produkte erstellt</li>';
+            $html .= '<li>Design-Daten können nicht aus Order Items geladen werden</li>';
+            $html .= '<li>Der Checkout-Prozess hat fehlgeschlagen</li>';
+            $html .= '</ul>';
+        } elseif (empty($yprint_meta)) {
+            $html .= '<p style="color: #dc3545; font-weight: bold;">❌ PROBLEM: Keine YPrint Meta-Felder vorhanden</p>';
+            $html .= '<ul style="color: #dc3545;">';
+            $html .= '<li>Der YPrint-Workflow wurde nie ausgeführt</li>';
+            $html .= '<li>Design-Koordinaten wurden nicht verarbeitet</li>';
+            $html .= '<li>Die Bestellung ist nicht "workflow-ready"</li>';
+            $html .= '</ul>';
+        } else {
+            $html .= '<p style="color: #28a745; font-weight: bold;">✅ TEILWEISE DATEN VORHANDEN</p>';
+            $html .= '<p>Einige YPrint-Daten sind vorhanden, aber möglicherweise unvollständig.</p>';
+        }
+        
+        $html .= '</div>';
+        
+        $html .= '<div style="background: #d1ecf1; padding: 10px; border-radius: 4px; margin: 10px 0;">';
+        $html .= '<h6 style="color: #0c5460; margin-top: 0;">🚀 LÖSUNGSVORSCHLÄGE:</h6>';
+        
+        if ($items_count === 0) {
+            $html .= '<ol style="color: #0c5460;">';
+            $html .= '<li><strong>Bestellung reparieren:</strong> Fügen Sie YPrint-Produkte zur Bestellung hinzu</li>';
+            $html .= '<li><strong>Design-Daten direkt laden:</strong> Verwenden Sie das Script "load_real_design_coordinates.php"</li>';
+            $html .= '<li><strong>Datenbank-Suche:</strong> Suchen Sie nach Designs des Kunden in der Datenbank</li>';
+            $html .= '<li><strong>Manuelle Koordinaten:</strong> Erstellen Sie Koordinaten basierend auf gefundenen Design-Daten</li>';
+            $html .= '</ol>';
+        } else {
+            $html .= '<ol style="color: #0c5460;">';
+            $html .= '<li><strong>Workflow-Starter verwenden:</strong> Klicken Sie auf "🚀 VOLLSTÄNDIGEN WORKFLOW STARTEN"</li>';
+            $html .= '<li><strong>Design-Daten aus Items laden:</strong> Extrahieren Sie Design-Daten aus Order Item Meta-Feldern</li>';
+            $html .= '<li><strong>Koordinaten berechnen:</strong> Verwenden Sie die gefundenen Design-Daten für Koordinatenberechnung</li>';
+            $html .= '</ol>';
+        }
+        
+        $html .= '</div>';
+        
+        $html .= '<div style="background: #f8d7da; padding: 10px; border-radius: 4px; margin: 10px 0;">';
+        $html .= '<h6 style="color: #721c24; margin-top: 0;">🔧 TECHNISCHE SCHRITTE:</h6>';
+        
+        $html .= '<p style="color: #721c24;"><strong>1. Design-Daten finden:</strong></p>';
+        $html .= '<ul style="color: #721c24; font-size: 11px;">';
+        $html .= '<li>Prüfen Sie die Datenbank-Tabellen: wp_octo_user_designs, wp_user_designs, etc.</li>';
+        $html .= '<li>Verwenden Sie: <code>SELECT * FROM wp_octo_user_designs WHERE user_id = ' . $customer_id . '</code></li>';
+        $html .= '<li>Suchen Sie nach Template ID 3657 oder anderen relevanten Templates</li>';
+        $html .= '</ul>';
+        
+        $html .= '<p style="color: #721c24;"><strong>2. Koordinaten extrahieren:</strong></p>';
+        $html .= '<ul style="color: #721c24; font-size: 11px;">';
+        $html .= '<li>Laden Sie das design_data JSON aus der Datenbank</li>';
+        $html .= '<li>Extrahieren Sie design_images[].transform Daten</li>';
+        $html .= '<li>Konvertieren Sie Pixel-Koordinaten zu Millimeter</li>';
+        $html .= '</ul>';
+        
+        $html .= '<p style="color: #721c24;"><strong>3. Meta-Felder erstellen:</strong></p>';
+        $html .= '<ul style="color: #721c24; font-size: 11px;">';
+        $html .= '<li>update_post_meta(' . $order_id . ', "_yprint_final_coordinates", $coordinates)</li>';
+        $html .= '<li>update_post_meta(' . $order_id . ', "_yprint_workflow_data", $workflow_data)</li>';
+        $html .= '<li>update_post_meta(' . $order_id . ', "_yprint_template_id", $template_id)</li>';
+        $html .= '</ul>';
+        
+        $html .= '</div>';
+        
+        $html .= '<div style="background: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0;">';
+        $html .= '<h6 style="color: #155724; margin-top: 0;">📞 NÄCHSTE SCHRITTE:</h6>';
+        $html .= '<ol style="color: #155724;">';
+        $html .= '<li>Führen Sie die Datenbank-Suche aus (siehe Schritt 5)</li>';
+        $html .= '<li>Verwenden Sie das Script "load_real_design_coordinates.php"</li>';
+        $html .= '<li>Oder verwenden Sie den Workflow-Starter Button</li>';
+        $html .= '<li>Überprüfen Sie die Ergebnisse in der Visualisierung</li>';
+        $html .= '</ol>';
+        $html .= '</div>';
+        
+        $html .= '</div>';
+        return $html;
     }
     
     /**
