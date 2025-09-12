@@ -101,11 +101,107 @@ class YPrint_Linear_Coordinate_System {
             return array('success' => false, 'error' => 'Invalid reference measurement');
         }
         
+        // ✅ NEU: Zusätzliche Validierung für realistische Werte
+        $pixel_distance = $reference_measurement['pixel_distance'];
+        $physical_distance_cm = $reference_measurement['physical_distance_cm'];
+        
+        // Pixel-Distanz sollte zwischen 10 und 700 Pixeln liegen
+        if ($pixel_distance < 10) {
+            error_log("YPrint Linear: ❌ Pixel-Distanz zu klein: {$pixel_distance}px");
+            return array(
+                'success' => false, 
+                'error' => 'Pixel distance too small: ' . $pixel_distance . 'px (minimum: 10px)',
+                'debug_info' => array(
+                    'pixel_distance' => $pixel_distance,
+                    'physical_distance_cm' => $physical_distance_cm,
+                    'issue' => 'Pixel distance below minimum threshold'
+                )
+            );
+        }
+        
+        if ($pixel_distance > 700) {
+            error_log("YPrint Linear: ❌ Pixel-Distanz zu groß: {$pixel_distance}px");
+            return array(
+                'success' => false, 
+                'error' => 'Pixel distance too large: ' . $pixel_distance . 'px (maximum: 700px)',
+                'debug_info' => array(
+                    'pixel_distance' => $pixel_distance,
+                    'physical_distance_cm' => $physical_distance_cm,
+                    'issue' => 'Pixel distance above maximum threshold'
+                )
+            );
+        }
+        
+        // Physische Distanz sollte zwischen 5 und 100 cm liegen
+        if ($physical_distance_cm < 5) {
+            error_log("YPrint Linear: ❌ Physische Distanz zu klein: {$physical_distance_cm}cm");
+            return array(
+                'success' => false, 
+                'error' => 'Physical distance too small: ' . $physical_distance_cm . 'cm (minimum: 5cm)',
+                'debug_info' => array(
+                    'pixel_distance' => $pixel_distance,
+                    'physical_distance_cm' => $physical_distance_cm,
+                    'issue' => 'Physical distance below minimum threshold'
+                )
+            );
+        }
+        
+        if ($physical_distance_cm > 100) {
+            error_log("YPrint Linear: ❌ Physische Distanz zu groß: {$physical_distance_cm}cm");
+            return array(
+                'success' => false, 
+                'error' => 'Physical distance too large: ' . $physical_distance_cm . 'cm (maximum: 100cm)',
+                'debug_info' => array(
+                    'pixel_distance' => $pixel_distance,
+                    'physical_distance_cm' => $physical_distance_cm,
+                    'issue' => 'Physical distance above maximum threshold'
+                )
+            );
+        }
+        
         $reference_pixel_distance = $reference_measurement['pixel_distance'];
         $reference_physical_cm = $reference_measurement['physical_distance_cm'];
         
         // ✅ KLARE BERECHNUNG: Pixel-zu-cm-Ratio aus Referenzmessung
         $pixel_to_cm_ratio = $reference_physical_cm / $reference_pixel_distance;
+        
+        // ✅ NEU: Plausibilitätsprüfung für pixel_to_cm_ratio
+        // Überprüfen, ob die Ratio im erwarteten Bereich liegt (0.05 bis 0.5)
+        // Dies fängt extreme Messfehler ab (z.B. falsche cm-Eingabe oder Pixel-Distanz)
+        if ($pixel_to_cm_ratio < 0.05) {
+            error_log("YPrint Linear: ❌ Unrealistischer Pixel-zu-cm-Ratio (zu klein): " . round($pixel_to_cm_ratio, 6));
+            error_log("YPrint Linear: ❌ Details - Physical: {$reference_physical_cm}cm, Pixel: {$reference_pixel_distance}px");
+            return array(
+                'success' => false, 
+                'error' => 'Unrealistic pixel-to-cm ratio detected (too small: ' . round($pixel_to_cm_ratio, 6) . ')',
+                'debug_info' => array(
+                    'reference_physical_cm' => $reference_physical_cm,
+                    'reference_pixel_distance' => $reference_pixel_distance,
+                    'pixel_to_cm_ratio' => $pixel_to_cm_ratio,
+                    'issue' => 'Ratio too small - possible measurement error'
+                )
+            );
+        }
+        
+        if ($pixel_to_cm_ratio > 0.5) {
+            error_log("YPrint Linear: ❌ Unrealistischer Pixel-zu-cm-Ratio (zu groß): " . round($pixel_to_cm_ratio, 6));
+            error_log("YPrint Linear: ❌ Details - Physical: {$reference_physical_cm}cm, Pixel: {$reference_pixel_distance}px");
+            return array(
+                'success' => false, 
+                'error' => 'Unrealistic pixel-to-cm ratio detected (too large: ' . round($pixel_to_cm_ratio, 6) . ')',
+                'debug_info' => array(
+                    'reference_physical_cm' => $reference_physical_cm,
+                    'reference_pixel_distance' => $reference_pixel_distance,
+                    'pixel_to_cm_ratio' => $pixel_to_cm_ratio,
+                    'issue' => 'Ratio too large - possible measurement error'
+                )
+            );
+        }
+        
+        // Zusätzliche Validierung: Warnung bei grenzwertigen Werten
+        if ($pixel_to_cm_ratio < 0.1 || $pixel_to_cm_ratio > 0.3) {
+            error_log("YPrint Linear: ⚠️ Grenzwertiger Pixel-zu-cm-Ratio: " . round($pixel_to_cm_ratio, 6));
+        }
         
         // Physische Koordinaten berechnen
         $position_factors = $normalized_factors['position_factors'];

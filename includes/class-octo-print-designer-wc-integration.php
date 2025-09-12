@@ -685,7 +685,7 @@ private function check_yprint_dependency() {
                     <div style="margin-top: 15px; padding: 12px; background: rgba(0,123,186,0.1); border-radius: 6px; font-size: 12px; color: #007cba; text-align: center;">
                         <strong>💡 Hinweis:</strong> Dieser Test führt alle YPrint-Verarbeitungsschritte nacheinander aus und zeigt das kombinierte Ergebnis aller 6 Schritte an.
                     </div>
-                </div>
+                    </div>
                     
                     <div id="test-result-container" style="display: none; margin-top: 15px;">
                         <h5 style="margin: 0 0 10px 0; color: #007cba; font-size: 13px;">
@@ -1457,17 +1457,17 @@ private function check_yprint_dependency() {
                                     $('#yprint-preview-error').hide();
                                     
                                     // Lade die echten Template-Bilder über den yprint_preview_modal AJAX-Handler
-                                    $.ajax({
-                                        url: ajaxurl,
-                                        type: 'POST',
-                                        data: {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
                                             action: 'yprint_preview_modal',
-                                            order_id: orderId,
+                            order_id: orderId,
                                             view_key: 'workflow_result',
                                             preview_type: 'dual_visualization',
                                             view_name: 'Workflow Ergebnisse',
-                                            nonce: $('#octo_print_provider_nonce').val()
-                                        },
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
                                         timeout: 30000,
                                         success: function(previewResponse) {
                                             console.log('YPrint Preview Response:', previewResponse);
@@ -1484,7 +1484,7 @@ private function check_yprint_dependency() {
                                                 } else if (data.image_url) {
                                                     // Normales Bild anzeigen
                                                     $('#yprint-preview-image-container').html('<img src="' + data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">');
-                                                } else {
+                            } else {
                                                     // Fallback: Workflow-Ergebnisse anzeigen
                                                     var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
                                                     $('#yprint-preview-image-container').html(
@@ -1498,8 +1498,8 @@ private function check_yprint_dependency() {
                                                 // Debug-Informationen
                                                 $('#yprint-preview-debug-content').html(data.debug_info || 'Keine Debug-Informationen verfügbar');
                                                 $('#yprint-preview-content').show();
-                                                
-                                            } else {
+                                
+                            } else {
                                                 // Fallback bei Fehler
                                                 var workflowResults = response.data || 'Keine Ergebnisse verfügbar';
                                                 $('#yprint-preview-image-container').html(
@@ -1523,8 +1523,8 @@ private function check_yprint_dependency() {
                                             );
                                             $('#yprint-preview-debug-content').html('Fehler beim Laden der Template-Vorschau');
                                             $('#yprint-preview-content').show();
-                                        },
-                                        complete: function() {
+                        },
+                        complete: function() {
                                             $('#yprint-preview-loading').hide();
                                         }
                                     });
@@ -1548,17 +1548,17 @@ private function check_yprint_dependency() {
                                         $('#yprint-preview-error').hide();
                                         
                                         // Lade die echten Template-Bilder über den yprint_preview_modal AJAX-Handler
-                                        $.ajax({
-                                            url: ajaxurl,
-                                            type: 'POST',
-                                            data: {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
                                                 action: 'yprint_preview_modal',
-                                                order_id: orderId,
+                            order_id: orderId,
                                                 view_key: 'workflow_result',
                                                 preview_type: 'dual_visualization',
                                                 view_name: 'Workflow Ergebnisse',
-                                                nonce: $('#octo_print_provider_nonce').val()
-                                            },
+                            nonce: $('#octo_print_provider_nonce').val()
+                        },
                                             timeout: 30000,
                                             success: function(previewResponse) {
                                                 console.log('YPrint Preview Response (Manual):', previewResponse);
@@ -1575,7 +1575,7 @@ private function check_yprint_dependency() {
                                                     } else if (data.image_url) {
                                                         // Normales Bild anzeigen
                                                         $('#yprint-preview-image-container').html('<img src="' + data.image_url + '" style="max-width: 100%; height: auto;" alt="Template Vorschau">');
-                                                    } else {
+                            } else {
                                                         // Fallback: Workflow-Ergebnisse anzeigen
                                                         var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
                                                         $('#yprint-preview-image-container').html(
@@ -1589,8 +1589,8 @@ private function check_yprint_dependency() {
                                                     // Debug-Informationen
                                                     $('#yprint-preview-debug-content').html(data.debug_info || 'Keine Debug-Informationen verfügbar');
                                                     $('#yprint-preview-content').show();
-                                                    
-                                                } else {
+                                
+                            } else {
                                                     // Fallback bei Fehler
                                                     var currentResults = $('#test-result-content').text() || 'Keine Ergebnisse verfügbar';
                                                     $('#yprint-preview-image-container').html(
@@ -1614,13 +1614,13 @@ private function check_yprint_dependency() {
                                                 );
                                                 $('#yprint-preview-debug-content').html('Fehler beim Laden der Template-Vorschau');
                                                 $('#yprint-preview-content').show();
-                                            },
-                                            complete: function() {
+                        },
+                        complete: function() {
                                                 $('#yprint-preview-loading').hide();
-                                            }
-                                        });
-                                    });
-                                    
+                        }
+                    });
+                });
+                
                                     // Button nach der Erfolgsmeldung einfügen
                                     $('.notice').last().after(previewButton);
                                 }, 1000);
@@ -5069,7 +5069,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $combined_result .= "   Status: Erfolgreich\n";
                 $combined_result .= "   Ergebnis: " . (is_string($step1_result) ? substr($step1_result, 0, 100) . "..." : "Canvas-Daten erfasst") . "\n\n";
                 error_log("✅ YPRINT WORKFLOW: Step 1 completed successfully");
-            } catch (Exception $e) {
+        } catch (Exception $e) {
                 $all_steps_successful = false;
                 $combined_result .= "❌ SCHRITT 1: Canvas-Erfassung & Design-Platzierung\n";
                 $combined_result .= "   Status: FEHLGESCHLAGEN\n";
@@ -5454,11 +5454,18 @@ private function build_print_provider_email_content($order, $design_items, $note
             $html .= '</div>';
             
         } else {
-            // ✅ FALLBACK: Inkonsistente Daten - zeige Warnung
-            $html .= '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,193,7,0.9); border: 2px solid #ffc107; border-radius: 8px; padding: 20px; text-align: center; color: #856404;">';
-            $html .= '<h4 style="margin: 0 0 10px 0;">⚠️ Inkonsistente Daten</h4>';
+            // ✅ FALLBACK: Inkonsistente Daten - zeige detaillierte Warnung
+            $html .= '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,193,7,0.9); border: 2px solid #ffc107; border-radius: 8px; padding: 20px; text-align: center; color: #856404; max-width: 350px;">';
+            $html .= '<h4 style="margin: 0 0 10px 0;">⚠️ Inkonsistente Daten erkannt</h4>';
             $html .= '<p style="margin: 0; font-size: 12px;">Die Referenzmessungen und Produktdimensionen sind nicht konsistent.</p>';
-            $html .= '<p style="margin: 5px 0 0 0; font-size: 11px;">Skalierungsverhältnis: ' . round($unified_reference_data['scale_factors']['ratio'], 3) . '</p>';
+            $html .= '<div style="margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px; font-size: 11px;">';
+            $html .= '<div><strong>Skalierungsverhältnis:</strong> ' . round($unified_reference_data['scale_factors']['ratio'], 3) . '</div>';
+            $html .= '<div><strong>Referenzmessung:</strong> ' . $unified_reference_data['validation']['reference_physical_cm'] . 'cm</div>';
+            $html .= '<div><strong>Produktbreite:</strong> ' . $unified_reference_data['validation']['product_width_mm'] . 'mm</div>';
+            $html .= '</div>';
+            $html .= '<p style="margin: 10px 0 0 0; font-size: 11px; color: #6c757d;">';
+            $html .= '<strong>Lösung:</strong> Bitte überprüfen Sie die Template-Kalibrierung im Admin-Bereich.';
+            $html .= '</p>';
             $html .= '</div>';
         }
         

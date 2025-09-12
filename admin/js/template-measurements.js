@@ -409,6 +409,38 @@ class YPrintTemplateMeasurements {
         this.drawPoint(event.target, point, this.tempPoints.length);
         
         if (this.tempPoints.length === 2) {
+            // ✅ NEU: Frontend-Validierung für unrealistische Distanzen
+            const distance = this.calculateDistance(this.tempPoints[0], this.tempPoints[1]);
+            
+            console.log('🎯 Distance validation:', {
+                distance: distance,
+                point1: this.tempPoints[0],
+                point2: this.tempPoints[1]
+            });
+            
+            // Plausibilitätsprüfung: Distanz sollte zwischen 10 und 700 Pixeln liegen
+            if (distance < 10) {
+                this.showNotification('⚠️ Die gemessene Distanz ist zu klein (' + Math.round(distance) + 'px). Bitte setzen Sie die Punkte weiter auseinander.', 'warning');
+                this.resetMeasurement();
+                return;
+            }
+            
+            if (distance > 700) {
+                this.showNotification('⚠️ Die gemessene Distanz ist zu groß (' + Math.round(distance) + 'px). Bitte setzen Sie die Punkte näher zusammen.', 'warning');
+                this.resetMeasurement();
+                return;
+            }
+            
+            // Zusätzliche Validierung: Mindestabstand zwischen Punkten
+            const minDistance = 20; // Mindestens 20 Pixel Abstand
+            if (distance < minDistance) {
+                this.showNotification('⚠️ Bitte setzen Sie die Messpunkte mindestens ' + minDistance + ' Pixel auseinander für eine präzise Messung.', 'warning');
+                this.resetMeasurement();
+                return;
+            }
+            
+            console.log('✅ Distance validation passed:', distance + 'px');
+            
             setTimeout(() => {
                 this.completeMeasurement();
             }, 100);
