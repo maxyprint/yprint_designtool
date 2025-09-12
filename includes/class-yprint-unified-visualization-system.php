@@ -186,34 +186,33 @@ class YPrint_Unified_Visualization_System {
         $template_height_px = $data['template_dimensions']['height'] ?? 600;
         
         // 2. PRODUKT-DIMENSIONEN IN MM (KORRIGIERT)
-        $order_size = $data['order_size'];
+        // Hole die Größe des aktuellen Orders
+        $order_size = strtolower($data['order_size'] ?? 'm');
         $all_product_dimensions = $data['product_dimensions'];
         
         // Stellen Sie sicher, dass die Dimensionen für die bestellte Größe existieren.
-        // Wenn nicht, verwenden Sie einen Fallback (z.B. Größe 'M') oder die erste verfügbare Größe.
         if (isset($all_product_dimensions[$order_size])) {
-            $size_specific_dimensions = $all_product_dimensions[$order_size];
+            $size_dimensions = $all_product_dimensions[$order_size];
             error_log("YPrint Unified: ✅ Verwende Dimensionen für Größe {$order_size}");
         } else {
             // Fallback-Logik: Versuche 'M' oder nimm die erste Größe im Array
-            $size_specific_dimensions = $all_product_dimensions['m'] ?? reset($all_product_dimensions);
-            if (!$size_specific_dimensions) {
+            $size_dimensions = $all_product_dimensions['m'] ?? reset($all_product_dimensions);
+            if (!$size_dimensions) {
                 // Absoluter Notfall-Fallback, falls gar keine Dimensionen gespeichert sind.
-                $size_specific_dimensions = ['chest' => 50, 'height_from_shoulder' => 68];
+                $size_dimensions = ['chest' => 50, 'height_from_shoulder' => 68];
                 error_log("YPrint Unified: ⚠️ Verwende Notfall-Fallback-Dimensionen");
             } else {
                 error_log("YPrint Unified: ⚠️ Größe {$order_size} nicht gefunden, verwende Fallback");
             }
         }
         
-        // Verwenden Sie die größenspezifischen Maße für die Berechnung.
-        // Konvertieren Sie die in cm gespeicherten Werte in mm.
-        $product_width_mm = ($size_specific_dimensions['chest'] ?? 50) * 10;
-        $product_height_mm = ($size_specific_dimensions['height_from_shoulder'] ?? 68) * 10;
+        $product_width_mm = ($size_dimensions['chest'] ?? 50) * 10; // cm zu mm
+        $product_height_mm = ($size_dimensions['height_from_shoulder'] ?? 68) * 10; // cm zu mm
         
-        error_log("YPrint Unified: 📏 Produktdimensionen für Größe {$order_size}:");
-        error_log("  Chest: " . ($size_specific_dimensions['chest'] ?? 50) . "cm = {$product_width_mm}mm");
-        error_log("  Height from Shoulder: " . ($size_specific_dimensions['height_from_shoulder'] ?? 68) . "cm = {$product_height_mm}mm");
+        error_log("YPrint Unified: 📏 Template-Skalierung Berechnung:");
+        error_log("  Template: {$template_width_px} x {$template_height_px} px");
+        error_log("  Produkt Größe {$order_size}: " . ($size_dimensions['chest'] ?? 'N/A') . " x " . ($size_dimensions['height_from_shoulder'] ?? 'N/A') . " cm");
+        error_log("  Produkt in mm: {$product_width_mm} x {$product_height_mm} mm");
         
         // 3. SKALIERUNGSFAKTOREN (mit Division-by-Zero-Schutz)
         if ($product_width_mm > 0 && $product_height_mm > 0 && $template_width_px > 0 && $template_height_px > 0) {
@@ -221,17 +220,14 @@ class YPrint_Unified_Visualization_System {
             $scale_mm_to_px_y = $template_height_px / $product_height_mm;
             $scale_mm_to_px = min($scale_mm_to_px_x, $scale_mm_to_px_y);
             
-            error_log("YPrint Unified: ✅ Skalierungsfaktoren berechnet:");
-            error_log("  Template: {$template_width_px}×{$template_height_px}px");
-            error_log("  Produkt: {$product_width_mm}×{$product_height_mm}mm");
+            error_log("YPrint Unified: ✅ Template-Skalierungsfaktoren berechnet:");
             error_log("  X-Skalierung: " . round($scale_mm_to_px_x, 6) . " px/mm");
             error_log("  Y-Skalierung: " . round($scale_mm_to_px_y, 6) . " px/mm");
-            error_log("  Finale Skalierung: " . round($scale_mm_to_px, 6) . " px/mm");
+            error_log("  Finale Template-Skalierung: " . round($scale_mm_to_px, 6) . " px/mm");
         } else {
-            // Fallback-Skalierung
-            $scale_mm_to_px = 1.0;
-            error_log("YPrint Unified: ⚠️ Invalide Dimensionen für Skalierung, verwende Fallback: 1.0 px/mm");
-            error_log("YPrint Unified: 📊 Debug - Template: {$template_width_px}x{$template_height_px}px, Produkt: {$product_width_mm}x{$product_height_mm}mm");
+            // Realistische Fallback-Skalierung basierend auf den Daten
+            $scale_mm_to_px = 0.412; // Gleiche Skalierung wie Referenz
+            error_log("YPrint Unified: ⚠️ Invalide Dimensionen, verwende Referenz-Skalierung als Fallback: {$scale_mm_to_px} px/mm");
         }
         
         $coordinates['template'] = array(
@@ -243,7 +239,9 @@ class YPrint_Unified_Visualization_System {
         $coordinates['product'] = array(
             'width_mm' => $product_width_mm,
             'height_mm' => $product_height_mm,
-            'order_size' => $order_size
+            'order_size' => strtoupper($data['order_size'] ?? 'M'),
+            'chest_cm' => $size_dimensions['chest'] ?? 50,
+            'height_cm' => $size_dimensions['height_from_shoulder'] ?? 68
         );
         
         // 4. REFERENZMESSUNGEN TRANSFORMIEREN (KORRIGIERT)
