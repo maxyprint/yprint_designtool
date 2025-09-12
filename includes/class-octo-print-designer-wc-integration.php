@@ -164,10 +164,26 @@ private function check_yprint_dependency() {
      * Add custom data to order items during checkout
      */
     public function add_custom_data_to_order_items($item, $cart_item_key, $values, $order) {
+        error_log("YPrint Checkout: 🛒 add_custom_data_to_order_items aufgerufen für Item: " . $item->get_name());
+        error_log("YPrint Checkout: 📊 Cart Item Values: " . json_encode(array_keys($values)));
+        
         if (isset($values['print_design'])) {
             $design = $values['print_design'];
             
-            // Add basic design metadata to order item
+            error_log("YPrint Checkout: ✅ Print Design Daten gefunden:");
+            error_log("  Design ID: " . ($design['design_id'] ?? 'nicht gesetzt'));
+            error_log("  Template ID: " . ($design['template_id'] ?? 'nicht gesetzt'));
+            error_log("  Name: " . ($design['name'] ?? 'nicht gesetzt'));
+            
+            // KORREKTE Meta-Key-Namen für YPrint-System
+            $item->add_meta_data('_yprint_design_id', $design['design_id']);           // ✅
+            $item->add_meta_data('_yprint_template_id', $design['template_id']);       // ✅
+            $item->add_meta_data('_yprint_design_name', $design['name']);              // ✅
+            $item->add_meta_data('_yprint_design_color', $design['variation_name']);   // ✅
+            $item->add_meta_data('_yprint_selected_size', $design['size_name']);       // ✅
+            $item->add_meta_data('_is_design_product', true);                          // ✅
+            
+            // Backward compatibility - alte Namen beibehalten
             $item->add_meta_data('_design_id', $design['design_id']);
             $item->add_meta_data('_design_name', $design['name']);
             $item->add_meta_data('_design_color', $design['variation_name']);
@@ -205,6 +221,12 @@ private function check_yprint_dependency() {
                 // Still maintain the old field for backward compatibility
                 $item->add_meta_data('_design_image_url', $design['design_image_url'] ?? '');
             }
+            
+            error_log("YPrint Checkout: ✅ Alle Meta-Daten erfolgreich hinzugefügt");
+        } else {
+            error_log("YPrint Checkout: ❌ KEINE print_design Daten gefunden!");
+            error_log("YPrint Checkout: 📊 Verfügbare Cart Item Keys: " . json_encode(array_keys($values)));
+            error_log("YPrint Checkout: 🔍 Vollständige Cart Item Values: " . json_encode($values));
         }
     }
 
