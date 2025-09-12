@@ -825,6 +825,31 @@ class YPrint_Unified_Visualization_System {
             );
         }
         
+        // PRIORITÄT 3.5: Real Design Coordinates (NEU!)
+        $real_design_coordinates = get_post_meta($order_id, '_yprint_real_design_coordinates', true);
+        if (!empty($real_design_coordinates) && is_array($real_design_coordinates)) {
+            error_log("YPrint Unified: ✅ Real Design Koordinaten gefunden: " . count($real_design_coordinates) . " Elemente");
+            
+            // Nimm das erste/größte Element als finale Koordinaten
+            $primary_element = $real_design_coordinates[0];
+            
+            error_log("YPrint Unified: ✅ Primary Element Koordinaten:");
+            error_log("  X: " . ($primary_element['x_mm'] ?? 'unknown') . " mm");
+            error_log("  Y: " . ($primary_element['y_mm'] ?? 'unknown') . " mm");
+            error_log("  Width: " . ($primary_element['width_mm'] ?? 'unknown') . " mm");
+            error_log("  Height: " . ($primary_element['height_mm'] ?? 'unknown') . " mm");
+            
+            return array(
+                'x_mm' => floatval($primary_element['x_mm'] ?? 0),
+                'y_mm' => floatval($primary_element['y_mm'] ?? 0),
+                'width_mm' => floatval($primary_element['width_mm'] ?? 0),
+                'height_mm' => floatval($primary_element['height_mm'] ?? 0),
+                'dpi' => 74,
+                'source' => 'real_design_coordinates',
+                'element_count' => count($real_design_coordinates)
+            );
+        }
+        
         // PRIORITÄT 4: Order-Items
         $order = wc_get_order($order_id);
         if ($order) {
