@@ -538,6 +538,28 @@ class YPrint_Unified_Visualization_System {
         
         error_log("YPrint Unified: 📊 Gefundene View-IDs: " . implode(', ', array_keys($view_print_areas)));
         
+        // ✅ NEU: Detaillierte Analyse der Datenstruktur
+        error_log("YPrint Unified: 🔍 Detaillierte Datenstruktur-Analyse:");
+        foreach ($view_print_areas as $view_id => $view_data) {
+            error_log("YPrint Unified: 📋 View {$view_id}:");
+            error_log("  - Datentyp: " . gettype($view_data));
+            if (is_array($view_data)) {
+                error_log("  - Array-Keys: " . implode(', ', array_keys($view_data)));
+                if (isset($view_data['measurements'])) {
+                    error_log("  - Measurements-Datentyp: " . gettype($view_data['measurements']));
+                    if (is_array($view_data['measurements'])) {
+                        error_log("  - Measurements-Keys: " . implode(', ', array_keys($view_data['measurements'])));
+                        foreach ($view_data['measurements'] as $measurement_key => $measurement) {
+                            error_log("  - Measurement {$measurement_key}: " . gettype($measurement));
+                            if (is_array($measurement)) {
+                                error_log("    - Keys: " . implode(', ', array_keys($measurement)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Durchsuche alle Views nach Referenzmessungen
         foreach ($view_print_areas as $view_id => $view_data) {
             error_log("YPrint Unified: 🔍 Prüfe View {$view_id}");
@@ -601,6 +623,32 @@ class YPrint_Unified_Visualization_System {
                     error_log("  Type: " . ($measurement['type'] ?? 'unknown'));
                     error_log("  Pixel Distance: " . ($measurement['pixel_distance'] ?? 'unknown'));
                     error_log("  Physical Size: " . ($measurement['physical_size_cm'] ?? $measurement['real_distance_cm'] ?? 'unknown') . " cm");
+                    return $measurement;
+                }
+            }
+            
+            // ✅ NEU: Methode 4: Suche nach ANY Messung mit pixel_distance und physical_size_cm
+            foreach ($view_data['measurements'] as $measurement_key => $measurement) {
+                // ✅ SICHERHEIT: Prüfe ob measurement ein Array ist
+                if (!is_array($measurement)) {
+                    continue;
+                }
+                
+                // Prüfe ob es eine gültige Messung mit den notwendigen Daten ist
+                if (isset($measurement['pixel_distance']) && isset($measurement['physical_size_cm'])) {
+                    error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (any measurement with pixel_distance and physical_size_cm)");
+                    error_log("  Type: " . ($measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown'));
+                    error_log("  Pixel Distance: " . ($measurement['pixel_distance'] ?? 'unknown'));
+                    error_log("  Physical Size: " . ($measurement['physical_size_cm'] ?? 'unknown') . " cm");
+                    return $measurement;
+                }
+                
+                // Alternative: Prüfe auf real_distance_cm
+                if (isset($measurement['pixel_distance']) && isset($measurement['real_distance_cm'])) {
+                    error_log("YPrint Unified: ✅ Referenzmessung gefunden in View {$view_id} (any measurement with pixel_distance and real_distance_cm)");
+                    error_log("  Type: " . ($measurement['type'] ?? $measurement['measurement_type'] ?? 'unknown'));
+                    error_log("  Pixel Distance: " . ($measurement['pixel_distance'] ?? 'unknown'));
+                    error_log("  Physical Size: " . ($measurement['real_distance_cm'] ?? 'unknown') . " cm");
                     return $measurement;
                 }
             }
