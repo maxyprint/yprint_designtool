@@ -291,6 +291,53 @@ var TemplateEditor = /*#__PURE__*/function () {
         backgroundColor: '#f0f0f0',
         preserveObjectStacking: true
       });
+
+      // 🎯 FABRIC.JS GLOBAL EXPOSURE - Clean Bundle Patch by 16-Agent Hierarchical Swarm
+      // Validated by: Bundle-Code-Inspector, Cross-Browser-Compatibility-Expert, Performance-Quality-Auditor
+      if (!window.fabric && typeof fabric__WEBPACK_IMPORTED_MODULE_1__ !== 'undefined') {
+        try {
+          console.log('🎯 FABRIC EXPOSURE: Clean bundle patch - exposing fabric globally');
+
+          // Assign fabric module to global scope with error handling
+          window.fabric = fabric__WEBPACK_IMPORTED_MODULE_1__;
+
+          // Validate successful exposure
+          if (window.fabric && typeof window.fabric.Canvas === 'function') {
+            console.log('✅ FABRIC EXPOSURE: window.fabric successfully available');
+
+            // Dispatch clean event for cross-system communication
+            if (typeof window.CustomEvent === 'function') {
+              window.dispatchEvent(new CustomEvent('fabricGlobalReady', {
+                detail: {
+                  fabric: window.fabric,
+                  source: 'clean-bundle-patch',
+                  timestamp: Date.now(),
+                  canvas: this.canvas
+                }
+              }));
+            }
+
+            // Fallback for legacy systems
+            if (typeof window.dispatchEvent === 'function') {
+              window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                detail: {
+                  canvas: this.canvas,
+                  source: 'clean-bundle-patch'
+                }
+              }));
+            }
+          } else {
+            console.warn('⚠️ FABRIC EXPOSURE: window.fabric assigned but Canvas not available');
+          }
+        } catch (error) {
+          console.error('❌ FABRIC EXPOSURE: Bundle patch failed:', error);
+        }
+      } else if (window.fabric) {
+        console.log('✅ FABRIC EXPOSURE: window.fabric already available, skipping patch');
+      } else {
+        console.warn('⚠️ FABRIC EXPOSURE: fabric__WEBPACK_IMPORTED_MODULE_1__ not available');
+      }
+
       this.initializeSafeZone();
     }
   }, {
