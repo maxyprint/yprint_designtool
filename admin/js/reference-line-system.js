@@ -45,6 +45,16 @@
                     }
                 }
             });
+
+            // Listen for the new global fabric ready event
+            window.addEventListener('fabricGlobalReady', (event) => {
+                console.log('🎯 REFERENCE LINE: Received fabricGlobalReady event!', event.detail);
+                if (event.detail.fabric && !this.fabric) {
+                    this.fabric = event.detail.fabric;
+                    window.fabric = event.detail.fabric;
+                    console.log('✅ REFERENCE LINE: Global fabric set from exposure event!');
+                }
+            });
         }
 
         setupCanvasDetection() {
@@ -470,6 +480,12 @@
                     window.fabricCanvas = instances[0];
                     return instances[0];
                 }
+            } else {
+                console.log('🔍 Method 6 - Fabric.js status:', {
+                    fabric: !!window.fabric,
+                    canvas: !!(window.fabric && window.fabric.Canvas),
+                    getInstances: !!(window.fabric && window.fabric.Canvas && window.fabric.Canvas.getInstances)
+                });
             }
 
             // Method 7: Extract Fabric from existing canvas elements (aggressive approach)

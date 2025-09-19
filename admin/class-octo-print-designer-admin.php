@@ -52,9 +52,17 @@ class Octo_Print_Designer_Admin {
         );
 
         wp_enqueue_script(
+            'octo-fabric-global-exposure',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
+            ['octo-print-designer-admin', 'jquery'],
+            $this->version . '.1',
+            true
+        );
+
+        wp_enqueue_script(
             'octo-template-editor-canvas-hook',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-print-designer-admin', 'jquery'],
+            ['octo-fabric-global-exposure', 'octo-print-designer-admin', 'jquery'],
             $this->version . '.3',
             true
         );
@@ -62,8 +70,8 @@ class Octo_Print_Designer_Admin {
         wp_enqueue_script(
             'octo-reference-line-system',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
-            $this->version . '.4',
+            ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
+            $this->version . '.5',
             true
         );
 
