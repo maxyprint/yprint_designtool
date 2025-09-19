@@ -1057,34 +1057,33 @@ class Octo_Print_Designer_Template {
         jQuery(document).ready(function($) {
             let sizeIndex = $('#size-definitions-tbody tr').length;
 
+            // Build reference line options safely
+            let referenceOptions = '';
+            referenceOptions += '<option value=""><?php echo esc_js(__('Select Reference...', 'octo-print-designer')); ?></option>';
+            <?php foreach ($reference_lines as $ref_index => $ref_line): ?>
+            referenceOptions += '<option value="<?php echo esc_js($ref_index); ?>"><?php echo esc_js(str_replace('_', ' ', ucwords($ref_line['type']))); ?> (<?php echo esc_js($ref_line['lengthPx']); ?>px)</option>';
+            <?php endforeach; ?>
+
             // Add new size definition row
             $('#add-size-definition').click(function() {
-                const newRow = `
-                    <tr data-index="${sizeIndex}">
-                        <td>
-                            <input type="text" name="size_definitions[${sizeIndex}][size]"
-                                   placeholder="S, M, L, XL..." class="regular-text" />
-                        </td>
-                        <td>
-                            <input type="number" name="size_definitions[${sizeIndex}][target_mm]"
-                                   placeholder="450" step="0.1" class="regular-text" />
-                        </td>
-                        <td>
-                            <select name="size_definitions[${sizeIndex}][reference_type]" class="regular-text">
-                                <option value=""><?php esc_html_e('Select Reference...', 'octo-print-designer'); ?></option>
-                                <?php foreach ($reference_lines as $ref_index => $ref_line): ?>
-                                    <option value="<?php echo esc_attr($ref_index); ?>">
-                                        <?php echo esc_html(str_replace('_', ' ', ucwords($ref_line['type']))); ?>
-                                        (<?php echo esc_html($ref_line['lengthPx']); ?>px)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </td>
-                        <td>
-                            <button type="button" class="button remove-size-definition"><?php esc_html_e('Remove', 'octo-print-designer'); ?></button>
-                        </td>
-                    </tr>
-                `;
+                const newRow = '<tr data-index="' + sizeIndex + '">' +
+                    '<td>' +
+                        '<input type="text" name="size_definitions[' + sizeIndex + '][size]" ' +
+                               'placeholder="S, M, L, XL..." class="regular-text" />' +
+                    '</td>' +
+                    '<td>' +
+                        '<input type="number" name="size_definitions[' + sizeIndex + '][target_mm]" ' +
+                               'placeholder="450" step="0.1" class="regular-text" />' +
+                    '</td>' +
+                    '<td>' +
+                        '<select name="size_definitions[' + sizeIndex + '][reference_type]" class="regular-text">' +
+                            referenceOptions +
+                        '</select>' +
+                    '</td>' +
+                    '<td>' +
+                        '<button type="button" class="button remove-size-definition"><?php echo esc_js(__('Remove', 'octo-print-designer')); ?></button>' +
+                    '</td>' +
+                '</tr>';
                 $('#size-definitions-tbody').append(newRow);
                 sizeIndex++;
             });
