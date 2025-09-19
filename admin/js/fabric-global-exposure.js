@@ -26,7 +26,7 @@
                         // Reconstruct fabric object from Canvas constructor
                         const fabricObj = {
                             Canvas: fabricConstructor,
-                            Object: editor.canvas.getObjects()[0]?.constructor || fabricConstructor.prototype.constructor,
+                            Object: (editor.canvas.getObjects()[0] && editor.canvas.getObjects()[0].constructor) || fabricConstructor.prototype.constructor,
                             util: fabricConstructor.util || {},
                             version: fabricConstructor.version || '5.x'
                         };
@@ -76,7 +76,7 @@
                 const fabricCanvas = canvas.__fabric;
                 const fabricObj = {
                     Canvas: fabricCanvas.constructor,
-                    Object: fabricCanvas.getObjects()[0]?.constructor,
+                    Object: (fabricCanvas.getObjects()[0] && fabricCanvas.getObjects()[0].constructor),
                     version: '5.x'
                 };
 
@@ -149,7 +149,7 @@
             // Also trigger the existing event for compatibility
             window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
                 detail: {
-                    canvas: window.fabricCanvas || (window.templateEditors && window.templateEditors.values().next().value?.canvas),
+                    canvas: window.fabricCanvas || (window.templateEditors && window.templateEditors.values().next().value && window.templateEditors.values().next().value.canvas),
                     source: 'global-exposure'
                 }
             }));
