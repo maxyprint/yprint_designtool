@@ -25,9 +25,74 @@
             this.bindEvents();
             this.setupModal();
             this.setupCanvasDetection();
+            this.setupCanvasReadyListener();
+        }
+
+        setupCanvasReadyListener() {
+            // Listen for the custom event from the canvas hook
+            window.addEventListener('fabricCanvasReady', (event) => {
+                console.log('🎯 REFERENCE LINE: Received fabricCanvasReady event!', event.detail);
+                if (event.detail.canvas && !this.canvas) {
+                    this.canvas = event.detail.canvas;
+                    window.fabricCanvas = event.detail.canvas;
+                    console.log('✅ REFERENCE LINE: Canvas set from custom event!');
+
+                    // If we're currently trying to start reference line creation, continue
+                    if (this.isWaitingForCanvas) {
+                        this.isWaitingForCanvas = false;
+                        console.log('🚀 REFERENCE LINE: Continuing delayed reference line creation...');
+                        setTimeout(() => this.startReferenceLineCreation(), 100);
+                    }
+                }
+            });
         }
 
         setupCanvasDetection() {
+            // Enhanced Canvas Detection Strategy
+            this.setupTemplateEditorHook();
+            this.setupMutationObserver();
+            this.setupWindowObjectWatcher();
+        }
+
+        setupTemplateEditorHook() {
+            // Hook into window object to catch template editor creation
+            const originalObjectDefineProperty = Object.defineProperty;
+            const self = this;
+
+            // Watch for templateEditors Map creation
+            const checkForEditors = () => {
+                if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
+                    console.log('🎯 DETECTED templateEditors Map creation!');
+                    self.checkCanvasFromEditors();
+                } else if (window.variationsManager && window.variationsManager.editors) {
+                    console.log('🎯 DETECTED variationsManager creation!');
+                    self.checkCanvasFromEditors();
+                }
+            };
+
+            // Poll for template editors
+            const editorCheckInterval = setInterval(() => {
+                checkForEditors();
+                if (this.canvas) {
+                    clearInterval(editorCheckInterval);
+                }
+            }, 100);
+
+            // Clear interval after 30 seconds to prevent memory leak
+            setTimeout(() => clearInterval(editorCheckInterval), 30000);
+        }
+
+        checkCanvasFromEditors() {
+            const foundCanvas = this.findCanvasInstance();
+            if (foundCanvas) {
+                console.log('✅ Canvas found via editor detection!');
+                this.canvas = foundCanvas;
+                // Notify any waiting processes
+                this.onCanvasReady && this.onCanvasReady();
+            }
+        }
+
+        setupMutationObserver() {
             // Set up MutationObserver to detect when canvas is added to DOM
             this.mutationObserver = new MutationObserver((mutations) => {
                 for (let mutation of mutations) {
@@ -59,6 +124,27 @@
             });
 
             console.log('🔍 MutationObserver started for canvas detection');
+        }
+
+        setupWindowObjectWatcher() {
+            // Watch for window properties being set
+            const watchProps = ['templateEditors', 'variationsManager', 'fabricCanvas'];
+            const self = this;
+
+            watchProps.forEach(prop => {
+                let value = window[prop];
+                Object.defineProperty(window, prop, {
+                    get() { return value; },
+                    set(newValue) {
+                        value = newValue;
+                        console.log(`🎯 WINDOW PROPERTY SET: ${prop}`, newValue);
+                        if (newValue && !self.canvas) {
+                            setTimeout(() => self.checkCanvasFromEditors(), 50);
+                        }
+                    },
+                    configurable: true
+                });
+            });
         }
 
         checkCanvasForFabric(canvasElement) {
@@ -265,6 +351,9 @@
             this.canvas = this.findCanvasInstance();
 
             if (!this.canvas) {
+                console.log('🎯 REFERENCE LINE: No canvas found, setting waiting flag...');
+                this.isWaitingForCanvas = true;
+
                 if (!this.retryAttempts || this.retryAttempts >= 5) {
                     console.error('Canvas instance not found. Available canvas elements:', document.querySelectorAll('canvas'));
                     console.error('Template editor available:', $('.template-editor').length);
@@ -294,7 +383,31 @@
                 return window.fabricCanvas;
             }
 
-            // Method 2: Look for canvas elements with Fabric.js attached
+            // Method 2: Check templateEditors Map (VariationsManager creates this)
+            if (window.templateEditors && window.templateEditors instanceof Map) {
+                console.log('🔍 Checking templateEditors Map...', window.templateEditors.size, 'editors');
+                for (const [key, editor] of window.templateEditors.entries()) {
+                    if (editor && editor.canvas) {
+                        console.log('✅ FOUND CANVAS IN TEMPLATE EDITOR:', key);
+                        window.fabricCanvas = editor.canvas;
+                        return editor.canvas;
+                    }
+                }
+            }
+
+            // Method 3: Check window.variationsManager for editor instances
+            if (window.variationsManager && window.variationsManager.editors) {
+                console.log('🔍 Checking variationsManager.editors...');
+                for (const [key, editor] of window.variationsManager.editors.entries()) {
+                    if (editor && editor.canvas) {
+                        console.log('✅ FOUND CANVAS IN VARIATIONS MANAGER:', key);
+                        window.fabricCanvas = editor.canvas;
+                        return editor.canvas;
+                    }
+                }
+            }
+
+            // Method 4: Look for canvas elements with Fabric.js attached
             const canvasElements = document.querySelectorAll('canvas');
             console.log('🔍 Canvas elements found:', canvasElements.length);
 
@@ -384,26 +497,111 @@
                 }
             }
 
-            // Method 8: Wait and retry if we haven't exceeded attempts
-            if (this.retryAttempts < 10) {
-                this.retryAttempts++;
-                const delay = this.retryAttempts <= 3 ? 1000 : 2000; // Longer delays after 3 attempts
-                console.log(`⏳ Canvas not ready, retrying in ${delay}ms (attempt ${this.retryAttempts}/10)`);
-
-                setTimeout(() => {
-                    this.startReferenceLineCreation();
-                }, delay);
-                return null;
+            // Method 8: Try to force-create a canvas from existing DOM elements
+            const canvasElement = this.findCanvasElementForFabric();
+            if (canvasElement) {
+                console.log('🔧 TRYING TO CREATE FABRIC CANVAS FROM ELEMENT:', canvasElement);
+                try {
+                    if (window.fabric && window.fabric.Canvas) {
+                        const fabricCanvas = new window.fabric.Canvas(canvasElement);
+                        window.fabricCanvas = fabricCanvas;
+                        console.log('✅ SUCCESSFULLY CREATED FABRIC CANVAS FROM ELEMENT!');
+                        return fabricCanvas;
+                    }
+                } catch (error) {
+                    console.log('❌ Failed to create Fabric canvas from element:', error);
+                }
             }
 
-            console.error('❌ CANVAS DETECTION FAILED after 10 attempts');
+            // Method 9: Wait and retry if we haven't exceeded attempts
+            if (this.retryAttempts < 20) { // Increased from 15 to 20 attempts
+                this.retryAttempts++;
+                const delay = this.retryAttempts <= 3 ? 500 : this.retryAttempts <= 7 ? 1000 : 2000;
+                console.log(`⏳ Canvas not ready, retrying in ${delay}ms (attempt ${this.retryAttempts}/20)`);
+
+                // Set up a promise-based retry for better handling
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const foundCanvas = this.findCanvasInstance();
+                        if (foundCanvas) {
+                            resolve(foundCanvas);
+                        } else {
+                            resolve(null);
+                            this.startReferenceLineCreation(); // Continue retry cycle
+                        }
+                    }, delay);
+                });
+            }
+
+            console.error('❌ CANVAS DETECTION FAILED after 20 attempts');
             console.error('🔍 Final DOM state:', {
                 canvasElements: canvasElements.length,
                 templateEditor: !!document.querySelector('.template-editor'),
                 canvasContainer: !!document.querySelector('.template-canvas-container'),
-                windowProps: Object.keys(window).filter(k => k.toLowerCase().includes('template'))
+                windowProps: Object.keys(window).filter(k => k.toLowerCase().includes('template')),
+                templateEditors: window.templateEditors ? window.templateEditors.size : 'not found',
+                variationsManager: !!window.variationsManager
             });
+
+            // Show user-friendly error with retry option
+            this.showCanvasNotFoundError();
             return null;
+        }
+
+        findCanvasElementForFabric() {
+            // Look for a canvas element that could be used to create a Fabric.js instance
+            const canvasElements = document.querySelectorAll('canvas');
+
+            // Prefer canvas elements within template containers
+            for (const canvas of canvasElements) {
+                const container = canvas.closest('.template-canvas-container, .template-editor, .canvas-container');
+                if (container && !canvas.__fabric && canvas.width > 0 && canvas.height > 0) {
+                    console.log('🎯 Found potential canvas element for Fabric.js creation:', canvas);
+                    return canvas;
+                }
+            }
+
+            // Fallback: any canvas without Fabric that has dimensions
+            for (const canvas of canvasElements) {
+                if (!canvas.__fabric && canvas.width > 0 && canvas.height > 0) {
+                    console.log('🎯 Found fallback canvas element:', canvas);
+                    return canvas;
+                }
+            }
+
+            return null;
+        }
+
+        showCanvasNotFoundError() {
+            const errorMessage = $(`
+                <div class="notice notice-error is-dismissible" style="margin: 20px 0;">
+                    <p><strong>Canvas Detection Failed:</strong> Cannot find Fabric.js canvas instance after 20 attempts.</p>
+                    <p>This usually means the Template Editor hasn't fully initialized yet.</p>
+                    <div style="margin-top: 10px;">
+                        <button type="button" class="button button-primary retry-canvas-detection">
+                            🔄 Retry Canvas Detection
+                        </button>
+                        <button type="button" class="button force-refresh-page" style="margin-left: 10px;">
+                            🔃 Refresh Page
+                        </button>
+                    </div>
+                    <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button>
+                </div>
+            `);
+
+            // Add click handlers
+            errorMessage.on('click', '.retry-canvas-detection', () => {
+                console.log('🔄 Manual retry triggered by user');
+                this.retryAttempts = 0; // Reset retry counter
+                errorMessage.remove();
+                this.startReferenceLineCreation();
+            });
+
+            errorMessage.on('click', '.force-refresh-page', () => {
+                window.location.reload();
+            });
+
+            $('.template-editor-toolbar').after(errorMessage);
         }
 
         showCanvasError() {
