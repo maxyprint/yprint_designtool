@@ -331,15 +331,35 @@
             for (let prop in window) {
                 if (prop.toLowerCase().includes('template') || prop.toLowerCase().includes('editor')) {
                     const obj = window[prop];
-                    if (obj && typeof obj === 'object' && obj.canvas) {
-                        console.log('✅ Found canvas in window.' + prop);
-                        window.fabricCanvas = obj.canvas;
-                        return obj.canvas;
+                    if (obj && typeof obj === 'object') {
+                        // Check for fabricCanvas property
+                        if (obj.fabricCanvas) {
+                            console.log('✅ Found fabricCanvas in window.' + prop);
+                            window.fabricCanvas = obj.fabricCanvas;
+                            return obj.fabricCanvas;
+                        }
+                        // Check for canvas property
+                        if (obj.canvas) {
+                            console.log('✅ Found canvas in window.' + prop);
+                            window.fabricCanvas = obj.canvas;
+                            return obj.canvas;
+                        }
                     }
                 }
             }
 
-            // Method 6: Wait and retry if we haven't exceeded attempts
+            // Method 6: Direct Fabric.js Canvas instances
+            if (window.fabric && window.fabric.Canvas && window.fabric.Canvas.getInstances) {
+                const instances = window.fabric.Canvas.getInstances();
+                console.log('🔍 Fabric.js instances found:', instances.length);
+                if (instances.length > 0) {
+                    console.log('✅ Using first Fabric.js canvas instance');
+                    window.fabricCanvas = instances[0];
+                    return instances[0];
+                }
+            }
+
+            // Method 7: Wait and retry if we haven't exceeded attempts
             if (this.retryAttempts < 10) {
                 this.retryAttempts++;
                 const delay = this.retryAttempts <= 3 ? 1000 : 2000; // Longer delays after 3 attempts
@@ -668,12 +688,39 @@
         console.log('🚀 REFERENCE LINE SYSTEM INITIALIZATION');
         checkSystemStatus();
 
-        // Wait for template editor to initialize, then start reference line system
-        setTimeout(() => {
-            console.log('⏰ DELAYED INITIALIZATION (1000ms)');
-            checkSystemStatus();
-            new ReferenceLineSystem();
-        }, 1000);
+        // Wait for Fabric.js to be available
+        function waitForFabric(attempts = 0) {
+            const maxAttempts = 20;
+            const delay = 500;
+
+            if (typeof fabric !== 'undefined' && window.fabric && window.fabric.Canvas) {
+                console.log('✅ Fabric.js is now available, initializing reference line system');
+                checkSystemStatus();
+                new ReferenceLineSystem();
+                return;
+            }
+
+            // Check if vendor bundle loaded Fabric.js
+            if (window.fabric && window.fabric.Canvas) {
+                console.log('✅ Fabric.js found via window.fabric, initializing reference line system');
+                checkSystemStatus();
+                new ReferenceLineSystem();
+                return;
+            }
+
+            if (attempts < maxAttempts) {
+                console.log(`⏳ Waiting for Fabric.js... (attempt ${attempts + 1}/${maxAttempts})`);
+                setTimeout(() => waitForFabric(attempts + 1), delay);
+            } else {
+                console.error('❌ Fabric.js never became available after', maxAttempts, 'attempts');
+                console.error('Available window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('fabric')));
+                console.error('Trying fallback initialization anyway...');
+                new ReferenceLineSystem();
+            }
+        }
+
+        // Start waiting for Fabric.js
+        waitForFabric();
     });
 
 })(jQuery);

@@ -54,8 +54,8 @@ class Octo_Print_Designer_Admin {
         wp_enqueue_script(
             'octo-reference-line-system',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
-            ['octo-print-designer-admin', 'jquery'],
-            $this->version . '.1',
+            ['octo-print-designer-vendor', 'octo-print-designer-admin', 'jquery'],
+            $this->version . '.2',
             true
         );
 
