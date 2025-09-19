@@ -16,12 +16,70 @@
             this.referenceLine = null;
             this.canvas = null;
             this.fabric = null;
+            this.mutationObserver = null;
+            this.canvasDetectionPromise = null;
             this.init();
         }
 
         init() {
             this.bindEvents();
             this.setupModal();
+            this.setupCanvasDetection();
+        }
+
+        setupCanvasDetection() {
+            // Set up MutationObserver to detect when canvas is added to DOM
+            this.mutationObserver = new MutationObserver((mutations) => {
+                for (let mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        const addedNodes = Array.from(mutation.addedNodes);
+                        for (let node of addedNodes) {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                // Check if a canvas was added
+                                if (node.tagName === 'CANVAS') {
+                                    console.log('🔍 MutationObserver: Canvas element added to DOM', node);
+                                    this.checkCanvasForFabric(node);
+                                }
+                                // Check if any child contains a canvas
+                                const canvasElements = node.querySelectorAll && node.querySelectorAll('canvas');
+                                if (canvasElements && canvasElements.length > 0) {
+                                    console.log('🔍 MutationObserver: Canvas found in added element', canvasElements);
+                                    canvasElements.forEach(canvas => this.checkCanvasForFabric(canvas));
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Start observing
+            this.mutationObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            console.log('🔍 MutationObserver started for canvas detection');
+        }
+
+        checkCanvasForFabric(canvasElement) {
+            // Check immediately
+            if (canvasElement.__fabric) {
+                console.log('✅ MutationObserver: Found Fabric.js canvas!', canvasElement.__fabric);
+                window.fabricCanvas = canvasElement.__fabric;
+                this.canvas = canvasElement.__fabric;
+                return true;
+            }
+
+            // Sometimes Fabric.js is attached after the element is added, so we wait a bit
+            setTimeout(() => {
+                if (canvasElement.__fabric) {
+                    console.log('✅ MutationObserver: Found Fabric.js canvas (delayed)!', canvasElement.__fabric);
+                    window.fabricCanvas = canvasElement.__fabric;
+                    this.canvas = canvasElement.__fabric;
+                }
+            }, 100);
+
+            return false;
         }
 
         bindEvents() {
@@ -181,7 +239,18 @@
         selectReferenceType(type) {
             this.currentReferenceType = type;
             this.closeModal();
-            this.startReferenceLineCreation();
+
+            console.log('🎯 USER SELECTED REFERENCE TYPE:', type);
+            console.log('🔍 IMMEDIATE DOM CHECK:');
+            console.log('- Canvas elements in DOM:', document.querySelectorAll('canvas').length);
+            console.log('- Template containers:', document.querySelectorAll('.template-canvas-container').length);
+            console.log('- Template editor:', document.querySelectorAll('.template-editor').length);
+
+            // Give a small delay to ensure any initialization is complete
+            setTimeout(() => {
+                console.log('🚀 STARTING REFERENCE LINE CREATION...');
+                this.startReferenceLineCreation();
+            }, 100);
         }
 
         startReferenceLineCreation() {
@@ -217,6 +286,8 @@
         }
 
         findCanvasInstance() {
+            console.log('🚀 STARTING CANVAS DETECTION - Attempt:', this.retryAttempts || 0);
+
             // Method 1: Check for globally exposed canvas
             if (window.fabricCanvas) {
                 console.log('✅ Found global fabricCanvas');
@@ -225,59 +296,68 @@
 
             // Method 2: Look for canvas elements with Fabric.js attached
             const canvasElements = document.querySelectorAll('canvas');
-            console.log('🔍 Found canvas elements:', canvasElements.length);
+            console.log('🔍 Canvas elements found:', canvasElements.length);
 
-            for (let canvasEl of canvasElements) {
-                console.log('🔍 Checking canvas:', canvasEl, 'Fabric instance:', canvasEl.__fabric);
+            for (let i = 0; i < canvasElements.length; i++) {
+                const canvasEl = canvasElements[i];
+                console.log(`🔍 Canvas ${i}:`, {
+                    element: canvasEl,
+                    hasClass: canvasEl.className,
+                    parent: canvasEl.parentElement?.className,
+                    fabric: !!canvasEl.__fabric,
+                    fabricType: canvasEl.__fabric?.constructor?.name
+                });
+
                 if (canvasEl.__fabric) {
-                    console.log('✅ Found Fabric.js canvas instance - exposing globally');
-                    // Expose globally for future use
+                    console.log('✅ FOUND FABRIC.JS CANVAS - exposing globally');
                     window.fabricCanvas = canvasEl.__fabric;
                     return canvasEl.__fabric;
                 }
             }
 
-            // Method 3: Wait and retry (Template Editor might still be initializing)
+            // Method 3: Check if we're in retry cycle
             if (!this.retryAttempts) {
                 this.retryAttempts = 0;
             }
 
-            if (this.retryAttempts < 5) {
-                this.retryAttempts++;
-                console.log(`⏳ Canvas not ready yet, retrying in 500ms (attempt ${this.retryAttempts}/5)`);
-                setTimeout(() => {
-                    this.startReferenceLineCreation();
-                }, 500);
-                return null;
-            }
+            // Method 4: Advanced DOM inspection
+            console.log('🔍 DOM State Analysis:');
+            console.log('- Template editor:', document.querySelector('.template-editor'));
+            console.log('- Canvas container:', document.querySelector('.template-canvas-container'));
+            console.log('- Template view:', document.querySelector('.template-view'));
+            console.log('- View items:', document.querySelectorAll('.view-item').length);
 
-            // Method 4: Check template editor container
-            const templateEditor = document.querySelector('.template-editor');
-            if (templateEditor && templateEditor.canvas) {
-                console.log('✅ Found canvas in template editor');
-                window.fabricCanvas = templateEditor.canvas;
-                return templateEditor.canvas;
-            }
-
-            // Method 5: Try to access from template-canvas-container
-            const canvasContainer = document.querySelector('.template-canvas-container');
-            if (canvasContainer) {
-                const canvas = canvasContainer.querySelector('canvas');
-                if (canvas && canvas.__fabric) {
-                    console.log('✅ Found canvas in container - exposing globally');
-                    window.fabricCanvas = canvas.__fabric;
-                    return canvas.__fabric;
+            // Method 5: Check for Template Editor instances in window object
+            for (let prop in window) {
+                if (prop.toLowerCase().includes('template') || prop.toLowerCase().includes('editor')) {
+                    const obj = window[prop];
+                    if (obj && typeof obj === 'object' && obj.canvas) {
+                        console.log('✅ Found canvas in window.' + prop);
+                        window.fabricCanvas = obj.canvas;
+                        return obj.canvas;
+                    }
                 }
             }
 
-            // Method 6: Check for any global template manager
-            if (window.templateManager && window.templateManager.canvas) {
-                console.log('✅ Found canvas in template manager');
-                window.fabricCanvas = window.templateManager.canvas;
-                return window.templateManager.canvas;
+            // Method 6: Wait and retry if we haven't exceeded attempts
+            if (this.retryAttempts < 10) {
+                this.retryAttempts++;
+                const delay = this.retryAttempts <= 3 ? 1000 : 2000; // Longer delays after 3 attempts
+                console.log(`⏳ Canvas not ready, retrying in ${delay}ms (attempt ${this.retryAttempts}/10)`);
+
+                setTimeout(() => {
+                    this.startReferenceLineCreation();
+                }, delay);
+                return null;
             }
 
-            console.error('❌ No Fabric.js canvas instance found after all attempts');
+            console.error('❌ CANVAS DETECTION FAILED after 10 attempts');
+            console.error('🔍 Final DOM state:', {
+                canvasElements: canvasElements.length,
+                templateEditor: !!document.querySelector('.template-editor'),
+                canvasContainer: !!document.querySelector('.template-canvas-container'),
+                windowProps: Object.keys(window).filter(k => k.toLowerCase().includes('template'))
+            });
             return null;
         }
 
@@ -558,10 +638,40 @@
         }
     }
 
+    // System status checker
+    function checkSystemStatus() {
+        console.log('🔍 SYSTEM STATUS CHECK:');
+        console.log('- jQuery loaded:', typeof $ !== 'undefined');
+        console.log('- Fabric.js loaded:', typeof fabric !== 'undefined');
+        console.log('- Current URL:', window.location.href);
+        console.log('- Page title:', document.title);
+        console.log('- Canvas elements:', document.querySelectorAll('canvas').length);
+        console.log('- Template elements:', document.querySelectorAll('[class*="template"]').length);
+        console.log('- Admin body classes:', document.body.className);
+
+        // Check for admin.bundle.js components
+        const scripts = Array.from(document.querySelectorAll('script[src*="admin.bundle"]'));
+        console.log('- Admin bundle loaded:', scripts.length > 0);
+
+        // Check window objects that might contain canvas
+        const windowProps = Object.getOwnPropertyNames(window).filter(prop =>
+            prop.toLowerCase().includes('template') ||
+            prop.toLowerCase().includes('editor') ||
+            prop.toLowerCase().includes('canvas') ||
+            prop.toLowerCase().includes('fabric')
+        );
+        console.log('- Relevant window properties:', windowProps);
+    }
+
     // Initialize when DOM is ready
     $(document).ready(function() {
+        console.log('🚀 REFERENCE LINE SYSTEM INITIALIZATION');
+        checkSystemStatus();
+
         // Wait for template editor to initialize, then start reference line system
         setTimeout(() => {
+            console.log('⏰ DELAYED INITIALIZATION (1000ms)');
+            checkSystemStatus();
             new ReferenceLineSystem();
         }, 1000);
     });

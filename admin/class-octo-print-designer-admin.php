@@ -55,7 +55,7 @@ class Octo_Print_Designer_Admin {
             'octo-reference-line-system',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
             ['octo-print-designer-admin', 'jquery'],
-            $this->version,
+            $this->version . '-' . time(),
             true
         );
 
