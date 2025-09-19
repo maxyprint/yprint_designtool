@@ -192,13 +192,22 @@
             $('.mode-select').removeClass('active');
             $('[data-mode="referenceline"]').addClass('active');
 
-            // Get the canvas instance (assuming Fabric.js)
-            this.canvas = window.fabricCanvas || this.findCanvasInstance();
+            // Get the canvas instance (improve detection)
+            this.canvas = this.findCanvasInstance();
 
             if (!this.canvas) {
-                console.error('Canvas instance not found');
+                if (!this.retryAttempts || this.retryAttempts >= 5) {
+                    console.error('Canvas instance not found. Available canvas elements:', document.querySelectorAll('canvas'));
+                    console.error('Template editor available:', $('.template-editor').length);
+                    console.error('Canvas container available:', $('.template-canvas-container').length);
+                    this.showCanvasError();
+                }
                 return;
             }
+
+            // Reset retry attempts on success
+            this.retryAttempts = 0;
+            console.log('✅ Canvas found:', this.canvas);
 
             // Show instruction
             this.showInstruction();
@@ -208,16 +217,83 @@
         }
 
         findCanvasInstance() {
-            // Try to find existing Fabric.js canvas
-            if (window.fabric && window.fabric.Canvas) {
-                const canvasElements = document.querySelectorAll('canvas');
-                for (let canvasEl of canvasElements) {
-                    if (canvasEl.__fabric) {
-                        return canvasEl.__fabric;
-                    }
+            // Method 1: Check for globally exposed canvas
+            if (window.fabricCanvas) {
+                console.log('✅ Found global fabricCanvas');
+                return window.fabricCanvas;
+            }
+
+            // Method 2: Look for canvas elements with Fabric.js attached
+            const canvasElements = document.querySelectorAll('canvas');
+            console.log('🔍 Found canvas elements:', canvasElements.length);
+
+            for (let canvasEl of canvasElements) {
+                console.log('🔍 Checking canvas:', canvasEl, 'Fabric instance:', canvasEl.__fabric);
+                if (canvasEl.__fabric) {
+                    console.log('✅ Found Fabric.js canvas instance - exposing globally');
+                    // Expose globally for future use
+                    window.fabricCanvas = canvasEl.__fabric;
+                    return canvasEl.__fabric;
                 }
             }
+
+            // Method 3: Wait and retry (Template Editor might still be initializing)
+            if (!this.retryAttempts) {
+                this.retryAttempts = 0;
+            }
+
+            if (this.retryAttempts < 5) {
+                this.retryAttempts++;
+                console.log(`⏳ Canvas not ready yet, retrying in 500ms (attempt ${this.retryAttempts}/5)`);
+                setTimeout(() => {
+                    this.startReferenceLineCreation();
+                }, 500);
+                return null;
+            }
+
+            // Method 4: Check template editor container
+            const templateEditor = document.querySelector('.template-editor');
+            if (templateEditor && templateEditor.canvas) {
+                console.log('✅ Found canvas in template editor');
+                window.fabricCanvas = templateEditor.canvas;
+                return templateEditor.canvas;
+            }
+
+            // Method 5: Try to access from template-canvas-container
+            const canvasContainer = document.querySelector('.template-canvas-container');
+            if (canvasContainer) {
+                const canvas = canvasContainer.querySelector('canvas');
+                if (canvas && canvas.__fabric) {
+                    console.log('✅ Found canvas in container - exposing globally');
+                    window.fabricCanvas = canvas.__fabric;
+                    return canvas.__fabric;
+                }
+            }
+
+            // Method 6: Check for any global template manager
+            if (window.templateManager && window.templateManager.canvas) {
+                console.log('✅ Found canvas in template manager');
+                window.fabricCanvas = window.templateManager.canvas;
+                return window.templateManager.canvas;
+            }
+
+            console.error('❌ No Fabric.js canvas instance found after all attempts');
             return null;
+        }
+
+        showCanvasError() {
+            const errorMessage = $(`
+                <div class="notice notice-error is-dismissible" style="margin: 20px 0;">
+                    <p><strong>Canvas Error:</strong> Cannot find Fabric.js canvas instance.</p>
+                    <p>Please ensure the Template View is loaded properly.</p>
+                    <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button>
+                </div>
+            `);
+            $('.template-editor-toolbar').after(errorMessage);
+
+            setTimeout(() => {
+                errorMessage.fadeOut(() => errorMessage.remove());
+            }, 8000);
         }
 
         addCanvasListeners() {
@@ -398,11 +474,11 @@
             if (!postId) return;
 
             // Save via AJAX
-            $.post(ajaxurl, {
+            $.post(window.ajaxurl || octoPrintDesigner.ajaxUrl, {
                 action: 'save_reference_line_data',
                 post_id: postId,
                 reference_data: JSON.stringify(data),
-                nonce: $('[name="octo_template_nonce"]').val()
+                nonce: window.octoPrintDesigner?.nonce || $('[name="octo_template_nonce"]').val() || $('#octo_template_nonce').val()
             })
             .done((response) => {
                 console.log('Reference line data saved:', response);
@@ -484,7 +560,10 @@
 
     // Initialize when DOM is ready
     $(document).ready(function() {
-        new ReferenceLineSystem();
+        // Wait for template editor to initialize, then start reference line system
+        setTimeout(() => {
+            new ReferenceLineSystem();
+        }, 1000);
     });
 
 })(jQuery);
