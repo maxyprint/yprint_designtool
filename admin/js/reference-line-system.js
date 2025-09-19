@@ -359,7 +359,32 @@
                 }
             }
 
-            // Method 7: Wait and retry if we haven't exceeded attempts
+            // Method 7: Extract Fabric from existing canvas elements (aggressive approach)
+            const canvasElements = document.querySelectorAll('canvas');
+            for (const canvas of canvasElements) {
+                if (canvas.__fabric) {
+                    console.log('🔍 Found canvas with __fabric property, extracting Fabric.js...');
+                    const fabricInstance = canvas.__fabric;
+
+                    // Try to get Fabric constructor from instance
+                    if (fabricInstance.constructor && fabricInstance.constructor.Canvas) {
+                        window.fabric = {Canvas: fabricInstance.constructor.Canvas};
+                        console.log('✅ Extracted Fabric.js from canvas instance');
+                        window.fabricCanvas = fabricInstance;
+                        return fabricInstance;
+                    }
+
+                    // Try to get fabric from the instance itself
+                    if (fabricInstance.fabric) {
+                        window.fabric = fabricInstance.fabric;
+                        console.log('✅ Found fabric reference in canvas instance');
+                        window.fabricCanvas = fabricInstance;
+                        return fabricInstance;
+                    }
+                }
+            }
+
+            // Method 8: Wait and retry if we haven't exceeded attempts
             if (this.retryAttempts < 10) {
                 this.retryAttempts++;
                 const delay = this.retryAttempts <= 3 ? 1000 : 2000; // Longer delays after 3 attempts
@@ -693,6 +718,7 @@
             const maxAttempts = 20;
             const delay = 500;
 
+            // Method 1: Check global fabric
             if (typeof fabric !== 'undefined' && window.fabric && window.fabric.Canvas) {
                 console.log('✅ Fabric.js is now available, initializing reference line system');
                 checkSystemStatus();
@@ -700,12 +726,54 @@
                 return;
             }
 
-            // Check if vendor bundle loaded Fabric.js
+            // Method 2: Check window.fabric directly
             if (window.fabric && window.fabric.Canvas) {
                 console.log('✅ Fabric.js found via window.fabric, initializing reference line system');
                 checkSystemStatus();
                 new ReferenceLineSystem();
                 return;
+            }
+
+            // Method 3: Check if admin bundle has initialized Template Editor with fabricCanvas
+            const canvasElements = document.querySelectorAll('canvas');
+            let foundFabricInstance = false;
+
+            for (const canvas of canvasElements) {
+                if (canvas.__fabric) {
+                    console.log('✅ Found Fabric.js instance attached to canvas element');
+                    window.fabric = canvas.__fabric.constructor.fabric || canvas.__fabric.fabric;
+                    if (window.fabric && window.fabric.Canvas) {
+                        foundFabricInstance = true;
+                        break;
+                    }
+                }
+            }
+
+            if (foundFabricInstance) {
+                console.log('✅ Fabric.js extracted from canvas instance, initializing reference line system');
+                checkSystemStatus();
+                new ReferenceLineSystem();
+                return;
+            }
+
+            // Method 4: Check webpack chunks for Fabric.js
+            if (window.webpackChunkocto_print_designer || window.__webpack_require__) {
+                console.log('🔍 Checking webpack chunks for Fabric.js...');
+                try {
+                    // Try to access Fabric.js from webpack modules
+                    if (window.__webpack_require__) {
+                        const fabricModule = window.__webpack_require__('./node_modules/fabric/dist/index.min.mjs');
+                        if (fabricModule && fabricModule.Canvas) {
+                            window.fabric = fabricModule;
+                            console.log('✅ Fabric.js found in webpack modules, initializing reference line system');
+                            checkSystemStatus();
+                            new ReferenceLineSystem();
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.log('🔍 Webpack module access failed:', e.message);
+                }
             }
 
             if (attempts < maxAttempts) {
