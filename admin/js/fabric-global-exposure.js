@@ -10,61 +10,165 @@
 
     console.log('🔧 FABRIC GLOBAL EXPOSURE: Starting exposure process...');
 
-    // Method 1: Check if TemplateEditor exists and extract Fabric from it
+    // Method 1: ADVANCED TemplateEditor Fabric Extraction with Deep Canvas Analysis
     function extractFabricFromTemplateEditor() {
-        if (window.templateEditors instanceof Map) {
+        if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
+            console.log('🔧 FABRIC EXPOSURE: Found templateEditors Map with', window.templateEditors.size, 'editors');
+
             for (const [key, editor] of window.templateEditors.entries()) {
-                if (editor && editor.canvas && editor.canvas.constructor) {
-                    const fabricConstructor = editor.canvas.constructor;
+                console.log('🔧 FABRIC EXPOSURE: Analyzing editor:', key, editor);
 
-                    // Extract the module that contains the Canvas constructor
-                    const fabricModule = fabricConstructor.__fabric_module ||
-                                       fabricConstructor.constructor ||
-                                       fabricConstructor;
+                if (editor && editor.canvas) {
+                    console.log('🔧 FABRIC EXPOSURE: Canvas found:', editor.canvas);
 
-                    if (fabricModule && typeof fabricModule === 'function') {
-                        // Reconstruct fabric object from Canvas constructor
-                        const fabricObj = {
-                            Canvas: fabricConstructor,
-                            Object: (editor.canvas.getObjects()[0] && editor.canvas.getObjects()[0].constructor) || fabricConstructor.prototype.constructor,
-                            util: fabricConstructor.util || {},
-                            version: fabricConstructor.version || '5.x'
-                        };
+                    // Method 1A: Extract Fabric.js from Canvas constructor
+                    const CanvasConstructor = editor.canvas.constructor;
+                    if (CanvasConstructor && CanvasConstructor.name === 'Canvas') {
+                        console.log('🔧 FABRIC EXPOSURE: Canvas constructor found:', CanvasConstructor);
 
-                        // Try to get more fabric classes from the canvas prototype chain
-                        try {
-                            const canvasProto = Object.getPrototypeOf(editor.canvas);
-                            if (canvasProto && canvasProto.constructor) {
-                                fabricObj.StaticCanvas = canvasProto.constructor;
-                            }
-                        } catch (e) {
-                            console.log('🔧 Could not extract StaticCanvas:', e.message);
+                        // Try to access the parent module/namespace that contains all Fabric classes
+                        let fabricNamespace = null;
+
+                        // Check canvas prototype chain for fabric module reference
+                        const canvasProto = Object.getPrototypeOf(editor.canvas);
+                        if (canvasProto && canvasProto.constructor && canvasProto.constructor.__fabric_main_module) {
+                            fabricNamespace = canvasProto.constructor.__fabric_main_module;
                         }
 
-                        console.log('✅ FABRIC EXPOSURE: Extracted from TemplateEditor!', fabricObj);
-                        return fabricObj;
+                        // Try to access via canvas instance properties
+                        if (!fabricNamespace && editor.canvas.__fabric_module) {
+                            fabricNamespace = editor.canvas.__fabric_module;
+                        }
+
+                        // Reverse-engineer fabric object from canvas methods and properties
+                        const fabricObj = {
+                            Canvas: CanvasConstructor,
+                            StaticCanvas: Object.getPrototypeOf(CanvasConstructor),
+                            Object: null,
+                            Rect: null,
+                            Image: null,
+                            util: CanvasConstructor.util || {},
+                            version: CanvasConstructor.version || '5.x'
+                        };
+
+                        // Method 1B: Extract Object classes from existing canvas objects
+                        const canvasObjects = editor.canvas.getObjects();
+                        if (canvasObjects && canvasObjects.length > 0) {
+                            const firstObject = canvasObjects[0];
+                            if (firstObject && firstObject.constructor) {
+                                fabricObj.Object = firstObject.constructor;
+                                console.log('🔧 FABRIC EXPOSURE: Found Object constructor from canvas object:', fabricObj.Object);
+                            }
+                        }
+
+                        // Method 1C: Check if safeZone exists (usually a Rect)
+                        if (editor.safeZone && editor.safeZone.constructor) {
+                            fabricObj.Rect = editor.safeZone.constructor;
+                            console.log('🔧 FABRIC EXPOSURE: Found Rect constructor from safeZone:', fabricObj.Rect);
+                        }
+
+                        // Method 1D: Try to access fabric from canvas internal properties
+                        if (editor.canvas._objects) {
+                            for (const obj of editor.canvas._objects) {
+                                if (obj.type === 'rect' && obj.constructor) {
+                                    fabricObj.Rect = obj.constructor;
+                                }
+                                if (obj.type === 'image' && obj.constructor) {
+                                    fabricObj.Image = obj.constructor;
+                                }
+                                if (!fabricObj.Object && obj.constructor) {
+                                    fabricObj.Object = obj.constructor;
+                                }
+                            }
+                        }
+
+                        // If we have Canvas constructor, create a comprehensive fabric object
+                        if (CanvasConstructor) {
+                            console.log('✅ FABRIC EXPOSURE: Successfully extracted from TemplateEditor!', fabricObj);
+                            return fabricObj;
+                        }
                     }
                 }
             }
+        } else {
+            console.log('🔧 FABRIC EXPOSURE: No templateEditors Map found or empty');
         }
         return null;
     }
 
-    // Method 2: Check if we can access webpack modules directly
+    // Method 2: WEBPACK MODULE CACHE HIJACKING - Direct Access to fabric__WEBPACK_IMPORTED_MODULE_1__
     function extractFabricFromWebpack() {
-        // Try to access webpack module cache
-        if (window.webpackChunkocto_print_designer && typeof __webpack_require__ !== 'undefined') {
+        console.log('🔧 FABRIC EXPOSURE: Attempting webpack module cache access...');
+
+        // Method 2A: Try to access webpack chunk and module cache
+        if (typeof window !== 'undefined' && window.webpackChunkocto_print_designer) {
+            console.log('🔧 FABRIC EXPOSURE: Found webpack chunk:', window.webpackChunkocto_print_designer);
+
             try {
-                // Try to require the fabric module directly
-                const fabricModule = __webpack_require__('./node_modules/fabric/dist/index.min.mjs');
-                if (fabricModule) {
-                    console.log('✅ FABRIC EXPOSURE: Extracted from Webpack!', fabricModule);
-                    return fabricModule;
+                // Try to access webpack require function
+                if (typeof __webpack_require__ !== 'undefined') {
+                    console.log('🔧 FABRIC EXPOSURE: __webpack_require__ is available');
+
+                    // Try common fabric module paths
+                    const fabricPaths = [
+                        './node_modules/fabric/dist/index.min.mjs',
+                        'fabric',
+                        './node_modules/fabric/dist/fabric.min.js',
+                        './node_modules/fabric/dist/index.js'
+                    ];
+
+                    for (const path of fabricPaths) {
+                        try {
+                            const fabricModule = __webpack_require__(path);
+                            if (fabricModule && (fabricModule.Canvas || fabricModule.default)) {
+                                console.log('✅ FABRIC EXPOSURE: Found fabric via webpack require:', path, fabricModule);
+                                return fabricModule.default || fabricModule;
+                            }
+                        } catch (e) {
+                            console.log('🔧 Webpack require failed for', path, ':', e.message);
+                        }
+                    }
                 }
+
+                // Method 2B: Try to access webpack module cache directly
+                if (typeof __webpack_require__.cache !== 'undefined') {
+                    console.log('🔧 FABRIC EXPOSURE: Accessing webpack module cache...');
+
+                    for (const moduleId in __webpack_require__.cache) {
+                        try {
+                            const module = __webpack_require__.cache[moduleId];
+                            if (module && module.exports) {
+                                // Check if this module contains Fabric.js Canvas
+                                const exports = module.exports;
+                                if (exports.Canvas && typeof exports.Canvas === 'function') {
+                                    console.log('✅ FABRIC EXPOSURE: Found Fabric in webpack cache!', moduleId, exports);
+                                    return exports;
+                                }
+                                // Check for default export
+                                if (exports.default && exports.default.Canvas) {
+                                    console.log('✅ FABRIC EXPOSURE: Found Fabric default export in webpack cache!', moduleId, exports.default);
+                                    return exports.default;
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore individual module access errors
+                        }
+                    }
+                }
+
             } catch (e) {
-                console.log('🔧 Webpack direct access failed:', e.message);
+                console.log('🔧 Webpack module access failed:', e.message);
             }
         }
+
+        // Method 2C: Try to find fabric in global webpack variables
+        const possibleWebpackVars = ['webpackChunk', '__webpack_modules__', '__webpack_require__'];
+        for (const varName of possibleWebpackVars) {
+            if (window[varName]) {
+                console.log('🔧 FABRIC EXPOSURE: Found webpack variable:', varName);
+            }
+        }
+
         return null;
     }
 
@@ -161,9 +265,11 @@
         return false;
     }
 
-    // Retry mechanism with progressive delays
+    // ADVANCED RETRY MECHANISM with TemplateEditor waiting and intelligent timing
     let retryCount = 0;
-    const maxRetries = 15;
+    const maxRetries = 20; // Increased retries
+    let templateEditorWaitCount = 0;
+    const maxTemplateEditorWait = 30; // Wait up to 30 attempts for templateEditors
 
     function attemptExposure() {
         retryCount++;
@@ -173,14 +279,29 @@
             return;
         }
 
+        // Special handling for waiting for templateEditors to be populated
+        if (window.templateEditors instanceof Map && window.templateEditors.size === 0 && templateEditorWaitCount < maxTemplateEditorWait) {
+            templateEditorWaitCount++;
+            const waitDelay = 200; // Wait 200ms for templateEditors to be populated
+            console.log(`🔧 FABRIC EXPOSURE: Waiting for templateEditors to be populated... ${templateEditorWaitCount}/${maxTemplateEditorWait}`);
+            setTimeout(attemptExposure, waitDelay);
+            return;
+        }
+
         const success = exposeFabricGlobally();
 
         if (!success && retryCount < maxRetries) {
-            const delay = Math.min(100 * retryCount, 2000); // Progressive delay up to 2s
+            const delay = Math.min(200 * retryCount, 3000); // Progressive delay up to 3s, slower progression
             console.log(`🔧 FABRIC EXPOSURE: Retry ${retryCount}/${maxRetries} in ${delay}ms...`);
             setTimeout(attemptExposure, delay);
         } else if (!success) {
             console.error('❌ FABRIC EXPOSURE: Failed after all retries');
+            console.log('🔧 Final fabric extraction attempt status:', {
+                templateEditors: window.templateEditors,
+                templateEditorsSize: window.templateEditors instanceof Map ? window.templateEditors.size : 'not a Map',
+                webpackChunk: window.webpackChunkocto_print_designer ? 'exists' : 'missing',
+                webpackRequire: typeof __webpack_require__ !== 'undefined' ? 'available' : 'missing'
+            });
         }
     }
 

@@ -55,7 +55,7 @@ class Octo_Print_Designer_Admin {
             'octo-fabric-global-exposure',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
             ['octo-print-designer-admin', 'jquery'],
-            $this->version . '.2',
+            $this->version . '.3',
             true
         );
 
