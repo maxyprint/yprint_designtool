@@ -41,6 +41,15 @@ class Octo_Print_Designer_WC_Integration {
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
+        // Product meta fields for sizing charts
+        add_action('woocommerce_product_data_panels', array($this, 'add_sizing_chart_product_data_panel'));
+        add_action('woocommerce_product_data_tabs', array($this, 'add_sizing_chart_product_data_tab'));
+        add_action('woocommerce_process_product_meta', array($this, 'save_sizing_chart_product_data'));
+
+        // Variation meta fields for sizing charts
+        add_action('woocommerce_variation_options_pricing', array($this, 'add_variation_sizing_chart_fields'), 10, 3);
+        add_action('woocommerce_save_product_variation', array($this, 'save_variation_sizing_chart_fields'), 10, 2);
+
     }
 
     /**
@@ -2243,5 +2252,227 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'sent_date' => date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $result['timestamp'])
             )
         ));
+    }
+
+    /**
+     * Add Sizing Chart tab to product data tabs
+     */
+    public function add_sizing_chart_product_data_tab($tabs) {
+        $tabs['sizing_chart'] = array(
+            'label'    => __('Sizing Chart', 'octo-print-designer'),
+            'target'   => 'sizing_chart_product_data',
+            'class'    => array('show_if_simple', 'show_if_variable'),
+            'priority' => 60,
+        );
+        return $tabs;
+    }
+
+    /**
+     * Add Sizing Chart panel to product data panels
+     */
+    public function add_sizing_chart_product_data_panel() {
+        ?>
+        <div id="sizing_chart_product_data" class="panel woocommerce_options_panel">
+            <div class="options_group">
+                <?php
+                woocommerce_wp_textarea_input(array(
+                    'id'          => '_sizing_chart_json',
+                    'label'       => __('Sizing Chart (JSON)', 'octo-print-designer'),
+                    'placeholder' => __('Enter sizing chart JSON data', 'octo-print-designer'),
+                    'description' => __('Format 1 (Scale factors): {"S": 0.9, "M": 1.0, "L": 1.1}<br>Format 2 (Millimeter values): {"S": {"chest_width_mm": 480}, "M": {"chest_width_mm": 510}}', 'octo-print-designer'),
+                    'desc_tip'    => false,
+                    'rows'        => 8,
+                    'cols'        => 80,
+                ));
+                ?>
+                <p class="form-field">
+                    <label><?php _e('JSON Validation', 'octo-print-designer'); ?></label>
+                    <button type="button" id="validate_sizing_chart_json" class="button button-secondary">
+                        <?php _e('Validate JSON', 'octo-print-designer'); ?>
+                    </button>
+                    <span id="json_validation_result" style="margin-left: 10px;"></span>
+                </p>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#validate_sizing_chart_json').on('click', function() {
+                var jsonText = $('#_sizing_chart_json').val();
+                var resultSpan = $('#json_validation_result');
+
+                if (!jsonText.trim()) {
+                    resultSpan.html('<span style="color: orange;">⚠️ Empty JSON</span>');
+                    return;
+                }
+
+                try {
+                    var parsed = JSON.parse(jsonText);
+
+                    // Validate format
+                    var isValidFormat1 = validateFormat1(parsed);
+                    var isValidFormat2 = validateFormat2(parsed);
+
+                    if (isValidFormat1) {
+                        resultSpan.html('<span style="color: green;">✅ Valid Format 1 (Scale factors)</span>');
+                    } else if (isValidFormat2) {
+                        resultSpan.html('<span style="color: green;">✅ Valid Format 2 (Millimeter values)</span>');
+                    } else {
+                        resultSpan.html('<span style="color: red;">❌ Invalid format - must match Format 1 or Format 2</span>');
+                    }
+                } catch (e) {
+                    resultSpan.html('<span style="color: red;">❌ Invalid JSON: ' + e.message + '</span>');
+                }
+            });
+
+            function validateFormat1(obj) {
+                // Format 1: {"S": 0.9, "M": 1.0, "L": 1.1}
+                for (var size in obj) {
+                    if (typeof obj[size] !== 'number') {
+                        return false;
+                    }
+                }
+                return Object.keys(obj).length > 0;
+            }
+
+            function validateFormat2(obj) {
+                // Format 2: {"S": {"chest_width_mm": 480}, "M": {"chest_width_mm": 510}}
+                for (var size in obj) {
+                    if (typeof obj[size] !== 'object' || obj[size] === null) {
+                        return false;
+                    }
+                    var hasValidMeasurement = false;
+                    for (var measurement in obj[size]) {
+                        if (typeof obj[size][measurement] === 'number') {
+                            hasValidMeasurement = true;
+                            break;
+                        }
+                    }
+                    if (!hasValidMeasurement) {
+                        return false;
+                    }
+                }
+                return Object.keys(obj).length > 0;
+            }
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Save Sizing Chart product data
+     */
+    public function save_sizing_chart_product_data($product_id) {
+        if (isset($_POST['_sizing_chart_json'])) {
+            $sizing_chart_json = sanitize_textarea_field($_POST['_sizing_chart_json']);
+
+            // Validate JSON before saving
+            if (!empty($sizing_chart_json)) {
+                $parsed = json_decode($sizing_chart_json, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    update_post_meta($product_id, '_sizing_chart_json', $sizing_chart_json);
+                } else {
+                    // Add admin notice for invalid JSON
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Sizing Chart JSON is invalid and was not saved.', 'octo-print-designer') . '</p></div>';
+                    });
+                }
+            } else {
+                delete_post_meta($product_id, '_sizing_chart_json');
+            }
+        }
+    }
+
+    /**
+     * Add sizing chart fields to product variations
+     */
+    public function add_variation_sizing_chart_fields($loop, $variation_data, $variation) {
+        $sizing_chart_json = get_post_meta($variation->ID, '_variation_sizing_chart_json', true);
+        ?>
+        <div class="form-row form-row-full">
+            <label><?php _e('Variation Sizing Chart (JSON)', 'octo-print-designer'); ?></label>
+            <textarea
+                name="_variation_sizing_chart_json[<?php echo $loop; ?>]"
+                placeholder="<?php _e('Enter sizing chart JSON for this variation', 'octo-print-designer'); ?>"
+                rows="4"
+                style="width: 100%;"
+            ><?php echo esc_textarea($sizing_chart_json); ?></textarea>
+            <p class="description">
+                <?php _e('Format 1: {"S": 0.9, "M": 1.0, "L": 1.1} | Format 2: {"S": {"chest_width_mm": 480}, "M": {"chest_width_mm": 510}}', 'octo-print-designer'); ?>
+            </p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Save variation sizing chart fields
+     */
+    public function save_variation_sizing_chart_fields($variation_id, $i) {
+        if (isset($_POST['_variation_sizing_chart_json'][$i])) {
+            $sizing_chart_json = sanitize_textarea_field($_POST['_variation_sizing_chart_json'][$i]);
+
+            // Validate JSON before saving
+            if (!empty($sizing_chart_json)) {
+                $parsed = json_decode($sizing_chart_json, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    update_post_meta($variation_id, '_variation_sizing_chart_json', $sizing_chart_json);
+                } else {
+                    delete_post_meta($variation_id, '_variation_sizing_chart_json');
+                }
+            } else {
+                delete_post_meta($variation_id, '_variation_sizing_chart_json');
+            }
+        }
+    }
+
+    /**
+     * Get sizing chart for product or variation
+     */
+    public function get_sizing_chart($product_id, $variation_id = null) {
+        $sizing_chart_json = '';
+
+        // First try to get from variation if variation_id is provided
+        if ($variation_id) {
+            $sizing_chart_json = get_post_meta($variation_id, '_variation_sizing_chart_json', true);
+        }
+
+        // If no variation chart or no variation_id, get from product
+        if (empty($sizing_chart_json)) {
+            $sizing_chart_json = get_post_meta($product_id, '_sizing_chart_json', true);
+        }
+
+        if (empty($sizing_chart_json)) {
+            return null;
+        }
+
+        $parsed = json_decode($sizing_chart_json, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return null;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * Determine sizing chart format type
+     */
+    public function get_sizing_chart_format($sizing_chart) {
+        if (!is_array($sizing_chart) || empty($sizing_chart)) {
+            return null;
+        }
+
+        $first_size = reset($sizing_chart);
+
+        // Format 1: Direct numeric values (scale factors)
+        if (is_numeric($first_size)) {
+            return 'scale_factors';
+        }
+
+        // Format 2: Object with measurements
+        if (is_array($first_size)) {
+            return 'measurements';
+        }
+
+        return null;
     }
 }

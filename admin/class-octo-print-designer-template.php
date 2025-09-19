@@ -103,6 +103,24 @@ class Octo_Print_Designer_Template {
             'normal',
             'high'
         );
+
+        add_meta_box(
+            'template_design_calculation',
+            __('Design Calculation Fields', 'octo-print-designer'),
+            array($this, 'render_design_calculation_meta_box'),
+            'design_template',
+            'normal',
+            'high'
+        );
+
+        add_meta_box(
+            'template_printable_area',
+            __('Printable Area Calculation Methods', 'octo-print-designer'),
+            array($this, 'render_printable_area_meta_box'),
+            'design_template',
+            'normal',
+            'high'
+        );
     }
 
     /**
@@ -285,6 +303,8 @@ class Octo_Print_Designer_Template {
         
         $this->save_inventory_meta($post_id);
         $this->save_pricing_meta($post_id);
+        $this->save_design_calculation_meta($post_id);
+        $this->save_printable_area_meta($post_id);
     }
 
     public function get_variations() {
@@ -570,35 +590,120 @@ class Octo_Print_Designer_Template {
     }
 
     /**
+     * Save the template design calculation data
+     */
+    private function save_design_calculation_meta($post_id) {
+        // Verify nonce
+        if (!isset($_POST['template_design_calculation_nonce']) ||
+            !wp_verify_nonce($_POST['template_design_calculation_nonce'], 'save_template_design_calculation')) {
+            return;
+        }
+
+        // Save mockup image URL
+        if (isset($_POST['mockup_image_url'])) {
+            $mockup_image_url = sanitize_url($_POST['mockup_image_url']);
+            update_post_meta($post_id, '_mockup_image_url', $mockup_image_url);
+        }
+
+        // Save print template image URL
+        if (isset($_POST['print_template_image_url'])) {
+            $print_template_image_url = sanitize_url($_POST['print_template_image_url']);
+            update_post_meta($post_id, '_print_template_image_url', $print_template_image_url);
+        }
+
+        // Save mockup design area (JSON)
+        if (isset($_POST['mockup_design_area_px'])) {
+            $mockup_design_area_px = $this->sanitize_json_field($_POST['mockup_design_area_px']);
+            update_post_meta($post_id, '_mockup_design_area_px', $mockup_design_area_px);
+        }
+    }
+
+    /**
+     * Save the template printable area data
+     */
+    private function save_printable_area_meta($post_id) {
+        // Verify nonce
+        if (!isset($_POST['template_printable_area_nonce']) ||
+            !wp_verify_nonce($_POST['template_printable_area_nonce'], 'save_template_printable_area')) {
+            return;
+        }
+
+        // Save Method 1 fields
+        if (isset($_POST['printable_area_px'])) {
+            $printable_area_px = $this->sanitize_json_field($_POST['printable_area_px']);
+            update_post_meta($post_id, '_printable_area_px', $printable_area_px);
+        }
+
+        if (isset($_POST['printable_area_mm'])) {
+            $printable_area_mm = $this->sanitize_json_field($_POST['printable_area_mm']);
+            update_post_meta($post_id, '_printable_area_mm', $printable_area_mm);
+        }
+
+        // Save Method 2 fields
+        if (isset($_POST['ref_chest_line_px'])) {
+            $ref_chest_line_px = $this->sanitize_json_field($_POST['ref_chest_line_px']);
+            update_post_meta($post_id, '_ref_chest_line_px', $ref_chest_line_px);
+        }
+
+        if (isset($_POST['anchor_point_px'])) {
+            $anchor_point_px = $this->sanitize_json_field($_POST['anchor_point_px']);
+            update_post_meta($post_id, '_anchor_point_px', $anchor_point_px);
+        }
+    }
+
+    /**
+     * Sanitize JSON field data
+     */
+    private function sanitize_json_field($json_string) {
+        if (empty($json_string)) {
+            return '';
+        }
+
+        // Remove any slashes and decode
+        $cleaned = stripslashes($json_string);
+
+        // Try to decode to validate JSON format
+        $decoded = json_decode($cleaned, true);
+
+        // If JSON is invalid, return empty string
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return '';
+        }
+
+        // Return the cleaned JSON string
+        return sanitize_textarea_field($cleaned);
+    }
+
+    /**
      * Render the physical dimensions meta box
      */
     public function render_physical_dimensions_meta_box($post) {
         wp_nonce_field('save_template_physical_dimensions', 'template_physical_dimensions_nonce');
-        
+
         // Get saved dimensions
         $physical_width = get_post_meta($post->ID, '_template_physical_width_cm', true);
         $physical_height = get_post_meta($post->ID, '_template_physical_height_cm', true);
-        
+
         // Default values if not set
         if (empty($physical_width)) $physical_width = 30; // Default 30cm
         if (empty($physical_height)) $physical_height = 40; // Default 40cm
-        
+
         ?>
         <div id="template-physical-dimensions-container" class="template-physical-dimensions-wrapper">
             <p class="description">
                 <?php esc_html_e('Enter the physical dimensions of the printable area on the t-shirt. These values will be used to accurately calculate pricing based on the actual size of the design.', 'octo-print-designer'); ?>
             </p>
-            
+
             <table class="form-table">
                 <tr>
                     <th scope="row">
                         <label for="physical_width_cm"><?php esc_html_e('Physical Width (cm)', 'octo-print-designer'); ?></label>
                     </th>
                     <td>
-                        <input 
-                            type="number" 
-                            id="physical_width_cm" 
-                            name="physical_width_cm" 
+                        <input
+                            type="number"
+                            id="physical_width_cm"
+                            name="physical_width_cm"
                             value="<?php echo esc_attr($physical_width); ?>"
                             step="0.1"
                             min="1"
@@ -615,10 +720,10 @@ class Octo_Print_Designer_Template {
                         <label for="physical_height_cm"><?php esc_html_e('Physical Height (cm)', 'octo-print-designer'); ?></label>
                     </th>
                     <td>
-                        <input 
-                            type="number" 
-                            id="physical_height_cm" 
-                            name="physical_height_cm" 
+                        <input
+                            type="number"
+                            id="physical_height_cm"
+                            name="physical_height_cm"
                             value="<?php echo esc_attr($physical_height); ?>"
                             step="0.1"
                             min="1"
@@ -632,6 +737,245 @@ class Octo_Print_Designer_Template {
                 </tr>
             </table>
         </div>
+        <?php
+    }
+
+    /**
+     * Render the design calculation meta box
+     */
+    public function render_design_calculation_meta_box($post) {
+        wp_nonce_field('save_template_design_calculation', 'template_design_calculation_nonce');
+
+        // Get saved values
+        $mockup_image_url = get_post_meta($post->ID, '_mockup_image_url', true);
+        $print_template_image_url = get_post_meta($post->ID, '_print_template_image_url', true);
+        $mockup_design_area_px = get_post_meta($post->ID, '_mockup_design_area_px', true);
+
+        ?>
+        <div id="template-design-calculation-container" class="template-design-calculation-wrapper">
+            <p class="description">
+                <?php esc_html_e('Configure the basic design calculation parameters used for mapping designs onto mockups and print templates.', 'octo-print-designer'); ?>
+            </p>
+
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="mockup_image_url"><?php esc_html_e('Mockup Image URL', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <input
+                            type="url"
+                            id="mockup_image_url"
+                            name="mockup_image_url"
+                            value="<?php echo esc_attr($mockup_image_url); ?>"
+                            class="large-text"
+                            placeholder="https://example.com/mockup-image.jpg"
+                        />
+                        <p class="description">
+                            <?php esc_html_e('URL to the mockup image used for design preview', 'octo-print-designer'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="print_template_image_url"><?php esc_html_e('Print Template Image URL', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <input
+                            type="url"
+                            id="print_template_image_url"
+                            name="print_template_image_url"
+                            value="<?php echo esc_attr($print_template_image_url); ?>"
+                            class="large-text"
+                            placeholder="https://example.com/print-template.jpg"
+                        />
+                        <p class="description">
+                            <?php esc_html_e('URL to the print template image used for production', 'octo-print-designer'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="mockup_design_area_px"><?php esc_html_e('Mockup Design Area (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea
+                            id="mockup_design_area_px"
+                            name="mockup_design_area_px"
+                            rows="8"
+                            class="large-text code"
+                            placeholder='{"x": 100, "y": 150, "width": 300, "height": 400}'
+                        ><?php echo esc_textarea($mockup_design_area_px); ?></textarea>
+                        <p class="description">
+                            <?php esc_html_e('JSON defining the design area coordinates on the mockup image in pixels. Example: {"x": 100, "y": 150, "width": 300, "height": 400}', 'octo-print-designer'); ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render the printable area calculation methods meta box
+     */
+    public function render_printable_area_meta_box($post) {
+        wp_nonce_field('save_template_printable_area', 'template_printable_area_nonce');
+
+        // Get saved values for Method 1
+        $printable_area_px = get_post_meta($post->ID, '_printable_area_px', true);
+        $printable_area_mm = get_post_meta($post->ID, '_printable_area_mm', true);
+
+        // Get saved values for Method 2
+        $ref_chest_line_px = get_post_meta($post->ID, '_ref_chest_line_px', true);
+        $anchor_point_px = get_post_meta($post->ID, '_anchor_point_px', true);
+
+        ?>
+        <div id="template-printable-area-container" class="template-printable-area-wrapper">
+            <p class="description">
+                <?php esc_html_e('Define the printable area calculation methods. Choose either Method 1 (Direct Area Definition) or Method 2 (Reference Line & Anchor Point).', 'octo-print-designer'); ?>
+            </p>
+
+            <div class="calculation-methods-tabs">
+                <div class="method-tabs">
+                    <button type="button" class="method-tab active" data-method="method1">
+                        <?php esc_html_e('Method 1: Direct Area', 'octo-print-designer'); ?>
+                    </button>
+                    <button type="button" class="method-tab" data-method="method2">
+                        <?php esc_html_e('Method 2: Reference & Anchor', 'octo-print-designer'); ?>
+                    </button>
+                </div>
+
+                <div id="method1-content" class="method-content active">
+                    <h4><?php esc_html_e('Method 1: Direct Printable Area Definition', 'octo-print-designer'); ?></h4>
+                    <p class="description">
+                        <?php esc_html_e('Define the printable area directly in pixels and millimeters.', 'octo-print-designer'); ?>
+                    </p>
+
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="printable_area_px"><?php esc_html_e('Printable Area in Pixels (JSON)', 'octo-print-designer'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    id="printable_area_px"
+                                    name="printable_area_px"
+                                    rows="8"
+                                    class="large-text code"
+                                    placeholder='{"x": 50, "y": 100, "width": 250, "height": 300}'
+                                ><?php echo esc_textarea($printable_area_px); ?></textarea>
+                                <p class="description">
+                                    <?php esc_html_e('JSON defining the printable area in pixels. Example: {"x": 50, "y": 100, "width": 250, "height": 300}', 'octo-print-designer'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="printable_area_mm"><?php esc_html_e('Printable Area in Millimeters (JSON)', 'octo-print-designer'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    id="printable_area_mm"
+                                    name="printable_area_mm"
+                                    rows="8"
+                                    class="large-text code"
+                                    placeholder='{"x": 25.0, "y": 50.0, "width": 125.0, "height": 150.0}'
+                                ><?php echo esc_textarea($printable_area_mm); ?></textarea>
+                                <p class="description">
+                                    <?php esc_html_e('JSON defining the printable area in millimeters. Example: {"x": 25.0, "y": 50.0, "width": 125.0, "height": 150.0}', 'octo-print-designer'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div id="method2-content" class="method-content">
+                    <h4><?php esc_html_e('Method 2: Reference Chest Line & Anchor Point', 'octo-print-designer'); ?></h4>
+                    <p class="description">
+                        <?php esc_html_e('Define the printable area using a reference chest line and anchor point for dynamic calculations.', 'octo-print-designer'); ?>
+                    </p>
+
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="ref_chest_line_px"><?php esc_html_e('Reference Chest Line in Pixels (JSON)', 'octo-print-designer'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    id="ref_chest_line_px"
+                                    name="ref_chest_line_px"
+                                    rows="6"
+                                    class="large-text code"
+                                    placeholder='{"start": {"x": 100, "y": 200}, "end": {"x": 400, "y": 200}}'
+                                ><?php echo esc_textarea($ref_chest_line_px); ?></textarea>
+                                <p class="description">
+                                    <?php esc_html_e('JSON defining the reference chest line coordinates. Example: {"start": {"x": 100, "y": 200}, "end": {"x": 400, "y": 200}}', 'octo-print-designer'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">
+                                <label for="anchor_point_px"><?php esc_html_e('Anchor Point in Pixels (JSON)', 'octo-print-designer'); ?></label>
+                            </th>
+                            <td>
+                                <textarea
+                                    id="anchor_point_px"
+                                    name="anchor_point_px"
+                                    rows="6"
+                                    class="large-text code"
+                                    placeholder='{"x": 250, "y": 150, "type": "center-top"}'
+                                ><?php echo esc_textarea($anchor_point_px); ?></textarea>
+                                <p class="description">
+                                    <?php esc_html_e('JSON defining the anchor point for design placement. Example: {"x": 250, "y": 150, "type": "center-top"}', 'octo-print-designer'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <style>
+        .calculation-methods-tabs .method-tabs {
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        .method-tab {
+            background: none;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .method-tab.active {
+            border-bottom-color: #0073aa;
+            color: #0073aa;
+            font-weight: bold;
+        }
+        .method-content {
+            display: none;
+        }
+        .method-content.active {
+            display: block;
+        }
+        </style>
+
+        <script>
+        jQuery(document).ready(function($) {
+            $('.method-tab').click(function() {
+                var method = $(this).data('method');
+
+                // Update tabs
+                $('.method-tab').removeClass('active');
+                $(this).addClass('active');
+
+                // Update content
+                $('.method-content').removeClass('active');
+                $('#' + method + '-content').addClass('active');
+            });
+        });
+        </script>
         <?php
     }
 
