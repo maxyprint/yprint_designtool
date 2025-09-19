@@ -1,0 +1,490 @@
+/**
+ * Reference Line System for Template Designer
+ * Integrates with existing view system to provide interactive measurement tools
+ */
+
+(function($) {
+    'use strict';
+
+    class ReferenceLineSystem {
+        constructor() {
+            this.isActive = false;
+            this.currentReferenceType = null;
+            this.clickCount = 0;
+            this.startPoint = null;
+            this.endPoint = null;
+            this.referenceLine = null;
+            this.canvas = null;
+            this.fabric = null;
+            this.init();
+        }
+
+        init() {
+            this.bindEvents();
+            this.setupModal();
+        }
+
+        bindEvents() {
+            // Reference line mode button
+            $(document).on('click', '[data-mode="referenceline"]', (e) => {
+                e.preventDefault();
+                this.activateReferenceLineMode();
+            });
+
+            // Modal close events
+            $(document).on('click', '.octo-modal-close', () => {
+                this.closeModal();
+            });
+
+            $(document).on('click', '.octo-modal', (e) => {
+                if ($(e.target).hasClass('octo-modal')) {
+                    this.closeModal();
+                }
+            });
+
+            // Reference type selection
+            $(document).on('click', '.select-reference-type', (e) => {
+                const type = $(e.currentTarget).data('type');
+                this.selectReferenceType(type);
+            });
+
+            // Canvas click events for coordinate selection
+            $(document).on('canvas:mouse:down', (e) => {
+                if (this.isActive && this.currentReferenceType) {
+                    this.handleCanvasClick(e);
+                }
+            });
+
+            // ESC key to cancel
+            $(document).on('keyup', (e) => {
+                if (e.keyCode === 27 && this.isActive) {
+                    this.cancelReferenceMode();
+                }
+            });
+        }
+
+        setupModal() {
+            // Add modal styles if not already present
+            if (!$('#reference-line-styles').length) {
+                const styles = `
+                    <style id="reference-line-styles">
+                        .octo-modal {
+                            display: none;
+                            position: fixed;
+                            z-index: 1000;
+                            left: 0;
+                            top: 0;
+                            width: 100%;
+                            height: 100%;
+                            background-color: rgba(0,0,0,0.5);
+                        }
+
+                        .octo-modal-content {
+                            background-color: #fff;
+                            margin: 15% auto;
+                            padding: 20px;
+                            border: 1px solid #ccc;
+                            border-radius: 5px;
+                            width: 500px;
+                            max-width: 90%;
+                            position: relative;
+                        }
+
+                        .octo-modal-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 20px;
+                            padding-bottom: 10px;
+                            border-bottom: 1px solid #eee;
+                        }
+
+                        .octo-modal-close {
+                            cursor: pointer;
+                            font-size: 24px;
+                            font-weight: bold;
+                            color: #999;
+                        }
+
+                        .octo-modal-close:hover {
+                            color: #333;
+                        }
+
+                        .reference-line-options {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                            margin-top: 20px;
+                        }
+
+                        .reference-line-options .button {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            padding: 15px;
+                            text-align: left;
+                            border: 2px solid #ddd;
+                            border-radius: 5px;
+                            background: #f9f9f9;
+                            transition: all 0.3s ease;
+                        }
+
+                        .reference-line-options .button:hover {
+                            border-color: #0073aa;
+                            background: #f0f8ff;
+                        }
+
+                        .reference-line-options .button .description {
+                            display: block;
+                            font-size: 12px;
+                            color: #666;
+                            margin-top: 5px;
+                        }
+
+                        .canvas-overlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            pointer-events: all;
+                            cursor: crosshair;
+                            z-index: 999;
+                        }
+
+                        .reference-line-instruction {
+                            position: fixed;
+                            top: 20px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: #0073aa;
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 5px;
+                            z-index: 1001;
+                            font-size: 14px;
+                        }
+
+                        .template-editor-toolbar .mode-select.active {
+                            background: #0073aa;
+                            color: white;
+                        }
+                    </style>
+                `;
+                $('head').append(styles);
+            }
+        }
+
+        activateReferenceLineMode() {
+            // Show the modal to select reference type
+            $('#reference-line-modal').show();
+        }
+
+        selectReferenceType(type) {
+            this.currentReferenceType = type;
+            this.closeModal();
+            this.startReferenceLineCreation();
+        }
+
+        startReferenceLineCreation() {
+            this.isActive = true;
+            this.clickCount = 0;
+
+            // Highlight the active button
+            $('.mode-select').removeClass('active');
+            $('[data-mode="referenceline"]').addClass('active');
+
+            // Get the canvas instance (assuming Fabric.js)
+            this.canvas = window.fabricCanvas || this.findCanvasInstance();
+
+            if (!this.canvas) {
+                console.error('Canvas instance not found');
+                return;
+            }
+
+            // Show instruction
+            this.showInstruction();
+
+            // Add event listeners for canvas clicks
+            this.addCanvasListeners();
+        }
+
+        findCanvasInstance() {
+            // Try to find existing Fabric.js canvas
+            if (window.fabric && window.fabric.Canvas) {
+                const canvasElements = document.querySelectorAll('canvas');
+                for (let canvasEl of canvasElements) {
+                    if (canvasEl.__fabric) {
+                        return canvasEl.__fabric;
+                    }
+                }
+            }
+            return null;
+        }
+
+        addCanvasListeners() {
+            if (this.canvas && this.canvas.on) {
+                this.canvas.on('mouse:down', this.handleFabricCanvasClick.bind(this));
+            }
+        }
+
+        removeCanvasListeners() {
+            if (this.canvas && this.canvas.off) {
+                this.canvas.off('mouse:down', this.handleFabricCanvasClick.bind(this));
+            }
+        }
+
+        handleFabricCanvasClick(e) {
+            if (!this.isActive) return;
+
+            const pointer = this.canvas.getPointer(e.e);
+
+            if (this.clickCount === 0) {
+                // First click - set start point
+                this.startPoint = pointer;
+                this.clickCount = 1;
+                this.updateInstruction('Click to set the end point of the reference line');
+                this.addTemporaryStartMarker(pointer);
+
+            } else if (this.clickCount === 1) {
+                // Second click - set end point and complete
+                this.endPoint = pointer;
+                this.completeReferenceLine();
+            }
+        }
+
+        handleCanvasClick(e) {
+            // Fallback for non-Fabric canvas
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (this.clickCount === 0) {
+                this.startPoint = { x, y };
+                this.clickCount = 1;
+                this.updateInstruction('Click to set the end point of the reference line');
+
+            } else if (this.clickCount === 1) {
+                this.endPoint = { x, y };
+                this.completeReferenceLine();
+            }
+        }
+
+        addTemporaryStartMarker(point) {
+            if (!this.canvas) return;
+
+            // Remove existing marker
+            this.removeTemporaryMarkers();
+
+            // Add start point marker
+            const marker = new fabric.Circle({
+                left: point.x - 5,
+                top: point.y - 5,
+                radius: 5,
+                fill: '#0073aa',
+                stroke: '#ffffff',
+                strokeWidth: 2,
+                selectable: false,
+                evented: false,
+                isTemporaryMarker: true
+            });
+
+            this.canvas.add(marker);
+            this.canvas.renderAll();
+        }
+
+        removeTemporaryMarkers() {
+            if (!this.canvas) return;
+
+            const markers = this.canvas.getObjects().filter(obj => obj.isTemporaryMarker);
+            markers.forEach(marker => this.canvas.remove(marker));
+            this.canvas.renderAll();
+        }
+
+        completeReferenceLine() {
+            if (!this.startPoint || !this.endPoint) return;
+
+            // Calculate line length in pixels
+            const dx = this.endPoint.x - this.startPoint.x;
+            const dy = this.endPoint.y - this.startPoint.y;
+            const lengthPx = Math.sqrt(dx * dx + dy * dy);
+
+            // Create the reference line data
+            const referenceData = {
+                type: this.currentReferenceType,
+                start: this.startPoint,
+                end: this.endPoint,
+                lengthPx: Math.round(lengthPx),
+                angle: Math.atan2(dy, dx) * (180 / Math.PI),
+                timestamp: Date.now()
+            };
+
+            // Add visual representation
+            this.addReferenceLineToCanvas(referenceData);
+
+            // Save to post meta or view system
+            this.saveReferenceLineData(referenceData);
+
+            // Show completion message
+            this.showCompletionMessage(referenceData);
+
+            // Reset the system
+            this.resetReferenceMode();
+        }
+
+        addReferenceLineToCanvas(data) {
+            if (!this.canvas) return;
+
+            // Remove temporary markers
+            this.removeTemporaryMarkers();
+
+            // Create reference line
+            const line = new fabric.Line([
+                data.start.x, data.start.y,
+                data.end.x, data.end.y
+            ], {
+                stroke: '#ff6b6b',
+                strokeWidth: 3,
+                strokeDashArray: [5, 5],
+                selectable: false,
+                evented: false,
+                isReferenceLine: true,
+                referenceData: data
+            });
+
+            // Add start and end markers
+            const startMarker = new fabric.Circle({
+                left: data.start.x - 6,
+                top: data.start.y - 6,
+                radius: 6,
+                fill: '#ff6b6b',
+                stroke: '#ffffff',
+                strokeWidth: 2,
+                selectable: false,
+                evented: false,
+                isReferenceLine: true
+            });
+
+            const endMarker = new fabric.Circle({
+                left: data.end.x - 6,
+                top: data.end.y - 6,
+                radius: 6,
+                fill: '#ff6b6b',
+                stroke: '#ffffff',
+                strokeWidth: 2,
+                selectable: false,
+                evented: false,
+                isReferenceLine: true
+            });
+
+            // Add label
+            const labelText = `${data.type.replace('_', ' ').toUpperCase()}\n${data.lengthPx}px`;
+            const label = new fabric.Text(labelText, {
+                left: (data.start.x + data.end.x) / 2,
+                top: (data.start.y + data.end.y) / 2 - 20,
+                fontSize: 12,
+                fill: '#ff6b6b',
+                backgroundColor: 'rgba(255,255,255,0.8)',
+                textAlign: 'center',
+                selectable: false,
+                evented: false,
+                isReferenceLine: true
+            });
+
+            this.canvas.add(line, startMarker, endMarker, label);
+            this.canvas.renderAll();
+        }
+
+        saveReferenceLineData(data) {
+            const postId = this.getPostId();
+            if (!postId) return;
+
+            // Save via AJAX
+            $.post(ajaxurl, {
+                action: 'save_reference_line_data',
+                post_id: postId,
+                reference_data: JSON.stringify(data),
+                nonce: $('[name="octo_template_nonce"]').val()
+            })
+            .done((response) => {
+                console.log('Reference line data saved:', response);
+            })
+            .fail((xhr, status, error) => {
+                console.error('Failed to save reference line data:', error);
+            });
+        }
+
+        getPostId() {
+            return $('[name="post_ID"]').val() || $('#post_ID').val();
+        }
+
+        showInstruction() {
+            const instruction = $(`
+                <div class="reference-line-instruction">
+                    Click to set the start point of your ${this.currentReferenceType.replace('_', ' ')} reference line
+                    <small style="display: block; margin-top: 5px;">Press ESC to cancel</small>
+                </div>
+            `);
+            $('body').append(instruction);
+        }
+
+        updateInstruction(text) {
+            $('.reference-line-instruction').html(`
+                ${text}
+                <small style="display: block; margin-top: 5px;">Press ESC to cancel</small>
+            `);
+        }
+
+        hideInstruction() {
+            $('.reference-line-instruction').remove();
+        }
+
+        showCompletionMessage(data) {
+            const message = $(`
+                <div class="notice notice-success is-dismissible" style="margin: 20px 0;">
+                    <p><strong>Reference Line Created!</strong></p>
+                    <p>Type: ${data.type.replace('_', ' ').toUpperCase()}</p>
+                    <p>Length: ${data.lengthPx} pixels</p>
+                    <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button>
+                </div>
+            `);
+
+            $('.template-editor-toolbar').after(message);
+
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                message.fadeOut(() => message.remove());
+            }, 5000);
+        }
+
+        resetReferenceMode() {
+            this.isActive = false;
+            this.currentReferenceType = null;
+            this.clickCount = 0;
+            this.startPoint = null;
+            this.endPoint = null;
+
+            $('.mode-select').removeClass('active');
+            this.hideInstruction();
+            this.removeCanvasListeners();
+        }
+
+        cancelReferenceMode() {
+            this.removeTemporaryMarkers();
+            this.resetReferenceMode();
+
+            // Show cancellation message
+            const message = $('<div class="notice notice-warning is-dismissible" style="margin: 20px 0;"><p>Reference line creation cancelled.</p></div>');
+            $('.template-editor-toolbar').after(message);
+            setTimeout(() => message.fadeOut(() => message.remove()), 3000);
+        }
+
+        closeModal() {
+            $('#reference-line-modal').hide();
+        }
+    }
+
+    // Initialize when DOM is ready
+    $(document).ready(function() {
+        new ReferenceLineSystem();
+    });
+
+})(jQuery);

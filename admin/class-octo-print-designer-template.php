@@ -121,6 +121,15 @@ class Octo_Print_Designer_Template {
             'normal',
             'high'
         );
+
+        add_meta_box(
+            'template_reference_lines',
+            __('Reference Lines & Measurements', 'octo-print-designer'),
+            array($this, 'render_reference_lines_meta_box'),
+            'design_template',
+            'normal',
+            'high'
+        );
     }
 
     /**
@@ -973,6 +982,154 @@ class Octo_Print_Designer_Template {
                 // Update content
                 $('.method-content').removeClass('active');
                 $('#' + method + '-content').addClass('active');
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Render the reference lines meta box
+     */
+    public function render_reference_lines_meta_box($post) {
+        wp_nonce_field('octo_template_nonce_action', 'octo_template_nonce');
+
+        $reference_lines = get_post_meta($post->ID, '_reference_lines_data', true);
+        if (!is_array($reference_lines)) {
+            $reference_lines = [];
+        }
+        ?>
+        <div class="reference-lines-container">
+            <div class="reference-lines-info">
+                <p><strong><?php esc_html_e('Interactive Reference Line System', 'octo-print-designer'); ?></strong></p>
+                <p><?php esc_html_e('Use the "Edit Reference Line" button in the template view toolbar to create measurement references by clicking two points on your template image.', 'octo-print-designer'); ?></p>
+            </div>
+
+            <?php if (!empty($reference_lines)): ?>
+                <div class="existing-reference-lines">
+                    <h4><?php esc_html_e('Existing Reference Lines', 'octo-print-designer'); ?></h4>
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e('Type', 'octo-print-designer'); ?></th>
+                                <th><?php esc_html_e('Length (px)', 'octo-print-designer'); ?></th>
+                                <th><?php esc_html_e('Coordinates', 'octo-print-designer'); ?></th>
+                                <th><?php esc_html_e('Created', 'octo-print-designer'); ?></th>
+                                <th><?php esc_html_e('Actions', 'octo-print-designer'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($reference_lines as $index => $line): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo esc_html(str_replace('_', ' ', ucwords($line['type']))); ?></strong>
+                                    </td>
+                                    <td><?php echo esc_html($line['lengthPx']); ?>px</td>
+                                    <td>
+                                        <small>
+                                            Start: <?php echo esc_html(round($line['start']['x'])); ?>, <?php echo esc_html(round($line['start']['y'])); ?><br>
+                                            End: <?php echo esc_html(round($line['end']['x'])); ?>, <?php echo esc_html(round($line['end']['y'])); ?>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        if (isset($line['timestamp'])) {
+                                            echo esc_html(date('Y-m-d H:i', $line['timestamp'] / 1000));
+                                        } else {
+                                            echo esc_html__('Unknown', 'octo-print-designer');
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="button button-small delete-reference-line" data-index="<?php echo esc_attr($index); ?>">
+                                            <?php esc_html_e('Delete', 'octo-print-designer'); ?>
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="no-reference-lines">
+                    <p><em><?php esc_html_e('No reference lines created yet. Use the template view toolbar to create your first reference line.', 'octo-print-designer'); ?></em></p>
+                </div>
+            <?php endif; ?>
+
+            <div class="reference-lines-usage">
+                <h4><?php esc_html_e('How to Use', 'octo-print-designer'); ?></h4>
+                <ol>
+                    <li><?php esc_html_e('Scroll down to the Template View section', 'octo-print-designer'); ?></li>
+                    <li><?php esc_html_e('Click the "Edit Reference Line" button in the toolbar', 'octo-print-designer'); ?></li>
+                    <li><?php esc_html_e('Choose either "Chest Width" or "Height from Shoulder" measurement type', 'octo-print-designer'); ?></li>
+                    <li><?php esc_html_e('Click two points on the template image to define your reference line', 'octo-print-designer'); ?></li>
+                    <li><?php esc_html_e('The reference line will be saved and displayed in this section', 'octo-print-designer'); ?></li>
+                </ol>
+            </div>
+        </div>
+
+        <style>
+            .reference-lines-container {
+                padding: 15px;
+            }
+
+            .reference-lines-info {
+                background: #f0f8ff;
+                padding: 15px;
+                border-left: 4px solid #0073aa;
+                margin-bottom: 20px;
+            }
+
+            .existing-reference-lines {
+                margin: 20px 0;
+            }
+
+            .reference-lines-usage {
+                background: #f9f9f9;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 20px;
+            }
+
+            .reference-lines-usage ol {
+                padding-left: 20px;
+            }
+
+            .delete-reference-line:hover {
+                background: #d63638;
+                color: white;
+            }
+
+            .no-reference-lines {
+                text-align: center;
+                padding: 30px;
+                background: #f9f9f9;
+                border-radius: 5px;
+                margin: 20px 0;
+            }
+        </style>
+
+        <script>
+        jQuery(document).ready(function($) {
+            $('.delete-reference-line').click(function() {
+                const index = $(this).data('index');
+                const postId = $('#post_ID').val();
+
+                if (confirm('<?php echo esc_js(__('Are you sure you want to delete this reference line?', 'octo-print-designer')); ?>')) {
+                    $.post(ajaxurl, {
+                        action: 'delete_reference_line',
+                        post_id: postId,
+                        line_index: index,
+                        nonce: $('#octo_template_nonce').val()
+                    })
+                    .done(function(response) {
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            alert('<?php echo esc_js(__('Failed to delete reference line', 'octo-print-designer')); ?>');
+                        }
+                    });
+                }
             });
         });
         </script>
