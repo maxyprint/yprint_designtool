@@ -360,8 +360,8 @@
             }
 
             // Method 7: Extract Fabric from existing canvas elements (aggressive approach)
-            const canvasElements = document.querySelectorAll('canvas');
-            for (const canvas of canvasElements) {
+            const canvasElementsForFabric = document.querySelectorAll('canvas');
+            for (const canvas of canvasElementsForFabric) {
                 if (canvas.__fabric) {
                     console.log('🔍 Found canvas with __fabric property, extracting Fabric.js...');
                     const fabricInstance = canvas.__fabric;
@@ -735,10 +735,10 @@
             }
 
             // Method 3: Check if admin bundle has initialized Template Editor with fabricCanvas
-            const canvasElements = document.querySelectorAll('canvas');
+            const adminCanvasElements = document.querySelectorAll('canvas');
             let foundFabricInstance = false;
 
-            for (const canvas of canvasElements) {
+            for (const canvas of adminCanvasElements) {
                 if (canvas.__fabric) {
                     console.log('✅ Found Fabric.js instance attached to canvas element');
                     window.fabric = canvas.__fabric.constructor.fabric || canvas.__fabric.fabric;

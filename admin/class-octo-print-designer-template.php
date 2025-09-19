@@ -1081,7 +1081,7 @@ class Octo_Print_Designer_Template {
                         '</select>' +
                     '</td>' +
                     '<td>' +
-                        '<button type="button" class="button remove-size-definition"><?php echo esc_js(__('Remove', 'octo-print-designer')); ?></button>' +
+                        '<button type="button" class="button remove-size-definition">Remove</button>' +
                     '</td>' +
                 '</tr>';
                 $('#size-definitions-tbody').append(newRow);
