@@ -758,54 +758,70 @@
                 return this.canvas;
             }
 
-            // Method A: Check templateEditors Map with robust validation
+            // Method A: Check templateEditors Map with relaxed validation
             if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
                 for (const [key, editor] of window.templateEditors.entries()) {
                     if (editor && editor.canvas &&
                         typeof editor.canvas.add === 'function' &&
-                        typeof editor.canvas.getObjects === 'function' &&
-                        editor.canvas.getElement &&
-                        editor.canvas.getElement()) {
-                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in templateEditor:', key);
+                        typeof editor.canvas.getObjects === 'function') {
+                        // 🎯 RELAXED VALIDATION: getElement() can be null during initialization
+                        console.log('✅ FOUND FUNCTIONAL CANVAS in templateEditor:', key, {
+                            hasAdd: typeof editor.canvas.add === 'function',
+                            hasGetObjects: typeof editor.canvas.getObjects === 'function',
+                            hasGetElement: typeof editor.canvas.getElement === 'function',
+                            elementExists: editor.canvas.getElement ? !!editor.canvas.getElement() : 'N/A'
+                        });
                         return editor.canvas;
                     }
                 }
             }
 
-            // Method B: Check variationsManager with robust validation
+            // Method B: Check variationsManager with relaxed validation
             if (window.variationsManager && window.variationsManager.editors instanceof Map) {
                 for (const [key, editor] of window.variationsManager.editors.entries()) {
                     if (editor && editor.canvas &&
                         typeof editor.canvas.add === 'function' &&
-                        typeof editor.canvas.getObjects === 'function' &&
-                        editor.canvas.getElement &&
-                        editor.canvas.getElement()) {
-                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in variationsManager:', key);
+                        typeof editor.canvas.getObjects === 'function') {
+                        // 🎯 RELAXED VALIDATION: getElement() can be null during initialization
+                        console.log('✅ FOUND FUNCTIONAL CANVAS in variationsManager:', key, {
+                            hasAdd: typeof editor.canvas.add === 'function',
+                            hasGetObjects: typeof editor.canvas.getObjects === 'function',
+                            hasGetElement: typeof editor.canvas.getElement === 'function',
+                            elementExists: editor.canvas.getElement ? !!editor.canvas.getElement() : 'N/A'
+                        });
                         return editor.canvas;
                     }
                 }
             }
 
-            // Method C: Check window.fabricCanvas with robust validation
+            // Method C: Check window.fabricCanvas with relaxed validation
             if (window.fabricCanvas &&
                 typeof window.fabricCanvas.add === 'function' &&
-                typeof window.fabricCanvas.getObjects === 'function' &&
-                window.fabricCanvas.getElement &&
-                window.fabricCanvas.getElement()) {
-                console.log('✅ FOUND FULLY INITIALIZED CANVAS in window.fabricCanvas');
+                typeof window.fabricCanvas.getObjects === 'function') {
+                // 🎯 RELAXED VALIDATION: getElement() can be null during initialization
+                console.log('✅ FOUND FUNCTIONAL CANVAS in window.fabricCanvas', {
+                    hasAdd: typeof window.fabricCanvas.add === 'function',
+                    hasGetObjects: typeof window.fabricCanvas.getObjects === 'function',
+                    hasGetElement: typeof window.fabricCanvas.getElement === 'function',
+                    elementExists: window.fabricCanvas.getElement ? !!window.fabricCanvas.getElement() : 'N/A'
+                });
                 return window.fabricCanvas;
             }
 
-            // Method D: Check for fabric instances with proper initialization
+            // Method D: Check for fabric instances with relaxed validation
             if (window.fabric && window.fabric.Canvas && window.fabric.Canvas.getInstances) {
                 const instances = window.fabric.Canvas.getInstances();
                 for (const instance of instances) {
                     if (instance &&
                         typeof instance.add === 'function' &&
-                        typeof instance.getObjects === 'function' &&
-                        instance.getElement &&
-                        instance.getElement()) {
-                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in fabric instances');
+                        typeof instance.getObjects === 'function') {
+                        // 🎯 RELAXED VALIDATION: getElement() can be null during initialization
+                        console.log('✅ FOUND FUNCTIONAL CANVAS in fabric instances', {
+                            hasAdd: typeof instance.add === 'function',
+                            hasGetObjects: typeof instance.getObjects === 'function',
+                            hasGetElement: typeof instance.getElement === 'function',
+                            elementExists: instance.getElement ? !!instance.getElement() : 'N/A'
+                        });
                         return instance;
                     }
                 }
