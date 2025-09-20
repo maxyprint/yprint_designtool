@@ -29,4 +29,11 @@
 	 * practising this, we should strive to set a better example in our own work.
 	 */
 
+	// Initialize Designer Widget Instance for global access
+	$(function() {
+		if (typeof DesignerWidget !== 'undefined') {
+			window.designerWidgetInstance = new DesignerWidget();
+		}
+	});
+
 })( jQuery );
