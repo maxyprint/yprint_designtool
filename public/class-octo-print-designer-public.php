@@ -122,6 +122,15 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 DESIGN DATA CAPTURE: Canvas data extraction system
+        wp_register_script(
+            'octo-print-designer-data-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/design-data-capture.js',
+            ['octo-print-designer-designer'], // Load after designer to ensure DesignerWidget is available
+            rand(),
+            true
+        );
+
         // 🚨 FABRIC EXPOSURE: Add inline script to expose fabric IMMEDIATELY after webpack loads
         wp_add_inline_script('octo-print-designer-designer', '
             // Immediate fabric exposure after webpack bundle loads
