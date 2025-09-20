@@ -24,6 +24,13 @@
         }
 
         init() {
+            // 🛡️ SINGLETON PATTERN: Prevent multiple initializations globally
+            if (window.referenceLineSystemInitialized) {
+                console.log('🛡️ Reference Line System already initialized - preventing duplicate');
+                return;
+            }
+            window.referenceLineSystemInitialized = true;
+
             console.log('🔍 REFERENCE LINE SYSTEM: Initializing with CASCADE ELIMINATION...');
             this.bindEvents();
             this.setupModal();
@@ -164,20 +171,28 @@
                 return false;
             };
 
-            // 🚨 CASCADE ELIMINATION: Single execution poll with proper termination
-            const editorCheckInterval = setInterval(() => {
+            // 🚨 CASCADE ELIMINATION: Store interval reference for cleanup
+            this.editorCheckInterval = setInterval(() => {
+                // 🛡️ GUARD: Stop if globally completed
+                if (window.canvasDetectionCompleted) {
+                    console.log('🛡️ Global detection completed - stopping interval');
+                    clearInterval(this.editorCheckInterval);
+                    return;
+                }
+
                 const found = checkForEditors();
                 if (found || this.canvas || detectionCompleted) {
                     console.log('🛡️ Stopping canvas detection interval - success or completion');
-                    clearInterval(editorCheckInterval);
+                    clearInterval(this.editorCheckInterval);
+                    window.canvasDetectionCompleted = true;
                 }
             }, 100);
 
             // 🚨 FAILSAFE: Clear interval after 10 seconds (reduced from 30s)
             setTimeout(() => {
-                if (editorCheckInterval) {
+                if (this.editorCheckInterval) {
                     console.log('🚨 Canvas detection timeout - clearing interval');
-                    clearInterval(editorCheckInterval);
+                    clearInterval(this.editorCheckInterval);
                 }
             }, 10000);
         }
@@ -212,25 +227,54 @@
                     return;
                 }
 
-                for (let mutation of mutations) {
-                    if (mutation.type === 'childList') {
-                        const addedNodes = Array.from(mutation.addedNodes);
-                        for (let node of addedNodes) {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                // Check if a canvas was added
-                                if (node.tagName === 'CANVAS') {
-                                    console.log('🔍 MutationObserver: Canvas element added to DOM (SINGLETON)', node);
-                                    this.checkCanvasForFabric(node);
-                                }
-                                // Check if any child contains a canvas
-                                const canvasElements = node.querySelectorAll && node.querySelectorAll('canvas');
-                                if (canvasElements && canvasElements.length > 0) {
-                                    console.log('🔍 MutationObserver: Canvas found in added element (SINGLETON)', canvasElements);
-                                    canvasElements.forEach(canvas => this.checkCanvasForFabric(canvas));
+                // 🛡️ CASCADE PREVENTION: Single execution flag for this observer callback
+                if (this.mutationObserverProcessing) {
+                    return;
+                }
+                this.mutationObserverProcessing = true;
+
+                try {
+                    for (let mutation of mutations) {
+                        if (mutation.type === 'childList') {
+                            const addedNodes = Array.from(mutation.addedNodes);
+                            for (let node of addedNodes) {
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    // Check if a canvas was added
+                                    if (node.tagName === 'CANVAS') {
+                                        console.log('🔍 MutationObserver: Canvas element added to DOM (SINGLETON)', node);
+                                        const success = this.checkCanvasForFabric(node);
+                                        if (success) {
+                                            console.log('✅ MutationObserver: Canvas found, disconnecting observer');
+                                            this.mutationObserver.disconnect();
+                                            window.mutationObserverActive = false;
+                                            window.canvasDetectionCompleted = true;
+                                            return;
+                                        }
+                                    }
+                                    // Check if any child contains a canvas
+                                    const canvasElements = node.querySelectorAll && node.querySelectorAll('canvas');
+                                    if (canvasElements && canvasElements.length > 0) {
+                                        console.log('🔍 MutationObserver: Canvas found in added element (SINGLETON)', canvasElements);
+                                        for (const canvas of canvasElements) {
+                                            const success = this.checkCanvasForFabric(canvas);
+                                            if (success) {
+                                                console.log('✅ MutationObserver: Canvas found, disconnecting observer');
+                                                this.mutationObserver.disconnect();
+                                                window.mutationObserverActive = false;
+                                                window.canvasDetectionCompleted = true;
+                                                return;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                } finally {
+                    // Reset processing flag after a delay to allow for new DOM changes
+                    setTimeout(() => {
+                        this.mutationObserverProcessing = false;
+                    }, 100);
                 }
             });
 
@@ -265,20 +309,31 @@
         }
 
         checkCanvasForFabric(canvasElement) {
+            // 🛡️ GUARD: Prevent processing if already found
+            if (window.canvasDetectionCompleted || this.canvas) {
+                return true;
+            }
+
             // Check immediately
             if (canvasElement.__fabric) {
                 console.log('✅ MutationObserver: Found Fabric.js canvas!', canvasElement.__fabric);
                 window.fabricCanvas = canvasElement.__fabric;
                 this.canvas = canvasElement.__fabric;
+                window.canvasDetectionCompleted = true;
+                // Stop all detection methods
+                this.stopAllDetectionMethods();
                 return true;
             }
 
             // Sometimes Fabric.js is attached after the element is added, so we wait a bit
             setTimeout(() => {
-                if (canvasElement.__fabric) {
+                if (!window.canvasDetectionCompleted && !this.canvas && canvasElement.__fabric) {
                     console.log('✅ MutationObserver: Found Fabric.js canvas (delayed)!', canvasElement.__fabric);
                     window.fabricCanvas = canvasElement.__fabric;
                     this.canvas = canvasElement.__fabric;
+                    window.canvasDetectionCompleted = true;
+                    // Stop all detection methods
+                    this.stopAllDetectionMethods();
                 }
             }, 100);
 
@@ -634,20 +689,32 @@
             }
 
             // Method 9: CONTROLLED retry with exponential backoff (LOG-SPAM ELIMINATED)
-            if (this.retryAttempts < 5) { // Reduced from 20 to 5 attempts
+            if (this.retryAttempts < 3) { // Reduced from 5 to 3 attempts to prevent cascade
                 this.retryAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, this.retryAttempts - 1), 8000); // Exponential backoff, max 8s
+                const delay = Math.min(1000 * this.retryAttempts, 3000); // Linear backoff, max 3s
 
-                // 🟢 LOG-SPAM ELIMINATION: Only log every 3rd attempt or errors
-                if (this.retryAttempts % 3 === 0 || this.retryAttempts === 1) {
-                    console.log(`⏳ Canvas detection retry ${this.retryAttempts}/5 (${delay}ms delay)`);
+                // 🟢 LOG-SPAM ELIMINATION: Only log first attempt
+                if (this.retryAttempts === 1) {
+                    console.log(`⏳ Canvas detection retry ${this.retryAttempts}/3 (${delay}ms delay)`);
                 }
 
-                // 🔵 ROBUST WAIT STRATEGY: Promise-based with proper error handling
+                // 🔵 ROBUST WAIT STRATEGY: Promise-based with proper termination
                 return new Promise((resolve) => {
+                    // 🛡️ GUARD: Check if already found before retry
+                    if (window.canvasDetectionCompleted || this.canvas) {
+                        resolve(this.canvas);
+                        return;
+                    }
+
                     setTimeout(() => {
-                        const foundCanvas = this.findCanvasInstance();
-                        resolve(foundCanvas); // Always resolve, no recursive call
+                        // Final guard check before retry
+                        if (window.canvasDetectionCompleted || this.canvas) {
+                            resolve(this.canvas);
+                        } else {
+                            // DO NOT CALL findCanvasInstance recursively - check immediate state only
+                            const immediateCanvas = this.tryCanvasDetection();
+                            resolve(immediateCanvas);
+                        }
                     }, delay);
                 });
             }
@@ -686,32 +753,62 @@
 
         // Try canvas detection without waiting
         tryCanvasDetection() {
-            // Method A: Check templateEditors Map
+            // 🛡️ GUARD: Stop if already found
+            if (window.canvasDetectionCompleted || this.canvas) {
+                return this.canvas;
+            }
+
+            // Method A: Check templateEditors Map with robust validation
             if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
-                console.log('🔍 Found templateEditors Map with', window.templateEditors.size, 'editors');
                 for (const [key, editor] of window.templateEditors.entries()) {
-                    if (editor && editor.canvas && typeof editor.canvas.add === 'function') {
-                        console.log('✅ FOUND EXISTING CANVAS in templateEditor:', key);
+                    if (editor && editor.canvas &&
+                        typeof editor.canvas.add === 'function' &&
+                        typeof editor.canvas.getObjects === 'function' &&
+                        editor.canvas.getElement &&
+                        editor.canvas.getElement()) {
+                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in templateEditor:', key);
                         return editor.canvas;
                     }
                 }
             }
 
-            // Method B: Check variationsManager
+            // Method B: Check variationsManager with robust validation
             if (window.variationsManager && window.variationsManager.editors instanceof Map) {
-                console.log('🔍 Found variationsManager with editors');
                 for (const [key, editor] of window.variationsManager.editors.entries()) {
-                    if (editor && editor.canvas && typeof editor.canvas.add === 'function') {
-                        console.log('✅ FOUND EXISTING CANVAS in variationsManager:', key);
+                    if (editor && editor.canvas &&
+                        typeof editor.canvas.add === 'function' &&
+                        typeof editor.canvas.getObjects === 'function' &&
+                        editor.canvas.getElement &&
+                        editor.canvas.getElement()) {
+                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in variationsManager:', key);
                         return editor.canvas;
                     }
                 }
             }
 
-            // Method C: Check window.fabricCanvas if set by other systems
-            if (window.fabricCanvas && typeof window.fabricCanvas.add === 'function') {
-                console.log('✅ FOUND EXISTING CANVAS in window.fabricCanvas');
+            // Method C: Check window.fabricCanvas with robust validation
+            if (window.fabricCanvas &&
+                typeof window.fabricCanvas.add === 'function' &&
+                typeof window.fabricCanvas.getObjects === 'function' &&
+                window.fabricCanvas.getElement &&
+                window.fabricCanvas.getElement()) {
+                console.log('✅ FOUND FULLY INITIALIZED CANVAS in window.fabricCanvas');
                 return window.fabricCanvas;
+            }
+
+            // Method D: Check for fabric instances with proper initialization
+            if (window.fabric && window.fabric.Canvas && window.fabric.Canvas.getInstances) {
+                const instances = window.fabric.Canvas.getInstances();
+                for (const instance of instances) {
+                    if (instance &&
+                        typeof instance.add === 'function' &&
+                        typeof instance.getObjects === 'function' &&
+                        instance.getElement &&
+                        instance.getElement()) {
+                        console.log('✅ FOUND FULLY INITIALIZED CANVAS in fabric instances');
+                        return instance;
+                    }
+                }
             }
 
             return null;
@@ -720,29 +817,38 @@
         // Intelligent polling strategy with progressive delays
         async waitForCanvasWithIntelligentPolling() {
             return new Promise((resolve, reject) => {
+                // 🛡️ GUARD: Check if already completed before starting
+                if (window.canvasDetectionCompleted || this.canvas) {
+                    resolve(this.canvas);
+                    return;
+                }
+
                 let attempts = 0;
-                const maxAttempts = 50; // Increased from 20
-                const baseDelay = 100; // Start with 100ms
+                const maxAttempts = 15; // Reduced from 50 to prevent spam
+                const baseDelay = 200; // Increased from 100ms to reduce frequency
+                let pollInterval = null;
 
                 const poll = () => {
+                    // 🛡️ GUARD: Stop if completed by another method
+                    if (window.canvasDetectionCompleted || this.canvas) {
+                        if (pollInterval) clearTimeout(pollInterval);
+                        resolve(this.canvas);
+                        return;
+                    }
+
                     attempts++;
-                    console.log(`🔄 Canvas polling attempt ${attempts}/${maxAttempts}`);
+                    // 🟢 LOG-SPAM ELIMINATION: Only log every 5 attempts
+                    if (attempts % 5 === 1 || attempts === 1) {
+                        console.log(`🔄 Canvas polling attempt ${attempts}/${maxAttempts}`);
+                    }
 
                     const canvas = this.tryCanvasDetection();
                     if (canvas) {
                         console.log('✅ CANVAS FOUND via intelligent polling!');
+                        window.canvasDetectionCompleted = true;
+                        this.stopAllDetectionMethods();
                         resolve(canvas);
                         return;
-                    }
-
-                    // 🟢 LOG-SPAM ELIMINATION: Conditional debug logging only
-                    if (this.debugMode || this.retryAttempts === 1) {
-                        console.log('🔍 Canvas search status:', {
-                            templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not found',
-                            variationsManager: window.variationsManager ? 'exists' : 'not found',
-                            variationsManagerEditors: window.variationsManager?.editors instanceof Map ? window.variationsManager.editors.size : 'not found',
-                            fabricCanvas: window.fabricCanvas ? 'exists' : 'not found'
-                        });
                     }
 
                     if (attempts >= maxAttempts) {
@@ -751,9 +857,9 @@
                         return;
                     }
 
-                    // Progressive delay: 100ms, 200ms, 300ms, ..., max 1000ms
-                    const delay = Math.min(baseDelay * attempts, 1000);
-                    setTimeout(poll, delay);
+                    // Progressive delay: 200ms, 400ms, 600ms, ..., max 2000ms
+                    const delay = Math.min(baseDelay * attempts, 2000);
+                    pollInterval = setTimeout(poll, delay);
                 };
 
                 // Start polling
