@@ -513,20 +513,13 @@
                 }
             }
 
-            // Method 8: Try to force-create a canvas from existing DOM elements
-            const canvasElement = this.findCanvasElementForFabric();
-            if (canvasElement) {
-                console.log('🔧 TRYING TO CREATE FABRIC CANVAS FROM ELEMENT:', canvasElement);
-                try {
-                    if (window.fabric && window.fabric.Canvas) {
-                        const fabricCanvas = new window.fabric.Canvas(canvasElement);
-                        window.fabricCanvas = fabricCanvas;
-                        console.log('✅ SUCCESSFULLY CREATED FABRIC CANVAS FROM ELEMENT!');
-                        return fabricCanvas;
-                    }
-                } catch (error) {
-                    console.log('❌ Failed to create Fabric canvas from element:', error);
-                }
+            // Method 8: Get existing canvas instance from templateEditors/variationsManager
+            // 🚨 FIXED: No longer trying to create new canvas instance - integrate with existing
+            const existingCanvas = this.getExistingCanvasInstance();
+            if (existingCanvas) {
+                console.log('✅ FOUND EXISTING CANVAS INSTANCE - INTEGRATING!', existingCanvas);
+                window.fabricCanvas = existingCanvas;
+                return existingCanvas;
             }
 
             // Method 9: Wait and retry if we haven't exceeded attempts
@@ -561,6 +554,42 @@
 
             // Show user-friendly error with retry option
             this.showCanvasNotFoundError();
+            return null;
+        }
+
+        // 🎯 NEW METHOD: Get existing canvas instance instead of creating new one
+        getExistingCanvasInstance() {
+            console.log('🔍 SEARCHING FOR EXISTING CANVAS INSTANCES...');
+
+            // Method A: Check templateEditors Map
+            if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
+                console.log('🔍 Found templateEditors Map with', window.templateEditors.size, 'editors');
+                for (const [key, editor] of window.templateEditors.entries()) {
+                    if (editor && editor.canvas && typeof editor.canvas.add === 'function') {
+                        console.log('✅ FOUND EXISTING CANVAS in templateEditor:', key);
+                        return editor.canvas;
+                    }
+                }
+            }
+
+            // Method B: Check variationsManager
+            if (window.variationsManager && window.variationsManager.editors instanceof Map) {
+                console.log('🔍 Found variationsManager with editors');
+                for (const [key, editor] of window.variationsManager.editors.entries()) {
+                    if (editor && editor.canvas && typeof editor.canvas.add === 'function') {
+                        console.log('✅ FOUND EXISTING CANVAS in variationsManager:', key);
+                        return editor.canvas;
+                    }
+                }
+            }
+
+            // Method C: Check window.fabricCanvas if set by other systems
+            if (window.fabricCanvas && typeof window.fabricCanvas.add === 'function') {
+                console.log('✅ FOUND EXISTING CANVAS in window.fabricCanvas');
+                return window.fabricCanvas;
+            }
+
+            console.log('❌ NO EXISTING CANVAS INSTANCE FOUND');
             return null;
         }
 
