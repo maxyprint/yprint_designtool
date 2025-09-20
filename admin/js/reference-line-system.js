@@ -18,6 +18,8 @@
             this.fabric = null;
             this.mutationObserver = null;
             this.canvasDetectionPromise = null;
+            this.debugMode = false; // 🟢 LOG-SPAM CONTROL: Set to true for detailed debugging
+            this.retryAttempts = 0; // Initialize retry counter
             this.init();
         }
 
@@ -526,22 +528,21 @@
                 console.log('❌ Error in canvas detection:', error);
             }
 
-            // Method 9: Wait and retry if we haven't exceeded attempts
-            if (this.retryAttempts < 20) { // Increased from 15 to 20 attempts
+            // Method 9: CONTROLLED retry with exponential backoff (LOG-SPAM ELIMINATED)
+            if (this.retryAttempts < 5) { // Reduced from 20 to 5 attempts
                 this.retryAttempts++;
-                const delay = this.retryAttempts <= 3 ? 500 : this.retryAttempts <= 7 ? 1000 : 2000;
-                console.log(`⏳ Canvas not ready, retrying in ${delay}ms (attempt ${this.retryAttempts}/20)`);
+                const delay = Math.min(1000 * Math.pow(2, this.retryAttempts - 1), 8000); // Exponential backoff, max 8s
 
-                // Set up a promise-based retry for better handling
+                // 🟢 LOG-SPAM ELIMINATION: Only log every 3rd attempt or errors
+                if (this.retryAttempts % 3 === 0 || this.retryAttempts === 1) {
+                    console.log(`⏳ Canvas detection retry ${this.retryAttempts}/5 (${delay}ms delay)`);
+                }
+
+                // 🔵 ROBUST WAIT STRATEGY: Promise-based with proper error handling
                 return new Promise((resolve) => {
                     setTimeout(() => {
                         const foundCanvas = this.findCanvasInstance();
-                        if (foundCanvas) {
-                            resolve(foundCanvas);
-                        } else {
-                            resolve(null);
-                            this.startReferenceLineCreation(); // Continue retry cycle
-                        }
+                        resolve(foundCanvas); // Always resolve, no recursive call
                     }, delay);
                 });
             }
@@ -563,7 +564,9 @@
 
         // 🎯 ROBUST WAIT STRATEGY: Intelligent canvas instance detection with timing
         async getExistingCanvasInstance() {
-            console.log('🔍 SEARCHING FOR EXISTING CANVAS INSTANCES (ROBUST MODE)...');
+            if (this.debugMode) {
+                console.log('🔍 SEARCHING FOR EXISTING CANVAS INSTANCES (ROBUST MODE)...');
+            }
 
             // First, try immediate detection
             const immediateCanvas = this.tryCanvasDetection();
@@ -627,13 +630,15 @@
                         return;
                     }
 
-                    // Log what we're finding for debugging
-                    console.log('🔍 Polling status:', {
-                        templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not found',
-                        variationsManager: window.variationsManager ? 'exists' : 'not found',
-                        variationsManagerEditors: window.variationsManager?.editors instanceof Map ? window.variationsManager.editors.size : 'not found',
-                        fabricCanvas: window.fabricCanvas ? 'exists' : 'not found'
-                    });
+                    // 🟢 LOG-SPAM ELIMINATION: Conditional debug logging only
+                    if (this.debugMode || this.retryAttempts === 1) {
+                        console.log('🔍 Canvas search status:', {
+                            templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not found',
+                            variationsManager: window.variationsManager ? 'exists' : 'not found',
+                            variationsManagerEditors: window.variationsManager?.editors instanceof Map ? window.variationsManager.editors.size : 'not found',
+                            fabricCanvas: window.fabricCanvas ? 'exists' : 'not found'
+                        });
+                    }
 
                     if (attempts >= maxAttempts) {
                         console.log('❌ INTELLIGENT POLLING TIMEOUT - Canvas not found after', maxAttempts, 'attempts');
