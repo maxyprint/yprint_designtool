@@ -65,6 +65,7 @@ class Octo_Print_Designer_Public {
     private function define_hooks() {
         Octo_Print_Designer_Loader::$instance->add_action('wp_enqueue_scripts', $this, 'enqueue_styles');
         Octo_Print_Designer_Loader::$instance->add_action('wp_enqueue_scripts', $this, 'enqueue_scripts');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_head', $this, 'add_fabric_preload_hints');
     }
 
 	/**
@@ -116,7 +117,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // remove fabric-fix dependency
+            ['octo-print-designer-vendor', 'octo-print-designer-fabric-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 CRITICAL: fabric-fix as MANDATORY dependency
             rand(),
             true
         );
@@ -185,5 +186,17 @@ class Octo_Print_Designer_Public {
         ]);
 
 	}
+
+    /**
+     * Add preload hints for critical fabric.js resources
+     */
+    public function add_fabric_preload_hints() {
+        // Only add preload hints on designer pages
+        if (is_page() || (function_exists('is_woocommerce') && is_woocommerce())) {
+            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposure-fix.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="dns-prefetch" href="' . parse_url(OCTO_PRINT_DESIGNER_URL, PHP_URL_HOST) . '">' . "\n";
+        }
+    }
 
 }

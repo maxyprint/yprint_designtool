@@ -386,49 +386,59 @@
     }
 
     async function initializeDesignLoader() {
-        debugLog('🚀 DESIGN-LOADER: Starting with fabric guarantee check...');
+        debugLog('🚀 DESIGN-LOADER: Starting with BLOCKING fabric wait...');
 
-        // 🚨 CRITICAL: Wait for fabric availability BEFORE proceeding
-        if (typeof window.guaranteeFabricAvailability === 'function') {
-            try {
-                await window.guaranteeFabricAvailability();
-                debugLog('✅ DESIGN-LOADER: Fabric guarantee satisfied');
-            } catch (error) {
-                debugError('❌ DESIGN-LOADER: Fabric guarantee failed:', error.message);
-                return; // Stop execution if fabric not available
-            }
+        // 🚨 CRITICAL: BLOCKING wait for fabric availability
+        function blockingWaitForFabric() {
+            return new Promise((resolve, reject) => {
+                const maxWaitTime = 10000; // 10 seconds maximum
+                const checkInterval = 100; // Check every 100ms
+                let elapsed = 0;
+
+                function checkFabric() {
+                    if (typeof window.fabric !== 'undefined' &&
+                        typeof window.fabric.Canvas === 'function') {
+                        debugLog('✅ DESIGN-LOADER: window.fabric available after', elapsed, 'ms');
+                        resolve();
+                        return;
+                    }
+
+                    elapsed += checkInterval;
+                    if (elapsed >= maxWaitTime) {
+                        debugError('❌ DESIGN-LOADER: Fabric wait timeout after', maxWaitTime, 'ms');
+                        reject(new Error('Fabric availability timeout'));
+                        return;
+                    }
+
+                    debugLog(`🔄 DESIGN-LOADER: Waiting for fabric... (${elapsed}ms)`);
+                    setTimeout(checkFabric, checkInterval);
+                }
+
+                // Start checking immediately
+                checkFabric();
+
+                // Also listen for fabric ready event as backup
+                window.addEventListener('fabricGlobalReady', function(event) {
+                    debugLog('✅ DESIGN-LOADER: Received fabricGlobalReady event');
+                    if (typeof window.fabric !== 'undefined') {
+                        resolve();
+                    }
+                }, { once: true });
+            });
         }
 
-        debugLog('Initializing design loader...');
-        
-        // 🚨 FIX: Event-based fabric.js dependency - eliminiert Race Condition
-        function listenForFabricReady() {
-            debugLog('🔄 DESIGN-LOADER FIX: Listening for fabric ready event');
+        try {
+            // BLOCKING wait - design-loader will NOT proceed until fabric is available
+            await blockingWaitForFabric();
+            debugLog('✅ DESIGN-LOADER: Fabric availability confirmed, proceeding...');
 
-            window.addEventListener('fabricGlobalReady', function(event) {
-                debugLog('✅ DESIGN-LOADER FIX: Received fabricGlobalReady event', event.detail);
-                if (typeof window.fabric !== 'undefined') {
-                    debugLog('✅ DESIGN-LOADER FIX: window.fabric now available via event');
-                    setTimeout(waitForDesigner, 100);
-                }
-            }, { once: true });
-
-            // Fallback timeout if event never fires
-            setTimeout(() => {
-                if (typeof window.fabric === 'undefined') {
-                    debugLog('⚠️ DESIGN-LOADER FIX: Event timeout, falling back to polling');
-                    waitForDesignerWithTimeout();
-                }
-            }, 2000);
-        }
-
-        // Prüfe ob window.fabric bereits verfügbar ist
-        if (typeof window.fabric !== 'undefined') {
-            debugLog('window.fabric already available at initialization');
+            // Now proceed with designer initialization
             setTimeout(waitForDesigner, 100);
-        } else {
-            debugLog('window.fabric not immediately available, using event-based loading...');
-            listenForFabricReady();
+
+        } catch (error) {
+            debugError('❌ DESIGN-LOADER: Critical failure - fabric never became available:', error.message);
+            debugError('❌ DESIGN-LOADER: Cannot proceed without fabric.js');
+            return; // Complete stop - do not retry
         }
         
         // Zusätzlicher Check nach vollständigem Page Load

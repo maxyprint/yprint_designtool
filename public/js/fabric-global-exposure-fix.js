@@ -187,22 +187,29 @@
         console.log('⚠️ FABRIC EXPOSURE FIX: All methods attempted, waiting for DOM changes');
     }
 
-    // Execute immediately
-    executeFabricFix();
-
-    // 🚨 CRITICAL: Immediate synchronous check for webpack modules
-    // This runs before other scripts to ensure fabric is available ASAP
-    if (typeof window.__webpack_require__ === 'function') {
-        try {
-            const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
-            if (fabricModule && typeof fabricModule.Canvas === 'function' && !window.fabric) {
-                window.fabric = fabricModule;
-                triggerFabricReadyEvent();
-                console.log('🎯 FABRIC EXPOSURE FIX: Immediate synchronous exposure successful');
+    // 🚨 CRITICAL: Immediate synchronous check for webpack modules FIRST
+    // This MUST run before other scripts to ensure fabric is available ASAP
+    function immediateFabricExposure() {
+        if (typeof window.__webpack_require__ === 'function') {
+            try {
+                const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
+                if (fabricModule && typeof fabricModule.Canvas === 'function' && !window.fabric) {
+                    window.fabric = fabricModule;
+                    triggerFabricReadyEvent();
+                    console.log('🎯 FABRIC EXPOSURE FIX: Immediate synchronous exposure successful');
+                    return true;
+                }
+            } catch (error) {
+                console.log('⚠️ FABRIC EXPOSURE FIX: Immediate exposure failed:', error.message);
             }
-        } catch (error) {
-            // Silent fail - other methods will handle this
         }
+        return false;
+    }
+
+    // Execute immediate exposure FIRST
+    if (!immediateFabricExposure()) {
+        // Only run other methods if immediate exposure failed
+        executeFabricFix();
     }
 
     // Retry on DOM changes (for dynamically loaded content)
