@@ -116,10 +116,35 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-products-listing-common', 'octo-print-designer-fabric-fix', 'octo-print-designer-stripe-service'], // fixes must load first
+            ['octo-print-designer-vendor', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // remove fabric-fix dependency
             rand(),
             true
         );
+
+        // 🚨 FABRIC EXPOSURE: Add inline script to expose fabric IMMEDIATELY after webpack loads
+        wp_add_inline_script('octo-print-designer-designer', '
+            // Immediate fabric exposure after webpack bundle loads
+            (function() {
+                if (typeof window.__webpack_require__ === "function") {
+                    try {
+                        const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
+                        if (fabricModule && typeof fabricModule.Canvas === "function" && !window.fabric) {
+                            window.fabric = fabricModule;
+                            console.log("🎯 FABRIC IMMEDIATE EXPOSURE: window.fabric available via inline script");
+
+                            // Trigger ready event for design-loader
+                            window.dispatchEvent(new CustomEvent("fabricGlobalReady", {
+                                detail: { fabric: window.fabric, source: "inline-exposure" }
+                            }));
+                        }
+                    } catch (error) {
+                        console.warn("⚠️ FABRIC EXPOSURE: Inline exposure failed:", error.message);
+                    }
+                } else {
+                    console.warn("⚠️ FABRIC EXPOSURE: __webpack_require__ not available in inline script");
+                }
+            })();
+        ', 'after');
         
         wp_localize_script('octo-print-designer-designer', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),

@@ -385,7 +385,20 @@
         initializeDesignLoader();
     }
 
-    function initializeDesignLoader() {
+    async function initializeDesignLoader() {
+        debugLog('🚀 DESIGN-LOADER: Starting with fabric guarantee check...');
+
+        // 🚨 CRITICAL: Wait for fabric availability BEFORE proceeding
+        if (typeof window.guaranteeFabricAvailability === 'function') {
+            try {
+                await window.guaranteeFabricAvailability();
+                debugLog('✅ DESIGN-LOADER: Fabric guarantee satisfied');
+            } catch (error) {
+                debugError('❌ DESIGN-LOADER: Fabric guarantee failed:', error.message);
+                return; // Stop execution if fabric not available
+            }
+        }
+
         debugLog('Initializing design loader...');
         
         // 🚨 FIX: Event-based fabric.js dependency - eliminiert Race Condition

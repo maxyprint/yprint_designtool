@@ -904,8 +904,34 @@ private function enqueue_design_loader() {
         true // Im Footer laden
     );
     
-    // Debug-Information hinzufügen
+    // 🚨 FABRIC GUARANTEE: Ensure fabric is available before design-loader executes
     wp_add_inline_script('octo-print-designer-loader', '
+        console.log("🔄 DESIGN-LOADER: Checking fabric availability before execution");
+
+        // GUARANTEE fabric availability - wait for it if needed
+        function guaranteeFabricAvailability() {
+            if (typeof window.fabric !== "undefined" && window.fabric.Canvas) {
+                console.log("✅ DESIGN-LOADER: window.fabric verified available");
+                return Promise.resolve();
+            }
+
+            // Listen for fabricGlobalReady event with timeout
+            return new Promise((resolve, reject) => {
+                console.log("⏳ DESIGN-LOADER: Waiting for fabric ready event...");
+
+                const timeout = setTimeout(() => {
+                    console.error("❌ DESIGN-LOADER: Fabric availability timeout after 5s");
+                    reject(new Error("fabric.js not available within timeout"));
+                }, 5000);
+
+                window.addEventListener("fabricGlobalReady", function(event) {
+                    console.log("✅ DESIGN-LOADER: Received fabricGlobalReady event", event.detail);
+                    clearTimeout(timeout);
+                    resolve();
+                }, { once: true });
+            });
+        }
+
         console.log("Design loader script enqueued successfully");
         console.log("Dependencies loaded:", typeof window.fabric !== "undefined");
     ', 'before');
