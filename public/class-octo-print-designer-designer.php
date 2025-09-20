@@ -66,8 +66,10 @@ class Octo_Print_Designer_Designer {
     
         wp_enqueue_script('octo-print-designer-designer');
 
+        // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system
+        wp_enqueue_script('octo-print-designer-data-capture');
 
-        
+
 // Fabric.js global verfügbar machen NACH dem Designer Bundle
 // Einfache window.fabric Verfügbarkeitsprüfung
 wp_add_inline_script('octo-print-designer-designer', '
