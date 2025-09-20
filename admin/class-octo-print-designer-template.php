@@ -104,6 +104,14 @@ class Octo_Print_Designer_Template {
             'high'
         );
 
+        add_meta_box(
+            'template_data_foundation',
+            __('Data Foundation - Calculation Methods', 'octo-print-designer'),
+            array($this, 'render_data_foundation_meta_box'),
+            'design_template',
+            'normal',
+            'high'
+        );
 
         add_meta_box(
             'template_reference_lines',
@@ -290,18 +298,52 @@ class Octo_Print_Designer_Template {
         }
         
         // Save physical dimensions
-        if (isset($_POST['template_physical_dimensions_nonce']) && 
+        if (isset($_POST['template_physical_dimensions_nonce']) &&
             wp_verify_nonce($_POST['template_physical_dimensions_nonce'], 'save_template_physical_dimensions')) {
-            
-            $physical_width = isset($_POST['physical_width_cm']) ? 
+
+            $physical_width = isset($_POST['physical_width_cm']) ?
                 (float) sanitize_text_field($_POST['physical_width_cm']) : 30;
-            $physical_height = isset($_POST['physical_height_cm']) ? 
+            $physical_height = isset($_POST['physical_height_cm']) ?
                 (float) sanitize_text_field($_POST['physical_height_cm']) : 40;
-                
+
             update_post_meta($post_id, '_template_physical_width_cm', $physical_width);
             update_post_meta($post_id, '_template_physical_height_cm', $physical_height);
         }
-        
+
+        // Save data foundation fields
+        if (isset($_POST['template_data_foundation_nonce']) &&
+            wp_verify_nonce($_POST['template_data_foundation_nonce'], 'save_template_data_foundation')) {
+
+            // Base fields
+            $mockup_image_url = isset($_POST['mockup_image_url']) ?
+                esc_url_raw($_POST['mockup_image_url']) : '';
+            $print_template_image_url = isset($_POST['print_template_image_url']) ?
+                esc_url_raw($_POST['print_template_image_url']) : '';
+            $mockup_design_area_px = isset($_POST['mockup_design_area_px']) ?
+                $this->sanitize_json_field($_POST['mockup_design_area_px']) : '';
+
+            // Method 1: Scalable Area
+            $printable_area_px = isset($_POST['printable_area_px']) ?
+                $this->sanitize_json_field($_POST['printable_area_px']) : '';
+            $printable_area_mm = isset($_POST['printable_area_mm']) ?
+                $this->sanitize_json_field($_POST['printable_area_mm']) : '';
+
+            // Method 2: Reference Lines
+            $ref_chest_line_px = isset($_POST['ref_chest_line_px']) ?
+                $this->sanitize_json_field($_POST['ref_chest_line_px']) : '';
+            $anchor_point_px = isset($_POST['anchor_point_px']) ?
+                $this->sanitize_json_field($_POST['anchor_point_px']) : '';
+
+            // Save all meta fields
+            update_post_meta($post_id, '_template_mockup_image_url', $mockup_image_url);
+            update_post_meta($post_id, '_template_print_template_image_url', $print_template_image_url);
+            update_post_meta($post_id, '_template_mockup_design_area_px', $mockup_design_area_px);
+            update_post_meta($post_id, '_template_printable_area_px', $printable_area_px);
+            update_post_meta($post_id, '_template_printable_area_mm', $printable_area_mm);
+            update_post_meta($post_id, '_template_ref_chest_line_px', $ref_chest_line_px);
+            update_post_meta($post_id, '_template_anchor_point_px', $anchor_point_px);
+        }
+
         $this->save_inventory_meta($post_id);
         $this->save_pricing_meta($post_id);
         $this->save_size_definitions_meta($post_id);
@@ -1132,6 +1174,147 @@ class Octo_Print_Designer_Template {
             });
         });
         </script>
+        <?php
+    }
+
+    /**
+     * Render the data foundation meta box for calculation methods
+     */
+    public function render_data_foundation_meta_box($post) {
+        wp_nonce_field('save_template_data_foundation', 'template_data_foundation_nonce');
+
+        // Get saved meta values
+        $mockup_image_url = get_post_meta($post->ID, '_template_mockup_image_url', true);
+        $print_template_image_url = get_post_meta($post->ID, '_template_print_template_image_url', true);
+        $mockup_design_area_px = get_post_meta($post->ID, '_template_mockup_design_area_px', true);
+        $printable_area_px = get_post_meta($post->ID, '_template_printable_area_px', true);
+        $printable_area_mm = get_post_meta($post->ID, '_template_printable_area_mm', true);
+        $ref_chest_line_px = get_post_meta($post->ID, '_template_ref_chest_line_px', true);
+        $anchor_point_px = get_post_meta($post->ID, '_template_anchor_point_px', true);
+        ?>
+
+        <div id="template-data-foundation-container" class="data-foundation-wrapper">
+            <div class="data-foundation-info">
+                <h4><?php esc_html_e('Data Foundation for Calculation Methods', 'octo-print-designer'); ?></h4>
+                <p><?php esc_html_e('Configure the essential data fields that enable both calculation methods for design scaling and positioning.', 'octo-print-designer'); ?></p>
+            </div>
+
+            <!-- Basis-Felder -->
+            <h3><?php esc_html_e('Base Fields', 'octo-print-designer'); ?></h3>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="mockup_image_url"><?php esc_html_e('Mockup Image URL', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <input type="url" id="mockup_image_url" name="mockup_image_url"
+                               value="<?php echo esc_attr($mockup_image_url); ?>" class="regular-text" />
+                        <p class="description"><?php esc_html_e('URL to the customer mockup image', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="print_template_image_url"><?php esc_html_e('Print Template Image URL', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <input type="url" id="print_template_image_url" name="print_template_image_url"
+                               value="<?php echo esc_attr($print_template_image_url); ?>" class="regular-text" />
+                        <p class="description"><?php esc_html_e('URL to the flat production template', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="mockup_design_area_px"><?php esc_html_e('Mockup Design Area (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="mockup_design_area_px" name="mockup_design_area_px"
+                                  rows="3" class="large-text code"><?php echo esc_textarea($mockup_design_area_px); ?></textarea>
+                        <p class="description"><?php esc_html_e('Clickable area on mockup. Example: {"x": 250, "y": 300, "width": 500, "height": 625}', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Methode 1: Skalierbare Fläche -->
+            <h3><?php esc_html_e('Method 1: Scalable Area', 'octo-print-designer'); ?></h3>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="printable_area_px"><?php esc_html_e('Printable Area Pixels (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="printable_area_px" name="printable_area_px"
+                                  rows="3" class="large-text code"><?php echo esc_textarea($printable_area_px); ?></textarea>
+                        <p class="description"><?php esc_html_e('Exact print area on template. Example: {"x": 100, "y": 150, "width": 4000, "height": 5000}', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="printable_area_mm"><?php esc_html_e('Printable Area Millimeters (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="printable_area_mm" name="printable_area_mm"
+                                  rows="3" class="large-text code"><?php echo esc_textarea($printable_area_mm); ?></textarea>
+                        <p class="description"><?php esc_html_e('Real size for reference (e.g. "M"). Example: {"width": 300, "height": 375}', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Methode 2: Referenzlinien -->
+            <h3><?php esc_html_e('Method 2: Reference Lines', 'octo-print-designer'); ?></h3>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="ref_chest_line_px"><?php esc_html_e('Reference Chest Line (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="ref_chest_line_px" name="ref_chest_line_px"
+                                  rows="3" class="large-text code"><?php echo esc_textarea($ref_chest_line_px); ?></textarea>
+                        <p class="description"><?php esc_html_e('Horizontal reference line. Example: {"x1": 200, "y1": 300, "x2": 800, "y2": 300}', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="anchor_point_px"><?php esc_html_e('Anchor Point (JSON)', 'octo-print-designer'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="anchor_point_px" name="anchor_point_px"
+                                  rows="3" class="large-text code"><?php echo esc_textarea($anchor_point_px); ?></textarea>
+                        <p class="description"><?php esc_html_e('Anchor point on print template. Example: {"x": 500, "y": 300}', 'octo-print-designer'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="data-foundation-note">
+                <p><strong><?php esc_html_e('Note:', 'octo-print-designer'); ?></strong>
+                   <?php esc_html_e('Per design template, you can choose which calculation method to use. Both sets of fields can be filled for maximum flexibility.', 'octo-print-designer'); ?>
+                </p>
+            </div>
+        </div>
+
+        <style>
+            .data-foundation-wrapper {
+                padding: 15px;
+            }
+            .data-foundation-info {
+                background: #e8f4fd;
+                padding: 15px;
+                border-left: 4px solid #0073aa;
+                margin-bottom: 20px;
+            }
+            .data-foundation-info h4 {
+                margin-top: 0;
+                color: #0073aa;
+            }
+            .data-foundation-note {
+                background: #f0f8e7;
+                padding: 15px;
+                border-left: 4px solid #46b450;
+                margin-top: 20px;
+            }
+            .data-foundation-note p {
+                margin: 0;
+            }
+        </style>
         <?php
     }
 
