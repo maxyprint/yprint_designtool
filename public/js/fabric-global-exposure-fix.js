@@ -187,30 +187,62 @@
         console.log('⚠️ FABRIC EXPOSURE FIX: All methods attempted, waiting for DOM changes');
     }
 
-    // 🚨 CRITICAL: Immediate synchronous check for webpack modules FIRST
-    // This MUST run before other scripts to ensure fabric is available ASAP
-    function immediateFabricExposure() {
+    // 🚨 OPTIMIZED: Passive fabric monitoring and exposure
+    function passiveFabricMonitoring() {
+        // Skip if fabric is already available
+        if (window.fabric && typeof window.fabric.Canvas === 'function') {
+            console.log('🎯 FABRIC EXPOSURE FIX: fabric already available, skipping');
+            return true;
+        }
+
+        console.log('🔍 FABRIC EXPOSURE FIX: Starting passive monitoring');
+
+        // Method 1: Immediate webpack check (if available)
         if (typeof window.__webpack_require__ === 'function') {
             try {
                 const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
-                if (fabricModule && typeof fabricModule.Canvas === 'function' && !window.fabric) {
+                if (fabricModule && typeof fabricModule.Canvas === 'function') {
                     window.fabric = fabricModule;
                     triggerFabricReadyEvent();
-                    console.log('🎯 FABRIC EXPOSURE FIX: Immediate synchronous exposure successful');
+                    console.log('✅ FABRIC EXPOSURE FIX: Immediate webpack exposure successful');
                     return true;
                 }
             } catch (error) {
-                console.log('⚠️ FABRIC EXPOSURE FIX: Immediate exposure failed:', error.message);
+                console.log('⚠️ FABRIC EXPOSURE FIX: Webpack method failed:', error.message);
             }
         }
+
+        // Method 2: Start passive monitoring
+        startPassiveMonitoring();
         return false;
     }
 
-    // Execute immediate exposure FIRST
-    if (!immediateFabricExposure()) {
-        // Only run other methods if immediate exposure failed
-        executeFabricFix();
+    function startPassiveMonitoring() {
+        let monitorCount = 0;
+        const maxMonitors = 100; // 10 seconds total
+
+        function monitorForFabric() {
+            monitorCount++;
+
+            // Try canvas extraction methods
+            if (extractFabricFromCanvas()) {
+                return; // Success
+            }
+
+            // Continue monitoring
+            if (monitorCount < maxMonitors) {
+                setTimeout(monitorForFabric, 100);
+            } else {
+                console.warn('⚠️ FABRIC EXPOSURE FIX: Passive monitoring timeout after', maxMonitors * 100, 'ms');
+            }
+        }
+
+        // Start monitoring with delay
+        setTimeout(monitorForFabric, 200);
     }
+
+    // Execute passive monitoring
+    passiveFabricMonitoring();
 
     // Retry on DOM changes (for dynamically loaded content)
     const observer = new MutationObserver(function(mutations) {

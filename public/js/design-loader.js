@@ -386,59 +386,125 @@
     }
 
     async function initializeDesignLoader() {
-        debugLog('🚀 DESIGN-LOADER: Starting with BLOCKING fabric wait...');
+        debugLog('🚀 DESIGN-LOADER: Starting with enhanced fabric detection...');
 
-        // 🚨 CRITICAL: BLOCKING wait for fabric availability
-        function blockingWaitForFabric() {
+        // 🚨 ENHANCED: Multi-method fabric availability detection
+        function waitForFabricMultiMethod() {
             return new Promise((resolve, reject) => {
-                const maxWaitTime = 10000; // 10 seconds maximum
-                const checkInterval = 100; // Check every 100ms
+                const maxWaitTime = 15000; // 15 seconds maximum
+                const checkInterval = 200; // Check every 200ms (less aggressive)
                 let elapsed = 0;
+                let attempts = 0;
 
                 function checkFabric() {
+                    attempts++;
+
+                    // Method 1: Direct window.fabric check
                     if (typeof window.fabric !== 'undefined' &&
                         typeof window.fabric.Canvas === 'function') {
-                        debugLog('✅ DESIGN-LOADER: window.fabric available after', elapsed, 'ms');
+                        debugLog('✅ DESIGN-LOADER: window.fabric available via direct check after', elapsed, 'ms');
                         resolve();
                         return;
                     }
 
-                    elapsed += checkInterval;
-                    if (elapsed >= maxWaitTime) {
-                        debugError('❌ DESIGN-LOADER: Fabric wait timeout after', maxWaitTime, 'ms');
-                        reject(new Error('Fabric availability timeout'));
+                    // Method 2: Check for DesignerWidget with fabricCanvas
+                    if (window.designerWidgetInstance &&
+                        window.designerWidgetInstance.fabricCanvas &&
+                        typeof window.designerWidgetInstance.fabricCanvas.constructor === 'function') {
+                        debugLog('✅ DESIGN-LOADER: fabric available via DesignerWidget after', elapsed, 'ms');
+
+                        // Extract fabric from DesignerWidget if not globally available
+                        if (!window.fabric) {
+                            try {
+                                const canvas = window.designerWidgetInstance.fabricCanvas;
+                                window.fabric = {
+                                    Canvas: canvas.constructor,
+                                    Image: canvas.constructor.Image || null,
+                                    Object: canvas.constructor.Object || null
+                                };
+                                debugLog('🔧 DESIGN-LOADER: Extracted fabric from DesignerWidget');
+                            } catch (e) {
+                                debugWarn('⚠️ DESIGN-LOADER: Failed to extract fabric from DesignerWidget:', e.message);
+                            }
+                        }
+                        resolve();
                         return;
                     }
 
-                    debugLog(`🔄 DESIGN-LOADER: Waiting for fabric... (${elapsed}ms)`);
+                    // Method 3: Check DOM for any canvas with __fabric
+                    const canvasElements = document.querySelectorAll('canvas');
+                    for (const canvas of canvasElements) {
+                        if (canvas.__fabric && canvas.__fabric.constructor) {
+                            debugLog('✅ DESIGN-LOADER: fabric available via DOM canvas after', elapsed, 'ms');
+                            if (!window.fabric) {
+                                try {
+                                    window.fabric = {
+                                        Canvas: canvas.__fabric.constructor,
+                                        Image: canvas.__fabric.constructor.Image || null,
+                                        Object: canvas.__fabric.constructor.Object || null
+                                    };
+                                    debugLog('🔧 DESIGN-LOADER: Extracted fabric from DOM canvas');
+                                } catch (e) {
+                                    debugWarn('⚠️ DESIGN-LOADER: Failed to extract fabric from DOM:', e.message);
+                                }
+                            }
+                            resolve();
+                            return;
+                        }
+                    }
+
+                    elapsed += checkInterval;
+                    if (elapsed >= maxWaitTime) {
+                        debugError('❌ DESIGN-LOADER: Enhanced fabric wait timeout after', maxWaitTime, 'ms');
+                        debugError('❌ DESIGN-LOADER: Final state check:');
+                        debugError('  - window.fabric:', typeof window.fabric);
+                        debugError('  - designerWidgetInstance:', !!window.designerWidgetInstance);
+                        debugError('  - canvas elements found:', canvasElements.length);
+                        debugError('  - total attempts:', attempts);
+                        reject(new Error('Enhanced fabric availability timeout'));
+                        return;
+                    }
+
+                    // Reduce log spam - only log every 5th attempt
+                    if (attempts % 5 === 0) {
+                        debugLog(`🔄 DESIGN-LOADER: Enhanced fabric detection... (${elapsed}ms, attempt ${attempts})`);
+                    }
                     setTimeout(checkFabric, checkInterval);
                 }
 
                 // Start checking immediately
                 checkFabric();
 
-                // Also listen for fabric ready event as backup
+                // Listen for fabric ready event with higher priority
                 window.addEventListener('fabricGlobalReady', function(event) {
-                    debugLog('✅ DESIGN-LOADER: Received fabricGlobalReady event');
-                    if (typeof window.fabric !== 'undefined') {
-                        resolve();
-                    }
+                    debugLog('✅ DESIGN-LOADER: Received fabricGlobalReady event from', event.detail?.source);
+                    resolve();
                 }, { once: true });
             });
         }
 
         try {
-            // BLOCKING wait - design-loader will NOT proceed until fabric is available
-            await blockingWaitForFabric();
-            debugLog('✅ DESIGN-LOADER: Fabric availability confirmed, proceeding...');
+            // Enhanced multi-method fabric detection
+            await waitForFabricMultiMethod();
+            debugLog('✅ DESIGN-LOADER: Fabric availability confirmed via enhanced detection');
+
+            // Verify fabric is actually functional
+            if (typeof window.fabric === 'undefined') {
+                throw new Error('Fabric resolved but window.fabric is still undefined');
+            }
+
+            debugLog('✅ DESIGN-LOADER: Fabric functional verification passed');
 
             // Now proceed with designer initialization
-            setTimeout(waitForDesigner, 100);
+            setTimeout(waitForDesigner, 500); // Slightly longer delay for stability
 
         } catch (error) {
-            debugError('❌ DESIGN-LOADER: Critical failure - fabric never became available:', error.message);
+            debugError('❌ DESIGN-LOADER: Enhanced detection failed:', error.message);
             debugError('❌ DESIGN-LOADER: Cannot proceed without fabric.js');
-            return; // Complete stop - do not retry
+
+            // Emergency fallback: try to proceed anyway for debugging
+            debugWarn('⚠️ DESIGN-LOADER: Attempting emergency fallback initialization...');
+            setTimeout(waitForDesigner, 1000);
         }
         
         // Zusätzlicher Check nach vollständigem Page Load

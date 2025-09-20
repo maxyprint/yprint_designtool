@@ -131,27 +131,101 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🚨 FABRIC EXPOSURE: Add inline script to expose fabric IMMEDIATELY after webpack loads
+        // 🚨 CRITICAL FABRIC EXPOSURE FIX: Expose fabric via DesignerWidget
         wp_add_inline_script('octo-print-designer-designer', '
-            // Immediate fabric exposure after webpack bundle loads
+            // Robust fabric exposure that works with webpack module system
             (function() {
-                if (typeof window.__webpack_require__ === "function") {
-                    try {
-                        const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
-                        if (fabricModule && typeof fabricModule.Canvas === "function" && !window.fabric) {
-                            window.fabric = fabricModule;
-                            console.log("🎯 FABRIC IMMEDIATE EXPOSURE: window.fabric available via inline script");
+                console.log("🔧 FABRIC EXPOSURE: Starting robust fabric extraction");
 
-                            // Trigger ready event for design-loader
-                            window.dispatchEvent(new CustomEvent("fabricGlobalReady", {
-                                detail: { fabric: window.fabric, source: "inline-exposure" }
-                            }));
+                let fabricExposed = false;
+                let retryCount = 0;
+                const maxRetries = 50; // 5 seconds maximum
+
+                function exposeFabricFromDesigner() {
+                    // Method 1: Extract from DesignerWidget instance if available
+                    if (window.designerWidgetInstance && window.designerWidgetInstance.fabricCanvas) {
+                        try {
+                            const canvasInstance = window.designerWidgetInstance.fabricCanvas;
+                            if (canvasInstance && canvasInstance.constructor) {
+                                // Extract fabric namespace from Canvas constructor
+                                const fabricNamespace = canvasInstance.constructor;
+
+                                // Build complete fabric object from Canvas constructor
+                                window.fabric = {
+                                    Canvas: fabricNamespace,
+                                    Image: fabricNamespace.Image || (canvasInstance.Image ? canvasInstance.Image.constructor : null),
+                                    Object: fabricNamespace.Object || (canvasInstance.Object ? canvasInstance.Object.constructor : null),
+                                    Text: fabricNamespace.Text || null,
+                                    IText: fabricNamespace.IText || null,
+                                    Group: fabricNamespace.Group || null,
+                                    util: fabricNamespace.util || {}
+                                };
+
+                                console.log("✅ FABRIC EXPOSURE: Extracted from DesignerWidget Canvas instance");
+                                fabricExposed = true;
+                                triggerFabricReady();
+                                return true;
+                            }
+                        } catch (error) {
+                            console.log("⚠️ FABRIC EXPOSURE: DesignerWidget extraction failed:", error.message);
                         }
-                    } catch (error) {
-                        console.warn("⚠️ FABRIC EXPOSURE: Inline exposure failed:", error.message);
                     }
-                } else {
-                    console.warn("⚠️ FABRIC EXPOSURE: __webpack_require__ not available in inline script");
+
+                    // Method 2: Look for any Canvas instances in DOM
+                    const canvasElements = document.querySelectorAll("canvas");
+                    for (const canvasEl of canvasElements) {
+                        if (canvasEl.__fabric && canvasEl.__fabric.constructor) {
+                            try {
+                                const CanvasConstructor = canvasEl.__fabric.constructor;
+                                window.fabric = {
+                                    Canvas: CanvasConstructor,
+                                    Image: CanvasConstructor.Image || null,
+                                    Object: CanvasConstructor.Object || null,
+                                    Text: CanvasConstructor.Text || null,
+                                    IText: CanvasConstructor.IText || null
+                                };
+                                console.log("✅ FABRIC EXPOSURE: Extracted from DOM Canvas element");
+                                fabricExposed = true;
+                                triggerFabricReady();
+                                return true;
+                            } catch (error) {
+                                console.log("⚠️ FABRIC EXPOSURE: DOM Canvas extraction failed:", error.message);
+                            }
+                        }
+                    }
+
+                    return false;
+                }
+
+                function triggerFabricReady() {
+                    window.dispatchEvent(new CustomEvent("fabricGlobalReady", {
+                        detail: { fabric: window.fabric, source: "robust-extraction" }
+                    }));
+                    console.log("🎉 FABRIC EXPOSURE: window.fabric successfully exposed and ready event dispatched");
+                }
+
+                function retryExposure() {
+                    if (fabricExposed || retryCount >= maxRetries) {
+                        if (!fabricExposed) {
+                            console.error("❌ FABRIC EXPOSURE: Failed after", maxRetries, "attempts");
+                        }
+                        return;
+                    }
+
+                    retryCount++;
+                    console.log("🔄 FABRIC EXPOSURE: Attempt", retryCount + "/" + maxRetries);
+
+                    if (exposeFabricFromDesigner()) {
+                        return; // Success
+                    }
+
+                    setTimeout(retryExposure, 100);
+                }
+
+                // Start immediately
+                if (!exposeFabricFromDesigner()) {
+                    // Retry with delays
+                    setTimeout(retryExposure, 100);
                 }
             })();
         ', 'after');
