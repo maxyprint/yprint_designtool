@@ -190,6 +190,21 @@
     // Execute immediately
     executeFabricFix();
 
+    // 🚨 CRITICAL: Immediate synchronous check for webpack modules
+    // This runs before other scripts to ensure fabric is available ASAP
+    if (typeof window.__webpack_require__ === 'function') {
+        try {
+            const fabricModule = window.__webpack_require__("./node_modules/fabric/dist/index.min.mjs");
+            if (fabricModule && typeof fabricModule.Canvas === 'function' && !window.fabric) {
+                window.fabric = fabricModule;
+                triggerFabricReadyEvent();
+                console.log('🎯 FABRIC EXPOSURE FIX: Immediate synchronous exposure successful');
+            }
+        } catch (error) {
+            // Silent fail - other methods will handle this
+        }
+    }
+
     // Retry on DOM changes (for dynamically loaded content)
     const observer = new MutationObserver(function(mutations) {
         if (!window.fabric) {

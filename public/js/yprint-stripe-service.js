@@ -109,6 +109,14 @@
         isReady() {
             return this.initialized;
         }
+
+        /**
+         * Check if service is initialized (alias for compatibility)
+         * Added to fix TypeError: window.YPrintStripeService.isInitialized is not a function
+         */
+        isInitialized() {
+            return this.initialized;
+        }
     }
 
     /**

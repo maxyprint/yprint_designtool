@@ -388,13 +388,34 @@
     function initializeDesignLoader() {
         debugLog('Initializing design loader...');
         
+        // 🚨 FIX: Event-based fabric.js dependency - eliminiert Race Condition
+        function listenForFabricReady() {
+            debugLog('🔄 DESIGN-LOADER FIX: Listening for fabric ready event');
+
+            window.addEventListener('fabricGlobalReady', function(event) {
+                debugLog('✅ DESIGN-LOADER FIX: Received fabricGlobalReady event', event.detail);
+                if (typeof window.fabric !== 'undefined') {
+                    debugLog('✅ DESIGN-LOADER FIX: window.fabric now available via event');
+                    setTimeout(waitForDesigner, 100);
+                }
+            }, { once: true });
+
+            // Fallback timeout if event never fires
+            setTimeout(() => {
+                if (typeof window.fabric === 'undefined') {
+                    debugLog('⚠️ DESIGN-LOADER FIX: Event timeout, falling back to polling');
+                    waitForDesignerWithTimeout();
+                }
+            }, 2000);
+        }
+
         // Prüfe ob window.fabric bereits verfügbar ist
         if (typeof window.fabric !== 'undefined') {
             debugLog('window.fabric already available at initialization');
             setTimeout(waitForDesigner, 100);
         } else {
-            debugLog('window.fabric not immediately available, starting polling...');
-            waitForDesignerWithTimeout();
+            debugLog('window.fabric not immediately available, using event-based loading...');
+            listenForFabricReady();
         }
         
         // Zusätzlicher Check nach vollständigem Page Load
