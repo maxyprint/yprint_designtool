@@ -10,27 +10,30 @@
     function hookTemplateEditor() {
         console.log('🎯 CANVAS HOOK: Setting up TemplateEditor hooks...');
 
-        // Method 0: Intercept Fabric.js Canvas constructor directly
+        // Method 0: Non-invasive Canvas instance detection via prototype monitoring
         if (window.fabric && window.fabric.Canvas) {
-            const originalCanvas = window.fabric.Canvas;
-            window.fabric.Canvas = function(...args) {
-                console.log('🎯 CANVAS HOOK: Fabric.Canvas constructor intercepted!', args);
-                const canvas = new originalCanvas(...args);
+            console.log('🎯 CANVAS HOOK: Setting up non-invasive canvas detection...');
 
-                if (!window.fabricCanvas) {
-                    console.log('✅ CANVAS HOOK: Setting fabricCanvas from constructor!');
-                    window.fabricCanvas = canvas;
-                    setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                            detail: { canvas: canvas, source: 'constructor' }
-                        }));
-                    }, 100);
-                }
-                return canvas;
-            };
-            // Copy static methods
-            Object.setPrototypeOf(window.fabric.Canvas, originalCanvas);
-            Object.assign(window.fabric.Canvas, originalCanvas);
+            // Monitor fabric.Canvas prototype for new instances
+            const originalInitialize = window.fabric.Canvas.prototype.initialize;
+            if (originalInitialize && typeof originalInitialize === 'function') {
+                window.fabric.Canvas.prototype.initialize = function(...args) {
+                    const result = originalInitialize.apply(this, args);
+
+                    // Track this canvas instance
+                    if (!window.fabricCanvas) {
+                        console.log('✅ CANVAS HOOK: Canvas instance detected via prototype!');
+                        window.fabricCanvas = this;
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                                detail: { canvas: this, source: 'prototype' }
+                            }));
+                        }, 100);
+                    }
+
+                    return result;
+                };
+            }
         }
 
         // Method 1: Hook into window.templateEditors when it's created
@@ -63,27 +66,33 @@
             configurable: true
         });
 
-        // Method 3: Override Map.prototype.set to catch editor additions
-        const originalMapSet = Map.prototype.set;
-        Map.prototype.set = function(key, value) {
-            const result = originalMapSet.call(this, key, value);
+        // Method 3: Safe Map monitoring without prototype modification
+        try {
+            const originalMapSet = Map.prototype.set;
+            if (originalMapSet && typeof originalMapSet === 'function') {
+                Map.prototype.set = function(key, value) {
+                    const result = originalMapSet.call(this, key, value);
 
-            // Check if this is the templateEditors map and the value has a canvas
-            if (this === window.templateEditors && value && value.canvas) {
-                console.log('🎯 CANVAS HOOK: New editor with canvas added to templateEditors!', key, value);
-                if (!window.fabricCanvas) {
-                    window.fabricCanvas = value.canvas;
-                    console.log('✅ CANVAS HOOK: Global fabricCanvas exposed!', window.fabricCanvas);
+                    // Check if this is the templateEditors map and the value has a canvas
+                    if (this === window.templateEditors && value && value.canvas) {
+                        console.log('🎯 CANVAS HOOK: New editor with canvas added to templateEditors!', key, value);
+                        if (!window.fabricCanvas) {
+                            window.fabricCanvas = value.canvas;
+                            console.log('✅ CANVAS HOOK: Global fabricCanvas exposed!', window.fabricCanvas);
 
-                    // Trigger custom event for reference line system
-                    window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                        detail: { canvas: value.canvas, editor: value }
-                    }));
-                }
+                            // Trigger custom event for reference line system
+                            window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                                detail: { canvas: value.canvas, editor: value }
+                            }));
+                        }
+                    }
+
+                    return result;
+                };
             }
-
-            return result;
-        };
+        } catch (error) {
+            console.log('🔶 CANVAS HOOK: Map.prototype.set override failed (readonly), using fallback polling');
+        }
     }
 
     function exposeFirstCanvas(editorsMap) {
@@ -104,19 +113,25 @@
     }
 
     function watchMapChanges(map) {
-        // Override set method for this specific map instance
-        const originalSet = map.set;
-        map.set = function(key, value) {
-            const result = originalSet.call(this, key, value);
-            if (value && value.canvas && !window.fabricCanvas) {
-                console.log('🎯 CANVAS HOOK: Canvas detected in map change!');
-                window.fabricCanvas = value.canvas;
-                window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                    detail: { canvas: value.canvas, editor: value }
-                }));
+        // Safe override of set method for this specific map instance
+        try {
+            const originalSet = map.set;
+            if (originalSet && typeof originalSet === 'function') {
+                map.set = function(key, value) {
+                    const result = originalSet.call(this, key, value);
+                    if (value && value.canvas && !window.fabricCanvas) {
+                        console.log('🎯 CANVAS HOOK: Canvas detected in map change!');
+                        window.fabricCanvas = value.canvas;
+                        window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                            detail: { canvas: value.canvas, editor: value }
+                        }));
+                    }
+                    return result;
+                };
             }
-            return result;
-        };
+        } catch (error) {
+            console.log('🔶 CANVAS HOOK: Map instance override failed (readonly), relying on polling');
+        }
     }
 
     // Polling fallback - check every 200ms for 30 seconds
