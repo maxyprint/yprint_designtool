@@ -95,10 +95,28 @@ class Octo_Print_Designer_Public {
             true
         );
         
+        // 🚨 CRITICAL FABRIC.JS EXPOSURE FIX - Issue #11
         wp_register_script(
-            'octo-print-designer-designer', 
+            'octo-print-designer-fabric-fix',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposure-fix.js',
+            [],
+            rand(),
+            true
+        );
+
+        // 🚨 CRITICAL STRIPE SERVICE FIX - Issue #11
+        wp_register_script(
+            'octo-print-designer-stripe-service',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
+            [],
+            rand(),
+            true
+        );
+
+        wp_register_script(
+            'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-products-listing-common'], // vendor bundle must load first
+            ['octo-print-designer-vendor', 'octo-print-designer-products-listing-common', 'octo-print-designer-fabric-fix', 'octo-print-designer-stripe-service'], // fixes must load first
             rand(),
             true
         );
