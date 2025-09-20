@@ -26,6 +26,10 @@ class Octo_Print_Designer_Admin {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_delete_reference_line', $this, 'delete_reference_line');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_calculate_size_factors', $this, 'calculate_size_factors');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_sizes_to_woocommerce', $this, 'sync_sizes_to_woocommerce');
+
+        // NEW: Canvas-Meta-Fields Synchronization Bridge
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_canvas_to_meta_fields', $this, 'sync_canvas_to_meta_fields');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_load_meta_fields_to_canvas', $this, 'load_meta_fields_to_canvas');
     
     }
 
@@ -91,10 +95,38 @@ class Octo_Print_Designer_Admin {
             true
         );
 
+        wp_enqueue_script(
+            'octo-canvas-meta-fields-sync',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-fields-sync.js',
+            ['octo-reference-line-system', 'octo-template-editor-canvas-hook', 'jquery'],
+            $this->version . '.1',
+            true
+        );
+
+        // 🧪 Load test suite in development mode (WP_DEBUG enabled)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            wp_enqueue_script(
+                'octo-canvas-meta-sync-tests',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-sync-test.js',
+                ['octo-canvas-meta-fields-sync', 'jquery'],
+                $this->version . '.1',
+                true
+            );
+        }
+
         wp_localize_script('octo-print-designer-admin', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('octo_print_designer_nonce'),
             'postId' => get_the_ID()
+        ]);
+
+        // NEW: Canvas-Meta-Fields Sync Configuration
+        wp_localize_script('octo-print-designer-admin', 'octoPrintDesignerSync', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'syncNonce' => wp_create_nonce('octo_canvas_meta_sync'),
+            'postId' => get_the_ID(),
+            'autoSyncEnabled' => true,
+            'debounceDelay' => 1000
         ]);
 
     }
@@ -385,5 +417,307 @@ class Octo_Print_Designer_Admin {
         ]);
 
         return $products;
+    }
+
+    /**
+     * 🚀 CANVAS-META-FIELDS SYNCHRONIZATION BRIDGE
+     * Automatic bidirectional sync between Canvas coordinates and WordPress Meta-Fields
+     * Eliminates manual JSON copy-paste workflow completely
+     */
+
+    /**
+     * Sync Canvas data to Meta-Fields automatically
+     * AJAX Handler: wp_ajax_sync_canvas_to_meta_fields
+     */
+    public function sync_canvas_to_meta_fields() {
+        // Enhanced security validation
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_canvas_meta_sync')) {
+            wp_send_json_error([
+                'message' => 'Security check failed',
+                'code' => 'SECURITY_FAILED'
+            ]);
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error([
+                'message' => 'Insufficient permissions',
+                'code' => 'PERMISSION_DENIED'
+            ]);
+            return;
+        }
+
+        $post_id = intval($_POST['post_id']);
+        $canvas_data = sanitize_textarea_field($_POST['canvas_data']);
+        $meta_fields_data = sanitize_textarea_field($_POST['meta_fields_data']);
+
+        if (!$post_id) {
+            wp_send_json_error([
+                'message' => 'Missing post ID',
+                'code' => 'MISSING_POST_ID'
+            ]);
+            return;
+        }
+
+        // Validate JSON data
+        $decoded_canvas = json_decode($canvas_data, true);
+        $decoded_meta = json_decode($meta_fields_data, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            wp_send_json_error([
+                'message' => 'Invalid JSON data: ' . json_last_error_msg(),
+                'code' => 'INVALID_JSON'
+            ]);
+            return;
+        }
+
+        // Validate Canvas data structure
+        if (!$this->validate_canvas_data($decoded_canvas)) {
+            wp_send_json_error([
+                'message' => 'Invalid Canvas data structure',
+                'code' => 'INVALID_CANVAS_DATA'
+            ]);
+            return;
+        }
+
+        // Save Canvas data (preserve existing functionality)
+        $existing_lines = get_post_meta($post_id, '_reference_lines_data', true);
+        if (!is_array($existing_lines)) {
+            $existing_lines = [];
+        }
+
+        // Add timestamp and source info
+        $decoded_canvas['timestamp'] = current_time('mysql');
+        $decoded_canvas['source'] = 'canvas_sync';
+        $existing_lines[] = $decoded_canvas;
+
+        update_post_meta($post_id, '_reference_lines_data', $existing_lines);
+
+        // 🎯 AUTO-POPULATE META-FIELDS (Eliminate manual entry)
+        $meta_updates = [];
+        foreach ($decoded_meta as $field_key => $field_value) {
+            $meta_key = '_' . sanitize_key($field_key);
+            $sanitized_value = is_string($field_value) ? sanitize_text_field($field_value) : $field_value;
+
+            update_post_meta($post_id, $meta_key, $sanitized_value);
+            $meta_updates[$field_key] = $sanitized_value;
+        }
+
+        // Auto-trigger size calculations if applicable
+        if (isset($decoded_canvas['referenceLines']) && !empty($decoded_canvas['referenceLines'])) {
+            $calculation_result = $this->auto_calculate_size_factors($post_id, $decoded_canvas);
+        }
+
+        // Success response with comprehensive data
+        wp_send_json_success([
+            'message' => 'Canvas synchronized to Meta-Fields successfully',
+            'meta_fields' => $meta_updates,
+            'canvas_data' => $decoded_canvas,
+            'reference_line_id' => count($existing_lines) - 1,
+            'calculation_triggered' => isset($calculation_result),
+            'timestamp' => current_time('c')
+        ]);
+    }
+
+    /**
+     * Load Meta-Fields data back to Canvas (reverse sync)
+     * AJAX Handler: wp_ajax_load_meta_fields_to_canvas
+     */
+    public function load_meta_fields_to_canvas() {
+        // Security validation
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_canvas_meta_sync')) {
+            wp_send_json_error([
+                'message' => 'Security check failed',
+                'code' => 'SECURITY_FAILED'
+            ]);
+            return;
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error([
+                'message' => 'Insufficient permissions',
+                'code' => 'PERMISSION_DENIED'
+            ]);
+            return;
+        }
+
+        $post_id = intval($_POST['post_id']);
+        if (!$post_id) {
+            wp_send_json_error([
+                'message' => 'Missing post ID',
+                'code' => 'MISSING_POST_ID'
+            ]);
+            return;
+        }
+
+        // Collect Meta-Fields data
+        $meta_data = [
+            'base_coordinate_x' => get_post_meta($post_id, '_base_coordinate_x', true),
+            'base_coordinate_y' => get_post_meta($post_id, '_base_coordinate_y', true),
+            'base_width' => get_post_meta($post_id, '_base_width', true),
+            'base_height' => get_post_meta($post_id, '_base_height', true),
+            'scalable_area_coordinates' => get_post_meta($post_id, '_scalable_area_coordinates', true),
+            'reference_lines_data' => get_post_meta($post_id, '_reference_lines_data', true),
+            'size_calculation_method' => get_post_meta($post_id, '_size_calculation_method', true)
+        ];
+
+        // Transform Meta-Fields data to Canvas format
+        $canvas_data = $this->transform_meta_fields_to_canvas($meta_data);
+
+        if (!$canvas_data) {
+            wp_send_json_error([
+                'message' => 'No valid Canvas data found in Meta-Fields',
+                'code' => 'NO_CANVAS_DATA'
+            ]);
+            return;
+        }
+
+        wp_send_json_success([
+            'message' => 'Meta-Fields data loaded for Canvas',
+            'canvas_data' => $canvas_data,
+            'meta_fields' => $meta_data,
+            'timestamp' => current_time('c')
+        ]);
+    }
+
+    /**
+     * Validate Canvas data structure for security and integrity
+     */
+    private function validate_canvas_data($data) {
+        if (!is_array($data)) {
+            return false;
+        }
+
+        // Define expected structure
+        $allowed_keys = ['referenceLines', 'scalableArea', 'baseCoordinates', 'baseDimensions', 'calculationMethod', 'timestamp', 'source'];
+
+        // Check for invalid keys
+        foreach (array_keys($data) as $key) {
+            if (!in_array($key, $allowed_keys)) {
+                error_log("Canvas data validation failed: unexpected key '$key'");
+                return false;
+            }
+        }
+
+        // Validate reference lines structure if present
+        if (isset($data['referenceLines']) && is_array($data['referenceLines'])) {
+            foreach ($data['referenceLines'] as $line) {
+                if (!isset($line['coordinates']) || !isset($line['type'])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Transform Meta-Fields data to Canvas-compatible format
+     */
+    private function transform_meta_fields_to_canvas($meta_data) {
+        $canvas_data = [];
+
+        // Transform base coordinates
+        if (!empty($meta_data['base_coordinate_x']) && !empty($meta_data['base_coordinate_y'])) {
+            $canvas_data['baseCoordinates'] = [
+                'x' => floatval($meta_data['base_coordinate_x']),
+                'y' => floatval($meta_data['base_coordinate_y'])
+            ];
+        }
+
+        // Transform base dimensions
+        if (!empty($meta_data['base_width']) && !empty($meta_data['base_height'])) {
+            $canvas_data['baseDimensions'] = [
+                'width' => floatval($meta_data['base_width']),
+                'height' => floatval($meta_data['base_height'])
+            ];
+        }
+
+        // Transform scalable area
+        if (!empty($meta_data['scalable_area_coordinates'])) {
+            $scalable_area = json_decode($meta_data['scalable_area_coordinates'], true);
+            if ($scalable_area && json_last_error() === JSON_ERROR_NONE) {
+                $canvas_data['scalableArea'] = $scalable_area;
+            }
+        }
+
+        // Transform reference lines
+        if (!empty($meta_data['reference_lines_data'])) {
+            if (is_array($meta_data['reference_lines_data'])) {
+                $canvas_data['referenceLines'] = $meta_data['reference_lines_data'];
+            } else {
+                $reference_lines = json_decode($meta_data['reference_lines_data'], true);
+                if ($reference_lines && json_last_error() === JSON_ERROR_NONE) {
+                    $canvas_data['referenceLines'] = $reference_lines;
+                }
+            }
+        }
+
+        // Add calculation method
+        if (!empty($meta_data['size_calculation_method'])) {
+            $canvas_data['calculationMethod'] = $meta_data['size_calculation_method'];
+        }
+
+        return !empty($canvas_data) ? $canvas_data : null;
+    }
+
+    /**
+     * Auto-trigger size factor calculations (enhanced version)
+     */
+    private function auto_calculate_size_factors($post_id, $canvas_data) {
+        if (!isset($canvas_data['referenceLines']) || empty($canvas_data['referenceLines'])) {
+            return false;
+        }
+
+        // Get existing size definitions
+        $size_definitions = get_post_meta($post_id, '_size_definitions', true);
+        if (!is_array($size_definitions) || empty($size_definitions)) {
+            // Create default size definitions if none exist
+            $size_definitions = [
+                ['size' => 'S', 'target_mm' => 400, 'reference_type' => 0],
+                ['size' => 'M', 'target_mm' => 450, 'reference_type' => 0],
+                ['size' => 'L', 'target_mm' => 500, 'reference_type' => 0],
+                ['size' => 'XL', 'target_mm' => 550, 'reference_type' => 0]
+            ];
+            update_post_meta($post_id, '_size_definitions', $size_definitions);
+        }
+
+        // Calculate size factors using existing logic
+        $size_calculations = [];
+        foreach ($size_definitions as $size_def) {
+            if (empty($size_def['size']) || empty($size_def['target_mm'])) {
+                continue;
+            }
+
+            $reference_index = intval($size_def['reference_type']);
+            if (!isset($canvas_data['referenceLines'][$reference_index])) {
+                continue;
+            }
+
+            $reference_line = $canvas_data['referenceLines'][$reference_index];
+            $target_mm = floatval($size_def['target_mm']);
+            $reference_mm = $this->estimate_reference_measurement($reference_line, $target_mm);
+            $scale_factor = $target_mm / $reference_mm;
+
+            $size_calculations[] = [
+                'size' => sanitize_text_field($size_def['size']),
+                'target_mm' => $target_mm,
+                'reference_mm' => $reference_mm,
+                'scale_factor' => $scale_factor,
+                'reference_index' => $reference_index,
+                'reference_type' => $reference_line['type'] ?? 'unknown',
+                'auto_calculated' => true,
+                'timestamp' => current_time('mysql')
+            ];
+        }
+
+        // Save calculations
+        if (!empty($size_calculations)) {
+            update_post_meta($post_id, '_size_calculations', $size_calculations);
+            return true;
+        }
+
+        return false;
     }
 }

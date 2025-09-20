@@ -1289,6 +1289,123 @@ class Octo_Print_Designer_Template {
                    <?php esc_html_e('Per design template, you can choose which calculation method to use. Both sets of fields can be filled for maximum flexibility.', 'octo-print-designer'); ?>
                 </p>
             </div>
+
+            <!-- 🚀 CANVAS-META-FIELDS SYNCHRONIZATION BRIDGE -->
+            <div id="canvas-meta-sync-container" class="canvas-sync-section">
+                <h3><?php esc_html_e('🔄 Canvas-Meta-Fields Synchronization', 'octo-print-designer'); ?></h3>
+                <div class="sync-controls">
+                    <p class="description">
+                        <?php esc_html_e('Automatically sync coordinates between the Canvas editor and Meta-Fields below. This eliminates manual JSON copy-paste.', 'octo-print-designer'); ?>
+                    </p>
+
+                    <div class="sync-buttons">
+                        <button id="sync-canvas-to-meta" class="button button-primary" type="button">
+                            <span class="dashicons dashicons-download"></span>
+                            <?php esc_html_e('Sync from Canvas', 'octo-print-designer'); ?>
+                        </button>
+                        <button id="sync-meta-to-canvas" class="button button-secondary" type="button">
+                            <span class="dashicons dashicons-upload"></span>
+                            <?php esc_html_e('Load to Canvas', 'octo-print-designer'); ?>
+                        </button>
+                    </div>
+
+                    <div class="sync-options">
+                        <label>
+                            <input type="checkbox" id="auto-sync-toggle" checked>
+                            <?php esc_html_e('Auto-sync when Canvas changes', 'octo-print-designer'); ?>
+                        </label>
+                    </div>
+
+                    <div id="sync-status" class="sync-status info">
+                        <?php esc_html_e('Sync bridge ready - make changes in Canvas to see automatic synchronization', 'octo-print-designer'); ?>
+                    </div>
+                </div>
+
+                <!-- Canvas-Sync Meta-Fields (Auto-populated, Read-only) -->
+                <h4><?php esc_html_e('Canvas Coordinate Fields (Auto-populated)', 'octo-print-designer'); ?></h4>
+                <table class="form-table canvas-sync-fields">
+                    <tr>
+                        <th scope="row">
+                            <label for="base_coordinate_x"><?php esc_html_e('Base Coordinate X', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="base_coordinate_x" name="base_coordinate_x"
+                                   value="<?php echo esc_attr(get_post_meta($post->ID, '_base_coordinate_x', true)); ?>"
+                                   class="regular-text readonly-meta-field" readonly />
+                            <p class="description"><?php esc_html_e('X coordinate of base position (auto-synced from Canvas)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="base_coordinate_y"><?php esc_html_e('Base Coordinate Y', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="base_coordinate_y" name="base_coordinate_y"
+                                   value="<?php echo esc_attr(get_post_meta($post->ID, '_base_coordinate_y', true)); ?>"
+                                   class="regular-text readonly-meta-field" readonly />
+                            <p class="description"><?php esc_html_e('Y coordinate of base position (auto-synced from Canvas)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="base_width"><?php esc_html_e('Base Width', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="base_width" name="base_width"
+                                   value="<?php echo esc_attr(get_post_meta($post->ID, '_base_width', true)); ?>"
+                                   class="regular-text readonly-meta-field" readonly />
+                            <p class="description"><?php esc_html_e('Canvas width dimension (auto-synced)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="base_height"><?php esc_html_e('Base Height', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="base_height" name="base_height"
+                                   value="<?php echo esc_attr(get_post_meta($post->ID, '_base_height', true)); ?>"
+                                   class="regular-text readonly-meta-field" readonly />
+                            <p class="description"><?php esc_html_e('Canvas height dimension (auto-synced)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="scalable_area_coordinates"><?php esc_html_e('Scalable Area Coordinates', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <textarea id="scalable_area_coordinates" name="scalable_area_coordinates"
+                                      rows="3" class="large-text code readonly-meta-field" readonly><?php echo esc_textarea(get_post_meta($post->ID, '_scalable_area_coordinates', true)); ?></textarea>
+                            <p class="description"><?php esc_html_e('JSON coordinates of scalable design area (auto-synced from Canvas)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="reference_lines_data_display"><?php esc_html_e('Reference Lines Data', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <textarea id="reference_lines_data_display" name="reference_lines_data_display"
+                                      rows="5" class="large-text code readonly-meta-field" readonly><?php echo esc_textarea(json_encode(get_post_meta($post->ID, '_reference_lines_data', true), JSON_PRETTY_PRINT)); ?></textarea>
+                            <p class="description"><?php esc_html_e('Reference lines coordinate data (auto-synced from Canvas)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="size_calculation_method"><?php esc_html_e('Size Calculation Method', 'octo-print-designer'); ?></label>
+                        </th>
+                        <td>
+                            <select id="size_calculation_method" name="size_calculation_method" class="regular-text">
+                                <option value="reference_lines" <?php selected(get_post_meta($post->ID, '_size_calculation_method', true), 'reference_lines'); ?>>
+                                    <?php esc_html_e('Reference Lines', 'octo-print-designer'); ?>
+                                </option>
+                                <option value="scalable_area" <?php selected(get_post_meta($post->ID, '_size_calculation_method', true), 'scalable_area'); ?>>
+                                    <?php esc_html_e('Scalable Area', 'octo-print-designer'); ?>
+                                </option>
+                            </select>
+                            <p class="description"><?php esc_html_e('Method used for size calculations (can be manually selected)', 'octo-print-designer'); ?></p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <style>
@@ -1313,6 +1430,78 @@ class Octo_Print_Designer_Template {
             }
             .data-foundation-note p {
                 margin: 0;
+            }
+
+            /* 🚀 Canvas-Meta-Fields Sync Styles */
+            .canvas-sync-section {
+                background: #f0f8ff;
+                padding: 20px;
+                border: 2px solid #0073aa;
+                border-radius: 8px;
+                margin-top: 25px;
+            }
+            .canvas-sync-section h3 {
+                color: #0073aa;
+                margin-top: 0;
+                font-size: 18px;
+            }
+            .sync-controls {
+                margin-bottom: 20px;
+            }
+            .sync-buttons {
+                margin: 15px 0;
+            }
+            .sync-buttons button {
+                margin-right: 10px;
+                min-width: 140px;
+            }
+            .sync-options {
+                margin: 10px 0;
+                font-size: 13px;
+            }
+            .sync-status {
+                margin-top: 15px;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: 500;
+                min-height: 20px;
+            }
+            .sync-status.success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .sync-status.error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .sync-status.info {
+                background: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            .sync-status.warning {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            .readonly-meta-field {
+                background-color: #f9f9f9 !important;
+                border: 1px solid #ccc !important;
+                cursor: not-allowed;
+                color: #666;
+            }
+            .canvas-sync-fields h4 {
+                color: #0073aa;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 5px;
+            }
+            .field-updated {
+                background-color: #d4edda !important;
+                border-color: #c3e6cb !important;
+                transition: all 0.3s ease;
             }
         </style>
         <?php
