@@ -840,8 +840,8 @@
                 }
 
                 let attempts = 0;
-                const maxAttempts = 15; // Reduced from 50 to prevent spam
-                const baseDelay = 200; // Increased from 100ms to reduce frequency
+                const maxAttempts = 40; // Increased for async initialization detection
+                const baseDelay = 100; // More frequent checking for better responsiveness
                 let pollInterval = null;
 
                 const poll = () => {

@@ -52,6 +52,14 @@ class Octo_Print_Designer_Admin {
         );
 
         wp_enqueue_script(
+            'octo-jquery-ui-compat-fix',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/jquery-ui-compat-fix.js',
+            ['jquery'],
+            $this->version . '.1',
+            true
+        );
+
+        wp_enqueue_script(
             'octo-fabric-global-exposure',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
             ['octo-print-designer-admin', 'jquery'],

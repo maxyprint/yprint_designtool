@@ -134,64 +134,103 @@
         }
     }
 
-    // Polling fallback - check every 200ms for 30 seconds
+    // Enhanced polling with fabric instance validation and DOM Ready detection
     function startPollingFallback() {
-        console.log('🎯 CANVAS HOOK: Starting polling fallback...');
+        console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        const maxAttempts = 150; // 30 seconds
+        const maxAttempts = 200; // 40 seconds - extended for async initialization
+        const pollInterval = 50; // More frequent polling - every 50ms
 
-        const pollInterval = setInterval(() => {
+        const poll = setInterval(() => {
             attempts++;
 
-            // Check templateEditors
+            // 1. Check templateEditors with full validation
             if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
                 for (const [key, editor] of window.templateEditors.entries()) {
-                    if (editor && editor.canvas && !window.fabricCanvas) {
-                        console.log('✅ CANVAS HOOK: Found canvas via polling!', key);
+                    if (editor && editor.canvas &&
+                        typeof editor.canvas.add === 'function' &&
+                        typeof editor.canvas.getObjects === 'function' &&
+                        !window.fabricCanvas) {
+                        console.log('✅ CANVAS HOOK: Found validated canvas via templateEditors!', key);
                         window.fabricCanvas = editor.canvas;
                         window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                            detail: { canvas: editor.canvas, editor: editor }
+                            detail: { canvas: editor.canvas, editor: editor, source: 'templateEditors' }
                         }));
-                        clearInterval(pollInterval);
+                        clearInterval(poll);
                         return;
                     }
                 }
             }
 
-            // Check variationsManager
+            // 2. Check variationsManager with full validation
             if (window.variationsManager && window.variationsManager.editors instanceof Map) {
                 for (const [key, editor] of window.variationsManager.editors.entries()) {
-                    if (editor && editor.canvas && !window.fabricCanvas) {
-                        console.log('✅ CANVAS HOOK: Found canvas via variationsManager polling!', key);
+                    if (editor && editor.canvas &&
+                        typeof editor.canvas.add === 'function' &&
+                        typeof editor.canvas.getObjects === 'function' &&
+                        !window.fabricCanvas) {
+                        console.log('✅ CANVAS HOOK: Found validated canvas via variationsManager!', key);
                         window.fabricCanvas = editor.canvas;
                         window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                            detail: { canvas: editor.canvas, editor: editor }
+                            detail: { canvas: editor.canvas, editor: editor, source: 'variationsManager' }
                         }));
-                        clearInterval(pollInterval);
+                        clearInterval(poll);
                         return;
                     }
                 }
             }
 
-            // Check canvas elements directly
+            // 3. Check canvas elements with fabric validation
             const canvasElements = document.querySelectorAll('canvas');
             for (const canvas of canvasElements) {
-                if (canvas.__fabric && !window.fabricCanvas) {
-                    console.log('✅ CANVAS HOOK: Found fabric canvas via direct polling!');
+                if (canvas.__fabric &&
+                    typeof canvas.__fabric.add === 'function' &&
+                    typeof canvas.__fabric.getObjects === 'function' &&
+                    !window.fabricCanvas) {
+                    console.log('✅ CANVAS HOOK: Found validated fabric canvas via DOM!');
                     window.fabricCanvas = canvas.__fabric;
                     window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
-                        detail: { canvas: canvas.__fabric, editor: null }
+                        detail: { canvas: canvas.__fabric, editor: null, source: 'domFabric' }
                     }));
-                    clearInterval(pollInterval);
+                    clearInterval(poll);
                     return;
                 }
             }
 
-            if (attempts >= maxAttempts) {
-                console.warn('🔶 CANVAS HOOK: Polling timeout after 30 seconds');
-                clearInterval(pollInterval);
+            // 4. Check fabric.Canvas.getInstances() if available
+            if (window.fabric && typeof window.fabric.Canvas?.getInstances === 'function') {
+                const instances = window.fabric.Canvas.getInstances();
+                if (instances && instances.length > 0 && !window.fabricCanvas) {
+                    const canvas = instances[0];
+                    if (typeof canvas.add === 'function' && typeof canvas.getObjects === 'function') {
+                        console.log('✅ CANVAS HOOK: Found validated canvas via fabric.Canvas.getInstances()!');
+                        window.fabricCanvas = canvas;
+                        window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                            detail: { canvas: canvas, editor: null, source: 'fabricInstances' }
+                        }));
+                        clearInterval(poll);
+                        return;
+                    }
+                }
             }
-        }, 200);
+
+            // Enhanced logging every 2 seconds instead of every attempt
+            if (attempts % 40 === 0) {
+                console.log(`🔄 CANVAS HOOK: Polling attempt ${attempts}/${maxAttempts} - Checking fabric instances...`);
+            }
+
+            if (attempts >= maxAttempts) {
+                console.error('🚨 CANVAS HOOK: CRITICAL - Polling timeout after 40 seconds');
+                console.error('🔍 Final state debug:', {
+                    fabricAvailable: !!window.fabric,
+                    templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not-map',
+                    variationsManager: !!window.variationsManager,
+                    canvasElements: document.querySelectorAll('canvas').length,
+                    fabricInstances: window.fabric?.Canvas?.getInstances?.()?.length || 0
+                });
+                clearInterval(poll);
+            }
+        }, pollInterval);
     }
 
     // Wait for Fabric.js to be available
