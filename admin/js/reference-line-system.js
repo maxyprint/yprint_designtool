@@ -24,39 +24,107 @@
         }
 
         init() {
+            console.log('🔍 REFERENCE LINE SYSTEM: Initializing with CASCADE ELIMINATION...');
             this.bindEvents();
             this.setupModal();
+
+            // 🚨 CASCADE ELIMINATION: Primary event-driven approach FIRST
+            this.setupEventDrivenCanvasDetection();
+
+            // 🚨 FALLBACK ONLY: Traditional detection as backup
             this.setupCanvasDetection();
-            this.setupCanvasReadyListener();
         }
 
-        setupCanvasReadyListener() {
-            // Listen for the custom event from the canvas hook
-            window.addEventListener('fabricCanvasReady', (event) => {
-                console.log('🎯 REFERENCE LINE: Received fabricCanvasReady event!', event.detail);
-                if (event.detail.canvas && !this.canvas) {
-                    this.canvas = event.detail.canvas;
-                    window.fabricCanvas = event.detail.canvas;
-                    console.log('✅ REFERENCE LINE: Canvas set from custom event!');
+        setupEventDrivenCanvasDetection() {
+            // 🚨 CASCADE ELIMINATION: Single unified event handler to replace duplicate listeners
+            if (window.eventDrivenCanvasListenerActive) {
+                console.log('🛡️ Event-driven canvas listener already active - skipping');
+                return;
+            }
+            window.eventDrivenCanvasListenerActive = true;
 
-                    // If we're currently trying to start reference line creation, continue
-                    if (this.isWaitingForCanvas) {
-                        this.isWaitingForCanvas = false;
-                        console.log('🚀 REFERENCE LINE: Continuing delayed reference line creation...');
-                        setTimeout(() => this.startReferenceLineCreation(), 100);
-                    }
-                }
-            });
+            console.log('🎯 EVENT-DRIVEN: Setting up unified canvas detection listeners...');
 
-            // Listen for the new global fabric ready event
+            // Primary: fabricGlobalReady event from admin.bundle.js
             window.addEventListener('fabricGlobalReady', (event) => {
                 console.log('🎯 REFERENCE LINE: Received fabricGlobalReady event!', event.detail);
-                if (event.detail.fabric && !this.fabric) {
-                    this.fabric = event.detail.fabric;
-                    window.fabric = event.detail.fabric;
-                    console.log('✅ REFERENCE LINE: Global fabric set from exposure event!');
-                }
+                this.handleCanvasEvent(event.detail, 'fabricGlobalReady');
             });
+
+            // Secondary: fabricCanvasReady event (existing)
+            window.addEventListener('fabricCanvasReady', (event) => {
+                console.log('🎯 REFERENCE LINE: Received fabricCanvasReady event!', event.detail);
+                this.handleCanvasEvent(event.detail, 'fabricCanvasReady');
+            });
+        }
+
+        handleCanvasEvent(eventDetail, eventType) {
+            // 🛡️ GUARD: Prevent multiple processing if already found
+            if (window.canvasDetectionCompleted || this.canvas) {
+                console.log('🛡️ Canvas already found - ignoring additional events');
+                return;
+            }
+
+            let canvas = null;
+
+            // Extract canvas from event detail
+            if (eventDetail && eventDetail.canvas) {
+                canvas = eventDetail.canvas;
+                console.log(`✅ REFERENCE LINE: Canvas found via ${eventType} event!`);
+            } else if (eventType === 'fabricGlobalReady' && eventDetail.fabric) {
+                // For fabricGlobalReady, set fabric and try to find canvas
+                this.fabric = eventDetail.fabric;
+                window.fabric = eventDetail.fabric;
+                console.log('✅ REFERENCE LINE: Global fabric set from exposure event!');
+                canvas = this.findCanvasUsingFabric();
+            }
+
+            if (canvas) {
+                this.canvas = canvas;
+                window.fabricCanvas = canvas;
+                window.canvasDetectionCompleted = true;
+                console.log('✅ REFERENCE LINE: Canvas set from event-driven detection!');
+                this.stopAllDetectionMethods();
+
+                // Handle delayed reference line creation
+                if (this.isWaitingForCanvas) {
+                    this.isWaitingForCanvas = false;
+                    console.log('🚀 REFERENCE LINE: Continuing delayed reference line creation...');
+                    setTimeout(() => this.startReferenceLineCreation(), 100);
+                }
+
+                this.onCanvasReady && this.onCanvasReady();
+            }
+        }
+
+        stopAllDetectionMethods() {
+            console.log('🛡️ EVENT-DRIVEN: Stopping all polling/detection methods...');
+
+            // Clear any polling intervals
+            if (this.editorCheckInterval) {
+                clearInterval(this.editorCheckInterval);
+            }
+
+            // Disconnect MutationObserver
+            if (this.mutationObserver) {
+                this.mutationObserver.disconnect();
+                window.mutationObserverActive = false;
+            }
+
+            // Mark all detection as completed
+            window.canvasDetectionInitialized = true;
+            window.canvasDetectionCompleted = true;
+        }
+
+        findCanvasUsingFabric() {
+            if (this.fabric && this.fabric.Canvas && this.fabric.Canvas.getInstances) {
+                const instances = this.fabric.Canvas.getInstances();
+                if (instances && instances.length > 0) {
+                    console.log('✅ REFERENCE LINE: Canvas found via fabric.Canvas.getInstances()!');
+                    return instances[0];
+                }
+            }
+            return null;
         }
 
         setupCanvasDetection() {
@@ -67,46 +135,83 @@
         }
 
         setupTemplateEditorHook() {
-            // Hook into window object to catch template editor creation
-            const originalObjectDefineProperty = Object.defineProperty;
+            // 🚨 CASCADE ELIMINATION: Singleton guard to prevent multiple initialization
+            if (window.canvasDetectionInitialized) {
+                console.log('🛡️ Canvas detection already initialized - skipping');
+                return;
+            }
+            window.canvasDetectionInitialized = true;
+
             const self = this;
+            let detectionCompleted = false;
 
             // Watch for templateEditors Map creation
             const checkForEditors = () => {
+                // 🛡️ GUARD: Prevent multiple executions after success
+                if (detectionCompleted) return false;
+
                 if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
-                    console.log('🎯 DETECTED templateEditors Map creation!');
+                    console.log('🎯 DETECTED templateEditors Map creation! (SINGLETON MODE)');
+                    detectionCompleted = true;
                     self.checkCanvasFromEditors();
+                    return true;
                 } else if (window.variationsManager && window.variationsManager.editors) {
-                    console.log('🎯 DETECTED variationsManager creation!');
+                    console.log('🎯 DETECTED variationsManager creation! (SINGLETON MODE)');
+                    detectionCompleted = true;
                     self.checkCanvasFromEditors();
+                    return true;
                 }
+                return false;
             };
 
-            // Poll for template editors
+            // 🚨 CASCADE ELIMINATION: Single execution poll with proper termination
             const editorCheckInterval = setInterval(() => {
-                checkForEditors();
-                if (this.canvas) {
+                const found = checkForEditors();
+                if (found || this.canvas || detectionCompleted) {
+                    console.log('🛡️ Stopping canvas detection interval - success or completion');
                     clearInterval(editorCheckInterval);
                 }
             }, 100);
 
-            // Clear interval after 30 seconds to prevent memory leak
-            setTimeout(() => clearInterval(editorCheckInterval), 30000);
+            // 🚨 FAILSAFE: Clear interval after 10 seconds (reduced from 30s)
+            setTimeout(() => {
+                if (editorCheckInterval) {
+                    console.log('🚨 Canvas detection timeout - clearing interval');
+                    clearInterval(editorCheckInterval);
+                }
+            }, 10000);
         }
 
         async checkCanvasFromEditors() {
             const foundCanvas = await this.findCanvasInstance();
             if (foundCanvas) {
-                console.log('✅ Canvas found via editor detection!');
+                console.log('✅ Canvas found via editor detection! (CASCADE SAFE)');
                 this.canvas = foundCanvas;
+                // 🚨 CASCADE ELIMINATION: Mark detection as completed globally
+                window.canvasDetectionCompleted = true;
                 // Notify any waiting processes
                 this.onCanvasReady && this.onCanvasReady();
             }
         }
 
         setupMutationObserver() {
+            // 🚨 CASCADE ELIMINATION: Prevent multiple observers
+            if (window.mutationObserverActive) {
+                console.log('🛡️ MutationObserver already active - skipping setup');
+                return;
+            }
+            window.mutationObserverActive = true;
+
             // Set up MutationObserver to detect when canvas is added to DOM
             this.mutationObserver = new MutationObserver((mutations) => {
+                // 🛡️ GUARD: Stop if canvas already found
+                if (window.canvasDetectionCompleted || this.canvas) {
+                    console.log('🛡️ Canvas already found - disconnecting MutationObserver');
+                    this.mutationObserver.disconnect();
+                    window.mutationObserverActive = false;
+                    return;
+                }
+
                 for (let mutation of mutations) {
                     if (mutation.type === 'childList') {
                         const addedNodes = Array.from(mutation.addedNodes);
@@ -114,13 +219,13 @@
                             if (node.nodeType === Node.ELEMENT_NODE) {
                                 // Check if a canvas was added
                                 if (node.tagName === 'CANVAS') {
-                                    console.log('🔍 MutationObserver: Canvas element added to DOM', node);
+                                    console.log('🔍 MutationObserver: Canvas element added to DOM (SINGLETON)', node);
                                     this.checkCanvasForFabric(node);
                                 }
                                 // Check if any child contains a canvas
                                 const canvasElements = node.querySelectorAll && node.querySelectorAll('canvas');
                                 if (canvasElements && canvasElements.length > 0) {
-                                    console.log('🔍 MutationObserver: Canvas found in added element', canvasElements);
+                                    console.log('🔍 MutationObserver: Canvas found in added element (SINGLETON)', canvasElements);
                                     canvasElements.forEach(canvas => this.checkCanvasForFabric(canvas));
                                 }
                             }
