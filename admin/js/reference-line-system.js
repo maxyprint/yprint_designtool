@@ -92,8 +92,8 @@
             setTimeout(() => clearInterval(editorCheckInterval), 30000);
         }
 
-        checkCanvasFromEditors() {
-            const foundCanvas = this.findCanvasInstance();
+        async checkCanvasFromEditors() {
+            const foundCanvas = await this.findCanvasInstance();
             if (foundCanvas) {
                 console.log('✅ Canvas found via editor detection!');
                 this.canvas = foundCanvas;
@@ -349,7 +349,7 @@
             }, 100);
         }
 
-        startReferenceLineCreation() {
+        async startReferenceLineCreation() {
             this.isActive = true;
             this.clickCount = 0;
 
@@ -358,7 +358,7 @@
             $('[data-mode="referenceline"]').addClass('active');
 
             // Get the canvas instance (improve detection)
-            this.canvas = this.findCanvasInstance();
+            this.canvas = await this.findCanvasInstance();
 
             if (!this.canvas) {
                 console.log('🎯 REFERENCE LINE: No canvas found, setting waiting flag...');
@@ -384,7 +384,7 @@
             this.addCanvasListeners();
         }
 
-        findCanvasInstance() {
+        async findCanvasInstance() {
             console.log('🚀 STARTING CANVAS DETECTION - Attempt:', this.retryAttempts || 0);
 
             // Method 1: Check for globally exposed canvas
@@ -515,11 +515,15 @@
 
             // Method 8: Get existing canvas instance from templateEditors/variationsManager
             // 🚨 FIXED: No longer trying to create new canvas instance - integrate with existing
-            const existingCanvas = this.getExistingCanvasInstance();
-            if (existingCanvas) {
-                console.log('✅ FOUND EXISTING CANVAS INSTANCE - INTEGRATING!', existingCanvas);
-                window.fabricCanvas = existingCanvas;
-                return existingCanvas;
+            try {
+                const existingCanvas = await this.getExistingCanvasInstance();
+                if (existingCanvas) {
+                    console.log('✅ FOUND EXISTING CANVAS INSTANCE - INTEGRATING!', existingCanvas);
+                    window.fabricCanvas = existingCanvas;
+                    return existingCanvas;
+                }
+            } catch (error) {
+                console.log('❌ Error in canvas detection:', error);
             }
 
             // Method 9: Wait and retry if we haven't exceeded attempts
@@ -557,10 +561,23 @@
             return null;
         }
 
-        // 🎯 NEW METHOD: Get existing canvas instance instead of creating new one
-        getExistingCanvasInstance() {
-            console.log('🔍 SEARCHING FOR EXISTING CANVAS INSTANCES...');
+        // 🎯 ROBUST WAIT STRATEGY: Intelligent canvas instance detection with timing
+        async getExistingCanvasInstance() {
+            console.log('🔍 SEARCHING FOR EXISTING CANVAS INSTANCES (ROBUST MODE)...');
 
+            // First, try immediate detection
+            const immediateCanvas = this.tryCanvasDetection();
+            if (immediateCanvas) {
+                return immediateCanvas;
+            }
+
+            // If immediate detection fails, use intelligent polling
+            console.log('⏳ IMMEDIATE DETECTION FAILED - Starting intelligent polling...');
+            return await this.waitForCanvasWithIntelligentPolling();
+        }
+
+        // Try canvas detection without waiting
+        tryCanvasDetection() {
             // Method A: Check templateEditors Map
             if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
                 console.log('🔍 Found templateEditors Map with', window.templateEditors.size, 'editors');
@@ -589,8 +606,49 @@
                 return window.fabricCanvas;
             }
 
-            console.log('❌ NO EXISTING CANVAS INSTANCE FOUND');
             return null;
+        }
+
+        // Intelligent polling strategy with progressive delays
+        async waitForCanvasWithIntelligentPolling() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 50; // Increased from 20
+                const baseDelay = 100; // Start with 100ms
+
+                const poll = () => {
+                    attempts++;
+                    console.log(`🔄 Canvas polling attempt ${attempts}/${maxAttempts}`);
+
+                    const canvas = this.tryCanvasDetection();
+                    if (canvas) {
+                        console.log('✅ CANVAS FOUND via intelligent polling!');
+                        resolve(canvas);
+                        return;
+                    }
+
+                    // Log what we're finding for debugging
+                    console.log('🔍 Polling status:', {
+                        templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not found',
+                        variationsManager: window.variationsManager ? 'exists' : 'not found',
+                        variationsManagerEditors: window.variationsManager?.editors instanceof Map ? window.variationsManager.editors.size : 'not found',
+                        fabricCanvas: window.fabricCanvas ? 'exists' : 'not found'
+                    });
+
+                    if (attempts >= maxAttempts) {
+                        console.log('❌ INTELLIGENT POLLING TIMEOUT - Canvas not found after', maxAttempts, 'attempts');
+                        resolve(null);
+                        return;
+                    }
+
+                    // Progressive delay: 100ms, 200ms, 300ms, ..., max 1000ms
+                    const delay = Math.min(baseDelay * attempts, 1000);
+                    setTimeout(poll, delay);
+                };
+
+                // Start polling
+                poll();
+            });
         }
 
         findCanvasElementForFabric() {
