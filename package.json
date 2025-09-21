@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node websocket-server.js",
     "dev": "nodemon websocket-server.js",
-    "test": "node test-websocket-client.js"
+    "test": "node test-websocket-client.js",
+    "test:enhanced": "node test-enhanced-websocket-integration.js",
+    "test:all": "npm test && npm run test:enhanced",
+    "docs": "echo 'Documentation: docs/WEBSOCKET-AI-TESTING-DOCUMENTATION.md'"
   },
   "dependencies": {
     "ws": "^8.14.0"

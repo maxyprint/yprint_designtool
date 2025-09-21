@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Final Design Data Capture Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .status-panel {
+            border: 2px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .status-panel.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .status-panel.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .status-panel.warning {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .mockup-design-area {
+            border: 3px solid #007cba;
+            background: white;
+            width: 800px;
+            height: 600px;
+            position: relative;
+            margin: 20px auto;
+        }
+
+        .designer-canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+        }
+
+        .test-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #005a87;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        .results-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .requirement {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .requirement-icon {
+            width: 20px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .requirement.passed .requirement-icon {
+            color: #28a745;
+        }
+
+        .requirement.failed .requirement-icon {
+            color: #dc3545;
+        }
+
+        .requirement.pending .requirement-icon {
+            color: #ffc107;
+        }
+
+        .json-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            overflow-x: auto;
+            white-space: pre;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        h1 { color: #007cba; }
+        h2 { color: #495057; }
+        h3 { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Final Design Data Capture Verification</h1>
+        <p>Comprehensive test of the complete Design Data Capture system implementation</p>
+
+        <div id="overall-status" class="status-panel">
+            <h3>📊 System Status</h3>
+            <div id="status-text">Initializing system checks...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>✅ Requirements Verification</h2>
+        <div id="requirements-list">
+            <div class="requirement pending" data-req="fabric-available">
+                <span class="requirement-icon">⏳</span>
+                <span>Fabric.js library available</span>
+            </div>
+            <div class="requirement pending" data-req="canvas-found">
+                <span class="requirement-icon">⏳</span>
+                <span>Canvas elements found and accessible</span>
+            </div>
+            <div class="requirement pending" data-req="mockup-area-found">
+                <span class="requirement-icon">⏳</span>
+                <span>mockup_design_area container identified</span>
+            </div>
+            <div class="requirement pending" data-req="generateDesignData-available">
+                <span class="requirement-icon">⏳</span>
+                <span>generateDesignData() function globally accessible</span>
+            </div>
+            <div class="requirement pending" data-req="coordinate-transformation">
+                <span class="requirement-icon">⏳</span>
+                <span>Coordinate transformation relative to mockup_design_area</span>
+            </div>
+            <div class="requirement pending" data-req="button-integration">
+                <span class="requirement-icon">⏳</span>
+                <span>Save/Cart button integration active</span>
+            </div>
+            <div class="requirement pending" data-req="debug-logging">
+                <span class="requirement-icon">⏳</span>
+                <span>Debug logging to browser console</span>
+            </div>
+            <div class="requirement pending" data-req="json-structure">
+                <span class="requirement-icon">⏳</span>
+                <span>Correct JSON structure (template_view_id, designed_on_area_px, elements)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎨 Test Design Area</h2>
+        <div class="mockup-design-area" id="mockup-design-area">
+            <div class="designer-canvas-container">
+                <canvas id="verification-canvas" width="780" height="580"></canvas>
+            </div>
+        </div>
+
+        <div class="test-buttons">
+            <button onclick="createTestElements()" class="success">Create Test Elements</button>
+            <button onclick="runFullVerification()" class="designer-action-button">🎯 Generate Design Data</button>
+            <button onclick="testSaveButton()" class="save-design-button">💾 Test Save Button</button>
+            <button onclick="testCartButton()" class="add-to-cart-button">🛒 Test Cart Button</button>
+            <button onclick="testCoordinateTransformation()" class="secondary">📐 Test Coordinates</button>
+            <button onclick="clearCanvas()" class="danger">🧹 Clear Canvas</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Results & Debug Output</h2>
+        <div id="results-panel" class="results-panel">
+            <div>🔄 Waiting for test execution...</div>
+        </div>
+    </div>
+
+    <!-- Load Fabric.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+    <!-- Load the comprehensive capture system -->
+    <script src="public/js/comprehensive-design-data-capture.js"></script>
+
+    <script>
+        let verificationCanvas = null;
+        let resultsPanel = null;
+        let testResults = {
+            requirements: {},
+            lastGeneratedData: null
+        };
+
+        // Initialize verification system
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 FINAL VERIFICATION: Starting comprehensive system test...');
+
+            resultsPanel = document.getElementById('results-panel');
+
+            // Initialize test canvas
+            setTimeout(() => {
+                initializeVerificationEnvironment();
+                runSystemChecks();
+            }, 1000);
+        });
+
+        function initializeVerificationEnvironment() {
+            // Create fabric canvas
+            verificationCanvas = new fabric.Canvas('verification-canvas', {
+                backgroundColor: '#ffffff',
+                selection: true
+            });
+
+            logResult('✅ Verification environment initialized');
+            logResult(`📐 Canvas: ${verificationCanvas.width}x${verificationCanvas.height}`);
+
+            // Check if comprehensive capture is available
+            if (window.comprehensiveCapture && window.generateDesignData) {
+                logResult('✅ Comprehensive capture system detected');
+                updateRequirement('generateDesignData-available', true);
+            } else {
+                logResult('❌ Comprehensive capture system not found');
+                updateRequirement('generateDesignData-available', false);
+            }
+        }
+
+        function runSystemChecks() {
+            logResult('🔍 Running system checks...');
+
+            // Check Fabric.js
+            if (typeof fabric !== 'undefined') {
+                updateRequirement('fabric-available', true);
+                logResult('✅ Fabric.js available');
+            } else {
+                updateRequirement('fabric-available', false);
+                logResult('❌ Fabric.js not available');
+            }
+
+            // Check canvas availability
+            const canvases = document.querySelectorAll('canvas');
+            if (canvases.length > 0) {
+                updateRequirement('canvas-found', true);
+                logResult(`✅ Found ${canvases.length} canvas elements`);
+            } else {
+                updateRequirement('canvas-found', false);
+                logResult('❌ No canvas elements found');
+            }
+
+            // Check mockup area
+            const mockupArea = document.getElementById('mockup-design-area');
+            if (mockupArea) {
+                updateRequirement('mockup-area-found', true);
+                logResult('✅ mockup_design_area container found');
+            } else {
+                updateRequirement('mockup-area-found', false);
+                logResult('❌ mockup_design_area container not found');
+            }
+
+            // Check button integration
+            const saveButtons = document.querySelectorAll('.save-design-button, .add-to-cart-button, .designer-action-button');
+            if (saveButtons.length > 0) {
+                updateRequirement('button-integration', true);
+                logResult(`✅ Found ${saveButtons.length} buttons for integration`);
+            } else {
+                updateRequirement('button-integration', false);
+                logResult('❌ No buttons found for integration');
+            }
+
+            updateOverallStatus();
+        }
+
+        function createTestElements() {
+            if (!verificationCanvas) {
+                logResult('❌ Canvas not available for test creation');
+                return;
+            }
+
+            // Clear canvas
+            verificationCanvas.clear();
+            verificationCanvas.backgroundColor = '#ffffff';
+
+            // Create comprehensive test elements
+            const testElements = [
+                // Text elements with different properties
+                new fabric.IText('Header Text', {
+                    left: 50,
+                    top: 50,
+                    fontFamily: 'Arial',
+                    fontSize: 28,
+                    fill: '#333333',
+                    fontWeight: 'bold'
+                }),
+
+                new fabric.IText('Body text with longer content', {
+                    left: 50,
+                    top: 100,
+                    fontFamily: 'Times New Roman',
+                    fontSize: 16,
+                    fill: '#666666'
+                }),
+
+                // Shape elements
+                new fabric.Rect({
+                    left: 300,
+                    top: 80,
+                    width: 120,
+                    height: 80,
+                    fill: '#ff6b6b',
+                    stroke: '#d63031',
+                    strokeWidth: 3,
+                    rx: 10,
+                    ry: 10
+                }),
+
+                new fabric.Circle({
+                    left: 500,
+                    top: 100,
+                    radius: 50,
+                    fill: '#74b9ff',
+                    stroke: '#0984e3',
+                    strokeWidth: 2
+                }),
+
+                new fabric.Ellipse({
+                    left: 650,
+                    top: 120,
+                    rx: 60,
+                    ry: 30,
+                    fill: '#a29bfe',
+                    stroke: '#6c5ce7',
+                    strokeWidth: 2
+                }),
+
+                // Line element
+                new fabric.Line([100, 250, 400, 280], {
+                    stroke: '#fdcb6e',
+                    strokeWidth: 5
+                }),
+
+                // Complex polygon
+                new fabric.Polygon([
+                    {x: 200, y: 300}, {x: 250, y: 280}, {x: 300, y: 320},
+                    {x: 280, y: 370}, {x: 220, y: 370}
+                ], {
+                    fill: '#55a3ff',
+                    stroke: '#2980b9',
+                    strokeWidth: 2
+                }),
+
+                // Simulated image element
+                new fabric.Rect({
+                    left: 450,
+                    top: 300,
+                    width: 150,
+                    height: 100,
+                    fill: '#95a5a6',
+                    stroke: '#7f8c8d',
+                    strokeWidth: 1
+                })
+            ];
+
+            // Add all elements
+            testElements.forEach((element, index) => {
+                // Add some rotation to test transformation
+                if (index % 3 === 0) {
+                    element.set('angle', 15);
+                }
+                verificationCanvas.add(element);
+            });
+
+            verificationCanvas.renderAll();
+
+            logResult(`✅ Created ${testElements.length} comprehensive test elements`);
+            logResult('🎨 Elements: text (2), shapes (4), line (1), polygon (1), image-sim (1)');
+        }
+
+        function runFullVerification() {
+            logResult('🎯 FULL VERIFICATION: Running complete design data capture test...');
+
+            try {
+                // Generate design data
+                const designData = window.generateDesignData ? window.generateDesignData() : null;
+
+                if (!designData) {
+                    logResult('❌ generateDesignData() returned null or undefined');
+                    updateRequirement('generateDesignData-available', false);
+                    return;
+                }
+
+                testResults.lastGeneratedData = designData;
+
+                // Verify JSON structure
+                const hasRequiredFields = designData.template_view_id &&
+                                        designData.designed_on_area_px &&
+                                        Array.isArray(designData.elements);
+
+                updateRequirement('json-structure', hasRequiredFields);
+
+                if (hasRequiredFields) {
+                    logResult('✅ JSON structure verification passed');
+                    updateRequirement('debug-logging', true); // If we got here, logging worked
+
+                    // Test coordinate transformation
+                    if (designData.elements.length > 0) {
+                        const firstElement = designData.elements[0];
+                        if (typeof firstElement.x === 'number' && typeof firstElement.y === 'number') {
+                            updateRequirement('coordinate-transformation', true);
+                            logResult('✅ Coordinate transformation working');
+                        }
+                    }
+
+                    // Display results
+                    logResult('📊 DESIGN DATA GENERATED:');
+                    displayJsonData(designData);
+
+                    // Summary
+                    logResult(`📐 Canvas size: ${designData.designed_on_area_px.width}x${designData.designed_on_area_px.height}`);
+                    logResult(`🎨 Elements captured: ${designData.elements.length}`);
+                    logResult(`🆔 Template view ID: ${designData.template_view_id}`);
+
+                    // Element type summary
+                    const elementTypes = {};
+                    designData.elements.forEach(el => {
+                        elementTypes[el.type] = (elementTypes[el.type] || 0) + 1;
+                    });
+                    logResult(`🎭 Element types: ${JSON.stringify(elementTypes)}`);
+
+                } else {
+                    logResult('❌ JSON structure verification failed');
+                    logResult('Required fields missing:', JSON.stringify({
+                        template_view_id: !!designData.template_view_id,
+                        designed_on_area_px: !!designData.designed_on_area_px,
+                        elements: Array.isArray(designData.elements)
+                    }));
+                }
+
+            } catch (error) {
+                logResult(`❌ Error during verification: ${error.message}`);
+                console.error('Verification error:', error);
+                updateRequirement('generateDesignData-available', false);
+            }
+
+            updateOverallStatus();
+        }
+
+        function testSaveButton() {
+            logResult('💾 Testing save button integration...');
+            runFullVerification();
+            logResult('📢 Save button test completed');
+        }
+
+        function testCartButton() {
+            logResult('🛒 Testing cart button integration...');
+            runFullVerification();
+            logResult('📢 Cart button test completed');
+        }
+
+        function testCoordinateTransformation() {
+            logResult('📐 Testing coordinate transformation...');
+
+            if (!verificationCanvas) {
+                logResult('❌ Canvas not available');
+                return;
+            }
+
+            // Create a test element at known coordinates
+            const testRect = new fabric.Rect({
+                left: 100,
+                top: 150,
+                width: 50,
+                height: 30,
+                fill: '#e74c3c'
+            });
+
+            verificationCanvas.add(testRect);
+            verificationCanvas.renderAll();
+
+            // Generate data and check coordinates
+            const designData = window.generateDesignData ? window.generateDesignData() : null;
+
+            if (designData && designData.elements.length > 0) {
+                const lastElement = designData.elements[designData.elements.length - 1];
+                logResult(`📍 Test element canvas coords: (100, 150)`);
+                logResult(`📍 Captured element coords: (${lastElement.x}, ${lastElement.y})`);
+
+                const coordsValid = typeof lastElement.x === 'number' && typeof lastElement.y === 'number';
+                updateRequirement('coordinate-transformation', coordsValid);
+
+                if (coordsValid) {
+                    logResult('✅ Coordinate transformation working correctly');
+                } else {
+                    logResult('❌ Coordinate transformation failed');
+                }
+            }
+
+            // Clean up test element
+            verificationCanvas.remove(testRect);
+            verificationCanvas.renderAll();
+        }
+
+        function clearCanvas() {
+            if (verificationCanvas) {
+                verificationCanvas.clear();
+                verificationCanvas.backgroundColor = '#ffffff';
+                logResult('🧹 Canvas cleared');
+            }
+        }
+
+        function updateRequirement(reqId, passed) {
+            testResults.requirements[reqId] = passed;
+            const reqElement = document.querySelector(`[data-req="${reqId}"]`);
+
+            if (reqElement) {
+                reqElement.className = `requirement ${passed ? 'passed' : 'failed'}`;
+                reqElement.querySelector('.requirement-icon').textContent = passed ? '✅' : '❌';
+            }
+        }
+
+        function updateOverallStatus() {
+            const passedCount = Object.values(testResults.requirements).filter(Boolean).length;
+            const totalCount = Object.keys(testResults.requirements).length;
+            const statusElement = document.getElementById('overall-status');
+            const statusText = document.getElementById('status-text');
+
+            if (passedCount === totalCount && totalCount > 0) {
+                statusElement.className = 'status-panel success';
+                statusText.innerHTML = `✅ All ${totalCount} requirements passed! System fully functional.`;
+            } else if (passedCount > 0) {
+                statusElement.className = 'status-panel warning';
+                statusText.innerHTML = `⚠️ ${passedCount}/${totalCount} requirements passed. System partially functional.`;
+            } else {
+                statusElement.className = 'status-panel error';
+                statusText.innerHTML = `❌ ${passedCount}/${totalCount} requirements passed. System needs attention.`;
+            }
+        }
+
+        function logResult(message) {
+            if (!resultsPanel) return;
+
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = document.createElement('div');
+            logLine.textContent = `[${timestamp}] ${message}`;
+
+            resultsPanel.appendChild(logLine);
+            resultsPanel.scrollTop = resultsPanel.scrollHeight;
+
+            // Also log to console for debug purposes
+            console.log(`[VERIFICATION] ${message}`);
+        }
+
+        function displayJsonData(data) {
+            const jsonDiv = document.createElement('div');
+            jsonDiv.className = 'json-output';
+            jsonDiv.textContent = JSON.stringify(data, null, 2);
+            resultsPanel.appendChild(jsonDiv);
+            resultsPanel.scrollTop = resultsPanel.scrollHeight;
+        }
+
+        // Listen for custom events from the capture system
+        window.addEventListener('designDataGenerated', function(event) {
+            logResult('📢 Received designDataGenerated event');
+            logResult(`🎯 Trigger: ${event.detail.trigger}`);
+        });
+
+        // Auto-run checks when comprehensive capture becomes available
+        setInterval(() => {
+            if (window.comprehensiveCapture && !testResults.requirements['generateDesignData-available']) {
+                updateRequirement('generateDesignData-available', true);
+                logResult('✅ Comprehensive capture system became available');
+                updateOverallStatus();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

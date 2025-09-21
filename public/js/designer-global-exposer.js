@@ -1,12 +1,13 @@
 /**
- * Designer Global Exposer
+ * Enhanced Designer Global Exposer
  * Ensures DesignerWidget class is available globally for design-data-capture system
+ * Version 2.0 - Improved webpack module extraction with better detection logic
  */
 
 (function() {
     'use strict';
 
-    console.log('🎯 DESIGNER EXPOSER: Starting DesignerWidget global exposure');
+    console.log('🎯 DESIGNER EXPOSER V2: Starting enhanced DesignerWidget global exposure');
     console.log('🔍 WEBPACK DEBUG: Available globals:', {
         webpackChunk: !!window.webpackChunkocto_print_designer,
         webpackRequire: !!window.__webpack_require__,

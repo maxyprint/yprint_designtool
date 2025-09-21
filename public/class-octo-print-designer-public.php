@@ -159,6 +159,15 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Advanced system that bypasses DesignerWidget exposure issues
+        wp_register_script(
+            'octo-print-designer-comprehensive-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/comprehensive-design-data-capture.js',
+            ['octo-print-designer-data-capture'], // Load after original capture system
+            rand(),
+            true
+        );
+
         // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
         wp_add_inline_script('octo-print-designer-designer', '
             // Verify emergency fabric loader worked
