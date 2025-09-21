@@ -123,11 +123,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 GLOBAL WIDGET INSTANCE: Creates window.designerWidgetInstance for design-data-capture
+        wp_register_script(
+            'octo-print-designer-global-instance',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/octo-print-designer-public.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            rand(),
+            true
+        );
+
         // 🎯 DESIGN DATA CAPTURE: Canvas data extraction system
         wp_register_script(
             'octo-print-designer-data-capture',
             OCTO_PRINT_DESIGNER_URL . 'public/js/design-data-capture.js',
-            ['octo-print-designer-designer'], // Load after designer to ensure DesignerWidget is available
+            ['octo-print-designer-global-instance'], // Load after global instance to ensure window.designerWidgetInstance is available
             rand(),
             true
         );

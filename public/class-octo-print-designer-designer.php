@@ -66,6 +66,9 @@ class Octo_Print_Designer_Designer {
     
         wp_enqueue_script('octo-print-designer-designer');
 
+        // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
+        wp_enqueue_script('octo-print-designer-global-instance');
+
         // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system
         wp_enqueue_script('octo-print-designer-data-capture');
 
