@@ -320,10 +320,13 @@ class DesignDataCapture {
 
 // Auto-Initialisierung wenn Designer Widget verfügbar ist
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 DESIGN DATA CAPTURE: DOM loaded, waiting for designer widget...');
+
     // Warte auf Designer Widget Initialisierung
     const initializeCapture = () => {
         const designerContainer = document.querySelector('.octo-print-designer');
         if (designerContainer && window.designerWidgetInstance) {
+            console.log('🎯 DESIGN DATA CAPTURE: Designer container and widget instance found');
             const capture = new DesignDataCapture(window.designerWidgetInstance);
             capture.hookIntoSaveDesign();
             capture.attachSaveButtonListeners();
@@ -331,14 +334,42 @@ document.addEventListener('DOMContentLoaded', function() {
             // Globaler Zugriff für Tests
             window.designDataCapture = capture;
 
-            console.log('Design Data Capture System initialized successfully');
-        } else {
-            // Retry nach 500ms
-            setTimeout(initializeCapture, 500);
+            console.log('✅ DESIGN DATA CAPTURE: System initialized successfully');
+            return true;
         }
+        return false;
     };
 
-    initializeCapture();
+    // Try immediate initialization
+    if (initializeCapture()) {
+        return;
+    }
+
+    // Listen for designerWidgetExposed event
+    window.addEventListener('designerWidgetExposed', function(event) {
+        console.log('🎯 DESIGN DATA CAPTURE: Received designerWidgetExposed event');
+        setTimeout(initializeCapture, 100); // Small delay to ensure instance is created
+    });
+
+    // Fallback: Retry periodically
+    let attempts = 0;
+    const maxAttempts = 20;
+    const retryCapture = setInterval(() => {
+        attempts++;
+        console.log('🔄 DESIGN DATA CAPTURE: Initialization attempt', attempts);
+
+        if (initializeCapture()) {
+            clearInterval(retryCapture);
+        } else if (attempts >= maxAttempts) {
+            console.error('❌ DESIGN DATA CAPTURE: Failed to initialize after', maxAttempts, 'attempts');
+            console.error('Debug info:', {
+                designerContainer: !!document.querySelector('.octo-print-designer'),
+                designerWidgetInstance: !!window.designerWidgetInstance,
+                DesignerWidget: !!window.DesignerWidget
+            });
+            clearInterval(retryCapture);
+        }
+    }, 500);
 });
 
 // Export für Modulnutzung

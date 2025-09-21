@@ -31,9 +31,62 @@
 
 	// Initialize Designer Widget Instance for global access
 	$(function() {
-		if (typeof DesignerWidget !== 'undefined') {
-			window.designerWidgetInstance = new DesignerWidget();
+		// Wait for designer bundle to load and expose DesignerWidget
+		function initializeDesignerWidget() {
+			// Check if DesignerWidget is available
+			if (typeof DesignerWidget !== 'undefined') {
+				console.log('🎯 GLOBAL INSTANCE: DesignerWidget class found, creating instance');
+				window.designerWidgetInstance = new DesignerWidget();
+				console.log('✅ GLOBAL INSTANCE: window.designerWidgetInstance created successfully');
+				return true;
+			}
+
+			// Try to import from designer bundle if webpack is available
+			if (typeof window.__webpack_require__ === 'function') {
+				try {
+					// Get the webpack modules cache
+					const modules = window.__webpack_require__.cache;
+
+					// Find the designer module
+					for (const moduleId in modules) {
+						const module = modules[moduleId];
+						if (module && module.exports && module.exports.DesignerWidget) {
+							console.log('🎯 GLOBAL INSTANCE: Found DesignerWidget in webpack module', moduleId);
+							window.DesignerWidget = module.exports.DesignerWidget;
+							window.designerWidgetInstance = new window.DesignerWidget();
+							console.log('✅ GLOBAL INSTANCE: window.designerWidgetInstance created from webpack module');
+							return true;
+						}
+					}
+				} catch (error) {
+					console.warn('⚠️ GLOBAL INSTANCE: Webpack module extraction failed:', error.message);
+				}
+			}
+
+			return false;
 		}
+
+		// Try immediate initialization
+		if (initializeDesignerWidget()) {
+			return;
+		}
+
+		// If not available, wait for designer bundle
+		let attempts = 0;
+		const maxAttempts = 10;
+		const retryInterval = 500;
+
+		const retryInit = setInterval(function() {
+			attempts++;
+			console.log('🔄 GLOBAL INSTANCE: Attempt', attempts, 'to find DesignerWidget');
+
+			if (initializeDesignerWidget()) {
+				clearInterval(retryInit);
+			} else if (attempts >= maxAttempts) {
+				console.error('❌ GLOBAL INSTANCE: Failed to initialize DesignerWidget after', maxAttempts, 'attempts');
+				clearInterval(retryInit);
+			}
+		}, retryInterval);
 	});
 
 })( jQuery );

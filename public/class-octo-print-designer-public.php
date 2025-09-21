@@ -123,11 +123,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 DESIGNER GLOBAL EXPOSER: Exposes DesignerWidget class globally from webpack bundle
+        wp_register_script(
+            'octo-print-designer-global-exposer',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/designer-global-exposer.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            rand(),
+            true
+        );
+
         // 🎯 GLOBAL WIDGET INSTANCE: Creates window.designerWidgetInstance for design-data-capture
         wp_register_script(
             'octo-print-designer-global-instance',
             OCTO_PRINT_DESIGNER_URL . 'public/js/octo-print-designer-public.js',
-            ['octo-print-designer-designer'], // Load after designer bundle
+            ['octo-print-designer-global-exposer'], // Load after exposer
             rand(),
             true
         );

@@ -66,6 +66,9 @@ class Octo_Print_Designer_Designer {
     
         wp_enqueue_script('octo-print-designer-designer');
 
+        // 🎯 DESIGNER GLOBAL EXPOSER: Enqueue DesignerWidget class exposure
+        wp_enqueue_script('octo-print-designer-global-exposer');
+
         // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
         wp_enqueue_script('octo-print-designer-global-instance');
 
