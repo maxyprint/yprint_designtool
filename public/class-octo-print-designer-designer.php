@@ -66,6 +66,9 @@ class Octo_Print_Designer_Designer {
     
         wp_enqueue_script('octo-print-designer-designer');
 
+        // 🚨 WEBPACK DESIGNER PATCH: Enqueue aggressive webpack intervention
+        wp_enqueue_script('octo-print-designer-webpack-patch');
+
         // 🎯 DESIGNER GLOBAL EXPOSER: Enqueue DesignerWidget class exposure
         wp_enqueue_script('octo-print-designer-global-exposer');
 

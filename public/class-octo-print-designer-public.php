@@ -123,11 +123,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🚨 WEBPACK DESIGNER PATCH: Aggressive webpack intervention for DesignerWidget exposure
+        wp_register_script(
+            'octo-print-designer-webpack-patch',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-designer-patch.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            rand(),
+            true
+        );
+
         // 🎯 DESIGNER GLOBAL EXPOSER: Exposes DesignerWidget class globally from webpack bundle
         wp_register_script(
             'octo-print-designer-global-exposer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/designer-global-exposer.js',
-            ['octo-print-designer-designer'], // Load after designer bundle
+            ['octo-print-designer-webpack-patch'], // Load after webpack patch
             rand(),
             true
         );

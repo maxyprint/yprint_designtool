@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webpack DesignerWidget Exposure Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            border-radius: 5px;
+            margin: 10px 0;
+            min-height: 300px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        .test-button:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 Webpack DesignerWidget Exposure Test</h1>
+        <p>Testing the updated webpack extraction logic</p>
+
+        <button class="test-button" onclick="runWebpackAnalysis()">Analyze Webpack Structure</button>
+        <button class="test-button" onclick="testDesignerExposure()">Test DesignerWidget Exposure</button>
+
+        <div id="consoleOutput" class="console-output">Click buttons to run tests...</div>
+    </div>
+
+    <!-- Load the webpack bundles in the same order as WordPress -->
+    <script src="public/js/dist/vendor.bundle.js"></script>
+    <script src="public/js/emergency-fabric-loader.js"></script>
+    <script src="public/js/dist/designer.bundle.js"></script>
+    <script src="public/js/designer-global-exposer.js"></script>
+
+    <script>
+        // Console output capture
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        let consoleBuffer = [];
+
+        function captureConsole(level, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.join(' ');
+            consoleBuffer.push(`[${timestamp}] ${level}: ${message}`);
+
+            updateConsoleOutput();
+
+            // Call original
+            if (level === 'LOG') originalConsoleLog.apply(console, args);
+            else if (level === 'ERROR') originalConsoleError.apply(console, args);
+            else if (level === 'WARN') originalConsoleWarn.apply(console, args);
+        }
+
+        console.log = function(...args) { captureConsole('LOG', args); };
+        console.error = function(...args) { captureConsole('ERROR', args); };
+        console.warn = function(...args) { captureConsole('WARN', args); };
+
+        function updateConsoleOutput() {
+            document.getElementById('consoleOutput').textContent = consoleBuffer.join('\n');
+        }
+
+        function runWebpackAnalysis() {
+            console.log('🔍 WEBPACK ANALYSIS: Starting comprehensive webpack structure analysis...');
+
+            // Check global webpack objects
+            console.log('Global webpack objects:');
+            console.log('- window.__webpack_require__:', typeof window.__webpack_require__);
+            console.log('- window.webpackChunkocto_print_designer:', !!window.webpackChunkocto_print_designer);
+
+            if (window.__webpack_require__) {
+                console.log('- webpack cache keys:', Object.keys(window.__webpack_require__.cache || {}));
+                console.log('- webpack modules keys:', Object.keys(window.__webpack_require__.m || {}));
+
+                // Try to find Designer module in cache
+                const cache = window.__webpack_require__.cache;
+                for (const moduleId in cache) {
+                    const module = cache[moduleId];
+                    if (module && module.exports) {
+                        const exportKeys = Object.keys(module.exports);
+                        if (exportKeys.includes('DesignerWidget')) {
+                            console.log('✅ FOUND DesignerWidget in cache module:', moduleId);
+                            console.log('- Export keys:', exportKeys);
+                            console.log('- DesignerWidget type:', typeof module.exports.DesignerWidget);
+                        }
+                    }
+                }
+
+                // Try to find in modules
+                const modules = window.__webpack_require__.m;
+                if (modules) {
+                    for (const moduleId in modules) {
+                        if (moduleId.includes('Designer')) {
+                            console.log('🎯 Found Designer-related module:', moduleId);
+                            try {
+                                const moduleExports = window.__webpack_require__(moduleId);
+                                console.log('- Exports:', Object.keys(moduleExports || {}));
+                                if (moduleExports && moduleExports.DesignerWidget) {
+                                    console.log('✅ FOUND DesignerWidget in module:', moduleId);
+                                }
+                            } catch (err) {
+                                console.log('- Error loading module:', err.message);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (window.webpackChunkocto_print_designer) {
+                console.log('Webpack chunk array length:', window.webpackChunkocto_print_designer.length);
+                window.webpackChunkocto_print_designer.forEach((chunk, index) => {
+                    console.log(`Chunk ${index}:`, chunk);
+                });
+            }
+        }
+
+        function testDesignerExposure() {
+            console.log('🧪 DESIGNER EXPOSURE TEST: Testing DesignerWidget exposure...');
+
+            // Check if DesignerWidget is available
+            console.log('window.DesignerWidget before exposure:', typeof window.DesignerWidget);
+
+            // Force trigger exposure function
+            if (window.exposeDesignerWidget) {
+                const result = window.exposeDesignerWidget();
+                console.log('Exposure function result:', result);
+            } else {
+                console.log('⚠️ exposeDesignerWidget function not available');
+            }
+
+            console.log('window.DesignerWidget after exposure:', typeof window.DesignerWidget);
+
+            if (window.DesignerWidget) {
+                console.log('✅ DesignerWidget successfully exposed!');
+                console.log('DesignerWidget constructor:', window.DesignerWidget.toString().substring(0, 200) + '...');
+            } else {
+                console.log('❌ DesignerWidget exposure failed');
+            }
+        }
+
+        // Start with basic analysis
+        setTimeout(() => {
+            console.log('🚀 AUTO ANALYSIS: Page loaded, running webpack analysis...');
+            runWebpackAnalysis();
+        }, 1000);
+    </script>
+</body>
+</html>
