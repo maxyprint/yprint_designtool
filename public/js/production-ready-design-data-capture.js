@@ -411,8 +411,10 @@ class ProductionReadyDesignDataCapture {
         // Hauptfunktion global verfügbar machen
         window.generateDesignData = () => this.generateDesignData();
 
-        // Instanz global verfügbar machen
+        // Instanz global verfügbar machen (mehrere Namen für Kompatibilität)
         window.comprehensiveCapture = this;
+        window.productionReadyCaptureInstance = this;
+        window.designDataCapture = this;
 
         // Zusätzliche Debug-Funktionen
         window.debugDesignCapture = () => {
@@ -424,6 +426,13 @@ class ProductionReadyDesignDataCapture {
                 retryCount: this.retryCount
             };
         };
+
+        console.log('🌍 Global functions exposed:', {
+            generateDesignData: typeof window.generateDesignData,
+            comprehensiveCapture: typeof window.comprehensiveCapture,
+            productionReadyCaptureInstance: typeof window.productionReadyCaptureInstance,
+            debugDesignCapture: typeof window.debugDesignCapture
+        });
     }
 
     /**
@@ -825,13 +834,29 @@ if (typeof window !== 'undefined') {
         // DOM lädt noch - warte auf DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
-                new ProductionReadyDesignDataCapture();
+                console.log('🚀 Auto-initializing Production-Ready Design Data Capture...');
+                const instance = new ProductionReadyDesignDataCapture();
+
+                // Stelle sicher, dass die Instanz global verfügbar ist
+                window.productionReadyCaptureInstance = instance;
+                window.comprehensiveCapture = instance;
+                window.designDataCapture = instance;
+
+                console.log('✅ Auto-initialization complete - instance available globally');
             }, 100); // Kurze Verzögerung für andere Scripts
         });
     } else {
         // DOM bereits geladen - initialisiere sofort
         setTimeout(() => {
-            new ProductionReadyDesignDataCapture();
+            console.log('🚀 Auto-initializing Production-Ready Design Data Capture (DOM ready)...');
+            const instance = new ProductionReadyDesignDataCapture();
+
+            // Stelle sicher, dass die Instanz global verfügbar ist
+            window.productionReadyCaptureInstance = instance;
+            window.comprehensiveCapture = instance;
+            window.designDataCapture = instance;
+
+            console.log('✅ Auto-initialization complete - instance available globally');
         }, 100);
     }
 }
