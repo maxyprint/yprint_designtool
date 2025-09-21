@@ -104,10 +104,17 @@
         </div>
 
         <div class="fix-section">
-            <h3>🎯 Fix 2: DesignerWidget Global Exposure</h3>
+            <h3>🚨 Fix 2A: Webpack Designer Patch (NEW)</h3>
+            <div id="webpackPatchStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ Aggressive webpack intervention exposes DesignerWidget</p>
+            <p><strong>Fix:</strong> webpack-designer-patch.js intercepts webpack runtime and modules</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🎯 Fix 2B: DesignerWidget Global Exposure (Enhanced)</h3>
             <div id="exposerStatus" class="status warning">Testing...</div>
             <p><strong>Expected:</strong> ✅ DesignerWidget class exposed globally from webpack bundle</p>
-            <p><strong>Fix:</strong> designer-global-exposer.js extracts class from webpack modules</p>
+            <p><strong>Fix:</strong> Enhanced designer-global-exposer.js with multiple extraction methods</p>
         </div>
 
         <div class="fix-section">
@@ -179,6 +186,7 @@
         // Test state
         let testResults = {
             fabric: false,
+            webpackPatch: false,
             exposer: false,
             instance: false,
             capture: false
@@ -210,6 +218,19 @@
             } else {
                 document.getElementById('fabricStatus').className = 'status error';
                 document.getElementById('fabricStatus').textContent = '❌ fabric.js not available';
+            }
+            updateProgress();
+        }
+
+        function testWebpackPatch() {
+            // Check if webpack patch system is working
+            if (window.webpackChunkocto_print_designer && window.__webpack_require__) {
+                testResults.webpackPatch = true;
+                document.getElementById('webpackPatchStatus').className = 'status success';
+                document.getElementById('webpackPatchStatus').textContent = '✅ Webpack patch system active and monitoring';
+            } else {
+                document.getElementById('webpackPatchStatus').className = 'status error';
+                document.getElementById('webpackPatchStatus').textContent = '❌ Webpack patch system not available';
             }
             updateProgress();
         }
@@ -321,6 +342,7 @@
         // Run tests periodically
         function runAllTests() {
             testFabricLoader();
+            testWebpackPatch();
             testDesignerExposer();
             testGlobalInstance();
             testDataCapture();
