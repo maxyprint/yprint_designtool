@@ -1,0 +1,374 @@
+/**
+ * WebSocket AI Testing Integration Styles
+ * For Octo Print Designer WordPress Plugin
+ */
+
+/* Main AI Test Panel */
+.ai-test-integration-panel {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.ai-test-integration-panel .postbox-header {
+    border-bottom: 1px solid #ccd0d4;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.ai-test-integration-panel .postbox-header h2 {
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Connection Indicator */
+.connection-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-left: 10px;
+    position: relative;
+}
+
+.connection-indicator.connected {
+    background: #46b450;
+    box-shadow: 0 0 8px rgba(70, 180, 80, 0.6);
+}
+
+.connection-indicator.disconnected {
+    background: #dc3232;
+    box-shadow: 0 0 8px rgba(220, 50, 50, 0.6);
+}
+
+.connection-indicator.connecting {
+    background: #ffb900;
+    animation: pulse-indicator 1.5s infinite;
+}
+
+@keyframes pulse-indicator {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.2);
+    }
+}
+
+/* Connection Info */
+.ai-test-connection-info {
+    padding: 15px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #eee;
+    margin: -15px -15px 15px -15px;
+}
+
+.ai-test-connection-info p {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Test Controls */
+.ai-test-controls {
+    margin-bottom: 20px;
+}
+
+.ai-test-controls button {
+    margin-right: 10px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-test-controls button:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.ai-test-controls button:hover:before {
+    left: 100%;
+}
+
+.ai-test-controls .button-primary {
+    background: linear-gradient(135deg, #0073aa 0%, #005177 100%);
+    border-color: #005177;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.ai-test-controls .button-primary:hover {
+    background: linear-gradient(135deg, #005177 0%, #003c5a 100%);
+}
+
+/* Progress Indicator */
+.ai-test-progress {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.progress-text {
+    font-size: 13px;
+    color: #495057;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.progress-bar-container {
+    background: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 24px;
+    position: relative;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    height: 100%;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.progress-bar:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, .15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, .15) 50%,
+        rgba(255, 255, 255, .15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 20px 20px;
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% { background-position: 20px 0; }
+    100% { background-position: 0 0; }
+}
+
+/* Results Display */
+.ai-test-results {
+    margin-top: 20px;
+    padding: 15px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.ai-test-results h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 8px;
+}
+
+.ai-test-results h5 {
+    margin-top: 15px;
+    margin-bottom: 8px;
+    color: #555;
+    font-size: 14px;
+}
+
+/* Test Result Cards */
+.test-results-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.test-result-card {
+    flex: 1;
+    min-width: 80px;
+    max-width: 120px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.test-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.test-result-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #0073aa;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.test-result-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Validation Issues */
+.validation-issues {
+    margin: 15px 0;
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+
+.validation-issues.success {
+    background: #f0f9ff;
+    border-left-color: #46b450;
+    color: #0f5132;
+}
+
+.validation-issues.error {
+    background: #fef7f7;
+    border-left-color: #dc3232;
+    color: #721c24;
+}
+
+.validation-issues.warning {
+    background: #fff8e5;
+    border-left-color: #ffb900;
+    color: #664d03;
+}
+
+/* Lists in Results */
+.ai-test-results ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.ai-test-results li {
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+/* Code Output */
+.ai-test-results pre {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-x: auto;
+    color: #24292e;
+}
+
+/* Help Section */
+.ai-test-help {
+    margin-top: 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, #f0f6fc 0%, #e6f2ff 100%);
+    border-left: 4px solid #0073aa;
+    border-radius: 0 6px 6px 0;
+}
+
+.ai-test-help p {
+    margin: 0;
+    font-size: 12px;
+    color: #0c5460;
+}
+
+/* Admin Notices Integration */
+.notice.ai-test-notice {
+    border-left-width: 4px;
+    border-left-style: solid;
+}
+
+.notice.ai-test-notice.notice-success {
+    border-left-color: #46b450;
+}
+
+.notice.ai-test-notice.notice-error {
+    border-left-color: #dc3232;
+}
+
+.notice.ai-test-notice.notice-warning {
+    border-left-color: #ffb900;
+}
+
+/* Responsive Design */
+@media (max-width: 782px) {
+    .test-results-grid {
+        flex-direction: column;
+    }
+
+    .test-result-card {
+        max-width: none;
+    }
+
+    .ai-test-controls button {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 8px;
+    }
+}
+
+/* Loading States */
+.ai-test-integration-panel.loading {
+    opacity: 0.7;
+}
+
+.ai-test-integration-panel.loading .ai-test-controls button:not(#start-server) {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Success/Error Animations */
+@keyframes success-flash {
+    0% { background-color: rgba(70, 180, 80, 0.1); }
+    50% { background-color: rgba(70, 180, 80, 0.2); }
+    100% { background-color: transparent; }
+}
+
+@keyframes error-flash {
+    0% { background-color: rgba(220, 50, 50, 0.1); }
+    50% { background-color: rgba(220, 50, 50, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.ai-test-results.success {
+    animation: success-flash 2s ease-in-out;
+}
+
+.ai-test-results.error {
+    animation: error-flash 2s ease-in-out;
+}
+
+/* WordPress Admin Color Scheme Integration */
+.admin-color-fresh .ai-test-integration-panel .postbox-header {
+    background: linear-gradient(135deg, #0073aa 0%, #005177 100%);
+}
+
+.admin-color-light .ai-test-integration-panel .postbox-header {
+    background: linear-gradient(135deg, #0085ba 0%, #006799 100%);
+}
+
+.admin-color-blue .ai-test-integration-panel .postbox-header {
+    background: linear-gradient(135deg, #096484 0%, #07526c 100%);
+}

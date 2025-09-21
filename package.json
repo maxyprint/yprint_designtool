@@ -1,0 +1,29 @@
+{
+  "name": "yprint-designtool-websocket",
+  "version": "1.0.0",
+  "description": "WebSocket server for real-time AI testing integration",
+  "main": "websocket-server.js",
+  "scripts": {
+    "start": "node websocket-server.js",
+    "dev": "nodemon websocket-server.js",
+    "test": "node test-websocket-client.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "websocket",
+    "ai-testing",
+    "real-time",
+    "design-tool",
+    "print-design"
+  ],
+  "author": "AI Testing Integration",
+  "license": "MIT"
+}

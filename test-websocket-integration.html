@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket AI Testing Integration - Live Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .panel {
+            background: #f9f9f9;
+            border-radius: 6px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected { background: #4caf50; }
+        .status-disconnected { background: #f44336; }
+        .status-connecting { background: #ff9800; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .button:hover:not(:disabled) {
+            background: #5a6fd8;
+        }
+
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .button.secondary {
+            background: #6c757d;
+        }
+
+        .button.success {
+            background: #28a745;
+        }
+
+        .button.danger {
+            background: #dc3545;
+        }
+
+        .progress-container {
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+            height: 20px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .design-preview {
+            border: 2px dashed #ddd;
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="10" height="10" fill="%23f0f0f0"/><rect x="10" y="10" width="10" height="10" fill="%23f0f0f0"/></svg>');
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .result-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .result-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .message.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Testing Integration - Live Demo</h1>
+            <p>Real-time WebSocket-based AI Testing für Print Design Tools</p>
+        </div>
+
+        <div class="content">
+            <!-- Connection Panel -->
+            <div class="panel">
+                <h3>🔌 WebSocket Verbindung</h3>
+                <div id="connection-status">
+                    <span class="status-indicator status-connecting"></span>
+                    Verbinde zu Server...
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="button" onclick="connectToServer()">Verbinden</button>
+                    <button class="button secondary" onclick="disconnectFromServer()">Trennen</button>
+                </div>
+                <div id="session-info" style="margin-top: 10px; font-size: 12px; color: #666;"></div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="panel">
+                <h3>⚡ Test Steuerung</h3>
+                <button class="button success" onclick="runDesignTest()" id="test-btn">
+                    🧪 Design Test Starten
+                </button>
+                <button class="button" onclick="validateDesign()" id="validate-btn">
+                    ✅ Design Validieren
+                </button>
+                <button class="button secondary" onclick="executeCode()" id="code-btn">
+                    ⚡ Code Ausführen
+                </button>
+                <button class="button danger" onclick="clearLog()" id="clear-btn">
+                    🗑️ Log Löschen
+                </button>
+            </div>
+
+            <!-- Design Preview -->
+            <div class="panel">
+                <h3>🎨 Design Preview</h3>
+                <div class="design-preview" id="design-preview">
+                    <div>
+                        <strong>Mock Design Data</strong><br>
+                        Typ: Business Card<br>
+                        Größe: 85×55mm<br>
+                        DPI: 300<br>
+                        Elemente: Text, Logo
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <small>Design-Daten werden hier simuliert</small>
+                </div>
+            </div>
+
+            <!-- Progress Panel -->
+            <div class="panel">
+                <h3>📊 Test Fortschritt</h3>
+                <div id="progress-section" style="display: none;">
+                    <div class="progress-text" id="progress-text">Initialisiere Test...</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+                <div id="no-progress" style="color: #999; text-align: center; padding: 20px;">
+                    Kein aktiver Test
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="panel full-width">
+                <h3>📋 Test Ergebnisse</h3>
+                <div id="results-container">
+                    <div style="color: #999; text-align: center; padding: 20px;">
+                        Keine Ergebnisse verfügbar
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Panel -->
+            <div class="panel full-width">
+                <h3>📝 WebSocket Log</h3>
+                <div class="log-container" id="log-container">
+Initialisiere WebSocket Client...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="public/js/websocket-client.js"></script>
+    <script>
+        let aiClient = null;
+        let currentTaskId = null;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeClient();
+        });
+
+        function initializeClient() {
+            try {
+                aiClient = new AITestClient('ws://localhost:8080/ws');
+                setupEventListeners();
+                log('✅ WebSocket Client initialisiert');
+            } catch (error) {
+                log(`❌ Fehler beim Initialisieren: ${error.message}`, 'error');
+                showMessage('Fehler beim Verbinden zum WebSocket Server. Ist der Server gestartet?', 'error');
+            }
+        }
+
+        function setupEventListeners() {
+            aiClient.on('connected', () => {
+                updateConnectionStatus('connected');
+                log('🔌 Verbunden mit AI Test Server');
+                enableButtons(true);
+            });
+
+            aiClient.on('disconnected', () => {
+                updateConnectionStatus('disconnected');
+                log('❌ Verbindung getrennt');
+                enableButtons(false);
+            });
+
+            aiClient.on('session_established', (data) => {
+                log(`🆔 Session etabliert: ${data.sessionId}`);
+                document.getElementById('session-info').innerHTML = `Session ID: ${data.sessionId}`;
+            });
+
+            aiClient.on('test_started', (data) => {
+                log(`🚀 Test gestartet: ${data.taskId}`);
+                currentTaskId = data.taskId;
+                showProgress('Test wird initialisiert...', 0);
+            });
+
+            aiClient.on('progress', (data) => {
+                log(`📊 Fortschritt: ${data.progress}% - ${data.step}`);
+                showProgress(data.step, data.progress);
+            });
+
+            aiClient.on('test_completed', (data) => {
+                log(`✅ Test abgeschlossen: ${data.taskId}`);
+                hideProgress();
+                showTestResults(data.result);
+            });
+
+            aiClient.on('validation_result', (data) => {
+                log(`✔️ Validierung abgeschlossen: ${data.taskId}`);
+                showValidationResults(data.result);
+            });
+
+            aiClient.on('code_result', (data) => {
+                log(`⚡ Code ausgeführt: ${data.taskId}`);
+                showCodeResults(data.result);
+            });
+
+            aiClient.on('server_error', (data) => {
+                log(`❌ Server Fehler: ${data.message}`, 'error');
+                showMessage(`Server Fehler: ${data.message}`, 'error');
+            });
+
+            aiClient.on('connection_failed', () => {
+                log('❌ Verbindung fehlgeschlagen', 'error');
+                showMessage('Verbindung zum Server fehlgeschlagen. Bitte versuchen Sie es erneut.', 'error');
+                updateConnectionStatus('disconnected');
+            });
+        }
+
+        function connectToServer() {
+            if (!aiClient) {
+                initializeClient();
+            } else {
+                aiClient.connect();
+            }
+            updateConnectionStatus('connecting');
+            log('🔄 Verbinde zu Server...');
+        }
+
+        function disconnectFromServer() {
+            if (aiClient) {
+                aiClient.disconnect();
+                log('🔌 Verbindung getrennt');
+            }
+        }
+
+        function runDesignTest() {
+            if (!aiClient || !aiClient.isConnected) {
+                showMessage('Nicht mit Server verbunden!', 'error');
+                return;
+            }
+
+            const mockDesignData = {
+                type: 'business_card',
+                dimensions: { width: 85, height: 55 },
+                elements: [
+                    { type: 'text', content: 'Max Mustermann', fontSize: 16, color: '#000000' },
+                    { type: 'text', content: 'max@example.com', fontSize: 10, color: '#666666' },
+                    { type: 'logo', src: 'logo.png', width: 20, height: 20 }
+                ],
+                dpi: 300,
+                colorProfile: 'CMYK'
+            };
+
+            aiClient.runDesignTest(mockDesignData);
+            log('🧪 Design Test gestartet...');
+        }
+
+        function validateDesign() {
+            if (!aiClient || !aiClient.isConnected) {
+                showMessage('Nicht mit Server verbunden!', 'error');
+                return;
+            }
+
+            const mockDesignData = {
+                type: 'business_card',
+                dimensions: { width: 85, height: 55 },
+                elements: [
+                    { type: 'text', content: 'Test Design', fontSize: 14 },
+                    { type: 'image', src: 'test.jpg', width: 30, height: 30 }
+                ],
+                dpi: 150,
+                colorProfile: 'RGB'
+            };
+
+            aiClient.validateDesign(mockDesignData);
+            log('✅ Design Validierung gestartet...');
+        }
+
+        function executeCode() {
+            if (!aiClient || !aiClient.isConnected) {
+                showMessage('Nicht mit Server verbunden!', 'error');
+                return;
+            }
+
+            const testCode = `
+// Print Size Calculator
+function calculatePrintDimensions(pixelWidth, pixelHeight, dpi) {
+    const inchWidth = pixelWidth / dpi;
+    const inchHeight = pixelHeight / dpi;
+    const mmWidth = inchWidth * 25.4;
+    const mmHeight = inchHeight * 25.4;
+
+    return {
+        inches: { width: inchWidth, height: inchHeight },
+        millimeters: { width: mmWidth, height: mmHeight }
+    };
+}
+
+const result = calculatePrintDimensions(1050, 1485, 300);
+console.log('A4 at 300 DPI:', result);
+return result;
+            `;
+
+            aiClient.executeCode(testCode, 'javascript');
+            log('⚡ Code Ausführung gestartet...');
+        }
+
+        function clearLog() {
+            document.getElementById('log-container').textContent = '';
+            log('🗑️ Log gelöscht');
+        }
+
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connection-status');
+            const indicator = statusElement.querySelector('.status-indicator');
+
+            indicator.className = 'status-indicator';
+
+            switch (status) {
+                case 'connected':
+                    indicator.classList.add('status-connected');
+                    statusElement.innerHTML = '<span class="status-indicator status-connected"></span>✅ Verbunden';
+                    break;
+                case 'connecting':
+                    indicator.classList.add('status-connecting');
+                    statusElement.innerHTML = '<span class="status-indicator status-connecting"></span>🔄 Verbinde...';
+                    break;
+                case 'disconnected':
+                    indicator.classList.add('status-disconnected');
+                    statusElement.innerHTML = '<span class="status-indicator status-disconnected"></span>❌ Getrennt';
+                    break;
+            }
+        }
+
+        function enableButtons(enabled) {
+            const buttons = ['test-btn', 'validate-btn', 'code-btn'];
+            buttons.forEach(id => {
+                const button = document.getElementById(id);
+                if (button) {
+                    button.disabled = !enabled;
+                }
+            });
+        }
+
+        function showProgress(text, progress) {
+            const progressSection = document.getElementById('progress-section');
+            const noProgress = document.getElementById('no-progress');
+            const progressText = document.getElementById('progress-text');
+            const progressBar = document.getElementById('progress-bar');
+
+            progressSection.style.display = 'block';
+            noProgress.style.display = 'none';
+            progressText.textContent = text;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        function hideProgress() {
+            const progressSection = document.getElementById('progress-section');
+            const noProgress = document.getElementById('no-progress');
+
+            progressSection.style.display = 'none';
+            noProgress.style.display = 'block';
+        }
+
+        function showTestResults(result) {
+            const container = document.getElementById('results-container');
+
+            container.innerHTML = `
+                <div class="results-grid">
+                    <div class="result-card">
+                        <div class="result-value">${result.testsRun}</div>
+                        <div class="result-label">Tests Ausgeführt</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-value" style="color: #28a745;">${result.testsPassed}</div>
+                        <div class="result-label">Erfolgreich</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-value" style="color: #dc3545;">${result.testsFailed}</div>
+                        <div class="result-label">Fehlgeschlagen</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-value">${result.executionTime}ms</div>
+                        <div class="result-label">Ausführungszeit</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <strong>Details:</strong><br>
+                    ${Object.entries(result.details).map(([key, value]) =>
+                        `${key}: <span style="color: ${value === 'PASS' ? '#28a745' : '#dc3545'}">${value}</span>`
+                    ).join('<br>')}
+                </div>
+            `;
+        }
+
+        function showValidationResults(result) {
+            const container = document.getElementById('results-container');
+            const statusColor = result.isValid ? '#28a745' : '#dc3545';
+
+            container.innerHTML = `
+                <div class="message ${result.isValid ? 'success' : 'error'}">
+                    <strong>Validierung ${result.isValid ? 'Erfolgreich' : 'Fehlgeschlagen'}</strong><br>
+                    Score: ${result.score}/100
+                </div>
+                ${result.issues.length > 0 ? `
+                    <div style="margin-top: 10px;">
+                        <strong>Gefundene Probleme:</strong>
+                        <ul style="margin-top: 5px; padding-left: 20px;">
+                            ${result.issues.map(issue => `<li>${issue}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                <div style="margin-top: 10px;">
+                    <strong>Verbesserungsvorschläge:</strong>
+                    <ul style="margin-top: 5px; padding-left: 20px;">
+                        ${result.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function showCodeResults(result) {
+            const container = document.getElementById('results-container');
+
+            container.innerHTML = `
+                <div class="message ${result.success ? 'success' : 'error'}">
+                    <strong>Code Ausführung ${result.success ? 'Erfolgreich' : 'Fehlgeschlagen'}</strong>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Ausführungszeit:</strong> ${result.executionTime}ms<br>
+                    ${result.output ? `<strong>Ausgabe:</strong><br><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px;">${result.output}</pre>` : ''}
+                    ${result.errors && result.errors.length > 0 ? `
+                        <strong>Fehler:</strong><br>
+                        <ul style="color: #dc3545;">
+                            ${result.errors.map(error => `<li>${error}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('results-container');
+            container.innerHTML = `<div class="message ${type}">${message}</div>`;
+        }
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : '📝';
+
+            logContainer.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Initialize connection on page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (!aiClient || !aiClient.isConnected) {
+                    log('⚠️  WebSocket Server nicht erreichbar. Starten Sie den Server mit: npm start');
+                    showMessage('WebSocket Server nicht erreichbar. Führen Sie "npm start" aus, um den Server zu starten.', 'error');
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

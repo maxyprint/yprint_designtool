@@ -25,15 +25,16 @@ class Octo_Print_Designer {
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-user-images.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-wc-integration.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
-        
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-websocket-integration.php';
+
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-template.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-admin.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-settings.php';
 
         require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-octo-print-designer-public.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-octo-print-designer-designer.php';
-        require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-octo-print-designer-products.php';  
-        
+        require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-octo-print-designer-products.php';
+
         $this->loader = new Octo_Print_Designer_Loader();
         Octo_Print_Designer_Settings::get_instance();
 
