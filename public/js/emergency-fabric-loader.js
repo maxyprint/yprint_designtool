@@ -10,11 +10,21 @@
 
     console.log('🚨 EMERGENCY FABRIC LOADER: Starting critical fabric.js loading');
 
-    // Skip if fabric is already available
-    if (window.fabric && typeof window.fabric.Canvas === 'function') {
-        console.log('✅ EMERGENCY FABRIC LOADER: fabric.js already available, skipping');
-        triggerFabricReady();
-        return;
+    // Wait for vendor bundle to load first, then check if fabric works
+    function checkFabricAfterVendor() {
+        return new Promise((resolve) => {
+            // Give vendor bundle time to load
+            setTimeout(() => {
+                if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                    console.log('✅ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle working, skipping CDN load');
+                    triggerFabricReady();
+                    resolve(true);
+                } else {
+                    console.log('⚠️ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle not working, loading from CDN');
+                    resolve(false);
+                }
+            }, 500); // Wait 500ms for vendor bundle
+        });
     }
 
     // Prevent multiple executions
@@ -122,13 +132,19 @@
      */
     async function loadFabric() {
         try {
-            // Method 1: Try webpack extraction first (faster if it works)
+            // Method 1: Wait for vendor bundle and check if fabric works
+            const vendorWorking = await checkFabricAfterVendor();
+            if (vendorWorking) {
+                return; // fabric.js from vendor bundle is working
+            }
+
+            // Method 2: Try webpack extraction (if vendor bundle loaded but fabric not exposed)
             if (tryWebpackExtraction()) {
                 triggerFabricReady();
                 return;
             }
 
-            // Method 2: Load from CDN (guaranteed to work)
+            // Method 3: Load from CDN as last resort
             await loadFabricFromCDN();
             triggerFabricReady();
 

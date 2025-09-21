@@ -88,14 +88,14 @@ class Octo_Print_Designer_Public {
 	 */
 	public function enqueue_scripts() {
 
-        // 🚨 VENDOR BUNDLE DISABLED: Emergency fabric loader provides fabric.js directly
-        // wp_register_script(
-        //     'octo-print-designer-vendor',
-        //     OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
-        //     [],
-        //     rand(),
-        //     true
-        // );
+        // 🚨 VENDOR BUNDLE RE-ENABLED: Needed for other libraries, emergency loader handles fabric.js conflicts
+        wp_register_script(
+            'octo-print-designer-vendor',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
+            [],
+            rand(),
+            true
+        );
         
         // 🚨 EMERGENCY FABRIC.JS LOADER - Direct CDN Loading Solution
         wp_register_script(
@@ -118,7 +118,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load after emergency fabric loader
+            ['octo-print-designer-vendor', 'octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load vendor bundle + emergency fabric loader
             rand(),
             true
         );
