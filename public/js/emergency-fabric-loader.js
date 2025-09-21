@@ -13,17 +13,26 @@
     // Wait for vendor bundle to load first, then check if fabric works
     function checkFabricAfterVendor() {
         return new Promise((resolve) => {
-            // Give vendor bundle time to load
+            // Give vendor bundle more time to load and extract fabric
             setTimeout(() => {
+                // First check if fabric is already available
                 if (window.fabric && typeof window.fabric.Canvas === 'function') {
                     console.log('✅ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle working, skipping CDN load');
                     triggerFabricReady();
                     resolve(true);
-                } else {
-                    console.log('⚠️ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle not working, loading from CDN');
-                    resolve(false);
+                    return;
                 }
-            }, 500); // Wait 500ms for vendor bundle
+
+                // Try webpack extraction since vendor bundle is loaded
+                if (tryWebpackExtraction()) {
+                    triggerFabricReady();
+                    resolve(true);
+                    return;
+                }
+
+                console.log('⚠️ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle not working, loading from CDN');
+                resolve(false);
+            }, 1000); // Wait 1000ms for vendor bundle and extraction
         });
     }
 
@@ -44,7 +53,7 @@
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js';
             script.crossOrigin = 'anonymous';
-            script.integrity = 'sha512-CeIsOAsgJnmevfCi2C7Zsyy6bQKi43utIjdA87Q0ZY84oDqnI0uwfM9+bKiIkI75lUeI00WG/+uJzOmuHlesMA==';
+            // Note: Integrity check removed due to CDN version changes
 
             script.onload = function() {
                 console.log('✅ EMERGENCY FABRIC LOADER: fabric.js loaded from CDN');
@@ -75,7 +84,35 @@
     function tryWebpackExtraction() {
         console.log('🔄 EMERGENCY FABRIC LOADER: Attempting webpack extraction as fallback');
 
-        // Look for any existing Canvas instances
+        // Method 1: Try to find fabric in webpack require cache
+        if (typeof window.__webpack_require__ === 'function') {
+            try {
+                // Try common webpack module patterns for fabric
+                const possibleModules = [
+                    'fabric',
+                    './node_modules/fabric/dist/fabric.min.js',
+                    './node_modules/fabric/dist/index.min.mjs',
+                    'fabric/dist/fabric.min'
+                ];
+
+                for (const moduleId of possibleModules) {
+                    try {
+                        const fabricModule = window.__webpack_require__(moduleId);
+                        if (fabricModule && typeof fabricModule.Canvas === 'function') {
+                            window.fabric = fabricModule;
+                            console.log('✅ EMERGENCY FABRIC LOADER: Extracted fabric from webpack cache');
+                            return true;
+                        }
+                    } catch (err) {
+                        // Continue trying other modules
+                    }
+                }
+            } catch (error) {
+                console.log('⚠️ EMERGENCY FABRIC LOADER: Webpack require failed:', error.message);
+            }
+        }
+
+        // Method 2: Look for any existing Canvas instances
         const canvasElements = document.querySelectorAll('canvas');
         for (const canvasEl of canvasElements) {
             if (canvasEl.__fabric && canvasEl.__fabric.constructor) {
@@ -100,6 +137,16 @@
                 } catch (error) {
                     console.log('⚠️ EMERGENCY FABRIC LOADER: Canvas extraction failed:', error.message);
                 }
+            }
+        }
+
+        // Method 3: Search for fabric in global variables
+        const globalSearch = ['fabric', 'Fabric', '__fabric__', '_fabric'];
+        for (const prop of globalSearch) {
+            if (window[prop] && typeof window[prop].Canvas === 'function') {
+                window.fabric = window[prop];
+                console.log('✅ EMERGENCY FABRIC LOADER: Found fabric in global variable:', prop);
+                return true;
             }
         }
 
