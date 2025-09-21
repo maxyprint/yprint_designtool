@@ -88,21 +88,22 @@ class Octo_Print_Designer_Public {
 	 */
 	public function enqueue_scripts() {
 
-        wp_register_script(
-            'octo-print-designer-vendor',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
-            [],
-            rand(),
-            true
-        );
+        // 🚨 VENDOR BUNDLE DISABLED: Emergency fabric loader provides fabric.js directly
+        // wp_register_script(
+        //     'octo-print-designer-vendor',
+        //     OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
+        //     [],
+        //     rand(),
+        //     true
+        // );
         
-        // 🚨 CRITICAL FABRIC.JS EXPOSURE FIX - Issue #11
+        // 🚨 EMERGENCY FABRIC.JS LOADER - Direct CDN Loading Solution
         wp_register_script(
-            'octo-print-designer-fabric-fix',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposure-fix.js',
-            [],
+            'octo-print-designer-emergency-fabric',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
+            [], // Load independently of other scripts
             rand(),
-            true
+            false // Load in head for immediate availability
         );
 
         // 🚨 CRITICAL STRIPE SERVICE FIX - Issue #11
@@ -117,7 +118,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-fabric-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 CRITICAL: fabric-fix as MANDATORY dependency
+            ['octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load after emergency fabric loader
             rand(),
             true
         );
@@ -131,101 +132,25 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🚨 CRITICAL FABRIC EXPOSURE FIX: Expose fabric via DesignerWidget
+        // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
         wp_add_inline_script('octo-print-designer-designer', '
-            // Robust fabric exposure that works with webpack module system
+            // Verify emergency fabric loader worked
             (function() {
-                console.log("🔧 FABRIC EXPOSURE: Starting robust fabric extraction");
+                console.log("🔍 EMERGENCY FABRIC VERIFICATION: Checking if fabric is available");
 
-                let fabricExposed = false;
-                let retryCount = 0;
-                const maxRetries = 50; // 5 seconds maximum
-
-                function exposeFabricFromDesigner() {
-                    // Method 1: Extract from DesignerWidget instance if available
-                    if (window.designerWidgetInstance && window.designerWidgetInstance.fabricCanvas) {
-                        try {
-                            const canvasInstance = window.designerWidgetInstance.fabricCanvas;
-                            if (canvasInstance && canvasInstance.constructor) {
-                                // Extract fabric namespace from Canvas constructor
-                                const fabricNamespace = canvasInstance.constructor;
-
-                                // Build complete fabric object from Canvas constructor
-                                window.fabric = {
-                                    Canvas: fabricNamespace,
-                                    Image: fabricNamespace.Image || (canvasInstance.Image ? canvasInstance.Image.constructor : null),
-                                    Object: fabricNamespace.Object || (canvasInstance.Object ? canvasInstance.Object.constructor : null),
-                                    Text: fabricNamespace.Text || null,
-                                    IText: fabricNamespace.IText || null,
-                                    Group: fabricNamespace.Group || null,
-                                    util: fabricNamespace.util || {}
-                                };
-
-                                console.log("✅ FABRIC EXPOSURE: Extracted from DesignerWidget Canvas instance");
-                                fabricExposed = true;
-                                triggerFabricReady();
-                                return true;
-                            }
-                        } catch (error) {
-                            console.log("⚠️ FABRIC EXPOSURE: DesignerWidget extraction failed:", error.message);
-                        }
-                    }
-
-                    // Method 2: Look for any Canvas instances in DOM
-                    const canvasElements = document.querySelectorAll("canvas");
-                    for (const canvasEl of canvasElements) {
-                        if (canvasEl.__fabric && canvasEl.__fabric.constructor) {
-                            try {
-                                const CanvasConstructor = canvasEl.__fabric.constructor;
-                                window.fabric = {
-                                    Canvas: CanvasConstructor,
-                                    Image: CanvasConstructor.Image || null,
-                                    Object: CanvasConstructor.Object || null,
-                                    Text: CanvasConstructor.Text || null,
-                                    IText: CanvasConstructor.IText || null
-                                };
-                                console.log("✅ FABRIC EXPOSURE: Extracted from DOM Canvas element");
-                                fabricExposed = true;
-                                triggerFabricReady();
-                                return true;
-                            } catch (error) {
-                                console.log("⚠️ FABRIC EXPOSURE: DOM Canvas extraction failed:", error.message);
-                            }
-                        }
-                    }
-
-                    return false;
-                }
-
-                function triggerFabricReady() {
-                    window.dispatchEvent(new CustomEvent("fabricGlobalReady", {
-                        detail: { fabric: window.fabric, source: "robust-extraction" }
-                    }));
-                    console.log("🎉 FABRIC EXPOSURE: window.fabric successfully exposed and ready event dispatched");
-                }
-
-                function retryExposure() {
-                    if (fabricExposed || retryCount >= maxRetries) {
-                        if (!fabricExposed) {
-                            console.error("❌ FABRIC EXPOSURE: Failed after", maxRetries, "attempts");
-                        }
-                        return;
-                    }
-
-                    retryCount++;
-                    console.log("🔄 FABRIC EXPOSURE: Attempt", retryCount + "/" + maxRetries);
-
-                    if (exposeFabricFromDesigner()) {
-                        return; // Success
-                    }
-
-                    setTimeout(retryExposure, 100);
-                }
-
-                // Start immediately
-                if (!exposeFabricFromDesigner()) {
-                    // Retry with delays
-                    setTimeout(retryExposure, 100);
+                if (typeof window.fabric !== "undefined" && window.fabric.Canvas) {
+                    console.log("✅ EMERGENCY FABRIC VERIFICATION: window.fabric verified available");
+                    console.log("Fabric details:", {
+                        hasCanvas: typeof window.fabric.Canvas !== "undefined",
+                        hasImage: typeof window.fabric.Image !== "undefined",
+                        source: window.emergencyFabricLoaded ? "emergency-loader" : "unknown"
+                    });
+                } else {
+                    console.error("❌ EMERGENCY FABRIC VERIFICATION: window.fabric still not available");
+                    console.error("Emergency loader status:", {
+                        emergencyActive: window.emergencyFabricLoaderActive || false,
+                        emergencyLoaded: window.emergencyFabricLoaded || false
+                    });
                 }
             })();
         ', 'after');
@@ -237,6 +162,7 @@ class Octo_Print_Designer_Public {
             'loginUrl' => Octo_Print_Designer_Settings::get_login_url(),
         ]);
 
+        // Products listing can work without fabric.js vendor bundle
         wp_register_script(
             'octo-print-designer-products-listing-vendor',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
@@ -276,8 +202,9 @@ class Octo_Print_Designer_Public {
     public function add_fabric_preload_hints() {
         // Only add preload hints on designer pages
         if (is_page() || (function_exists('is_woocommerce') && is_woocommerce())) {
-            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js" as="script" crossorigin="anonymous">' . "\n";
-            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposure-fix.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="dns-prefetch" href="cdnjs.cloudflare.com">' . "\n";
             echo '<link rel="dns-prefetch" href="' . parse_url(OCTO_PRINT_DESIGNER_URL, PHP_URL_HOST) . '">' . "\n";
         }
     }
