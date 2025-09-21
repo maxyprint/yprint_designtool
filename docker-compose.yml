@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  wordpress-test:
+    image: wordpress:6.4-apache
+    container_name: yprint-wp-test
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql-test:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_DB_NAME: wordpress_test
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_DEBUG_LOG: 1
+    volumes:
+      - ./wp-test-data:/var/www/html/wp-content
+      - ./public:/var/www/html/wp-content/plugins/octo-print-designer
+      - ./test-wordpress-config/wordpress-config.php:/var/www/html/wp-config-custom.php
+    depends_on:
+      - mysql-test
+    networks:
+      - wordpress-test-network
+
+  mysql-test:
+    image: mysql:8.0
+    container_name: yprint-mysql-test
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress_test
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - mysql-test-data:/var/lib/mysql
+      - ./test-wordpress-config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - wordpress-test-network
+
+  phpmyadmin-test:
+    image: phpmyadmin/phpmyadmin
+    container_name: yprint-phpmyadmin-test
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    environment:
+      PMA_HOST: mysql-test
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress_password
+    depends_on:
+      - mysql-test
+    networks:
+      - wordpress-test-network
+
+  # WebSocket Test Server Integration
+  websocket-test-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    container_name: yprint-websocket-test
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./websocket-server.js:/app/websocket-server.js
+      - ./test-results:/app/test-results
+    environment:
+      NODE_ENV: test
+      WORDPRESS_TEST_URL: http://wordpress-test
+    depends_on:
+      - wordpress-test
+    networks:
+      - wordpress-test-network
+
+  # Browser Automation for Testing
+  puppeteer-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.puppeteer
+    container_name: yprint-puppeteer-test
+    restart: unless-stopped
+    volumes:
+      - ./test-automation:/app/tests
+      - ./test-results:/app/results
+    environment:
+      WORDPRESS_TEST_URL: http://wordpress-test:80
+      WEBSOCKET_SERVER: ws://websocket-test-server:8080
+    depends_on:
+      - wordpress-test
+      - websocket-test-server
+    networks:
+      - wordpress-test-network
+
+volumes:
+  mysql-test-data:
+  wp-test-data:
+
+networks:
+  wordpress-test-network:
+    driver: bridge

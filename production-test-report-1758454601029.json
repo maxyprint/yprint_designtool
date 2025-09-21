@@ -1,0 +1,481 @@
+{
+  "timestamp": "2025-09-21T11:36:41.028Z",
+  "testEnvironment": "Production Simulator",
+  "timingSequence": {
+    "domReady": 265.503959,
+    "fabricLoaded": 587.103334,
+    "designerBundle": 759.8572919999999,
+    "canvasCreated": 1120.349917
+  },
+  "simulationLog": [
+    {
+      "timestamp": 2,
+      "message": "Initializing production test simulation...",
+      "type": "info"
+    },
+    {
+      "timestamp": 2,
+      "message": "Starting WordPress script loading simulation...",
+      "type": "info"
+    },
+    {
+      "timestamp": 266,
+      "message": "DOM Ready event fired",
+      "type": "timing"
+    },
+    {
+      "timestamp": 267,
+      "message": "Designer Bundle DOMContentLoaded listener triggered",
+      "type": "race"
+    },
+    {
+      "timestamp": 268,
+      "message": "Comprehensive Capture DOMContentLoaded listener triggered",
+      "type": "race"
+    },
+    {
+      "timestamp": 268,
+      "message": "Canvas detection test at 268ms: FAILED",
+      "type": "error"
+    },
+    {
+      "timestamp": 269,
+      "message": "Other plugins DOMContentLoaded listeners triggered",
+      "type": "race"
+    },
+    {
+      "timestamp": 587,
+      "message": "Fabric.js vendor bundle loaded",
+      "type": "timing"
+    },
+    {
+      "timestamp": 760,
+      "message": "Designer bundle loaded",
+      "type": "timing"
+    },
+    {
+      "timestamp": 871,
+      "message": "DesignerWidget instance created",
+      "type": "timing"
+    },
+    {
+      "timestamp": 1120,
+      "message": "Fabric canvas created and available",
+      "type": "timing"
+    },
+    {
+      "timestamp": 1121,
+      "message": "WordPress script loading simulation completed",
+      "type": "success"
+    },
+    {
+      "timestamp": 1121,
+      "message": "Testing Comprehensive Capture at different timing points...",
+      "type": "info"
+    },
+    {
+      "timestamp": 1124,
+      "message": "Immediate (DOMContentLoaded): FAILED",
+      "type": "error"
+    },
+    {
+      "timestamp": 1627,
+      "message": "After 500ms: FAILED",
+      "type": "error"
+    },
+    {
+      "timestamp": 2628,
+      "message": "After 1000ms: FAILED",
+      "type": "error"
+    },
+    {
+      "timestamp": 4130,
+      "message": "After 1500ms: FAILED",
+      "type": "error"
+    },
+    {
+      "timestamp": 4130,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4130,
+      "message": "RACE CONDITION ANALYSIS",
+      "type": "info"
+    },
+    {
+      "timestamp": 4130,
+      "message": "=======================",
+      "type": "info"
+    },
+    {
+      "timestamp": 4130,
+      "message": "Timing Sequence:",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4130,
+      "message": "  domReady: 266ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4130,
+      "message": "  fabricLoaded: 587ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4130,
+      "message": "  designerBundle: 760ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4130,
+      "message": "  canvasCreated: 1120ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4130,
+      "message": "1 Race Conditions detected!",
+      "type": "error"
+    },
+    {
+      "timestamp": 4130,
+      "message": "  Race 1: Canvas not available during DOMContentLoaded",
+      "type": "race"
+    },
+    {
+      "timestamp": 4131,
+      "message": "    Test time: 268ms",
+      "type": "race"
+    },
+    {
+      "timestamp": 4131,
+      "message": "    Canvas available: NaNms",
+      "type": "race"
+    },
+    {
+      "timestamp": 4131,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "Test Results:",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  Total tests: 4",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  Successful: 0",
+      "type": "success"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  Failed: 4",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "Failed test details:",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  Immediate (DOMContentLoaded): Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  After 500ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  After 1000ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "  After 1500ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "CONCLUSION:",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "===========",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "❌ PRODUCTION ISSUES DETECTED!",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   - Race conditions between DOMContentLoaded events",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   - Canvas detection fails at specific timing points",
+      "type": "error"
+    },
+    {
+      "timestamp": 4131,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4131,
+      "message": "RECOMMENDED FIXES:",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   1. Replace DOMContentLoaded with polling-based detection",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   2. Implement retry mechanism with exponential backoff",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   3. Add MutationObserver for canvas creation monitoring",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4131,
+      "message": "   4. Use event-driven approach instead of immediate execution",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4132,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "RACE CONDITION ANALYSIS",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "=======================",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "Timing Sequence:",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  domReady: 266ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  fabricLoaded: 587ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  designerBundle: 760ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  canvasCreated: 1120ms",
+      "type": "timing"
+    },
+    {
+      "timestamp": 4132,
+      "message": "1 Race Conditions detected!",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  Race 1: Canvas not available during DOMContentLoaded",
+      "type": "race"
+    },
+    {
+      "timestamp": 4132,
+      "message": "    Test time: 268ms",
+      "type": "race"
+    },
+    {
+      "timestamp": 4132,
+      "message": "    Canvas available: NaNms",
+      "type": "race"
+    },
+    {
+      "timestamp": 4132,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "Test Results:",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  Total tests: 4",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  Successful: 0",
+      "type": "success"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  Failed: 4",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "Failed test details:",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  Immediate (DOMContentLoaded): Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  After 500ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  After 1000ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "  After 1500ms: Canvas available = true",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "CONCLUSION:",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "===========",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "❌ PRODUCTION ISSUES DETECTED!",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   - Race conditions between DOMContentLoaded events",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   - Canvas detection fails at specific timing points",
+      "type": "error"
+    },
+    {
+      "timestamp": 4132,
+      "message": "",
+      "type": "info"
+    },
+    {
+      "timestamp": 4132,
+      "message": "RECOMMENDED FIXES:",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   1. Replace DOMContentLoaded with polling-based detection",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   2. Implement retry mechanism with exponential backoff",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   3. Add MutationObserver for canvas creation monitoring",
+      "type": "warning"
+    },
+    {
+      "timestamp": 4132,
+      "message": "   4. Use event-driven approach instead of immediate execution",
+      "type": "warning"
+    }
+  ],
+  "testResults": [
+    {
+      "testPoint": "Immediate (DOMContentLoaded)",
+      "timestamp": 1123.956584,
+      "success": false,
+      "canvasAvailable": true
+    },
+    {
+      "testPoint": "After 500ms",
+      "timestamp": 1626.491917,
+      "success": false,
+      "canvasAvailable": true
+    },
+    {
+      "testPoint": "After 1000ms",
+      "timestamp": 2627.718292,
+      "success": false,
+      "canvasAvailable": true
+    },
+    {
+      "testPoint": "After 1500ms",
+      "timestamp": 4130.096834,
+      "success": false,
+      "canvasAvailable": true
+    }
+  ],
+  "raceConditionsDetected": [
+    {
+      "testTime": 268.25854200000003,
+      "issue": "Canvas not available during DOMContentLoaded",
+      "expectedCanvasTime": "unknown",
+      "raceCondition": true
+    }
+  ],
+  "analysis": {
+    "raceConditionsDetected": true,
+    "failedTests": true,
+    "summary": {
+      "totalTests": 4,
+      "successfulTests": 0,
+      "failedTests": 4,
+      "raceConditions": 1
+    }
+  }
+}

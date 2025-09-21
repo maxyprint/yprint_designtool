@@ -75,11 +75,14 @@ class Octo_Print_Designer_Designer {
         // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
         wp_enqueue_script('octo-print-designer-global-instance');
 
-        // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system
-        wp_enqueue_script('octo-print-designer-data-capture');
+        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Enqueue race condition-free capture system
+        wp_enqueue_script('octo-print-designer-production-capture');
 
-        // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Enqueue advanced capture system
-        wp_enqueue_script('octo-print-designer-comprehensive-capture');
+        // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system (LEGACY)
+        // wp_enqueue_script('octo-print-designer-data-capture');
+
+        // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Enqueue advanced capture system (DEPRECATED)
+        // wp_enqueue_script('octo-print-designer-comprehensive-capture');
 
 
 // Fabric.js global verfügbar machen NACH dem Designer Bundle

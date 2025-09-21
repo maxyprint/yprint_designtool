@@ -1,0 +1,1305 @@
+{
+  "timestamp": "2025-09-21T11:29:39.383Z",
+  "testSuiteVersion": "1.0.0",
+  "totalDuration": 42136,
+  "globalResults": {
+    "totalTests": 96,
+    "passedTests": 51,
+    "failedTests": 45,
+    "raceConditions": 6,
+    "timingIssues": 10,
+    "criticalErrors": 0
+  },
+  "sessions": [
+    {
+      "id": "session_1758454137251_0xqznp",
+      "name": "Standard WordPress Installation",
+      "config": {
+        "domReadyDelay": [
+          100,
+          200
+        ],
+        "fabricLoadDelay": [
+          300,
+          500
+        ],
+        "bundleLoadDelay": [
+          200,
+          400
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          150,
+          250
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": false,
+        "testMobileDevice": false,
+        "testOldBrowser": false,
+        "cpuThrottling": 1,
+        "memoryPressure": false,
+        "networkLatency": 0,
+        "simulateOtherPlugins": false,
+        "simulateThemeConflicts": false
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 9,
+        "failedTests": 7,
+        "successRate": 56
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 1255.353625
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 1356.77025
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 1608.731083
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 2109.845666
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 3111.157458
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 4612.136125
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 147.6945,
+            "canvasCreatedTime": 1254.7984999999999,
+            "timeDifference": 1107.1039999999998,
+            "raceConditionDetected": true
+          },
+          "timestamp": 4613.174041
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 4613.24275
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 642.2210409999999,
+            "bundleLoadTime": 1021.664708,
+            "canvasCreationTime": 1254.7984999999999,
+            "correctOrder": true
+          },
+          "timestamp": 4613.308541
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 4613.440208
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 4613.447333
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 4613.451666
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 4613.4555
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 4613.459041
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 4613.462625
+        },
+        {
+          "testName": "performance_metrics",
+          "success": true,
+          "details": {
+            "totalLoadTime": {
+              "value": 1107,
+              "threshold": 3000,
+              "withinThreshold": true
+            },
+            "fabricLoadTime": {
+              "value": 495,
+              "threshold": 1000,
+              "withinThreshold": true
+            },
+            "bundleLoadTime": {
+              "value": 379,
+              "threshold": 800,
+              "withinThreshold": true
+            },
+            "canvasCreationTime": {
+              "value": 233,
+              "threshold": 500,
+              "withinThreshold": true
+            }
+          },
+          "timestamp": 4613.74675
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 147.6945,
+          "fabricLoaded": 642.2210409999999,
+          "bundleLoaded": 1021.664708,
+          "widgetCreated": 1094.221916,
+          "canvasCreated": 1254.7984999999999
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "session_1758454141862_ldg72k",
+      "name": "Slow WordPress Installation (Shared Hosting)",
+      "config": {
+        "domReadyDelay": [
+          200,
+          500
+        ],
+        "fabricLoadDelay": [
+          500,
+          1000
+        ],
+        "bundleLoadDelay": [
+          400,
+          800
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          300,
+          600
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": true,
+        "testMobileDevice": false,
+        "testOldBrowser": false,
+        "cpuThrottling": 1,
+        "memoryPressure": false,
+        "networkLatency": 200,
+        "simulateOtherPlugins": false,
+        "simulateThemeConflicts": false
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 8,
+        "failedTests": 8,
+        "successRate": 50
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 7557.104375
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 7658.665208
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 7910.3175
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 8411.916916
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 9413.497
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 10915.472916
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 5047.865708,
+            "canvasCreatedTime": 7555.692583,
+            "timeDifference": 2507.8268749999997,
+            "raceConditionDetected": true
+          },
+          "timestamp": 10916.124583
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 10916.137125
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 5976.7669160000005,
+            "bundleLoadTime": 6905.0851250000005,
+            "canvasCreationTime": 7555.692583,
+            "correctOrder": true
+          },
+          "timestamp": 10916.153958
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 10916.187833
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 10916.195041
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 10916.199958000001
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 10916.204375
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 10916.216
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 10916.22525
+        },
+        {
+          "testName": "performance_metrics",
+          "success": false,
+          "details": {
+            "totalLoadTime": {
+              "value": 2508,
+              "threshold": 3000,
+              "withinThreshold": true
+            },
+            "fabricLoadTime": {
+              "value": 929,
+              "threshold": 1000,
+              "withinThreshold": true
+            },
+            "bundleLoadTime": {
+              "value": 928,
+              "threshold": 800,
+              "withinThreshold": false
+            },
+            "canvasCreationTime": {
+              "value": 651,
+              "threshold": 500,
+              "withinThreshold": false
+            }
+          },
+          "timestamp": 10916.286041
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 5047.865708,
+          "fabricLoaded": 5976.7669160000005,
+          "bundleLoaded": 6905.0851250000005,
+          "widgetCreated": 7054.381083,
+          "canvasCreated": 7555.692583
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "session_1758454148165_x9y3tk",
+      "name": "Fast WordPress Installation (Optimized)",
+      "config": {
+        "domReadyDelay": [
+          50,
+          100
+        ],
+        "fabricLoadDelay": [
+          100,
+          200
+        ],
+        "bundleLoadDelay": [
+          75,
+          150
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          50,
+          100
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": false,
+        "testMobileDevice": false,
+        "testOldBrowser": false,
+        "cpuThrottling": 1,
+        "memoryPressure": false,
+        "networkLatency": 0,
+        "simulateOtherPlugins": false,
+        "simulateThemeConflicts": false
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 9,
+        "failedTests": 7,
+        "successRate": 56
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 11414.528333
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 11515.964041
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 11767.566208
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 12269.136041
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 13270.936541000001
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 14771.676375000001
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 10986.255708,
+            "canvasCreatedTime": 11413.124708,
+            "timeDifference": 426.8689999999988,
+            "raceConditionDetected": true
+          },
+          "timestamp": 14772.612041
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 14772.64875
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 11108.533375,
+            "bundleLoadTime": 11257.6845,
+            "canvasCreationTime": 11413.124708,
+            "correctOrder": true
+          },
+          "timestamp": 14772.663083
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 14772.9205
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 14772.929083
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 14772.942083
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 14772.945083
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 14772.946750000001
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 14772.948416
+        },
+        {
+          "testName": "performance_metrics",
+          "success": true,
+          "details": {
+            "totalLoadTime": {
+              "value": 427,
+              "threshold": 3000,
+              "withinThreshold": true
+            },
+            "fabricLoadTime": {
+              "value": 122,
+              "threshold": 1000,
+              "withinThreshold": true
+            },
+            "bundleLoadTime": {
+              "value": 149,
+              "threshold": 800,
+              "withinThreshold": true
+            },
+            "canvasCreationTime": {
+              "value": 155,
+              "threshold": 500,
+              "withinThreshold": true
+            }
+          },
+          "timestamp": 14773.0385
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 10986.255708,
+          "fabricLoaded": 11108.533375,
+          "bundleLoaded": 11257.6845,
+          "widgetCreated": 11333.880583,
+          "canvasCreated": 11413.124708
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "session_1758454152021_mngqh6",
+      "name": "WordPress with Plugin Conflicts",
+      "config": {
+        "domReadyDelay": [
+          150,
+          400
+        ],
+        "fabricLoadDelay": [
+          400,
+          800
+        ],
+        "bundleLoadDelay": [
+          300,
+          600
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          100,
+          300
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": false,
+        "testMobileDevice": false,
+        "testOldBrowser": false,
+        "cpuThrottling": 1,
+        "memoryPressure": false,
+        "networkLatency": 0,
+        "simulateOtherPlugins": true,
+        "simulateThemeConflicts": true
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 9,
+        "failedTests": 7,
+        "successRate": 56
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 16355.231041000001
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 16457.149332999998
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 16708.581166
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 17210.146624999998
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 18211.621625
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 19713.676915999997
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 15167.590125,
+            "canvasCreatedTime": 16353.831083000001,
+            "timeDifference": 1186.2409580000003,
+            "raceConditionDetected": true
+          },
+          "timestamp": 19714.172832999997
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 19714.185166
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 15698.931333,
+            "bundleLoadTime": 16127.318666000001,
+            "canvasCreationTime": 16353.831083000001,
+            "correctOrder": true
+          },
+          "timestamp": 19714.192583
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 19714.216207999998
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 19714.218707999997
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 19714.226916
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 19714.228
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 19714.228958
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 19714.229958
+        },
+        {
+          "testName": "performance_metrics",
+          "success": true,
+          "details": {
+            "totalLoadTime": {
+              "value": 1186,
+              "threshold": 3000,
+              "withinThreshold": true
+            },
+            "fabricLoadTime": {
+              "value": 531,
+              "threshold": 1000,
+              "withinThreshold": true
+            },
+            "bundleLoadTime": {
+              "value": 428,
+              "threshold": 800,
+              "withinThreshold": true
+            },
+            "canvasCreationTime": {
+              "value": 227,
+              "threshold": 500,
+              "withinThreshold": true
+            }
+          },
+          "timestamp": 19714.265375
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 15167.590125,
+          "fabricLoaded": 15698.931333,
+          "bundleLoaded": 16127.318666000001,
+          "widgetCreated": 16215.5775,
+          "canvasCreated": 16353.831083000001
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "session_1758454156963_h9o5ch",
+      "name": "Mobile Device Simulation",
+      "config": {
+        "domReadyDelay": [
+          300,
+          600
+        ],
+        "fabricLoadDelay": [
+          600,
+          1200
+        ],
+        "bundleLoadDelay": [
+          500,
+          1000
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          100,
+          300
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": false,
+        "testMobileDevice": true,
+        "testOldBrowser": false,
+        "cpuThrottling": 4,
+        "memoryPressure": true,
+        "networkLatency": 0,
+        "simulateOtherPlugins": false,
+        "simulateThemeConflicts": false
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 8,
+        "failedTests": 8,
+        "successRate": 50
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 31569.206749999998
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 31672.952875
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 31925.208666
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 32426.557416
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 33427.930041
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 34929.385083
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 21859.703332999998,
+            "canvasCreatedTime": 31568.892957999997,
+            "timeDifference": 9709.189624999999,
+            "raceConditionDetected": true
+          },
+          "timestamp": 34929.982040999996
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 34929.990583
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 26403.937166,
+            "bundleLoadTime": 30184.275290999998,
+            "canvasCreationTime": 31568.892957999997,
+            "correctOrder": true
+          },
+          "timestamp": 34929.999665999996
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 34930.032290999996
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 34930.035625
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 34930.037583
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 34930.039040999996
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 34930.040333
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 34930.041790999996
+        },
+        {
+          "testName": "performance_metrics",
+          "success": false,
+          "details": {
+            "totalLoadTime": {
+              "value": 9709,
+              "threshold": 3000,
+              "withinThreshold": false
+            },
+            "fabricLoadTime": {
+              "value": 4544,
+              "threshold": 1000,
+              "withinThreshold": false
+            },
+            "bundleLoadTime": {
+              "value": 3780,
+              "threshold": 800,
+              "withinThreshold": false
+            },
+            "canvasCreationTime": {
+              "value": 1385,
+              "threshold": 500,
+              "withinThreshold": false
+            }
+          },
+          "timestamp": 34930.091958
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 21859.703332999998,
+          "fabricLoaded": 26403.937166,
+          "bundleLoaded": 30184.275290999998,
+          "widgetCreated": 30497.575791,
+          "canvasCreated": 31568.892957999997
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "session_1758454172179_xj73vs",
+      "name": "Old Browser Simulation (IE11/Safari)",
+      "config": {
+        "domReadyDelay": [
+          200,
+          500
+        ],
+        "fabricLoadDelay": [
+          500,
+          1000
+        ],
+        "bundleLoadDelay": [
+          400,
+          800
+        ],
+        "widgetCreationDelay": [
+          50,
+          150
+        ],
+        "canvasCreationDelay": [
+          100,
+          300
+        ],
+        "testDOMContentLoadedRace": true,
+        "testMultipleCanvases": false,
+        "testScriptLoadingErrors": false,
+        "testSlowNetwork": false,
+        "testMobileDevice": false,
+        "testOldBrowser": true,
+        "cpuThrottling": 2,
+        "memoryPressure": false,
+        "networkLatency": 0,
+        "simulateOtherPlugins": false,
+        "simulateThemeConflicts": false
+      },
+      "summary": {
+        "totalTests": 16,
+        "successfulTests": 8,
+        "failedTests": 8,
+        "successRate": 50
+      },
+      "results": [
+        {
+          "testName": "canvas_detection_immediate__domcontentloaded_",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 38776.163875
+        },
+        {
+          "testName": "canvas_detection_after_100ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 38877.677458
+        },
+        {
+          "testName": "canvas_detection_after_250ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 39129.227
+        },
+        {
+          "testName": "canvas_detection_after_500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 39630.634791
+        },
+        {
+          "testName": "canvas_detection_after_1000ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 40631.815958
+        },
+        {
+          "testName": "canvas_detection_after_1500ms",
+          "success": false,
+          "error": "ComprehensiveDesignDataCapture not defined",
+          "timestamp": 42133.944333
+        },
+        {
+          "testName": "race_condition_domcontentloaded_vs_canvas_creation",
+          "success": false,
+          "details": {
+            "domReadyTime": 35763.528458,
+            "canvasCreatedTime": 38774.780999999995,
+            "timeDifference": 3011.2525419999947,
+            "raceConditionDetected": true
+          },
+          "timestamp": 42134.391291
+        },
+        {
+          "testName": "race_condition_multiple_domcontentloaded_listeners",
+          "success": true,
+          "details": {
+            "callbackCount": 0,
+            "acceptable": true
+          },
+          "timestamp": 42134.397165999995
+        },
+        {
+          "testName": "race_condition_script_loading_order_race",
+          "success": true,
+          "details": {
+            "fabricLoadTime": 36911.032541,
+            "bundleLoadTime": 38019.240957999995,
+            "canvasCreationTime": 38774.780999999995,
+            "correctOrder": true
+          },
+          "timestamp": 42134.402916
+        },
+        {
+          "testName": "edge_case_canvas_not_found",
+          "success": true,
+          "details": {
+            "edgeCase": "Canvas Not Found"
+          },
+          "timestamp": 42134.422166
+        },
+        {
+          "testName": "edge_case_multiple_canvas_elements",
+          "success": true,
+          "details": {
+            "edgeCase": "Multiple Canvas Elements"
+          },
+          "timestamp": 42134.424541
+        },
+        {
+          "testName": "edge_case_fabric_js_load_error",
+          "success": true,
+          "details": {
+            "edgeCase": "Fabric.js Load Error"
+          },
+          "timestamp": 42134.426
+        },
+        {
+          "testName": "edge_case_invalid_canvas_state",
+          "success": true,
+          "details": {
+            "edgeCase": "Invalid Canvas State"
+          },
+          "timestamp": 42134.427166
+        },
+        {
+          "testName": "edge_case_memory_pressure",
+          "success": true,
+          "details": {
+            "edgeCase": "Memory Pressure"
+          },
+          "timestamp": 42134.428083
+        },
+        {
+          "testName": "edge_case_cpu_throttling",
+          "success": true,
+          "details": {
+            "edgeCase": "CPU Throttling"
+          },
+          "timestamp": 42134.428958
+        },
+        {
+          "testName": "performance_metrics",
+          "success": false,
+          "details": {
+            "totalLoadTime": {
+              "value": 3011,
+              "threshold": 3000,
+              "withinThreshold": false
+            },
+            "fabricLoadTime": {
+              "value": 1148,
+              "threshold": 1000,
+              "withinThreshold": false
+            },
+            "bundleLoadTime": {
+              "value": 1108,
+              "threshold": 800,
+              "withinThreshold": false
+            },
+            "canvasCreationTime": {
+              "value": 756,
+              "threshold": 500,
+              "withinThreshold": false
+            }
+          },
+          "timestamp": 42134.460208
+        }
+      ],
+      "environment": {
+        "timing": {
+          "domReady": 35763.528458,
+          "fabricLoaded": 36911.032541,
+          "bundleLoaded": 38019.240957999995,
+          "widgetCreated": 38197.505416,
+          "canvasCreated": 38774.780999999995
+        },
+        "state": {
+          "domReady": true,
+          "fabricAvailable": true,
+          "bundleLoaded": true,
+          "widgetCreated": true,
+          "canvasAvailable": true,
+          "canvasElements": [
+            {
+              "__fabric": {
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "analysis": {
+    "overallSuccessRate": 53,
+    "raceConditionRate": 6,
+    "timingIssueRate": 10,
+    "criticalErrorRate": 0,
+    "severity": "LOW",
+    "status": "RACE_CONDITIONS"
+  },
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "category": "Race Conditions",
+      "issue": "DOMContentLoaded race conditions detected",
+      "solution": "Implement polling-based canvas detection with retry mechanism",
+      "impact": "Critical - System fails in production"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Performance",
+      "issue": "Slow loading times detected",
+      "solution": "Optimize script loading order and add performance monitoring",
+      "impact": "User experience degradation"
+    }
+  ]
+}
