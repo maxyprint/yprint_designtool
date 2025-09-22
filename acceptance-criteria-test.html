@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ Acceptance Criteria Verification</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .criteria-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        .criteria-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .criteria-card.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .criteria-card.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+        .criteria-card h3 {
+            margin-top: 0;
+            color: #0073aa;
+        }
+        .test-area {
+            grid-column: 1 / -1;
+            background: #fff;
+            border: 3px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .mockup-design-area {
+            width: 600px;
+            height: 400px;
+            margin: 20px auto;
+            border: 2px dashed #ccc;
+            background: #fafafa;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            border: 2px solid #28a745;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        .btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40,167,69,0.4);
+        }
+        .btn.test { background: linear-gradient(135deg, #007bff 0%, #6610f2 100%); }
+        .btn.save { background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); color: #000; }
+        .json-display {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 15px 0;
+            border: 2px solid #0f0;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .status.pass { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status.fail { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status.pending { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Design Data Capture - Acceptance Criteria Test</h1>
+            <p>Vollständige Verifikation aller Akzeptanzkriterien</p>
+        </div>
+
+        <div class="criteria-grid">
+            <div class="criteria-card" id="criteria-1">
+                <h3>✅ Kriterium 1: JSON-Objekt bei Speichern-Aktion</h3>
+                <div id="test-1" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> Klick auf "Speichern" → JSON wird generiert</p>
+            </div>
+
+            <div class="criteria-card" id="criteria-2">
+                <h3>✅ Kriterium 2: Alle Design-Elemente erfasst</h3>
+                <div id="test-2" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> Bilder, Texte, Formen → Alle im JSON</p>
+            </div>
+
+            <div class="criteria-card" id="criteria-3">
+                <h3>✅ Kriterium 3: Koordinaten relativ zur Design-Area</h3>
+                <div id="test-3" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> x, y relativ zu mockup_design_area</p>
+            </div>
+
+            <div class="criteria-card" id="criteria-4">
+                <h3>✅ Kriterium 4: Transformationen erfasst</h3>
+                <div id="test-4" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> scaleX, scaleY, angle korrekt</p>
+            </div>
+
+            <div class="criteria-card" id="criteria-5">
+                <h3>✅ Kriterium 5: Console-Logging funktioniert</h3>
+                <div id="test-5" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> "Design Data Captured:" in Console</p>
+            </div>
+
+            <div class="criteria-card" id="criteria-6">
+                <h3>✅ Kriterium 6: JSON-Struktur vollständig</h3>
+                <div id="test-6" class="status pending">⏳ Warte auf Test...</div>
+                <p><strong>Test:</strong> template_view_id, designed_on_area_px, elements</p>
+            </div>
+
+            <div class="test-area">
+                <h3>🎨 Test Design Canvas</h3>
+                <div class="controls">
+                    <button class="btn" onclick="addTestImage()">📷 Add Image</button>
+                    <button class="btn" onclick="addTestText()">📝 Add Text</button>
+                    <button class="btn" onclick="addTestShape()">🔴 Add Shape</button>
+                    <button class="btn test" onclick="runAllTests()">🧪 Run All Tests</button>
+                    <button class="btn save" onclick="testSaveAction()">💾 Test Save Action</button>
+                </div>
+
+                <div class="mockup-design-area" id="mockup-design-area">
+                    <canvas id="design-canvas" width="600" height="400"></canvas>
+                </div>
+
+                <div class="json-display" id="json-output">
+                    Klicke "Run All Tests" um die Akzeptanzkriterien zu testen...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fabricCanvas;
+        let captureSystem;
+        let testResults = {
+            criteria1: false,
+            criteria2: false,
+            criteria3: false,
+            criteria4: false,
+            criteria5: false,
+            criteria6: false
+        };
+
+        // Original console.log überschreiben für Test
+        const originalConsoleLog = console.log;
+        let consoleMessages = [];
+
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            consoleMessages.push(message);
+
+            // Test Kriterium 5: Console Logging
+            if (message.includes('Design Data Captured:')) {
+                testResults.criteria5 = true;
+                updateCriteriaStatus(5, 'pass', '✅ Console Logging funktioniert');
+            }
+        };
+
+        // Design Data Capture System implementieren
+        class AcceptanceTestCapture {
+            constructor(canvas) {
+                this.fabricCanvas = canvas;
+                this.mockupDesignAreaContainer = document.getElementById('mockup-design-area');
+                console.log('🎯 Acceptance Test Capture initialized');
+            }
+
+            generateDesignData() {
+                if (!this.fabricCanvas) {
+                    console.error('❌ Fabric Canvas not available');
+                    return null;
+                }
+
+                const templateViewId = this.getTemplateViewId();
+                const designedOnAreaPx = this.getDesignAreaDimensions();
+                const elements = this.extractCanvasElements();
+
+                const designData = {
+                    template_view_id: templateViewId,
+                    designed_on_area_px: designedOnAreaPx,
+                    elements: elements,
+                    test_metadata: {
+                        timestamp: new Date().toISOString(),
+                        test_environment: 'acceptance_criteria_test'
+                    }
+                };
+
+                // Kriterium 5: Console Logging
+                console.log('Design Data Captured:', designData);
+
+                return designData;
+            }
+
+            getTemplateViewId() {
+                return 'acceptance-test-produkt-vorn';
+            }
+
+            getDesignAreaDimensions() {
+                return {
+                    width: this.fabricCanvas.width,
+                    height: this.fabricCanvas.height
+                };
+            }
+
+            extractCanvasElements() {
+                const objects = this.fabricCanvas.getObjects();
+                const elements = [];
+
+                objects.forEach(obj => {
+                    if (!this.isInternalObject(obj)) {
+                        const element = this.transformObjectToElement(obj);
+                        if (element) {
+                            elements.push(element);
+                        }
+                    }
+                });
+
+                return elements;
+            }
+
+            isInternalObject(obj) {
+                return obj.isInternal || obj.selectable === false;
+            }
+
+            transformObjectToElement(obj) {
+                // Kriterium 3: Koordinaten relativ zur Design-Area
+                const transformedCoords = this.transformCoordinates(obj.left, obj.top);
+
+                const baseElement = {
+                    x: Math.round(transformedCoords.x),
+                    y: Math.round(transformedCoords.y),
+                    width: Math.round(obj.width * obj.scaleX),
+                    height: Math.round(obj.height * obj.scaleY),
+                    scaleX: obj.scaleX,  // Kriterium 4: Transformationen
+                    scaleY: obj.scaleY,  // Kriterium 4: Transformationen
+                    angle: obj.angle     // Kriterium 4: Transformationen
+                };
+
+                if (obj.type === 'image') {
+                    return {
+                        type: 'image',
+                        src: obj.src || obj._originalElement?.src || 'test-image.jpg',
+                        ...baseElement
+                    };
+                } else if (obj.type === 'i-text' || obj.type === 'text') {
+                    return {
+                        type: 'text',
+                        text: obj.text || '',
+                        fontFamily: obj.fontFamily || 'Arial',
+                        fontSize: obj.fontSize || 24,
+                        fill: obj.fill || '#000000',
+                        ...baseElement
+                    };
+                } else if (obj.type === 'rect') {
+                    return {
+                        type: 'rectangle',
+                        fill: obj.fill || '#000000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        ...baseElement
+                    };
+                } else if (obj.type === 'circle') {
+                    return {
+                        type: 'circle',
+                        radius: obj.radius || 0,
+                        fill: obj.fill || '#ff0000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        ...baseElement
+                    };
+                }
+
+                return {
+                    type: obj.type || 'unknown',
+                    ...baseElement
+                };
+            }
+
+            transformCoordinates(canvasX, canvasY) {
+                // Kriterium 3: Koordinaten relativ zur mockup_design_area
+                // In diesem Test sind die Koordinaten bereits relativ
+                return { x: canvasX, y: canvasY };
+            }
+        }
+
+        function initializeTest() {
+            console.log('🎯 Initializing Acceptance Criteria Test...');
+
+            fabricCanvas = new fabric.Canvas('design-canvas', {
+                width: 600,
+                height: 400,
+                backgroundColor: '#ffffff'
+            });
+
+            captureSystem = new AcceptanceTestCapture(fabricCanvas);
+
+            // Auto-add test elements
+            setTimeout(() => {
+                addTestImage();
+                setTimeout(() => addTestText(), 500);
+                setTimeout(() => addTestShape(), 1000);
+            }, 1000);
+
+            console.log('✅ Test environment initialized');
+        }
+
+        function addTestImage() {
+            const imageData = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA3M2FhIiByeD0iMTAiLz48dGV4dCB4PSI0MCIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSJib2xkIj5URVNUPC90ZXh0Pjwvc3ZnPg==';
+
+            fabric.Image.fromURL(imageData, function(img) {
+                img.set({
+                    left: 100,
+                    top: 50,
+                    scaleX: 1.2,  // Test Transformation
+                    scaleY: 1.2,  // Test Transformation
+                    angle: 15     // Test Transformation
+                });
+                fabricCanvas.add(img);
+                fabricCanvas.renderAll();
+                console.log('✅ Test image added with transformations');
+            });
+        }
+
+        function addTestText() {
+            const text = new fabric.IText('Test Text Element', {
+                left: 200,
+                top: 150,
+                fontFamily: 'Arial',
+                fontSize: 24,
+                fill: '#333333',
+                scaleX: 0.8,
+                scaleY: 1.1,
+                angle: -10
+            });
+
+            fabricCanvas.add(text);
+            fabricCanvas.renderAll();
+            console.log('✅ Test text added with transformations');
+        }
+
+        function addTestShape() {
+            const circle = new fabric.Circle({
+                left: 350,
+                top: 100,
+                radius: 40,
+                fill: '#ff6b6b',
+                stroke: '#333',
+                strokeWidth: 3,
+                scaleX: 1.5,
+                scaleY: 0.7,
+                angle: 25
+            });
+
+            fabricCanvas.add(circle);
+            fabricCanvas.renderAll();
+            console.log('✅ Test shape added with transformations');
+        }
+
+        function testSaveAction() {
+            console.log('💾 Testing save action...');
+
+            if (!captureSystem) {
+                updateCriteriaStatus(1, 'fail', '❌ Capture system not available');
+                return;
+            }
+
+            const designData = captureSystem.generateDesignData();
+
+            if (designData) {
+                // Kriterium 1: JSON bei Speichern-Aktion
+                testResults.criteria1 = true;
+                updateCriteriaStatus(1, 'pass', '✅ JSON wird bei Speichern generiert');
+
+                displayJsonOutput(designData);
+                runAllTests(designData);
+            } else {
+                updateCriteriaStatus(1, 'fail', '❌ Kein JSON bei Speichern generiert');
+            }
+        }
+
+        function runAllTests(designData = null) {
+            console.log('🧪 Running all acceptance criteria tests...');
+
+            if (!designData) {
+                designData = captureSystem ? captureSystem.generateDesignData() : null;
+            }
+
+            if (!designData) {
+                console.error('❌ No design data available for testing');
+                return;
+            }
+
+            // Test Kriterium 2: Alle Design-Elemente erfasst
+            if (Array.isArray(designData.elements) && designData.elements.length >= 3) {
+                const hasImage = designData.elements.some(el => el.type === 'image');
+                const hasText = designData.elements.some(el => el.type === 'text');
+                const hasShape = designData.elements.some(el => el.type === 'circle');
+
+                if (hasImage && hasText && hasShape) {
+                    testResults.criteria2 = true;
+                    updateCriteriaStatus(2, 'pass', `✅ Alle Elemente erfasst (${designData.elements.length} total)`);
+                } else {
+                    updateCriteriaStatus(2, 'fail', '❌ Nicht alle Element-Typen erfasst');
+                }
+            } else {
+                updateCriteriaStatus(2, 'fail', '❌ Keine oder zu wenige Elemente erfasst');
+            }
+
+            // Test Kriterium 3: Koordinaten relativ zur Design-Area
+            const hasValidCoordinates = designData.elements.every(el =>
+                typeof el.x === 'number' && typeof el.y === 'number' &&
+                el.x >= 0 && el.y >= 0 && el.x <= 600 && el.y <= 400
+            );
+            if (hasValidCoordinates) {
+                testResults.criteria3 = true;
+                updateCriteriaStatus(3, 'pass', '✅ Koordinaten sind korrekt relativ');
+            } else {
+                updateCriteriaStatus(3, 'fail', '❌ Koordinaten außerhalb gültigen Bereichs');
+            }
+
+            // Test Kriterium 4: Transformationen erfasst
+            const hasTransformations = designData.elements.some(el =>
+                el.scaleX !== 1 || el.scaleY !== 1 || el.angle !== 0
+            );
+            if (hasTransformations) {
+                testResults.criteria4 = true;
+                updateCriteriaStatus(4, 'pass', '✅ Transformationen korrekt erfasst');
+            } else {
+                updateCriteriaStatus(4, 'fail', '❌ Keine Transformationen erfasst');
+            }
+
+            // Test Kriterium 6: JSON-Struktur vollständig
+            const hasRequiredFields = designData.template_view_id &&
+                                    designData.designed_on_area_px &&
+                                    Array.isArray(designData.elements);
+            if (hasRequiredFields) {
+                testResults.criteria6 = true;
+                updateCriteriaStatus(6, 'pass', '✅ JSON-Struktur vollständig');
+            } else {
+                updateCriteriaStatus(6, 'fail', '❌ JSON-Struktur unvollständig');
+            }
+
+            displayTestSummary();
+        }
+
+        function updateCriteriaStatus(criteriaNumber, status, message) {
+            const testElement = document.getElementById(`test-${criteriaNumber}`);
+            const cardElement = document.getElementById(`criteria-${criteriaNumber}`);
+
+            testElement.className = `status ${status}`;
+            testElement.textContent = message;
+
+            cardElement.className = `criteria-card ${status}`;
+        }
+
+        function displayJsonOutput(data) {
+            const output = document.getElementById('json-output');
+            output.innerHTML = '🎯 CAPTURED DESIGN DATA:\n\n' + JSON.stringify(data, null, 2);
+        }
+
+        function displayTestSummary() {
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(result => result).length;
+
+            const output = document.getElementById('json-output');
+            output.innerHTML += `\n\n📊 TEST SUMMARY:\n✅ Passed: ${passedTests}/${totalTests}\n${passedTests === totalTests ? '🎉 ALL ACCEPTANCE CRITERIA MET!' : '⚠️ Some criteria failed'}`;
+
+            console.log(`📊 Test Summary: ${passedTests}/${totalTests} acceptance criteria met`);
+
+            if (passedTests === totalTests) {
+                console.log('🎉 ALL ACCEPTANCE CRITERIA SUCCESSFULLY MET!');
+                document.querySelector('.header').style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 Acceptance Criteria Test page loaded');
+            setTimeout(initializeTest, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,20 +1,13 @@
 {
   "preferredVersions": {
-    "php": "8.0",
-    "wp": "latest"
-  },
-  "features": {
-    "networking": true
+    "php": "7.4",
+    "wp": "6.3"
   },
   "steps": [
     {
       "step": "login",
       "username": "admin",
       "password": "password"
-    },
-    {
-      "step": "runPHP",
-      "code": "<?php echo 'YPrint Plugin Test Environment Ready'; ?>"
     }
   ]
 }
