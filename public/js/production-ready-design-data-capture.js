@@ -232,19 +232,23 @@ class ProductionReadyDesignDataCapture {
     }
 
     /**
-     * Führe die eigentliche Initialisierung durch
+     * Führe die eigentliche Initialisierung durch mit Reality Check
      */
     performInitialization() {
-        console.log('🚀 Performing system initialization...');
+        console.log('🚀 Performing system initialization with reality check...');
+
+        // CRITICAL: Reality Check vor Initialisierung
+        const realityCheck = this.performRealityCheck();
+
+        if (!realityCheck.allGood) {
+            console.warn('⚠️ Reality check failed, attempting bypass initialization...', realityCheck);
+            return this.initializeWithBypass(realityCheck);
+        }
 
         try {
-            // Finde Fabric Canvases
+            // Normale Initialisierung wenn Reality Check erfolgreich
             this.findFabricCanvases();
-
-            // Finde Mockup Design Area
             this.findMockupDesignArea();
-
-            // Registriere Button-Event-Listener
             this.attachToButtons();
 
             // Mache Funktionen global verfügbar
