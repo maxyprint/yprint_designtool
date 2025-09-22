@@ -119,7 +119,7 @@ class Octo_Print_Designer_Public {
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
             ['octo-print-designer-vendor', 'octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load vendor bundle + emergency fabric loader
-            rand(),
+            $this->version . '-fixed-' . time(), // Use version with timestamp for cache busting
             true
         );
 
@@ -173,6 +173,24 @@ class Octo_Print_Designer_Public {
             'octo-print-designer-comprehensive-capture',
             OCTO_PRINT_DESIGNER_URL . 'public/js/comprehensive-design-data-capture.js',
             ['octo-print-designer-data-capture'], // Load after original capture system
+            rand(),
+            true
+        );
+
+        // 🎯 OPS-DESIGNER DATA CAPTURE: Precise data capture für den echten [ops-designer] Shortcode
+        wp_register_script(
+            'octo-print-designer-ops-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/ops-designer-data-capture.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            rand(),
+            true
+        );
+
+        // 🚀 ENHANCED CANVAS INIT FIX: Advanced 4-strategy DesignerWidget exposure system (PRODUCTION SOLUTION)
+        wp_register_script(
+            'octo-print-designer-enhanced-canvas-fix',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-canvas-init-fix.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
             rand(),
             true
         );

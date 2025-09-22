@@ -2494,7 +2494,13 @@ document.addEventListener('DOMContentLoaded', function () {
 /******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
 /******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, ["public/js/dist/common","public/js/dist/vendor"], () => (__webpack_require__("./public/js/src/Designer.js")))
 /******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
-/******/ 	
+/******/
+/******/ 	// 🚀 GLOBAL EXPOSURE FIX: Expose DesignerWidget globally
+/******/ 	if (__webpack_exports__ && __webpack_exports__.DesignerWidget) {
+/******/ 		window.DesignerWidget = __webpack_exports__.DesignerWidget;
+/******/ 		console.log("✅ WEBPACK FIX: DesignerWidget exposed globally from bundle");
+/******/ 	}
+/******/
 /******/ })()
 ;
 //# sourceMappingURL=designer.bundle.js.map
