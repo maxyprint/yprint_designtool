@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YPrint Canvas Fix Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 4px; font-weight: bold; }
+        .pass { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .console-monitor { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 10px 0; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-box { background: #e9ecef; padding: 15px; border-radius: 4px; text-align: center; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #495057; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 YPrint Canvas Fix Verification</h1>
+        <p>Automatisierte Verifikation der implementierten Canvas-Fixes</p>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number" id="totalMessages">0</div>
+                <div>Total Console Messages</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="fabricAttempts">0</div>
+                <div>Fabric Detection Attempts</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="designErrors">0</div>
+                <div>Design Save Errors</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="testDuration">0</div>
+                <div>Test Duration (seconds)</div>
+            </div>
+        </div>
+
+        <div id="testResults"></div>
+
+        <button onclick="startVerification()">🚀 Start Verification Test</button>
+        <button onclick="clearResults()">🧹 Clear Results</button>
+
+        <div class="console-monitor">
+            <h4>📊 Console Monitor (Live)</h4>
+            <div id="consoleOutput"></div>
+        </div>
+    </div>
+
+    <!-- Include the actual YPrint scripts -->
+    <script src="public/js/production-ready-design-data-capture.js"></script>
+    <script src="public/js/design-data-capture.js"></script>
+
+    <script>
+        // Verification Test System
+        class CanvasFixVerifier {
+            constructor() {
+                this.startTime = Date.now();
+                this.consoleMessages = [];
+                this.fabricAttempts = 0;
+                this.designErrors = 0;
+                this.originalConsoleLog = console.log;
+                this.originalConsoleError = console.error;
+                this.setupConsoleMonitoring();
+            }
+
+            setupConsoleMonitoring() {
+                const self = this;
+
+                // Override console.log
+                console.log = function(...args) {
+                    const message = args.join(' ');
+                    self.consoleMessages.push(message);
+
+                    // Track specific patterns
+                    if (message.includes('🔄 No fabric canvas instances found yet')) {
+                        self.fabricAttempts++;
+                    }
+
+                    self.updateConsoleDisplay(message, 'log');
+                    self.originalConsoleLog.apply(console, args);
+                };
+
+                // Override console.error
+                console.error = function(...args) {
+                    const message = args.join(' ');
+                    self.consoleMessages.push(`ERROR: ${message}`);
+
+                    if (message.includes('Invalid input data') || message.includes('Error saving design')) {
+                        self.designErrors++;
+                    }
+
+                    self.updateConsoleDisplay(`ERROR: ${message}`, 'error');
+                    self.originalConsoleError.apply(console, args);
+                };
+            }
+
+            updateConsoleDisplay(message, type) {
+                const output = document.getElementById('consoleOutput');
+                const div = document.createElement('div');
+                div.style.color = type === 'error' ? 'red' : '#333';
+                div.style.fontSize = '12px';
+                div.style.marginBottom = '2px';
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                output.appendChild(div);
+                output.scrollTop = output.scrollHeight;
+
+                // Update live stats
+                this.updateStats();
+            }
+
+            updateStats() {
+                document.getElementById('totalMessages').textContent = this.consoleMessages.length;
+                document.getElementById('fabricAttempts').textContent = this.fabricAttempts;
+                document.getElementById('designErrors').textContent = this.designErrors;
+                document.getElementById('testDuration').textContent = Math.floor((Date.now() - this.startTime) / 1000);
+            }
+
+            async runVerification() {
+                this.addResult('🚀 Starting Canvas Fix Verification...', 'info');
+
+                // Test 1: Fabric Detection Test
+                await this.testFabricDetection();
+
+                // Test 2: Design Data Generation Test
+                await this.testDesignDataGeneration();
+
+                // Test 3: Performance Test
+                await this.testPerformance();
+
+                // Final Results
+                await this.generateFinalReport();
+            }
+
+            async testFabricDetection() {
+                this.addResult('🧪 Testing Fabric Canvas Detection...', 'info');
+
+                const beforeAttempts = this.fabricAttempts;
+
+                // Wait 30 seconds and monitor fabric detection
+                await this.sleep(30000);
+
+                const afterAttempts = this.fabricAttempts;
+                const detectionAttempts = afterAttempts - beforeAttempts;
+
+                if (detectionAttempts > 15) {
+                    this.addResult(`❌ FAIL: Excessive fabric detection attempts (${detectionAttempts})`, 'fail');
+                } else if (detectionAttempts > 0 && detectionAttempts <= 5) {
+                    this.addResult(`✅ PASS: Reasonable fabric detection attempts (${detectionAttempts})`, 'pass');
+                } else if (detectionAttempts === 0) {
+                    this.addResult(`✅ EXCELLENT: No detection loops detected`, 'pass');
+                }
+            }
+
+            async testDesignDataGeneration() {
+                this.addResult('🧪 Testing Design Data Generation...', 'info');
+
+                const beforeErrors = this.designErrors;
+
+                try {
+                    // Simulate design data generation
+                    if (window.DesignDataCapture) {
+                        const mockDesigner = { fabricCanvas: null };
+                        const capture = new DesignDataCapture(mockDesigner);
+                        const result = capture.generateDesignData();
+
+                        if (result && typeof result === 'object') {
+                            this.addResult('✅ PASS: generateDesignData() returns valid object', 'pass');
+                        } else {
+                            this.addResult('❌ FAIL: generateDesignData() returns invalid data', 'fail');
+                        }
+                    }
+                } catch (error) {
+                    this.addResult(`❌ FAIL: Design data generation error: ${error.message}`, 'fail');
+                }
+
+                const afterErrors = this.designErrors;
+                if (afterErrors > beforeErrors) {
+                    this.addResult(`❌ FAIL: New design errors detected (${afterErrors - beforeErrors})`, 'fail');
+                } else {
+                    this.addResult('✅ PASS: No design save errors detected', 'pass');
+                }
+            }
+
+            async testPerformance() {
+                this.addResult('🧪 Testing Performance Improvements...', 'info');
+
+                const totalMessages = this.consoleMessages.length;
+                const testDuration = (Date.now() - this.startTime) / 1000;
+                const messagesPerSecond = totalMessages / testDuration;
+
+                if (totalMessages < 50) {
+                    this.addResult(`✅ EXCELLENT: Low console output (${totalMessages} messages)`, 'pass');
+                } else if (totalMessages < 100) {
+                    this.addResult(`✅ PASS: Reasonable console output (${totalMessages} messages)`, 'pass');
+                } else {
+                    this.addResult(`❌ FAIL: Excessive console output (${totalMessages} messages)`, 'fail');
+                }
+
+                if (messagesPerSecond < 2) {
+                    this.addResult(`✅ PASS: Good message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'pass');
+                } else {
+                    this.addResult(`⚠️ WARNING: High message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'fail');
+                }
+            }
+
+            async generateFinalReport() {
+                this.addResult('📊 Generating Final Report...', 'info');
+
+                const totalTests = 4;
+                const passedTests = document.querySelectorAll('.pass').length;
+                const failedTests = document.querySelectorAll('.fail').length;
+
+                const successRate = (passedTests / (passedTests + failedTests)) * 100;
+
+                if (successRate >= 90) {
+                    this.addResult(`🎉 VERIFICATION COMPLETE: ${successRate.toFixed(1)}% SUCCESS RATE - FIXES WORKING!`, 'pass');
+                } else if (successRate >= 70) {
+                    this.addResult(`⚠️ PARTIAL SUCCESS: ${successRate.toFixed(1)}% SUCCESS RATE - Some issues remain`, 'info');
+                } else {
+                    this.addResult(`❌ VERIFICATION FAILED: ${successRate.toFixed(1)}% SUCCESS RATE - Major issues detected`, 'fail');
+                }
+
+                this.addResult(`📈 FINAL STATS: ${this.consoleMessages.length} total messages, ${this.fabricAttempts} fabric attempts, ${this.designErrors} errors`, 'info');
+            }
+
+            addResult(message, type) {
+                const results = document.getElementById('testResults');
+                const div = document.createElement('div');
+                div.className = `test-result ${type}`;
+                div.textContent = message;
+                results.appendChild(div);
+            }
+
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        let verifier;
+
+        function startVerification() {
+            clearResults();
+            verifier = new CanvasFixVerifier();
+            verifier.runVerification();
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('consoleOutput').innerHTML = '';
+            document.getElementById('totalMessages').textContent = '0';
+            document.getElementById('fabricAttempts').textContent = '0';
+            document.getElementById('designErrors').textContent = '0';
+            document.getElementById('testDuration').textContent = '0';
+        }
+
+        // Auto-start verification on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                startVerification();
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

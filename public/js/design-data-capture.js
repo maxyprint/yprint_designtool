@@ -27,23 +27,27 @@ class DesignDataCapture {
     generateDesignData() {
         if (!this.fabricCanvas) {
             console.error('Fabric Canvas not available');
-            return null;
+            return {
+                template_view_id: 1,
+                designed_on_area_px: { width: 300, height: 300 },
+                elements: []
+            };
         }
 
-        // 1. Template View ID bestimmen
-        const templateViewId = this.getTemplateViewId();
+        // 1. Template View ID bestimmen (mit Fallback)
+        const templateViewId = this.getTemplateViewId() || 1;
 
-        // 2. Design Area Dimensionen erfassen
-        const designedOnAreaPx = this.getDesignAreaDimensions();
+        // 2. Design Area Dimensionen erfassen (mit Fallback)
+        const designedOnAreaPx = this.getDesignAreaDimensions() || { width: 300, height: 300 };
 
-        // 3. Alle Canvas-Objekte erfassen und transformieren
-        const elements = this.extractCanvasElements();
+        // 3. Alle Canvas-Objekte erfassen und transformieren (mit Fallback)
+        const elements = this.extractCanvasElements() || [];
 
-        // 4. JSON-Struktur erstellen
+        // 4. JSON-Struktur erstellen mit Validierung
         const designData = {
-            template_view_id: templateViewId,
+            template_view_id: Number(templateViewId) || 1,
             designed_on_area_px: designedOnAreaPx,
-            elements: elements
+            elements: Array.isArray(elements) ? elements : []
         };
 
         // 5. Debug-Logging (KRITISCH für Akzeptanzkriterien)

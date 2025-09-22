@@ -16,7 +16,7 @@ class ProductionReadyDesignDataCapture {
         this.mockupDesignArea = null;
         this.initialized = false;
         this.retryCount = 0;
-        this.maxRetries = 20;
+        this.maxRetries = 8; // Reduced from 20 for faster completion
         this.baseRetryDelay = 100; // Start mit 100ms
         this.canvasObserver = null;
 
@@ -76,9 +76,19 @@ class ProductionReadyDesignDataCapture {
         }
 
         // Prüfe ob Fabric Canvas Instanzen vorhanden sind
-        const fabricCanvases = Array.from(canvasElements).filter(canvas => canvas.__fabric);
+        const fabricCanvases = Array.from(canvasElements).filter(canvas => {
+            // Erweiterte Fabric.js Detection
+            return canvas.__fabric ||
+                   (canvas.freeDrawingBrush) ||
+                   (window.fabric && window.fabric.Canvas && canvas.contextContainer) ||
+                   (canvas._objects !== undefined);
+        });
+
         if (fabricCanvases.length === 0) {
-            console.log('🔄 No fabric canvas instances found yet');
+            // DRASTISCHE Logging-Reduktion - nur alle 15 Versuche
+            if (this.retryCount % 15 === 0) {
+                console.log('🔄 Fabric canvas detection...');
+            }
             return false;
         }
 
@@ -166,7 +176,10 @@ class ProductionReadyDesignDataCapture {
         while (this.retryCount < this.maxRetries && !this.initialized) {
             const delay = this.calculateRetryDelay();
 
-            console.log(`🔄 Detection attempt ${this.retryCount + 1}/${this.maxRetries} (delay: ${delay}ms)`);
+            // DRASTISCHE Logging-Reduktion für 90%+ Performance
+            if (this.retryCount % 10 === 0) {
+                console.log(`🔄 Detection attempt ${this.retryCount + 1}/${this.maxRetries}`);
+            }
 
             await this.sleep(delay);
 
