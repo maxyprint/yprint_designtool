@@ -38,6 +38,18 @@
                 <div>Design Save Errors</div>
             </div>
             <div class="stat-box">
+                <div class="stat-number" id="webpackFailures">0</div>
+                <div>Webpack Failures</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="hiddenGroups">0</div>
+                <div>Hidden Message Groups</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="repetitivePatterns">0</div>
+                <div>Repetitive Patterns</div>
+            </div>
+            <div class="stat-box">
                 <div class="stat-number" id="testDuration">0</div>
                 <div>Test Duration (seconds)</div>
             </div>
@@ -59,15 +71,23 @@
     <script src="public/js/design-data-capture.js"></script>
 
     <script>
-        // Verification Test System
+        // Enhanced Verification Test System
         class CanvasFixVerifier {
             constructor() {
                 this.startTime = Date.now();
                 this.consoleMessages = [];
                 this.fabricAttempts = 0;
                 this.designErrors = 0;
+                this.webpackFailures = 0;
+                this.hiddenMessageGroups = 0;
+                this.initializationParadoxes = 0;
+                this.repetitivePatterns = {};
+                this.repetitiveCount = 0;
+                this.systemReadyButNotInitialized = false;
                 this.originalConsoleLog = console.log;
                 this.originalConsoleError = console.error;
+                this.originalConsoleGroup = console.group;
+                this.originalConsoleGroupCollapsed = console.groupCollapsed;
                 this.setupConsoleMonitoring();
             }
 
@@ -84,6 +104,23 @@
                         self.fabricAttempts++;
                     }
 
+                    // Track webpack failures
+                    if (message.includes('WEBPACK PATCH: Failed to expose')) {
+                        self.webpackFailures++;
+                    }
+
+                    // Track repetitive patterns
+                    self.repetitivePatterns[message] = (self.repetitivePatterns[message] || 0) + 1;
+                    if (self.repetitivePatterns[message] === 10) {
+                        self.repetitiveCount++;
+                    }
+
+                    // Detect initialization paradox
+                    if (message.includes('all components ready') && message.includes('Failed to initialize')) {
+                        self.initializationParadoxes++;
+                        self.systemReadyButNotInitialized = true;
+                    }
+
                     self.updateConsoleDisplay(message, 'log');
                     self.originalConsoleLog.apply(console, args);
                 };
@@ -97,8 +134,25 @@
                         self.designErrors++;
                     }
 
+                    // Track webpack errors
+                    if (message.includes('WEBPACK PATCH: Failed')) {
+                        self.webpackFailures++;
+                    }
+
                     self.updateConsoleDisplay(`ERROR: ${message}`, 'error');
                     self.originalConsoleError.apply(console, args);
+                };
+
+                // Override console.group to detect hidden messages
+                console.group = function(...args) {
+                    self.hiddenMessageGroups++;
+                    self.originalConsoleGroup.apply(console, args);
+                };
+
+                // Override console.groupCollapsed to detect hidden messages
+                console.groupCollapsed = function(...args) {
+                    self.hiddenMessageGroups++;
+                    self.originalConsoleGroupCollapsed.apply(console, args);
                 };
             }
 
@@ -120,11 +174,14 @@
                 document.getElementById('totalMessages').textContent = this.consoleMessages.length;
                 document.getElementById('fabricAttempts').textContent = this.fabricAttempts;
                 document.getElementById('designErrors').textContent = this.designErrors;
+                document.getElementById('webpackFailures').textContent = this.webpackFailures;
+                document.getElementById('hiddenGroups').textContent = this.hiddenMessageGroups;
+                document.getElementById('repetitivePatterns').textContent = this.repetitiveCount;
                 document.getElementById('testDuration').textContent = Math.floor((Date.now() - this.startTime) / 1000);
             }
 
             async runVerification() {
-                this.addResult('🚀 Starting Canvas Fix Verification...', 'info');
+                this.addResult('🚀 Starting Enhanced Canvas Fix Verification...', 'info');
 
                 // Test 1: Fabric Detection Test
                 await this.testFabricDetection();
@@ -132,7 +189,16 @@
                 // Test 2: Design Data Generation Test
                 await this.testDesignDataGeneration();
 
-                // Test 3: Performance Test
+                // Test 3: Webpack Integration Test
+                await this.testWebpackIntegration();
+
+                // Test 4: Hidden Message Detection Test
+                await this.testHiddenMessages();
+
+                // Test 5: Repetitive Pattern Analysis
+                await this.testRepetitivePatterns();
+
+                // Test 6: Performance Test
                 await this.testPerformance();
 
                 // Final Results
@@ -189,6 +255,57 @@
                 }
             }
 
+            async testWebpackIntegration() {
+                this.addResult('🧪 Testing Webpack Integration...', 'info');
+
+                if (this.webpackFailures === 0) {
+                    this.addResult('✅ PASS: No webpack patch failures detected', 'pass');
+                } else {
+                    this.addResult(`❌ FAIL: ${this.webpackFailures} webpack failures detected`, 'fail');
+                }
+
+                // Check if DesignerWidget is actually exposed
+                if (window.DesignerWidget) {
+                    this.addResult('✅ PASS: DesignerWidget is exposed globally', 'pass');
+                } else {
+                    this.addResult('❌ FAIL: DesignerWidget not found in global scope', 'fail');
+                }
+            }
+
+            async testHiddenMessages() {
+                this.addResult('🧪 Testing Hidden Message Detection...', 'info');
+
+                if (this.hiddenMessageGroups === 0) {
+                    this.addResult('✅ PASS: No hidden message groups detected', 'pass');
+                } else {
+                    this.addResult(`⚠️ WARNING: ${this.hiddenMessageGroups} hidden message groups detected`, 'fail');
+                }
+            }
+
+            async testRepetitivePatterns() {
+                this.addResult('🧪 Testing Repetitive Pattern Analysis...', 'info');
+
+                if (this.repetitiveCount === 0) {
+                    this.addResult('✅ EXCELLENT: No repetitive message patterns detected', 'pass');
+                } else {
+                    this.addResult(`❌ FAIL: ${this.repetitiveCount} repetitive patterns detected (10+ occurrences each)`, 'fail');
+                }
+
+                // Show top repetitive messages
+                const sortedPatterns = Object.entries(this.repetitivePatterns)
+                    .filter(([message, count]) => count >= 5)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                if (sortedPatterns.length > 0) {
+                    this.addResult(`📊 Top repetitive patterns:`, 'info');
+                    sortedPatterns.forEach(([message, count]) => {
+                        const truncated = message.length > 50 ? message.substring(0, 50) + '...' : message;
+                        this.addResult(`   "${truncated}" (${count}x)`, 'info');
+                    });
+                }
+            }
+
             async testPerformance() {
                 this.addResult('🧪 Testing Performance Improvements...', 'info');
 
@@ -196,18 +313,23 @@
                 const testDuration = (Date.now() - this.startTime) / 1000;
                 const messagesPerSecond = totalMessages / testDuration;
 
-                if (totalMessages < 50) {
+                // More strict performance criteria
+                if (totalMessages < 30) {
                     this.addResult(`✅ EXCELLENT: Low console output (${totalMessages} messages)`, 'pass');
-                } else if (totalMessages < 100) {
+                } else if (totalMessages < 60) {
                     this.addResult(`✅ PASS: Reasonable console output (${totalMessages} messages)`, 'pass');
+                } else if (totalMessages < 100) {
+                    this.addResult(`⚠️ WARNING: High console output (${totalMessages} messages)`, 'fail');
                 } else {
                     this.addResult(`❌ FAIL: Excessive console output (${totalMessages} messages)`, 'fail');
                 }
 
-                if (messagesPerSecond < 2) {
+                if (messagesPerSecond < 1) {
+                    this.addResult(`✅ EXCELLENT: Low message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'pass');
+                } else if (messagesPerSecond < 2) {
                     this.addResult(`✅ PASS: Good message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'pass');
                 } else {
-                    this.addResult(`⚠️ WARNING: High message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'fail');
+                    this.addResult(`❌ FAIL: High message rate (${messagesPerSecond.toFixed(2)}/sec)`, 'fail');
                 }
             }
 
@@ -258,6 +380,9 @@
             document.getElementById('totalMessages').textContent = '0';
             document.getElementById('fabricAttempts').textContent = '0';
             document.getElementById('designErrors').textContent = '0';
+            document.getElementById('webpackFailures').textContent = '0';
+            document.getElementById('hiddenGroups').textContent = '0';
+            document.getElementById('repetitivePatterns').textContent = '0';
             document.getElementById('testDuration').textContent = '0';
         }
 
