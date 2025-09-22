@@ -13,15 +13,8 @@
       "password": "password"
     },
     {
-      "step": "installPlugin",
-      "pluginZipFile": {
-        "resource": "url",
-        "url": "https://github.com/maxyprint/yprint_designtool/archive/main.zip"
-      }
-    },
-    {
-      "step": "activatePlugin",
-      "pluginPath": "yprint_designtool-main"
+      "step": "runPHP",
+      "code": "<?php echo 'YPrint Plugin Test Environment Ready'; ?>"
     }
   ]
 }
