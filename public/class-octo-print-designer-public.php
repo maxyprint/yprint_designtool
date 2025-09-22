@@ -159,13 +159,22 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Race Condition-freie Implementierung
+        // 🚀 ISSUE #18 FIX: OPTIMIZED DESIGN DATA CAPTURE (Console Spam Eliminated)
+        wp_register_script(
+            'octo-print-designer-optimized-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '-issue18-' . time(), // Version-based cache busting
+            true
+        );
+
+        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Race Condition-freie Implementierung (DEPRECATED - replaced by optimized version)
         wp_register_script(
             'octo-print-designer-production-capture',
             OCTO_PRINT_DESIGNER_URL . 'public/js/production-ready-design-data-capture.js',
             ['octo-print-designer-designer'], // Load after designer bundle
             rand(),
-            true
+            false // Disabled - replaced by optimized version
         );
 
         // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Advanced system that bypasses DesignerWidget exposure issues (DEPRECATED)

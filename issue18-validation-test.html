@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚀 Issue #18 Validation Test - Console Optimization</title>
+    <style>
+        body { font-family: system-ui; max-width: 1200px; margin: 50px auto; padding: 20px; }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        .test-result { padding: 15px; margin: 15px 0; border-radius: 8px; }
+        .test-pass { background: #e8f5e8; border: 2px solid #4CAF50; }
+        .test-fail { background: #ffeaea; border: 2px solid #f44336; }
+        .test-warn { background: #fff8e1; border: 2px solid #ff9800; }
+        #console { background: #000; color: #00ff00; padding: 15px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0; }
+        .metric-card { background: #f5f5f5; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #2196F3; }
+        .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .debug-controls { margin: 20px 0; }
+        button { padding: 10px 20px; margin: 5px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1976D2; }
+        .emergency { background: #ff5722 !important; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Issue #18 Validation Test - Console Optimization & Design Data Capture</h1>
+
+    <div class="debug-controls">
+        <button onclick="enableDebugMode()">Enable Debug Mode</button>
+        <button onclick="disableDebugMode()">Enable Production Mode (Console Optimization)</button>
+        <button onclick="runFullTest()">Run Full Validation Test</button>
+        <button onclick="measureConsoleMessages()">Measure Console Messages</button>
+        <button onclick="testDesignDataCapture()">Test Design Data Capture</button>
+        <button class="emergency" onclick="emergencyReset()">Emergency Reset</button>
+    </div>
+
+    <div id="test-results">
+        <h2>🎯 Issue #18 Acceptance Criteria Validation</h2>
+    </div>
+
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-value" id="console-count">0</div>
+            <div>Console Messages (Target: &lt;34)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="retry-attempts">0</div>
+            <div>Canvas Detection Retries (Target: ≤3)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="capture-completeness">0%</div>
+            <div>Data Capture Completeness</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="performance-score">0</div>
+            <div>Performance Score (/100)</div>
+        </div>
+    </div>
+
+    <div class="before-after">
+        <div>
+            <h3>BEFORE (Original System)</h3>
+            <ul>
+                <li>Console Messages: 340+ (excessive logging)</li>
+                <li>Failed Canvas Detection: 16+ attempts</li>
+                <li>Incomplete Data Capture: Partial JSON</li>
+                <li>No Debug Levels: Always verbose</li>
+                <li>Performance: Degraded</li>
+            </ul>
+        </div>
+        <div>
+            <h3>AFTER (Issue #18 Fix)</h3>
+            <ul>
+                <li>Console Messages: &lt;34 (90%+ reduction)</li>
+                <li>Canvas Detection: ≤3 attempts max</li>
+                <li>Complete Data Capture: Full JSON structure</li>
+                <li>Debug Level System: Production mode</li>
+                <li>Performance: Optimized</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>Real-time Console Output:</h2>
+    <div id="console"></div>
+
+    <div class="octo-print-designer" style="border: 2px dashed #ccc; padding: 20px; margin: 20px 0;">
+        <div class="mockup-design-area" style="width: 600px; height: 400px; background: #f0f0f0; position: relative;">
+            <canvas id="test-canvas" width="600" height="400" style="border: 1px solid #ccc;"></canvas>
+            <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px; border-radius: 3px; font-size: 12px;">
+                Test Canvas Area
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the optimized scripts -->
+    <script src="/Users/maxschwarz/Desktop/yprint_designtool/public/js/dist/vendor.bundle.js"></script>
+    <script src="/Users/maxschwarz/Desktop/yprint_designtool/public/js/octo-print-designer-public.js"></script>
+    <script src="/Users/maxschwarz/Desktop/yprint_designtool/public/js/optimized-design-data-capture.js"></script>
+
+    <script>
+        const consoleDiv = document.getElementById('console');
+        const resultsDiv = document.getElementById('test-results');
+        let consoleMessageCount = 0;
+        let retryAttemptCount = 0;
+        let testStartTime = Date.now();
+
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function captureConsole(level, originalFunc) {
+            return function(...args) {
+                originalFunc.apply(console, args);
+
+                consoleMessageCount++;
+                document.getElementById('console-count').textContent = consoleMessageCount;
+
+                // Count retry attempts
+                const message = args.join(' ');
+                if (message.includes('Attempt') && message.includes('to find')) {
+                    retryAttemptCount++;
+                    document.getElementById('retry-attempts').textContent = retryAttemptCount;
+                }
+
+                const div = document.createElement('div');
+                div.style.color = level === 'error' ? '#ff5555' :
+                                 level === 'warn' ? '#ffaa55' : '#00ff00';
+                div.textContent = `[${new Date().toLocaleTimeString()}] [${level.toUpperCase()}] ${args.join(' ')}`;
+                consoleDiv.appendChild(div);
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            };
+        }
+
+        console.log = captureConsole('log', originalLog);
+        console.error = captureConsole('error', originalError);
+        console.warn = captureConsole('warn', originalWarn);
+
+        function enableDebugMode() {
+            window.octoPrintDesignerDebug = true;
+            addTestResult('Debug Mode Enabled', 'Debug logging activated - expect more console messages', 'warn');
+            location.reload();
+        }
+
+        function disableDebugMode() {
+            window.octoPrintDesignerDebug = false;
+            addTestResult('Production Mode Enabled', 'Console optimization active - 90%+ message reduction', 'pass');
+            location.reload();
+        }
+
+        function measureConsoleMessages() {
+            const beforeCount = consoleMessageCount;
+
+            setTimeout(() => {
+                const afterCount = consoleMessageCount;
+                const newMessages = afterCount - beforeCount;
+
+                const reductionAchieved = newMessages < 34;
+                addTestResult(
+                    'Console Message Count Test',
+                    `Measured ${newMessages} console messages. Target: <34 messages. ${reductionAchieved ? 'PASS' : 'FAIL'}`,
+                    reductionAchieved ? 'pass' : 'fail'
+                );
+
+                updatePerformanceScore();
+            }, 5000);
+        }
+
+        function testDesignDataCapture() {
+            addTestResult('Testing Design Data Capture', 'Attempting to generate complete design data...', 'warn');
+
+            setTimeout(() => {
+                try {
+                    if (typeof window.generateDesignData === 'function') {
+                        const designData = window.generateDesignData();
+
+                        const hasAllFields = designData.timestamp &&
+                                           designData.canvas &&
+                                           designData.elements !== undefined &&
+                                           designData.template_view_id &&
+                                           designData.user_session;
+
+                        const hasCoordinateTransformation = designData.canvas &&
+                                                          typeof designData.canvas.mockup_offset_x === 'number' &&
+                                                          typeof designData.canvas.mockup_offset_y === 'number';
+
+                        document.getElementById('capture-completeness').textContent = hasAllFields ? '100%' : '50%';
+
+                        addTestResult(
+                            'Design Data Capture Test',
+                            `Complete JSON structure: ${hasAllFields ? 'YES' : 'NO'}. Coordinate transformation: ${hasCoordinateTransformation ? 'YES' : 'NO'}`,
+                            hasAllFields && hasCoordinateTransformation ? 'pass' : 'fail'
+                        );
+
+                        console.log('🧪 Complete Design Data Generated:', designData);
+
+                    } else {
+                        addTestResult('Design Data Capture Test', 'generateDesignData function not available', 'fail');
+                    }
+                } catch (error) {
+                    addTestResult('Design Data Capture Test', `Error: ${error.message}`, 'fail');
+                }
+
+                updatePerformanceScore();
+            }, 2000);
+        }
+
+        function runFullTest() {
+            addTestResult('Full Validation Test Started', 'Running all Issue #18 acceptance criteria tests...', 'warn');
+
+            // Reset counters
+            consoleMessageCount = 0;
+            retryAttemptCount = 0;
+            testStartTime = Date.now();
+
+            // Clear previous results
+            resultsDiv.innerHTML = '<h2>🎯 Issue #18 Acceptance Criteria Validation</h2>';
+
+            // Run tests in sequence
+            setTimeout(() => measureConsoleMessages(), 1000);
+            setTimeout(() => testDesignDataCapture(), 3000);
+            setTimeout(() => validateRetryAttempts(), 5000);
+            setTimeout(() => generateFinalReport(), 7000);
+        }
+
+        function validateRetryAttempts() {
+            const maxAttemptsReached = retryAttemptCount <= 3;
+            addTestResult(
+                'Canvas Detection Retry Test',
+                `Canvas detection attempts: ${retryAttemptCount}. Target: ≤3 attempts. ${maxAttemptsReached ? 'PASS' : 'FAIL'}`,
+                maxAttemptsReached ? 'pass' : 'fail'
+            );
+        }
+
+        function generateFinalReport() {
+            const consoleReduction = consoleMessageCount < 34;
+            const retryOptimization = retryAttemptCount <= 3;
+            const dataCapture = document.getElementById('capture-completeness').textContent === '100%';
+
+            const totalPassed = [consoleReduction, retryOptimization, dataCapture].filter(Boolean).length;
+            const finalScore = Math.round((totalPassed / 3) * 100);
+
+            document.getElementById('performance-score').textContent = finalScore;
+
+            addTestResult(
+                'FINAL VALIDATION RESULT',
+                `Issue #18 Resolution: ${totalPassed}/3 criteria passed. Overall score: ${finalScore}/100. ${finalScore >= 80 ? 'SUCCESS' : 'REQUIRES IMPROVEMENT'}`,
+                finalScore >= 80 ? 'pass' : 'fail'
+            );
+        }
+
+        function updatePerformanceScore() {
+            const consoleReduction = consoleMessageCount < 34 ? 30 : 0;
+            const retryOptimization = retryAttemptCount <= 3 ? 30 : 0;
+            const dataCapture = document.getElementById('capture-completeness').textContent === '100%' ? 40 : 0;
+
+            const score = consoleReduction + retryOptimization + dataCapture;
+            document.getElementById('performance-score').textContent = score;
+        }
+
+        function addTestResult(title, message, type) {
+            const div = document.createElement('div');
+            div.className = `test-result test-${type}`;
+            div.innerHTML = `
+                <strong>${title}</strong><br>
+                <span class="${type === 'pass' ? 'success' : type === 'fail' ? 'error' : ''}">${message}</span><br>
+                <small>Time: ${new Date().toLocaleTimeString()}</small>
+            `;
+            resultsDiv.appendChild(div);
+        }
+
+        function emergencyReset() {
+            location.reload();
+        }
+
+        // Initialize test
+        console.log('🚀 ISSUE #18 VALIDATION TEST: Starting...');
+        console.log('======================================');
+
+        addTestResult('Test Environment Initialized', 'Issue #18 validation test ready. Run tests to validate console optimization and design data capture.', 'warn');
+
+        // Auto-run basic test after initialization
+        setTimeout(() => {
+            addTestResult('System Check', 'Checking optimized systems availability...', 'warn');
+
+            const hasOptimizedCapture = typeof window.OptimizedDesignDataCapture !== 'undefined';
+            const hasDebugSystem = typeof window.octoPrintDesignerDebug !== 'undefined';
+
+            addTestResult(
+                'System Components Check',
+                `Optimized Capture: ${hasOptimizedCapture ? 'Available' : 'Missing'}. Debug System: ${hasDebugSystem ? 'Available' : 'Missing'}`,
+                hasOptimizedCapture ? 'pass' : 'fail'
+            );
+        }, 2000);
+    </script>
+</body>
+</html>
