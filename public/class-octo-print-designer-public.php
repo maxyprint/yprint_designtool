@@ -88,12 +88,48 @@ class Octo_Print_Designer_Public {
 	 */
 	public function enqueue_scripts() {
 
-        // 🚨 VENDOR BUNDLE RE-ENABLED: Needed for other libraries, emergency loader handles fabric.js conflicts
+        // 🔍 COMPREHENSIVE DEBUG SYSTEM: Complete console debugging suite for fabric.js loading analysis
+        // Phase 0.1: Race Condition Analyzer - Precision timing measurements
+        wp_register_script(
+            'octo-race-condition-analyzer',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/race-condition-analyzer.js',
+            [], // Load first for timing accuracy
+            $this->version . '.debug-race-v1',
+            false // Load in head for early monitoring
+        );
+
+        // Phase 0.2: Fabric Debug Console - Comprehensive loading analysis
+        wp_register_script(
+            'octo-fabric-debug-console',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-debug-console.js',
+            ['octo-race-condition-analyzer'], // After race condition analyzer
+            $this->version . '.debug-console-v1',
+            false // Load in head for early monitoring
+        );
+
+        // Phase 0.3: Webpack Bundle Inspector - Deep bundle analysis
+        wp_register_script(
+            'octo-webpack-bundle-inspector',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-bundle-inspector.js',
+            ['octo-fabric-debug-console'], // After debug console
+            $this->version . '.debug-inspector-v1',
+            false // Load in head for early monitoring
+        );
+
+        // Phase 0.4: Timeline Tracker - Visual loading sequence analysis
+        wp_register_script(
+            'octo-fabric-timeline-tracker',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-loading-timeline-tracker.js',
+            ['octo-webpack-bundle-inspector'], // After bundle inspector
+            $this->version . '.debug-timeline-v1',
+            false // Load in head for early monitoring
+        );
+
         wp_register_script(
             'octo-print-designer-vendor',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
-            [],
-            rand(),
+            ['octo-fabric-timeline-tracker'], // After complete debug system
+            $this->version . '.vendor-monitored',
             true
         );
         
@@ -164,8 +200,8 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-webpack-fabric-extractor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🎯 ARTEFAKT-SYSTEM: Now uses webpack extractor
-            $this->version . '-extractor-' . time(), // Updated version identifier
+            ['octo-fabric-timeline-tracker', 'octo-print-designer-vendor', 'octo-webpack-fabric-extractor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🔍 DEBUG: Complete debug system integration
+            $this->version . '.designer-full-debug-' . time(), // Updated version identifier
             true
         );
 
