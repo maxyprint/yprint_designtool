@@ -97,11 +97,20 @@ class Octo_Print_Designer_Public {
             true
         );
         
+        // 🏆 HIVE MIND CANVAS SINGLETON MANAGER - Comprehensive Canvas Protection
+        wp_register_script(
+            'octo-print-designer-canvas-singleton',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-singleton-manager.js',
+            [], // Must load first before any canvas initialization
+            rand(),
+            false // Load in head for immediate protection
+        );
+
         // 🚨 EMERGENCY FABRIC.JS LOADER - Direct CDN Loading Solution
         wp_register_script(
             'octo-print-designer-emergency-fabric',
             OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
-            [], // Load independently of other scripts
+            ['octo-print-designer-canvas-singleton'], // Load after singleton protection
             rand(),
             false // Load in head for immediate availability
         );
@@ -124,11 +133,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🏆 HIVE MIND ENHANCED JSON COORDINATE SYSTEM - Advanced Design Data Capture
+        wp_register_script(
+            'octo-print-designer-enhanced-json',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-json-coordinate-system.js',
+            ['octo-print-designer-canvas-singleton'], // Load after singleton manager
+            rand(),
+            true
+        );
+
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-emergency-fabric', 'octo-print-designer-save-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load with save fix
-            $this->version . '-fixed-' . time(), // Use version with timestamp for cache busting
+            ['octo-print-designer-vendor', 'octo-print-designer-canvas-singleton', 'octo-print-designer-emergency-fabric', 'octo-print-designer-enhanced-json', 'octo-print-designer-save-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🏆 HIVE MIND: Complete dependency chain
+            $this->version . '-hivemind-' . time(), // Hive Mind version with timestamp
             true
         );
 
@@ -154,7 +172,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-global-instance',
             OCTO_PRINT_DESIGNER_URL . 'public/js/octo-print-designer-public.js',
-            ['octo-print-designer-global-exposer'], // Load after exposer
+            ['octo-print-designer-canvas-singleton', 'octo-print-designer-global-exposer'], // Load after singleton and exposer
             rand(),
             true
         );

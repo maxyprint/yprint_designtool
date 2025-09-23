@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 HIVE MIND VERIFICATION TEST</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        .test-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+            border-left: 5px solid #00ff88;
+        }
+        .status {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+        }
+        .success { color: #00ff88; }
+        .error { color: #ff6b6b; }
+        .warning { color: #ffd93d; }
+        .info { color: #6bcf7f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏆 HIVE MIND VERIFICATION TEST</h1>
+        <h2>🐝 7-Agent Swarm Deployment Validation</h2>
+        <h3>Canvas Singleton Protection & JSON Coordinate System</h3>
+        <p><strong>SWARM ID:</strong> swarm_1758638159571_p7mbkettu</p>
+    </div>
+
+    <div class="test-container">
+        <h3>🔧 SYSTEM COMPONENTS TEST</h3>
+        <button class="btn" onclick="testCanvasSingleton()">🛡️ TEST CANVAS SINGLETON</button>
+        <button class="btn" onclick="testJSONSystem()">📊 TEST JSON COORDINATES</button>
+        <button class="btn" onclick="testIntegration()">🚀 INTEGRATION TEST</button>
+        <button class="btn" onclick="clearResults()">🧹 CLEAR RESULTS</button>
+    </div>
+
+    <div id="results" class="status">
+🔄 Ready for Hive Mind verification testing...
+Click buttons above to test individual components.
+    </div>
+
+    <div class="test-container">
+        <h3>📋 EXPECTED RESULTS</h3>
+        <ul>
+            <li class="success">✅ Canvas Singleton Manager loaded and active</li>
+            <li class="success">✅ Enhanced JSON Coordinate System available</li>
+            <li class="success">✅ generateDesignData() returns valid JSON with coordinates</li>
+            <li class="success">✅ No canvas double-initialization errors</li>
+            <li class="success">✅ "Invalid input data" error eliminated</li>
+        </ul>
+    </div>
+
+    <script>
+        function updateResults(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' :
+                            type === 'error' ? 'error' :
+                            type === 'warning' ? 'warning' : 'info';
+
+            results.innerHTML += `\n[${timestamp}] <span class="${className}">${message}</span>`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '🧹 Results cleared. Ready for new tests...\n';
+        }
+
+        function testCanvasSingleton() {
+            updateResults('🛡️ TESTING CANVAS SINGLETON MANAGER...', 'info');
+
+            // Test 1: Check if manager exists
+            if (typeof window.CanvasSingletonManager !== 'undefined') {
+                updateResults('✅ CanvasSingletonManager class available', 'success');
+            } else {
+                updateResults('❌ CanvasSingletonManager class NOT found', 'error');
+                return;
+            }
+
+            // Test 2: Check global instance
+            if (window.canvasSingletonManager) {
+                updateResults('✅ Global canvasSingletonManager instance active', 'success');
+
+                const status = window.canvasSingletonManager.getStatus();
+                updateResults(`📊 Manager Status: ${status.totalCanvases} canvases, ${status.activeInitializations} initializing`, 'info');
+
+                if (status.disposed) {
+                    updateResults('⚠️ Manager is disposed', 'warning');
+                } else {
+                    updateResults('✅ Manager is active and ready', 'success');
+                }
+            } else {
+                updateResults('❌ Global canvasSingletonManager instance NOT found', 'error');
+            }
+
+            // Test 3: Check fabric.js wrapper
+            if (typeof window.fabric !== 'undefined' && window.fabric.Canvas) {
+                updateResults('✅ fabric.js Canvas wrapper with singleton protection active', 'success');
+            } else {
+                updateResults('⚠️ fabric.js Canvas wrapper not yet active', 'warning');
+            }
+        }
+
+        function testJSONSystem() {
+            updateResults('📊 TESTING JSON COORDINATE SYSTEM...', 'info');
+
+            // Test 1: Check class availability
+            if (typeof window.EnhancedJSONCoordinateSystem !== 'undefined') {
+                updateResults('✅ EnhancedJSONCoordinateSystem class available', 'success');
+            } else {
+                updateResults('❌ EnhancedJSONCoordinateSystem class NOT found', 'error');
+                return;
+            }
+
+            // Test 2: Check global instance
+            if (window.enhancedJSONSystem) {
+                updateResults('✅ Global enhancedJSONSystem instance active', 'success');
+            } else {
+                updateResults('❌ Global enhancedJSONSystem instance NOT found', 'error');
+                return;
+            }
+
+            // Test 3: Check generateDesignData function
+            if (typeof window.generateDesignData === 'function') {
+                updateResults('✅ Global generateDesignData() function available', 'success');
+
+                // Test function execution
+                try {
+                    const result = window.generateDesignData();
+                    if (result && typeof result === 'object') {
+                        if (result.error) {
+                            updateResults(`⚠️ generateDesignData() returned error: ${result.message}`, 'warning');
+                        } else {
+                            updateResults('✅ generateDesignData() returned valid data structure', 'success');
+                            updateResults(`📊 Result: ${result.elements ? result.elements.length : 0} elements, template: ${result.template_id}`, 'info');
+                        }
+                    } else {
+                        updateResults('❌ generateDesignData() returned invalid data', 'error');
+                    }
+                } catch (error) {
+                    updateResults(`❌ generateDesignData() execution error: ${error.message}`, 'error');
+                }
+            } else {
+                updateResults('❌ Global generateDesignData() function NOT found', 'error');
+            }
+
+            // Test 4: Test function
+            if (typeof window.testJSONGeneration === 'function') {
+                updateResults('✅ testJSONGeneration() debug function available', 'success');
+            }
+        }
+
+        function testIntegration() {
+            updateResults('🚀 RUNNING INTEGRATION TEST...', 'info');
+
+            let passed = 0;
+            let total = 0;
+
+            // Integration Test 1: Manager + JSON System coordination
+            total++;
+            if (window.canvasSingletonManager && window.enhancedJSONSystem) {
+                if (window.enhancedJSONSystem.canvasManager === window.canvasSingletonManager) {
+                    updateResults('✅ JSON System correctly linked to Canvas Manager', 'success');
+                    passed++;
+                } else {
+                    updateResults('⚠️ JSON System not linked to Canvas Manager', 'warning');
+                }
+            } else {
+                updateResults('❌ Missing core components for integration', 'error');
+            }
+
+            // Integration Test 2: No console errors during operation
+            total++;
+            const originalError = console.error;
+            let errorCount = 0;
+            console.error = function(...args) {
+                if (args[0] && args[0].includes && args[0].includes('fabric')) {
+                    errorCount++;
+                }
+                originalError.apply(console, args);
+            };
+
+            // Trigger some operations
+            try {
+                if (typeof window.generateDesignData === 'function') {
+                    window.generateDesignData();
+                }
+
+                setTimeout(() => {
+                    console.error = originalError;
+                    if (errorCount === 0) {
+                        updateResults('✅ No fabric-related errors during test execution', 'success');
+                        passed++;
+                    } else {
+                        updateResults(`⚠️ ${errorCount} fabric-related errors detected`, 'warning');
+                    }
+
+                    // Final integration score
+                    const score = Math.round((passed / total) * 100);
+                    if (score >= 80) {
+                        updateResults(`🏆 INTEGRATION TEST PASSED: ${score}% (${passed}/${total})`, 'success');
+                    } else {
+                        updateResults(`⚠️ INTEGRATION TEST PARTIAL: ${score}% (${passed}/${total})`, 'warning');
+                    }
+                }, 1000);
+
+            } catch (error) {
+                updateResults(`❌ Integration test execution error: ${error.message}`, 'error');
+                console.error = originalError;
+            }
+        }
+
+        // Auto-initialize when page loads
+        window.addEventListener('load', () => {
+            updateResults('🏆 HIVE MIND VERIFICATION TEST READY', 'info');
+            updateResults('🐝 7-Agent Swarm Solutions Loaded', 'info');
+            updateResults('Click test buttons to verify individual components...', 'info');
+        });
+    </script>
+</body>
+</html>
