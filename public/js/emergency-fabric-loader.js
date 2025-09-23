@@ -18,6 +18,8 @@
                 // First check if fabric is already available
                 if (window.fabric && typeof window.fabric.Canvas === 'function') {
                     console.log('✅ EMERGENCY FABRIC LOADER: fabric.js from vendor bundle working, skipping CDN load');
+                    console.log('🔍 FABRIC DEBUG: window.fabric.Canvas type:', typeof window.fabric.Canvas);
+                    console.log('🔍 FABRIC DEBUG: fabric.js is now available for DesignerWidget');
                     triggerFabricReady();
                     resolve(true);
                     return;
@@ -61,6 +63,8 @@
                 // Verify fabric is available
                 if (typeof window.fabric !== 'undefined' && typeof window.fabric.Canvas === 'function') {
                     console.log('✅ EMERGENCY FABRIC LOADER: window.fabric verified available');
+                    console.log('🔍 FABRIC DEBUG: CDN fabric.Canvas type:', typeof window.fabric.Canvas);
+                    console.log('🔍 FABRIC DEBUG: fabric.js is now available for DesignerWidget from CDN');
                     resolve();
                 } else {
                     console.error('❌ EMERGENCY FABRIC LOADER: fabric.js loaded but window.fabric not available');
@@ -158,19 +162,22 @@
      */
     function triggerFabricReady() {
         if (window.fabric) {
-            window.dispatchEvent(new CustomEvent('fabricGlobalReady', {
-                detail: {
-                    fabric: window.fabric,
-                    source: 'emergency-loader',
-                    timestamp: Date.now()
-                }
-            }));
+            // Dispatch multiple event types for compatibility
+            const eventDetail = {
+                fabric: window.fabric,
+                source: 'emergency-loader',
+                timestamp: Date.now()
+            };
+
+            window.dispatchEvent(new CustomEvent('fabricGlobalReady', { detail: eventDetail }));
+            window.dispatchEvent(new CustomEvent('fabricready', { detail: eventDetail }));
 
             // Set flag for design-loader
             window.fabricManuallyExposed = true;
             window.emergencyFabricLoaded = true;
 
-            console.log('🎉 EMERGENCY FABRIC LOADER: window.fabric ready and event dispatched');
+            console.log('🎉 EMERGENCY FABRIC LOADER: window.fabric ready and events dispatched');
+            console.log('🔍 FABRIC DEBUG: Events fired - fabricGlobalReady and fabricready');
         }
     }
 

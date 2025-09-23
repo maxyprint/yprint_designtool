@@ -68,9 +68,10 @@
 			console.log('🔍 CANVAS DEBUG: window.fabric exists:', typeof window.fabric);
 			console.log('🔍 CANVAS DEBUG: window.fabric.Canvas exists:', typeof window.fabric?.Canvas);
 
-			if (typeof DesignerWidget !== 'undefined') {
-				debugLog('debug', '🎯 GLOBAL INSTANCE: DesignerWidget class found, creating instance');
-				console.log('🔍 CANVAS DEBUG: Creating new DesignerWidget...');
+			// 🎯 TIMING FIX: Ensure both DesignerWidget AND fabric.js are available
+			if (typeof DesignerWidget !== 'undefined' && typeof window.fabric !== 'undefined' && window.fabric.Canvas) {
+				debugLog('debug', '🎯 GLOBAL INSTANCE: DesignerWidget class found, fabric.js ready, creating instance');
+				console.log('🔍 CANVAS DEBUG: Both DesignerWidget and fabric.js are ready, creating instance...');
 
 				try {
 					window.designerWidgetInstance = new DesignerWidget();
@@ -82,6 +83,17 @@
 					debugLog('error', '❌ GLOBAL INSTANCE: DesignerWidget creation failed:', error);
 					return false;
 				}
+			}
+
+			// Debug what's missing
+			if (typeof DesignerWidget === 'undefined') {
+				console.log('🔍 CANVAS DEBUG: DesignerWidget not yet available');
+			}
+			if (typeof window.fabric === 'undefined') {
+				console.log('🔍 CANVAS DEBUG: window.fabric not yet available - waiting for emergency fabric loader...');
+			}
+			if (typeof window.fabric !== 'undefined' && !window.fabric.Canvas) {
+				console.log('🔍 CANVAS DEBUG: window.fabric exists but Canvas not available');
 			}
 
 			// Try to import from designer bundle if webpack is available
