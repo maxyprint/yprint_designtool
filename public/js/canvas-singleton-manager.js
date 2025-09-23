@@ -236,10 +236,16 @@
                 return existing;
             }
 
-            // Check if canvas element already has fabric
-            if (canvasElement.__fabric) {
-                console.log('🚨 HIVE MIND PROTECTION: Canvas element already has fabric instance:', canvasId);
-                throw new Error('fabric: Trying to initialize a canvas that has already been initialized. Did you forget to dispose the canvas?');
+            // Check if canvas element already has fabric - FIXED: Check for functional fabric instance
+            if (canvasElement.__fabric && canvasElement.__fabric.dispose && typeof canvasElement.__fabric.getObjects === 'function') {
+                console.log('🚨 HIVE MIND PROTECTION: Canvas element already has functional fabric instance:', canvasId);
+                // Don't throw error, register existing functional canvas instead
+                window.canvasSingletonManager.registerCanvas(canvasId, canvasElement.__fabric, {
+                    type: 'fabric',
+                    element: canvasElement,
+                    options: options
+                });
+                return canvasElement.__fabric;
             }
 
             console.log('🎨 HIVE MIND: Creating new fabric canvas:', canvasId);
