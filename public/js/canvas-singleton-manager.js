@@ -330,6 +330,129 @@
         });
     }
 
+    // 🎯 WEBPACK IMPORT INTERCEPTION: Wrap fabric modules in webpack bundles
+    function installWebpackFabricInterception() {
+        if (typeof window.__webpack_require__ !== 'function') {
+            console.log('🔍 HIVE MIND: __webpack_require__ not available, skipping webpack interception');
+            return false;
+        }
+
+        console.log('🎯 HIVE MIND: Installing webpack fabric module interception...');
+
+        // Store original webpack require function
+        const originalWebpackRequire = window.__webpack_require__;
+
+        // Override webpack require to intercept fabric imports
+        window.__webpack_require__ = function(moduleId) {
+            const module = originalWebpackRequire.call(this, moduleId);
+
+            // Check if this is a fabric.js module by looking for Canvas constructor
+            if (module && typeof module === 'object' && module.Canvas && typeof module.Canvas === 'function') {
+                console.log('🎯 HIVE MIND: Intercepted fabric.js webpack module:', moduleId);
+
+                // Check if already wrapped
+                if (!module.Canvas.__hiveMindWrapped) {
+                    console.log('🛡️ HIVE MIND: Wrapping webpack fabric.Canvas with singleton protection...');
+
+                    const OriginalWebpackCanvas = module.Canvas;
+
+                    module.Canvas = function(canvasElement, options = {}) {
+                        const canvasId = canvasElement.id || 'canvas-' + Date.now();
+
+                        console.log('🔍 WEBPACK DEBUG: fabric.Canvas() called via webpack import for:', canvasId);
+                        console.log('🔍 WEBPACK DEBUG: canvasElement exists:', !!canvasElement);
+                        console.log('🔍 WEBPACK DEBUG: canvasElement.__fabric exists:', !!canvasElement.__fabric);
+
+                        // Use same singleton protection logic
+                        const existing = window.canvasSingletonManager.getCanvas(canvasId);
+                        console.log('🔍 WEBPACK DEBUG: Singleton manager has existing canvas:', !!existing);
+                        if (existing) {
+                            console.log('🛡️ WEBPACK SINGLETON: Returning existing canvas for:', canvasId);
+                            return existing;
+                        }
+
+                        // Check if canvas element already has functional fabric instance
+                        if (canvasElement.__fabric) {
+                            console.log('🔍 WEBPACK DEBUG: __fabric exists, checking functionality...');
+                            console.log('🔍 WEBPACK DEBUG: __fabric.dispose exists:', typeof canvasElement.__fabric.dispose);
+                            console.log('🔍 WEBPACK DEBUG: __fabric.getObjects exists:', typeof canvasElement.__fabric.getObjects);
+
+                            if (canvasElement.__fabric.dispose && typeof canvasElement.__fabric.getObjects === 'function') {
+                                console.log('🚨 WEBPACK PROTECTION: Canvas element already has functional fabric instance:', canvasId);
+                                // Register existing functional canvas instead of creating new
+                                window.canvasSingletonManager.registerCanvas(canvasId, canvasElement.__fabric, {
+                                    type: 'fabric',
+                                    element: canvasElement,
+                                    options: options
+                                });
+                                return canvasElement.__fabric;
+                            } else {
+                                console.log('🧹 WEBPACK DEBUG: __fabric exists but non-functional, cleaning up...');
+                                delete canvasElement.__fabric;
+                            }
+                        }
+
+                        console.log('🎨 WEBPACK HIVE MIND: Creating new fabric canvas via webpack import:', canvasId);
+                        const fabricCanvas = new OriginalWebpackCanvas(canvasElement, options);
+                        console.log('✅ WEBPACK DEBUG: New fabric canvas created successfully:', !!fabricCanvas);
+
+                        // Register with singleton manager
+                        window.canvasSingletonManager.registerCanvas(canvasId, fabricCanvas, {
+                            type: 'fabric',
+                            element: canvasElement,
+                            options: options,
+                            source: 'webpack-import'
+                        });
+
+                        return fabricCanvas;
+                    };
+
+                    // Copy static methods and properties
+                    Object.setPrototypeOf(module.Canvas, OriginalWebpackCanvas);
+                    Object.assign(module.Canvas, OriginalWebpackCanvas);
+
+                    // Mark as wrapped to prevent double-wrapping
+                    module.Canvas.__hiveMindWrapped = true;
+                    module.Canvas.__originalConstructor = OriginalWebpackCanvas;
+
+                    console.log('✅ HIVE MIND: Webpack fabric.Canvas wrapper installed for module:', moduleId);
+                }
+            }
+
+            return module;
+        };
+
+        // Copy properties from original function
+        Object.setPrototypeOf(window.__webpack_require__, originalWebpackRequire);
+        Object.assign(window.__webpack_require__, originalWebpackRequire);
+
+        console.log('✅ HIVE MIND: Webpack fabric module interception installed successfully');
+        return true;
+    }
+
+    // Install webpack interception immediately if available
+    let webpackIntercepted = installWebpackFabricInterception();
+
+    // If webpack not ready, poll for it
+    if (!webpackIntercepted) {
+        console.log('🔍 HIVE MIND: Polling for webpack availability...');
+        let webpackAttempts = 0;
+        const maxWebpackAttempts = 20;
+
+        const webpackInterval = setInterval(() => {
+            webpackAttempts++;
+            console.log(`🔍 HIVE MIND: Webpack attempt ${webpackAttempts}/${maxWebpackAttempts}`);
+
+            if (installWebpackFabricInterception()) {
+                clearInterval(webpackInterval);
+                console.log('✅ HIVE MIND: Webpack interception installed after', webpackAttempts, 'attempts');
+            } else if (webpackAttempts >= maxWebpackAttempts) {
+                clearInterval(webpackInterval);
+                console.log('⚠️ HIVE MIND: Giving up webpack interception after', maxWebpackAttempts, 'attempts');
+            }
+        }, 100);
+    }
+
     // Window unload cleanup
     window.addEventListener('beforeunload', () => {
         if (window.canvasSingletonManager) {
