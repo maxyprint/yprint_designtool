@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Artefakt-Gesteuertes System Test - Webpack Fabric Extractor</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            border: 2px solid #333;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .success {
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        .error {
+            border-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        .warning {
+            border-color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+        }
+        #console-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            font-size: 12px;
+        }
+        .criteria-check {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .criteria-check::before {
+            content: "⏳";
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .criteria-check.success::before {
+            content: "✅";
+            color: #00ff00;
+        }
+        .criteria-check.error::before {
+            content: "❌";
+            color: #ff0000;
+        }
+        button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 ARTEFAKT-GESTEUERTES MULTI-AGENTEN-SYSTEM TEST</h1>
+    <h2>Webpack Fabric Extractor - Proactive Solution</h2>
+
+    <div class="test-section">
+        <h3>📊 MESSBARE ERFOLGSKRITERIEN - LIVE VALIDATION</h3>
+
+        <div id="criterion-1" class="criteria-check">
+            <strong>Kriterium 1:</strong> fabric.js wird zuverlässig aus vendor.bundle.js geladen (emergency loader NICHT aktiv)
+        </div>
+
+        <div id="criterion-2" class="criteria-check">
+            <strong>Kriterium 2:</strong> window.fabric ist verfügbar BEVOR abhängige Skripte initialisiert werden
+        </div>
+
+        <div id="criterion-3" class="criteria-check">
+            <strong>Kriterium 3:</strong> Keine "Failed to initialize" Fehler mehr
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>🔧 TEST CONTROLS</h3>
+        <button onclick="runComprehensiveTest()">🚀 Start Comprehensive Test</button>
+        <button onclick="simulateVendorBundleLoad()">📦 Simulate Vendor Bundle Load</button>
+        <button onclick="testWebpackExtraction()">⚙️ Test Webpack Extraction</button>
+        <button onclick="clearConsole()">🧹 Clear Console</button>
+    </div>
+
+    <div class="test-section">
+        <h3>📈 SYSTEM STATUS</h3>
+        <div id="system-status">
+            <div>Webpack Fabric Extractor: <span id="extractor-status">⏳ Waiting</span></div>
+            <div>Emergency Loader Status: <span id="emergency-status">⏳ Checking</span></div>
+            <div>Fabric Global Availability: <span id="fabric-status">⏳ Checking</span></div>
+            <div>Dependent Scripts Ready: <span id="scripts-status">⏳ Checking</span></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 CONSOLE OUTPUT</h3>
+        <div id="console-output"></div>
+    </div>
+
+    <!-- Simulate vendor bundle loading -->
+    <script>
+        // Mock webpack chunks for testing
+        window.webpackChunkocto_print_designer = window.webpackChunkocto_print_designer || [];
+
+        // Mock webpack require function
+        window.__webpack_require__ = function(moduleId) {
+            if (moduleId === './node_modules/fabric/dist/index.min.mjs') {
+                // Return a mock fabric module
+                return {
+                    Canvas: function(element, options) {
+                        console.log('✅ TEST: Mock Fabric Canvas constructor called');
+                        this.element = element;
+                        this.options = options || {};
+                        return this;
+                    },
+                    Object: function() {
+                        console.log('✅ TEST: Mock Fabric Object constructor called');
+                        return this;
+                    },
+                    Image: function() {
+                        console.log('✅ TEST: Mock Fabric Image constructor called');
+                        return this;
+                    }
+                };
+            }
+            throw new Error('Module not found: ' + moduleId);
+        };
+
+        // Mock webpack require cache
+        window.__webpack_require__.cache = {
+            './node_modules/fabric/dist/index.min.mjs': {
+                exports: {
+                    Canvas: function(element, options) {
+                        console.log('✅ TEST: Cache Fabric Canvas constructor called');
+                        return this;
+                    },
+                    Object: function() { return this; },
+                    Image: function() { return this; }
+                }
+            }
+        };
+    </script>
+
+    <!-- Load the webpack fabric extractor -->
+    <script src="public/js/webpack-fabric-extractor.js"></script>
+
+    <script>
+        // Console logging override
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addToConsoleOutput(message, type = 'log') {
+            const output = document.getElementById('console-output');
+            const div = document.createElement('div');
+            div.style.color = type === 'error' ? '#ff0000' : type === 'warn' ? '#ffaa00' : '#00ff00';
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'warn');
+        };
+
+        // Test functions
+        function runComprehensiveTest() {
+            console.log('🚀 STARTING COMPREHENSIVE ARTEFAKT-SYSTEM TEST');
+
+            // Test Criterion 1: fabric.js loaded from vendor bundle
+            testCriterion1();
+
+            // Test Criterion 2: window.fabric availability timing
+            testCriterion2();
+
+            // Test Criterion 3: No initialization failures
+            testCriterion3();
+
+            updateSystemStatus();
+        }
+
+        function testCriterion1() {
+            console.log('📊 Testing Kriterium 1: fabric.js vendor bundle loading');
+
+            const emergencyActive = window.emergencyFabricLoaderActive;
+            const fabricFromWebpack = window.webpackFabricExtractorActive;
+
+            const criterion1 = document.getElementById('criterion-1');
+
+            if (!emergencyActive && fabricFromWebpack) {
+                criterion1.className = 'criteria-check success';
+                console.log('✅ Kriterium 1 ERFÜLLT: fabric.js aus vendor bundle geladen, emergency loader nicht aktiv');
+            } else {
+                criterion1.className = 'criteria-check error';
+                console.error('❌ Kriterium 1 NICHT ERFÜLLT:', { emergencyActive, fabricFromWebpack });
+            }
+        }
+
+        function testCriterion2() {
+            console.log('📊 Testing Kriterium 2: window.fabric availability timing');
+
+            const fabricAvailable = window.fabric && typeof window.fabric.Canvas === 'function';
+            const fabricGloballyExposed = window.fabricGloballyExposed;
+
+            const criterion2 = document.getElementById('criterion-2');
+
+            if (fabricAvailable && fabricGloballyExposed) {
+                criterion2.className = 'criteria-check success';
+                console.log('✅ Kriterium 2 ERFÜLLT: window.fabric verfügbar vor abhängigen Skripten');
+            } else {
+                criterion2.className = 'criteria-check error';
+                console.error('❌ Kriterium 2 NICHT ERFÜLLT:', { fabricAvailable, fabricGloballyExposed });
+            }
+        }
+
+        function testCriterion3() {
+            console.log('📊 Testing Kriterium 3: Keine Initialisierungsfehler');
+
+            // Simulate dependent script initialization
+            try {
+                if (window.fabric && window.fabric.Canvas) {
+                    const testCanvas = new window.fabric.Canvas();
+                    console.log('✅ Test Canvas Initialisierung erfolgreich');
+
+                    const criterion3 = document.getElementById('criterion-3');
+                    criterion3.className = 'criteria-check success';
+                    console.log('✅ Kriterium 3 ERFÜLLT: Keine Initialisierungsfehler');
+                } else {
+                    throw new Error('fabric.js nicht verfügbar für Initialisierung');
+                }
+            } catch (error) {
+                const criterion3 = document.getElementById('criterion-3');
+                criterion3.className = 'criteria-check error';
+                console.error('❌ Kriterium 3 NICHT ERFÜLLT:', error.message);
+            }
+        }
+
+        function simulateVendorBundleLoad() {
+            console.log('📦 Simulating vendor bundle load...');
+
+            // Trigger webpack chunk loading
+            window.webpackChunkocto_print_designer.push([["vendor"], {
+                "./node_modules/fabric/dist/index.min.mjs": function(module, exports, require) {
+                    exports.Canvas = function(element, options) {
+                        console.log('✅ VENDOR BUNDLE: Fabric Canvas from simulated vendor bundle');
+                        return this;
+                    };
+                    exports.Object = function() { return this; };
+                    exports.Image = function() { return this; };
+                }
+            }]);
+
+            console.log('✅ Vendor bundle simulation complete');
+        }
+
+        function testWebpackExtraction() {
+            console.log('⚙️ Testing webpack extraction manually...');
+
+            // Re-trigger extraction
+            if (window.webpackFabricExtractorActive) {
+                console.log('🔄 Extractor already active, checking status...');
+            } else {
+                console.log('🚀 Starting extractor...');
+                // Extractor should auto-start
+            }
+        }
+
+        function updateSystemStatus() {
+            // Update extractor status
+            const extractorStatus = document.getElementById('extractor-status');
+            extractorStatus.textContent = window.webpackFabricExtractorActive ? '✅ Active' : '❌ Inactive';
+            extractorStatus.style.color = window.webpackFabricExtractorActive ? '#00ff00' : '#ff0000';
+
+            // Update emergency status
+            const emergencyStatus = document.getElementById('emergency-status');
+            emergencyStatus.textContent = window.emergencyFabricLoaderActive ? '❌ Active (Should be off)' : '✅ Inactive';
+            emergencyStatus.style.color = window.emergencyFabricLoaderActive ? '#ff0000' : '#00ff00';
+
+            // Update fabric status
+            const fabricStatus = document.getElementById('fabric-status');
+            const fabricAvailable = window.fabric && typeof window.fabric.Canvas === 'function';
+            fabricStatus.textContent = fabricAvailable ? '✅ Available' : '❌ Not Available';
+            fabricStatus.style.color = fabricAvailable ? '#00ff00' : '#ff0000';
+
+            // Update scripts status
+            const scriptsStatus = document.getElementById('scripts-status');
+            scriptsStatus.textContent = window.fabricGloballyExposed ? '✅ Ready' : '⏳ Waiting';
+            scriptsStatus.style.color = window.fabricGloballyExposed ? '#00ff00' : '#ffaa00';
+        }
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+        }
+
+        // Listen for fabric ready events
+        document.addEventListener('fabricGlobalReady', function(event) {
+            console.log('🎉 FABRIC GLOBAL READY EVENT RECEIVED:', event.detail);
+            updateSystemStatus();
+        });
+
+        // Auto-update status every 2 seconds
+        setInterval(updateSystemStatus, 2000);
+
+        // Initial status update
+        setTimeout(updateSystemStatus, 1000);
+
+        console.log('🎯 ARTEFAKT-SYSTEM TEST INTERFACE READY');
+        console.log('📊 Use the test controls to validate the multi-agent solution');
+    </script>
+</body>
+</html>

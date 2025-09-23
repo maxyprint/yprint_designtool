@@ -63,17 +63,26 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // 🎯 ISSUE #123 FIX: Agent-Recommended Script Loading Sequence
-        // Phase 1: Fabric Singleton Wrapper (CRITICAL - Load before any fabric usage)
+        // 🎯 ARTEFAKT-GESTEUERTES SYSTEM: Admin Webpack Fabric Extraction
+        // Phase 1: Immediate Fabric Extraction from Webpack Bundle
+        wp_enqueue_script(
+            'octo-webpack-fabric-extractor-admin',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-extractor.js',
+            ['octo-print-designer-vendor'], // Load immediately after vendor bundle
+            $this->version . '.extractor-admin-v2',
+            true
+        );
+
+        // Phase 2: Fabric Singleton Wrapper (only after extraction)
         wp_enqueue_script(
             'octo-fabric-canvas-singleton',
             OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-singleton.js',
-            ['octo-print-designer-vendor'], // After vendor bundle loads fabric
+            ['octo-webpack-fabric-extractor-admin', 'jquery'], // After fabric is extracted and globally available
             $this->version . '.1-singleton',
             true
         );
 
-        // Phase 2: Canvas Initialization Controller
+        // Phase 3: Canvas Initialization Controller
         wp_enqueue_script(
             'octo-canvas-initialization-controller',
             OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-initialization-controller.js',
@@ -82,7 +91,7 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Phase 3: Script Load Coordinator
+        // Phase 4: Script Load Coordinator
         wp_enqueue_script(
             'octo-script-load-coordinator',
             OCTO_PRINT_DESIGNER_URL . 'public/js/script-load-coordinator.js',

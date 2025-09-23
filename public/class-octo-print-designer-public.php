@@ -97,17 +97,26 @@ class Octo_Print_Designer_Public {
             true
         );
         
-        // 🎯 ISSUE #123 FIX: Agent-Coordinated Singleton System (PUBLIC FRONTEND)
-        // Phase 1: Fabric Singleton Wrapper
+        // 🎯 ARTEFAKT-GESTEUERTES SYSTEM: Proactive Webpack Fabric Extraction
+        // Phase 1: Immediate Fabric Extraction from Webpack Bundle
+        wp_register_script(
+            'octo-webpack-fabric-extractor',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-extractor.js',
+            ['octo-print-designer-vendor'], // Load immediately after vendor bundle
+            $this->version . '.extractor-v2',
+            true
+        );
+
+        // Phase 2: Fabric Singleton Wrapper (only after extraction)
         wp_register_script(
             'octo-fabric-canvas-singleton-public',
             OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-singleton.js',
-            ['octo-print-designer-vendor'], // After vendor bundle loads fabric
+            ['octo-webpack-fabric-extractor'], // After fabric is extracted and globally available
             $this->version . '.1-singleton-public',
             true
         );
 
-        // Phase 2: Canvas Initialization Controller
+        // Phase 3: Canvas Initialization Controller
         wp_register_script(
             'octo-canvas-initialization-controller-public',
             OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-initialization-controller.js',
@@ -116,22 +125,13 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // Phase 3: Script Load Coordinator
+        // Phase 4: Script Load Coordinator
         wp_register_script(
             'octo-script-load-coordinator-public',
             OCTO_PRINT_DESIGNER_URL . 'public/js/script-load-coordinator.js',
             ['octo-canvas-initialization-controller-public'],
             $this->version . '.1-coordinator-public',
             true
-        );
-
-        // Phase 4: Emergency Fabric Loader (Enhanced with Singleton Awareness)
-        wp_register_script(
-            'octo-print-designer-emergency-fabric',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
-            ['octo-script-load-coordinator-public'], // Now coordinates with singleton system
-            $this->version . '.2-singleton-aware',
-            true // Changed to true for better coordination
         );
 
         // 🚨 DESIGN SAVE EMERGENCY FIX - Solves "Invalid input data" error
@@ -164,8 +164,8 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🎯 ISSUE #123: Now includes canvas controller
-            $this->version . '-singleton-' . time(), // Updated version identifier
+            ['octo-print-designer-vendor', 'octo-webpack-fabric-extractor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🎯 ARTEFAKT-SYSTEM: Now uses webpack extractor
+            $this->version . '-extractor-' . time(), // Updated version identifier
             true
         );
 
