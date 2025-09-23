@@ -204,6 +204,15 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🏆 PERMANENT SAVE FIX: Auto-adds missing template_id, name, and nonce fields to AJAX requests
+        wp_register_script(
+            'octo-print-designer-permanent-save-fix',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/permanent-save-fix.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '-permanent-' . time(),
+            true
+        );
+
         // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
         wp_add_inline_script('octo-print-designer-designer', '
             // Verify emergency fabric loader worked

@@ -75,6 +75,9 @@ class Octo_Print_Designer_Designer {
         // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
         wp_enqueue_script('octo-print-designer-global-instance');
 
+        // 🏆 PERMANENT SAVE FIX: Enqueue permanent AJAX interceptor for save functionality
+        wp_enqueue_script('octo-print-designer-permanent-save-fix');
+
         // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Enqueue race condition-free capture system
         wp_enqueue_script('octo-print-designer-production-capture');
 
