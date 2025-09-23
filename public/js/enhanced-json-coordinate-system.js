@@ -111,11 +111,14 @@
             this.debugLog('debug', '🔍 Phase 1: Canvas discovery...');
 
             // Method 1: Use Canvas Singleton Manager
+            console.log('🔍 JSON DEBUG: Checking Canvas Singleton Manager...');
             if (this.canvasManager) {
                 const status = this.canvasManager.getStatus();
+                console.log('🔍 JSON DEBUG: Canvas Manager Status:', status);
                 this.debugLog('debug', '📊 Canvas Manager Status:', status);
 
                 for (const canvasId of status.canvases) {
+                    console.log('🔍 JSON DEBUG: Checking canvas ID:', canvasId);
                     const canvas = this.canvasManager.getCanvas(canvasId);
                     if (canvas && canvas.getObjects) {
                         const element = document.getElementById(canvasId);
@@ -125,14 +128,24 @@
                         }
                     }
                 }
+            } else {
+                console.log('🔍 JSON DEBUG: Canvas Manager not available');
             }
 
             // Method 2: Search for fabric canvas instances
+            console.log('🔍 JSON DEBUG: Searching DOM for canvas elements...');
             const canvasElements = document.querySelectorAll('canvas');
+            console.log('🔍 JSON DEBUG: Found', canvasElements.length, 'canvas elements');
+
             for (const element of canvasElements) {
-                if (element.__fabric && element.__fabric.getObjects) {
-                    this.debugLog('info', '✅ Found canvas via __fabric property:', element.id);
-                    return { success: true, canvas: element.__fabric, canvasElement: element };
+                console.log('🔍 JSON DEBUG: Checking canvas:', element.id || 'no-id', 'has __fabric:', !!element.__fabric);
+                if (element.__fabric) {
+                    console.log('🔍 JSON DEBUG: __fabric type:', typeof element.__fabric, 'has getObjects:', typeof element.__fabric.getObjects);
+                    if (element.__fabric.getObjects) {
+                        console.log('✅ JSON DEBUG: Found functional canvas via __fabric:', element.id);
+                        this.debugLog('info', '✅ Found canvas via __fabric property:', element.id);
+                        return { success: true, canvas: element.__fabric, canvasElement: element };
+                    }
                 }
             }
 

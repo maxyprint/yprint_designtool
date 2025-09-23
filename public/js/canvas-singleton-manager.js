@@ -229,27 +229,43 @@
         window.fabric.Canvas = function(canvasElement, options = {}) {
             const canvasId = canvasElement.id || 'canvas-' + Date.now();
 
+            console.log('🔍 DEBUG: fabric.Canvas() called for:', canvasId);
+            console.log('🔍 DEBUG: canvasElement exists:', !!canvasElement);
+            console.log('🔍 DEBUG: canvasElement.__fabric exists:', !!canvasElement.__fabric);
+            console.log('🔍 DEBUG: canvasElement.__fabric type:', typeof canvasElement.__fabric);
+
             // Check singleton protection
             const existing = window.canvasSingletonManager.getCanvas(canvasId);
+            console.log('🔍 DEBUG: Singleton manager has existing canvas:', !!existing);
             if (existing) {
                 console.log('🛡️ HIVE MIND SINGLETON: Returning existing canvas for:', canvasId);
                 return existing;
             }
 
             // Check if canvas element already has fabric - FIXED: Check for functional fabric instance
-            if (canvasElement.__fabric && canvasElement.__fabric.dispose && typeof canvasElement.__fabric.getObjects === 'function') {
-                console.log('🚨 HIVE MIND PROTECTION: Canvas element already has functional fabric instance:', canvasId);
-                // Don't throw error, register existing functional canvas instead
-                window.canvasSingletonManager.registerCanvas(canvasId, canvasElement.__fabric, {
-                    type: 'fabric',
-                    element: canvasElement,
-                    options: options
-                });
-                return canvasElement.__fabric;
+            if (canvasElement.__fabric) {
+                console.log('🔍 DEBUG: __fabric exists, checking functionality...');
+                console.log('🔍 DEBUG: __fabric.dispose exists:', typeof canvasElement.__fabric.dispose);
+                console.log('🔍 DEBUG: __fabric.getObjects exists:', typeof canvasElement.__fabric.getObjects);
+
+                if (canvasElement.__fabric.dispose && typeof canvasElement.__fabric.getObjects === 'function') {
+                    console.log('🚨 HIVE MIND PROTECTION: Canvas element already has functional fabric instance:', canvasId);
+                    // Don't throw error, register existing functional canvas instead
+                    window.canvasSingletonManager.registerCanvas(canvasId, canvasElement.__fabric, {
+                        type: 'fabric',
+                        element: canvasElement,
+                        options: options
+                    });
+                    return canvasElement.__fabric;
+                } else {
+                    console.log('🧹 DEBUG: __fabric exists but non-functional, cleaning up...');
+                    delete canvasElement.__fabric;
+                }
             }
 
             console.log('🎨 HIVE MIND: Creating new fabric canvas:', canvasId);
             const fabricCanvas = new OriginalCanvas(canvasElement, options);
+            console.log('✅ DEBUG: New fabric canvas created successfully:', !!fabricCanvas);
 
             // Register with singleton manager
             window.canvasSingletonManager.registerCanvas(canvasId, fabricCanvas, {

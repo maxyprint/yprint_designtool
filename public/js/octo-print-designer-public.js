@@ -63,11 +63,25 @@
 			}
 
 			// Check if DesignerWidget is available
+			console.log('🔍 CANVAS DEBUG: Checking DesignerWidget availability...');
+			console.log('🔍 CANVAS DEBUG: typeof DesignerWidget:', typeof DesignerWidget);
+			console.log('🔍 CANVAS DEBUG: window.fabric exists:', typeof window.fabric);
+			console.log('🔍 CANVAS DEBUG: window.fabric.Canvas exists:', typeof window.fabric?.Canvas);
+
 			if (typeof DesignerWidget !== 'undefined') {
 				debugLog('debug', '🎯 GLOBAL INSTANCE: DesignerWidget class found, creating instance');
-				window.designerWidgetInstance = new DesignerWidget();
-				debugLog('info', '✅ GLOBAL INSTANCE: window.designerWidgetInstance created successfully');
-				return true;
+				console.log('🔍 CANVAS DEBUG: Creating new DesignerWidget...');
+
+				try {
+					window.designerWidgetInstance = new DesignerWidget();
+					console.log('✅ CANVAS DEBUG: DesignerWidget created successfully');
+					debugLog('info', '✅ GLOBAL INSTANCE: window.designerWidgetInstance created successfully');
+					return true;
+				} catch (error) {
+					console.error('❌ CANVAS DEBUG: DesignerWidget creation failed:', error);
+					debugLog('error', '❌ GLOBAL INSTANCE: DesignerWidget creation failed:', error);
+					return false;
+				}
 			}
 
 			// Try to import from designer bundle if webpack is available
