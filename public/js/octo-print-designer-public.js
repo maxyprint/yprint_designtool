@@ -56,6 +56,12 @@
 
 		// Wait for designer bundle to load and expose DesignerWidget
 		function initializeDesignerWidget() {
+			// PHASE 3 FIX: Singleton guard - prevent double initialization
+			if (window.designerWidgetInstance) {
+				debugLog('debug', '🛡️ SINGLETON: DesignerWidget already exists, skipping initialization');
+				return true;
+			}
+
 			// Check if DesignerWidget is available
 			if (typeof DesignerWidget !== 'undefined') {
 				debugLog('debug', '🎯 GLOBAL INSTANCE: DesignerWidget class found, creating instance');

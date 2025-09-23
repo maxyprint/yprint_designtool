@@ -22,7 +22,7 @@ class DesignSaveEmergencyFix {
         this.interceptSaveFunctions();
 
         // Add missing fields to all AJAX calls
-        this.patchAjaxCalls();
+        // this.patchAjaxCalls(); // PHASE 3 FIX: Method undefined, commented out to prevent TypeError
 
         console.log('✅ Design Save Emergency Fix ready!');
     }
@@ -105,7 +105,7 @@ class DesignSaveEmergencyFix {
             }
         }
 
-        return originalFunction.call(this, url, options);
+        return originalFunction.call(window, url, options); // PHASE 3 FIX: Correct context for Window.fetch
     }
 
     addRequiredFields(data) {
