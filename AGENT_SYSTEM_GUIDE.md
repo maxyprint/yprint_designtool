@@ -4,7 +4,7 @@
 
 ### **THE PROBLEM WE SOLVED:**
 - **MCP Tools ≠ MCP Servers** - Most agent systems in Claude are just mock implementations
-- **RUV-Swarm, Flow-Nexus tools** = Mock responses, no real functionality
+- **RUV-Swarm tools** = Mock responses, no real functionality
 - **Claude-Flow MCP Tools** = Also mock when accessed as tools
 - **Claude-Flow MCP Server** = REAL agent orchestration system
 
@@ -94,7 +94,7 @@ mcp__claude-flow__workflow_create
 - Generic "success: true" responses with no real data
 - Tools that return placeholder values
 - No persistent state between operations
-- Credit/authentication requirements (Flow-Nexus)
+- Credit/authentication requirements
 
 ### **2. Permission Issues:**
 - **DON'T:** Use `sudo npm install -g` (causes permission problems)

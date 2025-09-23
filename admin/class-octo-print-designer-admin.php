@@ -63,19 +63,49 @@ class Octo_Print_Designer_Admin {
             true
         );
 
+        // 🎯 ISSUE #123 FIX: Agent-Recommended Script Loading Sequence
+        // Phase 1: Fabric Singleton Wrapper (CRITICAL - Load before any fabric usage)
         wp_enqueue_script(
-            'octo-fabric-global-exposure',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
-            ['octo-print-designer-admin', 'jquery'],
-            $this->version . '.3',
+            'octo-fabric-canvas-singleton',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-singleton.js',
+            ['octo-print-designer-vendor'], // After vendor bundle loads fabric
+            $this->version . '.1-singleton',
             true
         );
 
+        // Phase 2: Canvas Initialization Controller
+        wp_enqueue_script(
+            'octo-canvas-initialization-controller',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-initialization-controller.js',
+            ['octo-fabric-canvas-singleton', 'jquery'],
+            $this->version . '.1-controller',
+            true
+        );
+
+        // Phase 3: Script Load Coordinator
+        wp_enqueue_script(
+            'octo-script-load-coordinator',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/script-load-coordinator.js',
+            ['octo-canvas-initialization-controller', 'jquery'],
+            $this->version . '.1-coordinator',
+            true
+        );
+
+        // Phase 4: Fabric Global Exposure (Enhanced)
+        wp_enqueue_script(
+            'octo-fabric-global-exposure',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
+            ['octo-script-load-coordinator', 'octo-print-designer-admin', 'jquery'],
+            $this->version . '.4-enhanced',
+            true
+        );
+
+        // Phase 5: Canvas Hook (Now Singleton-Aware)
         wp_enqueue_script(
             'octo-template-editor-canvas-hook',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-fabric-global-exposure', 'octo-print-designer-admin', 'jquery'],
-            $this->version . '.3',
+            ['octo-fabric-global-exposure', 'octo-canvas-initialization-controller', 'jquery'],
+            $this->version . '.4-singleton-aware',
             true
         );
 

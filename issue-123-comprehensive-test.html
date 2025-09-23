@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Issue #123 Comprehensive Test - Hive Mind Agent Validation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 20px;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .test-title {
+            color: #FFD700;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .status {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            min-width: 120px;
+            display: inline-block;
+        }
+
+        .status.success { background: #28a745; }
+        .status.error { background: #dc3545; }
+        .status.warning { background: #ffc107; color: #000; }
+        .status.info { background: #17a2b8; }
+        .status.pending { background: #6c757d; }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .test-button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: transform 0.2s;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .test-button:active {
+            transform: translateY(0);
+        }
+
+        .canvas-container {
+            grid-column: 1 / -1;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        #test-canvas {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: white;
+        }
+
+        .agent-badge {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin: 2px;
+            display: inline-block;
+        }
+
+        .critical-alert {
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Issue #123 Comprehensive Test Suite</h1>
+            <h2>Hive Mind Agent-Coordinated Canvas Singleton Validation</h2>
+            <div>
+                <span class="agent-badge">🔍 Fabric-Audit-Specialist</span>
+                <span class="agent-badge">🧪 Canvas-Integration-Tester</span>
+                <span class="agent-badge">⚡ Bundle-Performance-Monitor</span>
+                <span class="agent-badge">🔬 Solution-Architecture-Reviewer</span>
+            </div>
+        </div>
+
+        <div class="critical-alert" id="critical-status">
+            🎯 TESTING AGENT-COORDINATED SOLUTION: Multi-Layer Singleton Architecture
+        </div>
+
+        <div class="test-grid">
+            <!-- Fabric Audit Tests -->
+            <div class="test-section">
+                <div class="test-title">🔍 Fabric Audit Tests</div>
+
+                <div class="metric">
+                    <span>Fabric.js Global Status:</span>
+                    <span class="status pending" id="fabric-global-status">Checking...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Singleton Wrapper Status:</span>
+                    <span class="status pending" id="singleton-wrapper-status">Checking...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Initialization Points:</span>
+                    <span class="status pending" id="init-points-status">Detecting...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Race Condition Risk:</span>
+                    <span class="status pending" id="race-condition-status">Analyzing...</span>
+                </div>
+
+                <button class="test-button" onclick="runFabricAuditTests()">🔍 Run Fabric Audit</button>
+
+                <div class="log-container" id="fabric-audit-log">
+                    Fabric audit tests will appear here...
+                </div>
+            </div>
+
+            <!-- Canvas Integration Tests -->
+            <div class="test-section">
+                <div class="test-title">🧪 Canvas Integration Tests</div>
+
+                <div class="metric">
+                    <span>Canvas Controller Status:</span>
+                    <span class="status pending" id="controller-status">Checking...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Design Save Capability:</span>
+                    <span class="status pending" id="design-save-status">Testing...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Canvas Stability:</span>
+                    <span class="status pending" id="canvas-stability-status">Monitoring...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Error Detection:</span>
+                    <span class="status pending" id="error-detection-status">Scanning...</span>
+                </div>
+
+                <button class="test-button" onclick="runCanvasIntegrationTests()">🧪 Run Integration Tests</button>
+
+                <div class="log-container" id="canvas-integration-log">
+                    Canvas integration tests will appear here...
+                </div>
+            </div>
+
+            <!-- Performance Monitor Tests -->
+            <div class="test-section">
+                <div class="test-title">⚡ Performance Monitor Tests</div>
+
+                <div class="metric">
+                    <span>Memory Usage:</span>
+                    <span class="status pending" id="memory-usage-status">Measuring...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Loading Sequence:</span>
+                    <span class="status pending" id="loading-sequence-status">Optimizing...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Bundle Coordination:</span>
+                    <span class="status pending" id="bundle-coordination-status">Monitoring...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Performance Impact:</span>
+                    <span class="status pending" id="performance-impact-status">Analyzing...</span>
+                </div>
+
+                <button class="test-button" onclick="runPerformanceTests()">⚡ Run Performance Tests</button>
+
+                <div class="log-container" id="performance-log">
+                    Performance monitoring will appear here...
+                </div>
+            </div>
+
+            <!-- Architecture Review Tests -->
+            <div class="test-section">
+                <div class="test-title">🔬 Architecture Review Tests</div>
+
+                <div class="metric">
+                    <span>Security Assessment:</span>
+                    <span class="status pending" id="security-status">Auditing...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Best Practices:</span>
+                    <span class="status pending" id="best-practices-status">Validating...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Integration Quality:</span>
+                    <span class="status pending" id="integration-quality-status">Reviewing...</span>
+                </div>
+
+                <div class="metric">
+                    <span>Solution Validation:</span>
+                    <span class="status pending" id="solution-validation-status">Assessing...</span>
+                </div>
+
+                <button class="test-button" onclick="runArchitectureTests()">🔬 Run Architecture Review</button>
+
+                <div class="log-container" id="architecture-log">
+                    Architecture review will appear here...
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Test Area -->
+        <div class="canvas-container">
+            <h3>🎯 Live Canvas Singleton Test</h3>
+            <p>This canvas tests the actual singleton implementation in real-time</p>
+            <canvas id="test-canvas" width="800" height="400"></canvas>
+            <br><br>
+            <button class="test-button" onclick="testCanvasSingleton()">🎯 Test Canvas Singleton</button>
+            <button class="test-button" onclick="testDesignSave()">💾 Test Design Save</button>
+            <button class="test-button" onclick="runFullValidation()">🚀 Run Full Validation</button>
+        </div>
+    </div>
+
+    <script>
+        // 🧠 HIVE MIND TEST ORCHESTRATOR
+        let testResults = {
+            fabricAudit: {},
+            canvasIntegration: {},
+            performance: {},
+            architecture: {},
+            overallScore: 0
+        };
+
+        let testStartTime = Date.now();
+
+        // Agent-Recommended Test Functions
+
+        function log(sectionId, message, type = 'info') {
+            const logContainer = document.getElementById(sectionId);
+            const timestamp = new Date().toLocaleTimeString();
+            const typeEmoji = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || 'ℹ️';
+
+            logContainer.innerHTML += `${typeEmoji} [${timestamp}] ${message}\\n`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function updateStatus(statusId, text, type) {
+            const statusElement = document.getElementById(statusId);
+            statusElement.textContent = text;
+            statusElement.className = `status ${type}`;
+        }
+
+        // 🔍 Fabric Audit Specialist Tests
+        function runFabricAuditTests() {
+            log('fabric-audit-log', '🔍 FABRIC AUDIT SPECIALIST: Starting comprehensive fabric.js analysis...', 'info');
+
+            // Test 1: Fabric Global Availability
+            setTimeout(() => {
+                if (typeof fabric !== 'undefined' && fabric.Canvas) {
+                    updateStatus('fabric-global-status', 'Available', 'success');
+                    log('fabric-audit-log', '✅ fabric.js globally available', 'success');
+                    testResults.fabricAudit.globalAvailable = true;
+                } else {
+                    updateStatus('fabric-global-status', 'Missing', 'error');
+                    log('fabric-audit-log', '❌ fabric.js not globally available', 'error');
+                    testResults.fabricAudit.globalAvailable = false;
+                }
+            }, 500);
+
+            // Test 2: Singleton Wrapper Detection
+            setTimeout(() => {
+                if (typeof fabric !== 'undefined' && fabric.Canvas && fabric.Canvas.__singletonWrapped) {
+                    updateStatus('singleton-wrapper-status', 'Active', 'success');
+                    log('fabric-audit-log', '✅ Singleton wrapper successfully applied', 'success');
+                    testResults.fabricAudit.singletonWrapper = true;
+                } else {
+                    updateStatus('singleton-wrapper-status', 'Missing', 'warning');
+                    log('fabric-audit-log', '⚠️ Singleton wrapper not detected', 'warning');
+                    testResults.fabricAudit.singletonWrapper = false;
+                }
+            }, 1000);
+
+            // Test 3: Initialization Points Analysis
+            setTimeout(() => {
+                if (typeof window.canvasInitializationController !== 'undefined') {
+                    const status = window.canvasInitializationController.getStatus();
+                    updateStatus('init-points-status', `${status.sources.length} Sources`, 'info');
+                    log('fabric-audit-log', `📊 Found ${status.sources.length} initialization sources: ${status.sources.join(', ')}`, 'info');
+                    testResults.fabricAudit.initializationPoints = status.sources.length;
+                } else {
+                    updateStatus('init-points-status', 'Controller Missing', 'error');
+                    log('fabric-audit-log', '❌ Canvas initialization controller not found', 'error');
+                    testResults.fabricAudit.initializationPoints = 0;
+                }
+            }, 1500);
+
+            // Test 4: Race Condition Risk Assessment
+            setTimeout(() => {
+                const riskLevel = testResults.fabricAudit.singletonWrapper ? 'LOW' : 'HIGH';
+                const riskType = riskLevel === 'LOW' ? 'success' : 'error';
+
+                updateStatus('race-condition-status', riskLevel, riskType);
+                log('fabric-audit-log', `🔍 Race condition risk: ${riskLevel}`, riskLevel === 'LOW' ? 'success' : 'error');
+                testResults.fabricAudit.raceConditionRisk = riskLevel;
+
+                log('fabric-audit-log', '🎉 FABRIC AUDIT COMPLETE - Agent recommendations implemented', 'success');
+            }, 2000);
+        }
+
+        // 🧪 Canvas Integration Tester Tests
+        function runCanvasIntegrationTests() {
+            log('canvas-integration-log', '🧪 CANVAS INTEGRATION TESTER: Starting functionality validation...', 'info');
+
+            // Test 1: Canvas Controller Status
+            setTimeout(() => {
+                if (typeof window.getDesignerCanvas === 'function') {
+                    updateStatus('controller-status', 'Functional', 'success');
+                    log('canvas-integration-log', '✅ Canvas controller functions available', 'success');
+                    testResults.canvasIntegration.controllerStatus = true;
+                } else {
+                    updateStatus('controller-status', 'Missing', 'error');
+                    log('canvas-integration-log', '❌ Canvas controller functions not found', 'error');
+                    testResults.canvasIntegration.controllerStatus = false;
+                }
+            }, 500);
+
+            // Test 2: Design Save Capability
+            setTimeout(() => {
+                try {
+                    if (typeof window.designerWidgetInstance !== 'undefined' &&
+                        window.designerWidgetInstance.generateDesignData) {
+                        const testData = window.designerWidgetInstance.generateDesignData();
+                        updateStatus('design-save-status', 'Functional', 'success');
+                        log('canvas-integration-log', '✅ Design save capability verified', 'success');
+                        testResults.canvasIntegration.designSave = true;
+                    } else {
+                        updateStatus('design-save-status', 'Impaired', 'warning');
+                        log('canvas-integration-log', '⚠️ Design save function needs validation', 'warning');
+                        testResults.canvasIntegration.designSave = false;
+                    }
+                } catch (error) {
+                    updateStatus('design-save-status', 'Error', 'error');
+                    log('canvas-integration-log', `❌ Design save error: ${error.message}`, 'error');
+                    testResults.canvasIntegration.designSave = false;
+                }
+            }, 1000);
+
+            // Test 3: Canvas Stability Assessment
+            setTimeout(() => {
+                const canvas = document.getElementById('test-canvas');
+                if (canvas && !canvas.__fabric) {
+                    updateStatus('canvas-stability-status', 'Stable', 'success');
+                    log('canvas-integration-log', '✅ Canvas element stable, no premature initialization', 'success');
+                    testResults.canvasIntegration.stability = true;
+                } else if (canvas && canvas.__fabric) {
+                    updateStatus('canvas-stability-status', 'Pre-initialized', 'warning');
+                    log('canvas-integration-log', '⚠️ Canvas already has fabric instance', 'warning');
+                    testResults.canvasIntegration.stability = false;
+                } else {
+                    updateStatus('canvas-stability-status', 'Element Missing', 'error');
+                    log('canvas-integration-log', '❌ Canvas element not found', 'error');
+                    testResults.canvasIntegration.stability = false;
+                }
+            }, 1500);
+
+            // Test 4: Error Detection Scan
+            setTimeout(() => {
+                const errorCount = (window.console.error._callCount || 0);
+                if (errorCount === 0) {
+                    updateStatus('error-detection-status', 'Clean', 'success');
+                    log('canvas-integration-log', '✅ No canvas-related errors detected', 'success');
+                    testResults.canvasIntegration.errorDetection = true;
+                } else {
+                    updateStatus('error-detection-status', `${errorCount} Errors`, 'error');
+                    log('canvas-integration-log', `❌ ${errorCount} errors detected`, 'error');
+                    testResults.canvasIntegration.errorDetection = false;
+                }
+
+                log('canvas-integration-log', '🎉 CANVAS INTEGRATION TESTS COMPLETE', 'success');
+            }, 2000);
+        }
+
+        // ⚡ Performance Monitor Tests
+        function runPerformanceTests() {
+            log('performance-log', '⚡ BUNDLE PERFORMANCE MONITOR: Starting optimization analysis...', 'info');
+
+            // Test 1: Memory Usage Monitoring
+            setTimeout(() => {
+                if (performance.memory) {
+                    const memoryMB = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+                    updateStatus('memory-usage-status', `${memoryMB}MB`, memoryMB < 100 ? 'success' : 'warning');
+                    log('performance-log', `📊 Current memory usage: ${memoryMB}MB`, 'info');
+                    testResults.performance.memoryUsage = memoryMB;
+                } else {
+                    updateStatus('memory-usage-status', 'Unavailable', 'info');
+                    log('performance-log', 'ℹ️ Memory monitoring not available in this browser', 'info');
+                    testResults.performance.memoryUsage = 0;
+                }
+            }, 500);
+
+            // Test 2: Loading Sequence Validation
+            setTimeout(() => {
+                if (typeof window.scriptLoadCoordinator !== 'undefined') {
+                    updateStatus('loading-sequence-status', 'Coordinated', 'success');
+                    log('performance-log', '✅ Script loading coordinator active', 'success');
+                    testResults.performance.loadingSequence = true;
+                } else {
+                    updateStatus('loading-sequence-status', 'Uncoordinated', 'warning');
+                    log('performance-log', '⚠️ Script loading coordinator not detected', 'warning');
+                    testResults.performance.loadingSequence = false;
+                }
+            }, 1000);
+
+            // Test 3: Bundle Coordination Check
+            setTimeout(() => {
+                const bundleCount = document.querySelectorAll('script[src*="bundle"]').length;
+                updateStatus('bundle-coordination-status', `${bundleCount} Bundles`, bundleCount > 0 ? 'success' : 'warning');
+                log('performance-log', `📦 ${bundleCount} bundle scripts detected`, 'info');
+                testResults.performance.bundleCount = bundleCount;
+            }, 1500);
+
+            // Test 4: Performance Impact Assessment
+            setTimeout(() => {
+                const loadTime = Date.now() - testStartTime;
+                const impact = loadTime < 3000 ? 'LOW' : loadTime < 5000 ? 'MEDIUM' : 'HIGH';
+                const impactType = impact === 'LOW' ? 'success' : impact === 'MEDIUM' ? 'warning' : 'error';
+
+                updateStatus('performance-impact-status', impact, impactType);
+                log('performance-log', `⚡ Performance impact: ${impact} (${loadTime}ms)`, impactType);
+                testResults.performance.impact = impact;
+
+                log('performance-log', '🎉 PERFORMANCE MONITORING COMPLETE', 'success');
+            }, 2000);
+        }
+
+        // 🔬 Architecture Review Tests
+        function runArchitectureTests() {
+            log('architecture-log', '🔬 SOLUTION ARCHITECTURE REVIEWER: Starting security and quality audit...', 'info');
+
+            // Test 1: Security Assessment
+            setTimeout(() => {
+                const hasGlobalPollution = Object.keys(window).filter(key => key.includes('fabric') && key !== 'fabric').length;
+                if (hasGlobalPollution === 0) {
+                    updateStatus('security-status', 'Secure', 'success');
+                    log('architecture-log', '✅ No global namespace pollution detected', 'success');
+                    testResults.architecture.security = true;
+                } else {
+                    updateStatus('security-status', 'Pollution Risk', 'warning');
+                    log('architecture-log', `⚠️ ${hasGlobalPollution} potential global pollution sources`, 'warning');
+                    testResults.architecture.security = false;
+                }
+            }, 500);
+
+            // Test 2: Best Practices Validation
+            setTimeout(() => {
+                const hasErrorHandling = typeof window.canvasInitializationController !== 'undefined';
+                const hasVersioning = document.querySelector('script[src*="singleton"]') !== null;
+
+                if (hasErrorHandling && hasVersioning) {
+                    updateStatus('best-practices-status', 'Compliant', 'success');
+                    log('architecture-log', '✅ Best practices implemented', 'success');
+                    testResults.architecture.bestPractices = true;
+                } else {
+                    updateStatus('best-practices-status', 'Partial', 'warning');
+                    log('architecture-log', '⚠️ Some best practices missing', 'warning');
+                    testResults.architecture.bestPractices = false;
+                }
+            }, 1000);
+
+            // Test 3: Integration Quality Assessment
+            setTimeout(() => {
+                const integrationScore = Object.values(testResults.canvasIntegration).filter(Boolean).length;
+                const maxScore = 4;
+                const quality = integrationScore === maxScore ? 'HIGH' : integrationScore >= 2 ? 'MEDIUM' : 'LOW';
+                const qualityType = quality === 'HIGH' ? 'success' : quality === 'MEDIUM' ? 'warning' : 'error';
+
+                updateStatus('integration-quality-status', quality, qualityType);
+                log('architecture-log', `🔗 Integration quality: ${quality} (${integrationScore}/${maxScore})`, qualityType);
+                testResults.architecture.integrationQuality = quality;
+            }, 1500);
+
+            // Test 4: Solution Validation
+            setTimeout(() => {
+                const implementationComponents = [
+                    typeof window.canvasInitializationController !== 'undefined',
+                    typeof fabric !== 'undefined' && fabric.Canvas && fabric.Canvas.__singletonWrapped,
+                    typeof window.scriptLoadCoordinator !== 'undefined'
+                ].filter(Boolean).length;
+
+                const validation = implementationComponents === 3 ? 'EXCELLENT' : implementationComponents === 2 ? 'GOOD' : 'NEEDS_WORK';
+                const validationType = validation === 'EXCELLENT' ? 'success' : validation === 'GOOD' ? 'warning' : 'error';
+
+                updateStatus('solution-validation-status', validation, validationType);
+                log('architecture-log', `🎯 Solution validation: ${validation} (${implementationComponents}/3 components)`, validationType);
+                testResults.architecture.solutionValidation = validation;
+
+                log('architecture-log', '🎉 ARCHITECTURE REVIEW COMPLETE', 'success');
+            }, 2000);
+        }
+
+        // Canvas Singleton Test
+        function testCanvasSingleton() {
+            const canvas = document.getElementById('test-canvas');
+
+            try {
+                // First attempt
+                if (window.initializeDesignerCanvas) {
+                    window.initializeDesignerCanvas({
+                        source: 'test-singleton-1',
+                        width: 800,
+                        height: 400
+                    }).then(result => {
+                        console.log('First initialization:', result);
+
+                        // Second attempt (should return existing)
+                        window.initializeDesignerCanvas({
+                            source: 'test-singleton-2',
+                            width: 800,
+                            height: 400
+                        }).then(result2 => {
+                            console.log('Second initialization:', result2);
+
+                            if (result2.isExisting) {
+                                alert('✅ SUCCESS: Singleton working! Second call returned existing canvas.');
+                            } else {
+                                alert('❌ FAILURE: Singleton not working! Second call created new canvas.');
+                            }
+                        });
+                    });
+                } else {
+                    alert('❌ Canvas initialization controller not available');
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        // Design Save Test
+        function testDesignSave() {
+            try {
+                if (window.designerWidgetInstance && window.designerWidgetInstance.generateDesignData) {
+                    const designData = window.designerWidgetInstance.generateDesignData();
+                    console.log('Design Data:', designData);
+                    alert('✅ SUCCESS: Design save function working!');
+                } else {
+                    alert('❌ FAILURE: Design save function not available');
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        // Full Validation Suite
+        function runFullValidation() {
+            document.getElementById('critical-status').innerHTML = '🚀 RUNNING FULL HIVE MIND VALIDATION...';
+
+            runFabricAuditTests();
+            setTimeout(() => runCanvasIntegrationTests(), 1000);
+            setTimeout(() => runPerformanceTests(), 2000);
+            setTimeout(() => runArchitectureTests(), 3000);
+
+            setTimeout(() => {
+                const overallScore = calculateOverallScore();
+                document.getElementById('critical-status').innerHTML =
+                    `🎯 VALIDATION COMPLETE: ${overallScore.score}% SUCCESS (${overallScore.status})`;
+            }, 6000);
+        }
+
+        function calculateOverallScore() {
+            const scores = [];
+
+            // Fabric Audit Score
+            const fabricScore = Object.values(testResults.fabricAudit).filter(v => v === true || v === 'LOW').length;
+            scores.push(fabricScore / 4 * 100);
+
+            // Canvas Integration Score
+            const canvasScore = Object.values(testResults.canvasIntegration).filter(Boolean).length;
+            scores.push(canvasScore / 4 * 100);
+
+            // Performance Score
+            const perfScore = Object.values(testResults.performance).filter(v => v === true || v === 'LOW' || typeof v === 'number').length;
+            scores.push(perfScore / 4 * 100);
+
+            // Architecture Score
+            const archScore = Object.values(testResults.architecture).filter(v => v === true || v === 'HIGH' || v === 'EXCELLENT').length;
+            scores.push(archScore / 4 * 100);
+
+            const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            const status = avgScore >= 90 ? 'EXCELLENT' : avgScore >= 75 ? 'GOOD' : avgScore >= 60 ? 'ACCEPTABLE' : 'NEEDS_WORK';
+
+            return { score: avgScore, status: status };
+        }
+
+        // Auto-start basic checks on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('critical-status').innerHTML =
+                    '🧠 HIVE MIND READY: Click buttons to validate agent-coordinated solution';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

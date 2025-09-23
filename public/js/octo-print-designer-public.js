@@ -41,16 +41,40 @@
 	}
 
 	$(function() {
-		// 🎯 SINGLETON CHECK: Prevent duplicate instances
-		if (window.designerWidgetInstance) {
-			debugLog('debug', '🎯 SINGLETON: DesignerWidget instance already exists, reusing existing');
-			return;
+		// 🎯 ISSUE #123 FIX: Use Canvas Initialization Controller
+		debugLog('info', '🎯 ISSUE #123 FIX: Using Canvas Initialization Controller for singleton management');
+
+		// Wait for controller to be ready
+		function initializeWithController() {
+			if (!window.canvasInitializationController) {
+				debugLog('debug', '⏳ Waiting for Canvas Initialization Controller...');
+				return false;
+			}
+
+			// Check controller status
+			const status = window.canvasInitializationController.getStatus();
+			debugLog('debug', '📊 Canvas Controller Status:', status);
+
+			// If canvas already initialized, get existing instance
+			if (status.isInitialized) {
+				const existingCanvas = window.canvasInitializationController.getCanvas();
+				if (existingCanvas && window.designerWidgetInstance) {
+					debugLog('info', '✅ ISSUE #123 FIX: Canvas and DesignerWidget already initialized, reusing existing');
+					return true;
+				}
+			}
+
+			// SINGLETON CHECK: Prevent duplicate widget instances
+			if (window.designerWidgetInstance) {
+				debugLog('debug', '🎯 SINGLETON: DesignerWidget instance already exists, reusing existing');
+				return true;
+			}
+
+			return false;
 		}
 
-		// 🎯 CANVAS CHECK: Prevent fabric.js double initialization
-		const canvasElement = document.getElementById('octo-print-designer-canvas');
-		if (canvasElement && canvasElement.__fabric) {
-			debugLog('debug', '🎯 SINGLETON: Canvas already initialized, preventing duplicate fabric initialization');
+		// Try immediate initialization with controller
+		if (initializeWithController()) {
 			return;
 		}
 
@@ -121,47 +145,95 @@
 			return false;
 		}
 
-		// Try immediate initialization
-		if (initializeDesignerWidget()) {
-			return;
+		// 🎯 ISSUE #123 FIX: Initialize DesignerWidget through Controller
+		async function initializeWithControllerAndWidget() {
+			debugLog('info', '🎯 ISSUE #123 FIX: Initializing DesignerWidget through Canvas Controller');
+
+			try {
+				// Ensure controller is available
+				if (!window.canvasInitializationController) {
+					debugLog('warn', '⚠️ Canvas Controller not available, falling back to traditional initialization');
+					return initializeDesignerWidget();
+				}
+
+				// Initialize canvas through controller first
+				const canvasResult = await window.canvasInitializationController.initializeCanvas({
+					source: 'octo-print-designer-public',
+					width: 800,
+					height: 600,
+					backgroundColor: '#ffffff'
+				});
+
+				if (!canvasResult.success) {
+					debugLog('error', '❌ Canvas initialization failed:', canvasResult.error);
+					return false;
+				}
+
+				debugLog('info', '✅ Canvas initialized:', canvasResult.message);
+
+				// Now initialize DesignerWidget
+				if (initializeDesignerWidget()) {
+					// Link canvas to widget if needed
+					if (window.designerWidgetInstance && canvasResult.canvas) {
+						if (!window.designerWidgetInstance.canvas) {
+							window.designerWidgetInstance.canvas = canvasResult.canvas;
+							debugLog('info', '🔗 Linked canvas to DesignerWidget instance');
+						}
+					}
+					return true;
+				}
+
+				return false;
+
+			} catch (error) {
+				debugLog('error', '❌ Controller-based initialization failed:', error);
+				return initializeDesignerWidget();
+			}
 		}
 
-		// 🚀 ISSUE #18 FIX: Optimized retry with exponential backoff, max 3 attempts
-		let attempts = 0;
-		const maxAttempts = 3; // Reduced from 10 to eliminate console spam
-		let retryDelay = 500;
-
-		const retryInit = setInterval(function() {
-			attempts++;
-			debugLog('debug', '🔄 GLOBAL INSTANCE: Attempt', attempts, 'to find DesignerWidget');
-
-			if (initializeDesignerWidget()) {
-				clearInterval(retryInit);
+		// Try controller-based initialization first
+		initializeWithControllerAndWidget().then(success => {
+			if (success) {
+				debugLog('info', '✅ ISSUE #123 FIX: DesignerWidget initialized successfully through controller');
 				return;
 			}
 
-			if (attempts >= maxAttempts) {
-				debugLog('error', '❌ GLOBAL INSTANCE: Failed to initialize DesignerWidget after', maxAttempts, 'attempts');
-				clearInterval(retryInit);
+			// Fallback to retry mechanism
+			let attempts = 0;
+			const maxAttempts = 3;
+			let retryDelay = 500;
 
-				// 🚀 FALLBACK: Create minimal instance for data capture compatibility
-				window.designerWidgetInstance = {
-					initialized: false,
-					error: 'Failed to initialize DesignerWidget',
-					generateDesignData: () => ({
-						error: 'DesignerWidget initialization failed',
-						template_view_id: 'fallback',
-						designed_on_area_px: { width: 0, height: 0 },
-						elements: [],
-						timestamp: new Date().toISOString()
-					})
-				};
-				return;
-			}
+			const retryInit = setInterval(function() {
+				attempts++;
+				debugLog('debug', '🔄 FALLBACK: Attempt', attempts, 'to find DesignerWidget');
 
-			// Exponential backoff for subsequent attempts
-			retryDelay = Math.min(retryDelay * 2, 2000);
-		}, retryDelay);
+				if (initializeDesignerWidget()) {
+					clearInterval(retryInit);
+					return;
+				}
+
+				if (attempts >= maxAttempts) {
+					debugLog('error', '❌ FALLBACK: Failed to initialize DesignerWidget after', maxAttempts, 'attempts');
+					clearInterval(retryInit);
+
+					// Create minimal fallback instance
+					window.designerWidgetInstance = {
+						initialized: false,
+						error: 'Failed to initialize DesignerWidget',
+						generateDesignData: () => ({
+							error: 'DesignerWidget initialization failed',
+							template_view_id: 'fallback',
+							designed_on_area_px: { width: 0, height: 0 },
+							elements: [],
+							timestamp: new Date().toISOString()
+						})
+					};
+					return;
+				}
+
+				retryDelay = Math.min(retryDelay * 2, 2000);
+			}, retryDelay);
+		});
 	});
 
 })( jQuery );

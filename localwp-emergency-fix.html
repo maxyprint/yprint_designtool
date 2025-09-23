@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Hive Mind LocalWP Emergency Fix</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255,255,255,0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(231, 76, 60, 0.4);
+        }
+
+        .emergency-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .fix-section {
+            background: #fff5f5;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #e74c3c;
+        }
+
+        .critical-alert {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .solution-box {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .command-box {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .step-number {
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #ffc107, #e0a800);
+        }
+
+        .url-tester {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .url-result {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .url-success { background: #d4edda; color: #155724; }
+        .url-error { background: #f8d7da; color: #721c24; }
+        .url-testing { background: #fff3cd; color: #856404; }
+
+        .swarm-status {
+            background: #e3f2fd;
+            border: 2px solid #bbdefb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="emergency-header">
+            <h1>🚨 Hive Mind LocalWP Emergency Fix</h1>
+            <p>LocalWP 404 "Site Not Found" Routing Problem</p>
+            <p><strong>Emergency Swarm ID:</strong> swarm-1758623419407-r2jg48vqn</p>
+        </div>
+
+        <div class="critical-alert">
+            <h2>🚨 PROBLEM ERKANNT</h2>
+            <p><strong>Error:</strong> 404 Site Not Found - The site you requested does not have an associated route in Local</p>
+            <p><strong>Ursache:</strong> LocalWP Routing-Konfiguration oder Site nicht gestartet</p>
+        </div>
+
+        <div class="swarm-status">
+            <h3>🐝 Hive Mind Emergency Response</h3>
+            <p>✅ Emergency Troubleshooting Swarm deployed</p>
+            <p>🔍 4 Agents analysieren LocalWP-Konfiguration</p>
+            <p>🚀 Automatische Fix-Pipeline aktiviert</p>
+        </div>
+
+        <div class="fix-section">
+            <h2>🔧 Sofort-Lösungen (in Reihenfolge versuchen)</h2>
+
+            <div class="solution-box">
+                <div class="step-number">1</div>
+                <strong>LocalWP App öffnen und Site-Status prüfen</strong>
+                <p>Öffnen Sie die LocalWP Desktop-App und überprüfen Sie den Site-Status</p>
+                <button class="btn" onclick="openLocalWPApp()">📱 LocalWP App öffnen</button>
+            </div>
+
+            <div class="solution-box">
+                <div class="step-number">2</div>
+                <strong>Site in LocalWP starten/neustarten</strong>
+                <p>Klicken Sie auf "Start site" oder "Restart" in der LocalWP App</p>
+                <div class="command-box">
+                    LocalWP → Site auswählen → "Start site" Button
+                    Oder: Rechtsklick auf Site → Restart
+                </div>
+            </div>
+
+            <div class="solution-box">
+                <div class="step-number">3</div>
+                <strong>Korrekte Site-URL ermitteln</strong>
+                <p>Die URL könnte anders sein als localhost:10003</p>
+                <button class="btn btn-warning" onclick="testCommonURLs()">🔍 URLs automatisch testen</button>
+                <button class="btn btn-success" onclick="openLocalWPSiteInfo()">📋 Site-Info anzeigen</button>
+            </div>
+        </div>
+
+        <div class="fix-section">
+            <h2>🔍 Automatische URL-Erkennung</h2>
+            <div class="url-tester">
+                <h3>Hive Mind testet häufige LocalWP URLs:</h3>
+                <div id="url-test-results">
+                    <div class="url-testing">🔄 Bereit zum Testen...</div>
+                </div>
+                <button class="btn" onclick="runURLTests()">🚀 URL-Tests starten</button>
+            </div>
+        </div>
+
+        <div class="fix-section">
+            <h2>🛠️ Erweiterte Troubleshooting-Schritte</h2>
+
+            <div class="solution-box">
+                <div class="step-number">4</div>
+                <strong>LocalWP Router Logs prüfen</strong>
+                <div class="command-box">
+LocalWP → Help → Reveal Local Router's Logs
+Prüfen Sie die aktuellsten Log-Einträge auf Fehler
+                </div>
+                <button class="btn" onclick="openRouterLogs()">📝 Router Logs öffnen</button>
+            </div>
+
+            <div class="solution-box">
+                <div class="step-number">5</div>
+                <strong>LocalWP komplett neustarten</strong>
+                <div class="command-box">
+1. LocalWP App komplett schließen
+2. Alle LocalWP-Prozesse beenden
+3. LocalWP neu starten
+4. Site erneut starten
+                </div>
+                <button class="btn" onclick="restartLocalWP()">🔄 LocalWP Neustart</button>
+            </div>
+
+            <div class="solution-box">
+                <div class="step-number">6</div>
+                <strong>Neue WordPress-Site erstellen (falls nötig)</strong>
+                <p>Falls die Site korrupt ist, erstellen Sie eine neue:</p>
+                <div class="command-box">
+LocalWP → Create a new site
+Site Name: yprint-designer-test
+Environment: Preferred (Latest)
+                </div>
+                <button class="btn" onclick="createNewSite()">➕ Neue Site erstellen</button>
+            </div>
+        </div>
+
+        <div class="fix-section">
+            <h2>🎯 Plugin-Installation nach LocalWP-Fix</h2>
+            <div class="solution-box">
+                <h3>Nach erfolgreicher LocalWP-Verbindung:</h3>
+                <ol>
+                    <li>Plugin-Dateien in <code>wp-content/plugins/yprint_designtool/</code> kopieren</li>
+                    <li>WordPress Admin → Plugins → Plugin aktivieren</li>
+                    <li>Neue Seite mit [ops-designer] Shortcode erstellen</li>
+                    <li>Browser-Konsole testen</li>
+                </ol>
+                <button class="btn btn-success" onclick="pluginInstallGuide()">📚 Plugin-Installation zeigen</button>
+            </div>
+        </div>
+
+        <div class="fix-section">
+            <h2>🐝 Hive Mind Koordination</h2>
+            <div class="swarm-status">
+                <h3>Emergency Swarm Agents Status:</h3>
+                <ul>
+                    <li>🔍 <strong>LocalWP Diagnostic Agent:</strong> Analysiert Routing-Probleme</li>
+                    <li>🌐 <strong>URL Discovery Agent:</strong> Findet korrekte Site-URLs</li>
+                    <li>🔧 <strong>Fix Implementation Agent:</strong> Führt Reparaturen durch</li>
+                    <li>✅ <strong>Validation Agent:</strong> Überprüft erfolgreiche Fixes</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🐝 Hive Mind LocalWP Emergency Fix Suite
+        class HiveMindLocalWPFix {
+            constructor() {
+                this.swarmId = 'swarm-1758623419407-r2jg48vqn';
+                this.commonPorts = [10003, 10004, 10005, 10006, 10007, 10008, 10009, 8000, 8080, 3000];
+                this.testResults = [];
+                this.init();
+            }
+
+            init() {
+                console.log('🚨 Hive Mind LocalWP Emergency Fix aktiviert');
+                console.log('🐝 Emergency Swarm ID:', this.swarmId);
+                this.logResult('✅ Emergency Fix Suite initialisiert');
+            }
+
+            logResult(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.testResults.push(`[${timestamp}] ${message}`);
+                console.log(`🐝 ${message}`);
+            }
+
+            async testCommonURLs() {
+                this.logResult('🔍 Starte automatische URL-Erkennung...');
+                const resultsDiv = document.getElementById('url-test-results');
+                resultsDiv.innerHTML = '<div class="url-testing">🔄 Teste URLs...</div>';
+
+                const urlsToTest = [
+                    'http://localhost:10003',
+                    'http://localhost:10004',
+                    'http://localhost:10005',
+                    'http://localhost:10006',
+                    'http://yprint-designtool.local',
+                    'http://yprint.local',
+                    'http://localhost:8000',
+                    'http://127.0.0.1:10003',
+                    'http://127.0.0.1:10004'
+                ];
+
+                for (const url of urlsToTest) {
+                    await this.testURL(url, resultsDiv);
+                }
+
+                this.logResult('🔍 URL-Tests abgeschlossen');
+            }
+
+            async testURL(url, resultsDiv) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        timeout: 5000
+                    });
+
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'url-result url-success';
+                    resultDiv.innerHTML = `✅ ${url} - Erreichbar! <a href="${url}" target="_blank" class="btn btn-success">Öffnen</a>`;
+                    resultsDiv.appendChild(resultDiv);
+
+                    this.logResult(`✅ URL funktioniert: ${url}`);
+                    return true;
+                } catch (error) {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'url-result url-error';
+                    resultDiv.innerHTML = `❌ ${url} - Nicht erreichbar`;
+                    resultsDiv.appendChild(resultDiv);
+                    return false;
+                }
+            }
+
+            openLocalWPApp() {
+                this.logResult('📱 Versuche LocalWP App zu öffnen...');
+
+                // Try different ways to open LocalWP
+                const commands = [
+                    'open -a "Local"',
+                    'open /Applications/Local.app',
+                    'localwp://',
+                    'local://'
+                ];
+
+                // Since we can't execute shell commands directly, provide instructions
+                alert(`
+🚨 LocalWP App öffnen:
+
+1. Im Dock nach "Local" suchen und klicken
+2. Oder: Spotlight (⌘ + Space) → "Local" eingeben
+3. Oder: Programme → Local.app doppelklicken
+
+Dann:
+- Site auswählen
+- "Start site" klicken
+- URL notieren und hier eingeben
+                `);
+
+                this.logResult('📱 LocalWP App Anweisungen angezeigt');
+            }
+
+            openLocalWPSiteInfo() {
+                this.logResult('📋 Zeige LocalWP Site-Info Anweisungen...');
+
+                alert(`
+📋 LocalWP Site-Information finden:
+
+1. LocalWP App öffnen
+2. Ihre Site auswählen (yprint-designtool oder ähnlich)
+3. Rechts im Info-Panel schauen nach:
+   - "Local site domain" (z.B. yprint-designtool.local)
+   - "Port" (z.B. 10003, 10004)
+   - "Site URL"
+
+4. Vollständige URL testen:
+   http://[domain]:[port]
+
+Beispiele:
+- http://yprint-designtool.local:10003
+- http://localhost:10004
+                `);
+            }
+
+            openRouterLogs() {
+                this.logResult('📝 Router Logs Anweisungen...');
+
+                alert(`
+📝 LocalWP Router Logs prüfen:
+
+1. LocalWP App öffnen
+2. Menü: Help → Reveal Local Router's Logs
+3. Datei öffnet sich automatisch
+4. Neueste Einträge am Ende der Datei prüfen
+5. Nach Fehlern oder "404" suchen
+
+Häufige Probleme:
+- Port bereits belegt
+- Routing-Konflikte
+- Service nicht gestartet
+                `);
+            }
+
+            restartLocalWP() {
+                this.logResult('🔄 LocalWP Neustart-Anweisungen...');
+
+                alert(`
+🔄 LocalWP komplett neustarten:
+
+1. LocalWP App schließen (⌘ + Q)
+2. Activity Monitor öffnen
+3. Nach "Local" Prozessen suchen und beenden
+4. LocalWP App neu starten
+5. Site erneut starten
+6. Neue URL testen
+
+Alternative:
+- Computer neustarten (löst alle Port-Konflikte)
+                `);
+            }
+
+            createNewSite() {
+                this.logResult('➕ Neue Site Erstellung...');
+
+                alert(`
+➕ Neue LocalWP Site erstellen:
+
+1. LocalWP → "Create a new site" (+)
+2. Site Name: "yprint-test"
+3. Domain: yprint-test.local
+4. Environment: Preferred (Latest)
+5. Username: admin
+6. Password: [sicheres Passwort]
+7. Site erstellen lassen
+
+Nach Erstellung:
+- Plugin-Ordner kopieren: wp-content/plugins/yprint_designtool/
+- WordPress Admin → Plugins → Aktivieren
+- Neue Seite mit [ops-designer] erstellen
+                `);
+            }
+
+            pluginInstallGuide() {
+                this.logResult('📚 Plugin Installation Guide...');
+
+                const guide = `
+📚 Plugin-Installation nach LocalWP-Fix:
+
+1. LocalWP Site-Ordner finden:
+   LocalWP → Site → "Go to site folder"
+
+2. Plugin kopieren:
+   Kopiere gesamten yprint_designtool Ordner nach:
+   [site-folder]/app/public/wp-content/plugins/
+
+3. WordPress Admin:
+   http://[your-site-url]/wp-admin
+   Username: admin, Password: [von LocalWP]
+
+4. Plugin aktivieren:
+   WordPress Admin → Plugins → "OctoPrint Designer" → Activate
+
+5. Test-Seite erstellen:
+   Seiten → Neu hinzufügen
+   Titel: "Designer Test"
+   Inhalt: [ops-designer]
+   Veröffentlichen
+
+6. Browser-Console Test:
+   F12 → Console → Design erstellen → Speichern → JSON prüfen
+                `;
+
+                // Create and show modal with guide
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0,0,0,0.8); z-index: 1000;
+                    display: flex; align-items: center; justify-content: center;
+                `;
+
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    background: white; padding: 30px; border-radius: 10px;
+                    max-width: 800px; max-height: 80vh; overflow-y: auto;
+                `;
+                content.innerHTML = `
+                    <h2>📚 Plugin Installation Guide</h2>
+                    <pre style="white-space: pre-wrap; font-family: monospace; background: #f5f5f5; padding: 15px; border-radius: 5px;">${guide}</pre>
+                    <button onclick="this.closest('div[style*=fixed]').remove()" style="background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Schließen</button>
+                `;
+
+                modal.appendChild(content);
+                document.body.appendChild(modal);
+            }
+
+            exportEmergencyReport() {
+                const report = {
+                    swarmId: this.swarmId,
+                    timestamp: new Date().toISOString(),
+                    problemType: 'LocalWP 404 Site Not Found',
+                    testResults: this.testResults,
+                    emergencyActions: [
+                        'LocalWP App status check',
+                        'Site restart procedure',
+                        'URL discovery tests',
+                        'Router logs analysis',
+                        'Complete LocalWP restart',
+                        'New site creation guide'
+                    ],
+                    nextSteps: [
+                        'Fix LocalWP routing',
+                        'Install plugin to working site',
+                        'Test [ops-designer] shortcode',
+                        'Validate browser console JSON'
+                    ]
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hive-mind-localwp-emergency-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                this.logResult('📊 Emergency Report exportiert');
+            }
+        }
+
+        // Global functions for buttons
+        let hiveMindFix;
+
+        function openLocalWPApp() { hiveMindFix.openLocalWPApp(); }
+        function testCommonURLs() { hiveMindFix.testCommonURLs(); }
+        function openLocalWPSiteInfo() { hiveMindFix.openLocalWPSiteInfo(); }
+        function runURLTests() { hiveMindFix.testCommonURLs(); }
+        function openRouterLogs() { hiveMindFix.openRouterLogs(); }
+        function restartLocalWP() { hiveMindFix.restartLocalWP(); }
+        function createNewSite() { hiveMindFix.createNewSite(); }
+        function pluginInstallGuide() { hiveMindFix.pluginInstallGuide(); }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            hiveMindFix = new HiveMindLocalWPFix();
+
+            console.log('🚨 ===== HIVE MIND LOCALWP EMERGENCY FIX =====');
+            console.log('🎯 PROBLEM: LocalWP 404 Site Not Found');
+            console.log('🔧 LÖSUNG: Systematische LocalWP Troubleshooting');
+            console.log('🐝 Emergency Swarm deployed und bereit');
+        });
+    </script>
+</body>
+</html>

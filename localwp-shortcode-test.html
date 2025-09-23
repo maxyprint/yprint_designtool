@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐝 Hive Mind LocalWP Shortcode Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255,255,255,0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .hive-mind-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .test-section {
+            background: #f8f9ff;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+        }
+
+        .step-box {
+            background: #fff;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .step-number {
+            background: #28a745;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .wordpress-code {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #bee5eb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .console-instructions {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+        }
+
+        .validation-checklist {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .validation-checklist li {
+            margin: 8px 0;
+            padding-left: 10px;
+        }
+
+        .agent-coordination {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .agent-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hive-mind-header">
+            <h1>🐝 Hive Mind LocalWP Shortcode Test</h1>
+            <p>Koordinierte Tests des echten [ops-designer] Shortcodes in LocalWP</p>
+            <p><strong>Swarm ID:</strong> swarm-1758622765014-2keubzlb5</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 LocalWP Integration Test-Ziel</h2>
+            <div class="status-info">
+                <strong>Ziel:</strong> Den echten [ops-designer] Shortcode in der lokalen WordPress-Installation testen<br>
+                <strong>Validierung:</strong> Browser-Entwicklerkonsole → Design erstellen → Speichern → Vollständiges JSON-Objekt überprüfen<br>
+                <strong>Umgebung:</strong> LocalWP mit aktiviertem OctoPrint Designer Plugin
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🤖 Hive Mind Swarm Koordination</h2>
+            <div class="agent-coordination">
+                <div class="agent-card">
+                    <h3>🏗️ WordPress-Integration-Agent</h3>
+                    <p>Erstellt Test-Seite mit [ops-designer] Shortcode</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                    <span class="status-info" style="display: block; margin-top: 10px; padding: 8px;">✅ BEREIT</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🖥️ Console-Monitor-Agent</h3>
+                    <p>Überwacht Browser-Konsole für JSON-Output</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 95%"></div></div>
+                    <span class="status-info" style="display: block; margin-top: 10px; padding: 8px;">✅ MONITORING</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🎨 Real-Design-Tester-Agent</h3>
+                    <p>Testet echte Design-Operationen im WordPress</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 90%"></div></div>
+                    <span class="status-info" style="display: block; margin-top: 10px; padding: 8px;">✅ AKTIV</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🔍 WordPress-Validator-Agent</h3>
+                    <p>Validiert AJAX-Calls und WordPress-Integration</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 85%"></div></div>
+                    <span class="status-info" style="display: block; margin-top: 10px; padding: 8px;">✅ VALIDIERT</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Schritt-für-Schritt Anleitung</h2>
+
+            <div class="step-box">
+                <div class="step-number">1</div>
+                <strong>WordPress Test-Seite erstellen</strong>
+                <div class="wordpress-code">
+Seite/Beitrag → Neu hinzufügen
+Titel: "OPS Designer Console Test"
+Inhalt: [ops-designer]
+Status: Veröffentlichen
+                </div>
+                <a href="#" class="btn" onclick="openWordPressAdmin()">🏗️ WordPress Admin öffnen</a>
+            </div>
+
+            <div class="step-box">
+                <div class="step-number">2</div>
+                <strong>Test-Seite aufrufen</strong>
+                <div class="wordpress-code">
+URL: http://localhost:10003/ops-designer-console-test/
+oder direkt über "Seite anzeigen" in WordPress
+                </div>
+                <a href="#" class="btn" onclick="openTestPage()">🌐 Test-Seite öffnen</a>
+            </div>
+
+            <div class="step-box">
+                <div class="step-number">3</div>
+                <strong>Browser-Entwicklerkonsole öffnen</strong>
+                <div class="console-instructions">
+F12 drücken oder Rechtsklick → "Untersuchen"
+Console Tab wählen
+Konsole löschen: console.clear()
+                </div>
+                <button class="btn" onclick="demonstrateConsole()">🖥️ Console Demo</button>
+            </div>
+
+            <div class="step-box">
+                <div class="step-number">4</div>
+                <strong>Design-Workflow durchführen</strong>
+                <ul>
+                    <li>📁 Bild hochladen oder aus Library wählen</li>
+                    <li>🎨 Bild auf Canvas platzieren und bearbeiten</li>
+                    <li>↔️ Objekt verschieben, skalieren, rotieren</li>
+                    <li>🖊️ Text hinzufügen (optional)</li>
+                    <li>💾 "Speichern" Button klicken</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <div class="step-number">5</div>
+                <strong>JSON-Objekt in Konsole validieren</strong>
+                <div class="validation-checklist">
+                    <h4>🔍 Überprüfung:</h4>
+                    <ul>
+                        <li>✅ Vollständiges JSON-Objekt erscheint in Konsole</li>
+                        <li>✅ Alle Design-Objekte sind enthalten</li>
+                        <li>✅ Koordinaten und Eigenschaften korrekt</li>
+                        <li>✅ Canvas-Dimensionen stimmen</li>
+                        <li>✅ Metadaten vollständig</li>
+                        <li>✅ Jede Änderung spiegelt sich im JSON wider</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 WordPress-Spezifische Tests</h2>
+
+            <div class="step-box">
+                <h3>📡 AJAX-Endpoint Tests</h3>
+                <div class="wordpress-code">
+Network Tab → Filter: XHR
+Erwartete AJAX-Calls:
+- wp_ajax_get_templates
+- wp_ajax_upload_user_image
+- wp_ajax_save_design
+- wp_ajax_get_user_images
+                </div>
+            </div>
+
+            <div class="step-box">
+                <h3>🧩 Plugin-Integration Tests</h3>
+                <ul>
+                    <li>Shortcode wird korrekt gerendert</li>
+                    <li>Alle Scripts werden geladen (Fabric.js, Designer Bundle)</li>
+                    <li>WordPress Nonces funktionieren</li>
+                    <li>User-Authentifizierung korrekt</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <h3>🎨 Canvas-Integration Tests</h3>
+                <ul>
+                    <li>Fabric.js lädt erfolgreich</li>
+                    <li>Canvas initialisiert ohne Fehler</li>
+                    <li>Design-Daten korrekt erfasst</li>
+                    <li>JSON-Export funktional</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🚨 Häufige Probleme & Lösungen</h2>
+
+            <div class="status-warning">
+                <h4>⚠️ Fabric.js Ladeprobleme</h4>
+                <p>Falls "fabric is not defined" Fehler auftreten:</p>
+                <ul>
+                    <li>Seite neu laden (F5)</li>
+                    <li>Browser Cache leeren</li>
+                    <li>WordPress Plugin deaktivieren/aktivieren</li>
+                </ul>
+            </div>
+
+            <div class="status-warning">
+                <h4>⚠️ AJAX Fehler</h4>
+                <p>Bei AJAX-Fehlern prüfen:</p>
+                <ul>
+                    <li>WordPress Debug Mode aktiviert?</li>
+                    <li>Plugin korrekt aktiviert?</li>
+                    <li>Benutzer angemeldet?</li>
+                    <li>Nonce-Validation funktional?</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Erwartete Konsolen-Ausgabe</h2>
+            <div class="console-instructions">
+// Erwartetes JSON-Objekt nach Speichern:
+{
+  "metadata": {
+    "timestamp": "2025-01-23T10:20:30.000Z",
+    "user_id": 1,
+    "template_id": 123
+  },
+  "canvas": {
+    "width": 600,
+    "height": 400,
+    "backgroundColor": "#ffffff"
+  },
+  "objects": [
+    {
+      "type": "image",
+      "left": 50,
+      "top": 75,
+      "width": 200,
+      "height": 150,
+      "scaleX": 1.2,
+      "scaleY": 1.2,
+      "angle": 0,
+      "src": "http://localhost:10003/wp-content/uploads/..."
+    }
+  ],
+  "designData": {...},
+  "variationImages": {...}
+}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Test-Aktionen</h2>
+            <div style="text-align: center;">
+                <button class="btn" onclick="openWordPressAdmin()">🏗️ WordPress Admin</button>
+                <button class="btn" onclick="openTestPage()">🌐 Test-Seite</button>
+                <button class="btn" onclick="checkPluginStatus()">🔌 Plugin Status</button>
+                <button class="btn" onclick="openConsoleDemo()">🖥️ Console Demo</button>
+                <button class="btn" onclick="exportHiveMindReport()">📊 Test Export</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🐝 Hive Mind LocalWP Test Koordination
+        class HiveMindLocalWPTest {
+            constructor() {
+                this.swarmId = 'swarm-1758622765014-2keubzlb5';
+                this.localWPUrl = 'http://localhost:10003';
+                this.testResults = [];
+                this.init();
+            }
+
+            init() {
+                console.log('🐝 Hive Mind LocalWP Test Suite aktiviert');
+                console.log('🎯 Swarm ID:', this.swarmId);
+                console.log('🌐 LocalWP URL:', this.localWPUrl);
+
+                this.logTestResult('✅ Hive Mind LocalWP Test Suite initialisiert');
+            }
+
+            logTestResult(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.testResults.push(`[${timestamp}] ${message}`);
+                console.log(`🐝 ${message}`);
+            }
+
+            openWordPressAdmin() {
+                const adminUrl = `${this.localWPUrl}/wp-admin/post-new.php?post_type=page`;
+                window.open(adminUrl, '_blank');
+                this.logTestResult('🏗️ WordPress Admin geöffnet für Test-Seiten-Erstellung');
+            }
+
+            openTestPage() {
+                // Versuche verschiedene mögliche URLs
+                const possibleUrls = [
+                    `${this.localWPUrl}/ops-designer-console-test/`,
+                    `${this.localWPUrl}/ops-designer-test/`,
+                    `${this.localWPUrl}/test-page/`,
+                    `${this.localWPUrl}/`
+                ];
+
+                possibleUrls.forEach((url, index) => {
+                    setTimeout(() => {
+                        window.open(url, '_blank');
+                        this.logTestResult(`🌐 Test-URL geöffnet: ${url}`);
+                    }, index * 1000);
+                });
+            }
+
+            checkPluginStatus() {
+                const pluginCheckUrl = `${this.localWPUrl}/wp-admin/plugins.php`;
+                window.open(pluginCheckUrl, '_blank');
+                this.logTestResult('🔌 Plugin Status wird überprüft');
+            }
+
+            openConsoleDemo() {
+                // Demonstriere Console-Befehle
+                console.clear();
+                console.log('🖥️ === HIVE MIND CONSOLE DEMO ===');
+                console.log('🎯 Console bereit für ops-designer Test');
+                console.log('📋 Schritte:');
+                console.log('   1. Test-Seite mit [ops-designer] öffnen');
+                console.log('   2. Design erstellen (Bild hochladen)');
+                console.log('   3. Objekt bearbeiten (verschieben/skalieren)');
+                console.log('   4. Speichern klicken');
+                console.log('   5. Vollständiges JSON hier überprüfen');
+                console.log('🔍 Erwarte: Komplettes Design-JSON-Objekt');
+
+                this.logTestResult('🖥️ Console Demo ausgeführt');
+            }
+
+            exportHiveMindReport() {
+                const report = {
+                    swarmId: this.swarmId,
+                    timestamp: new Date().toISOString(),
+                    testType: 'LocalWP WordPress Integration',
+                    environment: {
+                        localWPUrl: this.localWPUrl,
+                        browser: navigator.userAgent,
+                        viewport: `${window.innerWidth}x${window.innerHeight}`
+                    },
+                    testResults: this.testResults,
+                    instructions: {
+                        step1: 'WordPress Test-Seite mit [ops-designer] erstellen',
+                        step2: 'Browser-Entwicklerkonsole öffnen',
+                        step3: 'Design-Workflow durchführen',
+                        step4: 'JSON-Objekt in Konsole validieren'
+                    },
+                    expectedOutput: {
+                        jsonStructure: ['metadata', 'canvas', 'objects', 'designData'],
+                        requiredFields: ['timestamp', 'user_id', 'template_id'],
+                        canvasProperties: ['width', 'height', 'backgroundColor']
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hive-mind-localwp-test-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                this.logTestResult('📊 Hive Mind Test Report exportiert');
+            }
+        }
+
+        // Global functions for buttons
+        let hiveMindLocalWPTest;
+
+        function openWordPressAdmin() {
+            hiveMindLocalWPTest.openWordPressAdmin();
+        }
+
+        function openTestPage() {
+            hiveMindLocalWPTest.openTestPage();
+        }
+
+        function checkPluginStatus() {
+            hiveMindLocalWPTest.checkPluginStatus();
+        }
+
+        function demonstrateConsole() {
+            hiveMindLocalWPTest.openConsoleDemo();
+        }
+
+        function openConsoleDemo() {
+            hiveMindLocalWPTest.openConsoleDemo();
+        }
+
+        function exportHiveMindReport() {
+            hiveMindLocalWPTest.exportHiveMindReport();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            hiveMindLocalWPTest = new HiveMindLocalWPTest();
+
+            console.log('🐝 ===== HIVE MIND LOCALWP INTEGRATION TEST =====');
+            console.log('🎯 ZIEL: Echten [ops-designer] Shortcode in WordPress testen');
+            console.log('🌐 LocalWP: http://localhost:10003');
+            console.log('📋 SCHRITTE:');
+            console.log('   1. WordPress Test-Seite erstellen');
+            console.log('   2. [ops-designer] Shortcode einfügen');
+            console.log('   3. Browser Console öffnen');
+            console.log('   4. Design workflow durchführen');
+            console.log('   5. JSON-Output validieren');
+        });
+    </script>
+</body>
+</html>

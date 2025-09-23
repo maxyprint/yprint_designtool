@@ -97,22 +97,41 @@ class Octo_Print_Designer_Public {
             true
         );
         
-        // 🏆 HIVE MIND CANVAS SINGLETON MANAGER - Comprehensive Canvas Protection
+        // 🎯 ISSUE #123 FIX: Agent-Coordinated Singleton System (PUBLIC FRONTEND)
+        // Phase 1: Fabric Singleton Wrapper
         wp_register_script(
-            'octo-print-designer-canvas-singleton',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-singleton-manager.js',
-            [], // Must load first before any canvas initialization
-            rand(),
-            false // Load in head for immediate protection
+            'octo-fabric-canvas-singleton-public',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-singleton.js',
+            ['octo-print-designer-vendor'], // After vendor bundle loads fabric
+            $this->version . '.1-singleton-public',
+            true
         );
 
-        // 🚨 EMERGENCY FABRIC.JS LOADER - Direct CDN Loading Solution
+        // Phase 2: Canvas Initialization Controller
+        wp_register_script(
+            'octo-canvas-initialization-controller-public',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-initialization-controller.js',
+            ['octo-fabric-canvas-singleton-public'],
+            $this->version . '.1-controller-public',
+            true
+        );
+
+        // Phase 3: Script Load Coordinator
+        wp_register_script(
+            'octo-script-load-coordinator-public',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/script-load-coordinator.js',
+            ['octo-canvas-initialization-controller-public'],
+            $this->version . '.1-coordinator-public',
+            true
+        );
+
+        // Phase 4: Emergency Fabric Loader (Enhanced with Singleton Awareness)
         wp_register_script(
             'octo-print-designer-emergency-fabric',
             OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
-            ['octo-print-designer-canvas-singleton'], // Load after singleton protection
-            rand(),
-            false // Load in head for immediate availability
+            ['octo-script-load-coordinator-public'], // Now coordinates with singleton system
+            $this->version . '.2-singleton-aware',
+            true // Changed to true for better coordination
         );
 
         // 🚨 DESIGN SAVE EMERGENCY FIX - Solves "Invalid input data" error
@@ -145,8 +164,8 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-canvas-singleton', 'octo-print-designer-emergency-fabric', 'octo-print-designer-enhanced-json', 'octo-print-designer-save-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🏆 HIVE MIND: Complete dependency chain
-            $this->version . '-hivemind-' . time(), // Hive Mind version with timestamp
+            ['octo-print-designer-vendor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🎯 ISSUE #123: Now includes canvas controller
+            $this->version . '-singleton-' . time(), // Updated version identifier
             true
         );
 
