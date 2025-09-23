@@ -106,6 +106,15 @@ class Octo_Print_Designer_Public {
             false // Load in head for immediate availability
         );
 
+        // 🚨 DESIGN SAVE EMERGENCY FIX - Solves "Invalid input data" error
+        wp_register_script(
+            'octo-print-designer-save-fix',
+            OCTO_PRINT_DESIGNER_URL . 'design-save-emergency-fix.js',
+            ['jquery', 'octo-print-designer-emergency-fabric'],
+            rand(),
+            true
+        );
+
         // 🚨 CRITICAL STRIPE SERVICE FIX - Issue #11
         wp_register_script(
             'octo-print-designer-stripe-service',
@@ -118,7 +127,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-print-designer-vendor', 'octo-print-designer-emergency-fabric', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load vendor bundle + emergency fabric loader
+            ['octo-print-designer-vendor', 'octo-print-designer-emergency-fabric', 'octo-print-designer-save-fix', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🚨 EMERGENCY: Load with save fix
             $this->version . '-fixed-' . time(), // Use version with timestamp for cache busting
             true
         );
