@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Admin Integration Test - generateDesignData() Verfügbarkeit</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f1f1f1; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #0073aa; margin-bottom: 30px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #b8daff; color: #0c5460; }
+        button { background: #0073aa; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #005a87; }
+        .console-output { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+        .badge-success { background: #28a745; color: white; }
+        .badge-error { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #212529; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Admin Integration Test</h1>
+        <p><strong>Ziel:</strong> Verifikation der generateDesignData() Verfügbarkeit im WordPress Admin-Kontext</p>
+
+        <div class="test-section info">
+            <h3>📋 Test-Protokoll</h3>
+            <p><strong>Test-Zeitpunkt:</strong> <span id="testTime"></span></p>
+            <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+            <p><strong>Test-URL:</strong> <span id="currentUrl"></span></p>
+        </div>
+
+        <div class="test-section" id="systemCheck">
+            <h3>🔍 System Verfügbarkeits-Check</h3>
+            <div id="systemResults"></div>
+            <button onclick="runSystemCheck()">System Check Ausführen</button>
+        </div>
+
+        <div class="test-section" id="designDataTest">
+            <h3>🎯 generateDesignData() Function Test</h3>
+            <div id="designDataResults"></div>
+            <button onclick="runDesignDataTest()">Design Data Test Ausführen</button>
+        </div>
+
+        <div class="test-section" id="integrationTest">
+            <h3>🚀 Vollständiger Integration Test</h3>
+            <div id="integrationResults"></div>
+            <button onclick="runFullIntegrationTest()">Vollständigen Test Ausführen</button>
+        </div>
+
+        <div class="test-section" id="consoleOutput">
+            <h3>📊 Console Output</h3>
+            <div class="console-output" id="consoleLog"></div>
+            <button onclick="clearConsoleOutput()">Console Leeren</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize test environment
+        document.getElementById('testTime').textContent = new Date().toISOString();
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        document.getElementById('currentUrl').textContent = window.location.href;
+
+        let consoleOutput = [];
+
+        // Override console methods to capture output
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = function(...args) {
+            consoleOutput.push({type: 'log', message: args.join(' '), timestamp: new Date().toISOString()});
+            updateConsoleDisplay();
+            originalLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            consoleOutput.push({type: 'error', message: args.join(' '), timestamp: new Date().toISOString()});
+            updateConsoleDisplay();
+            originalError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            consoleOutput.push({type: 'warn', message: args.join(' '), timestamp: new Date().toISOString()});
+            updateConsoleDisplay();
+            originalWarn.apply(console, args);
+        };
+
+        function updateConsoleDisplay() {
+            const consoleDiv = document.getElementById('consoleLog');
+            consoleDiv.innerHTML = consoleOutput.map(entry =>
+                `<div style="color: ${entry.type === 'error' ? 'red' : entry.type === 'warn' ? 'orange' : 'black'}">
+                    [${entry.timestamp.split('T')[1].split('.')[0]}] ${entry.message}
+                </div>`
+            ).join('');
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function clearConsoleOutput() {
+            consoleOutput = [];
+            updateConsoleDisplay();
+        }
+
+        function createStatusBadge(status, text) {
+            const badgeClass = status === 'success' ? 'badge-success' :
+                             status === 'error' ? 'badge-error' : 'badge-warning';
+            return `<span class="status-badge ${badgeClass}">${text}</span>`;
+        }
+
+        function runSystemCheck() {
+            console.log('🔍 [ADMIN TEST] Starting system availability check...');
+
+            const results = [];
+
+            // Check jQuery
+            results.push({
+                test: 'jQuery Verfügbarkeit',
+                status: typeof window.$ !== 'undefined' ? 'success' : 'error',
+                value: typeof window.$
+            });
+
+            // Check Fabric.js
+            results.push({
+                test: 'Fabric.js Verfügbarkeit',
+                status: typeof window.fabric !== 'undefined' ? 'success' : 'error',
+                value: typeof window.fabric
+            });
+
+            // Check Design Data Capture Systems
+            results.push({
+                test: 'OptimizedDesignDataCapture',
+                status: typeof window.optimizedCaptureInstance !== 'undefined' ? 'success' : 'error',
+                value: typeof window.optimizedCaptureInstance
+            });
+
+            results.push({
+                test: 'EnhancedJSONSystem',
+                status: typeof window.enhancedJSONSystem !== 'undefined' ? 'success' : 'error',
+                value: typeof window.enhancedJSONSystem
+            });
+
+            // Check generateDesignData function
+            results.push({
+                test: 'generateDesignData() Function',
+                status: typeof window.generateDesignData === 'function' ? 'success' : 'error',
+                value: typeof window.generateDesignData
+            });
+
+            const resultsHtml = results.map(result => `
+                <div>
+                    <strong>${result.test}:</strong>
+                    ${createStatusBadge(result.status, result.status === 'success' ? '✅ VERFÜGBAR' : '❌ NICHT VERFÜGBAR')}
+                    <code>${result.value}</code>
+                </div>
+            `).join('');
+
+            document.getElementById('systemResults').innerHTML = resultsHtml;
+
+            const overallSuccess = results.every(r => r.status === 'success');
+            console.log(`🎯 [ADMIN TEST] System check ${overallSuccess ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}`);
+        }
+
+        function runDesignDataTest() {
+            console.log('🎯 [ADMIN TEST] Testing generateDesignData() function...');
+
+            if (typeof window.generateDesignData !== 'function') {
+                document.getElementById('designDataResults').innerHTML = `
+                    <div class="error">
+                        ❌ <strong>FEHLER:</strong> generateDesignData() function ist nicht verfügbar!<br>
+                        <small>Dies bedeutet, dass das Design Data Capture System nicht im Admin-Kontext geladen wurde.</small>
+                    </div>
+                `;
+                console.error('❌ [ADMIN TEST] generateDesignData() function not available');
+                return;
+            }
+
+            try {
+                console.log('✅ [ADMIN TEST] generateDesignData() function available');
+                const designData = window.generateDesignData();
+
+                document.getElementById('designDataResults').innerHTML = `
+                    <div class="success">
+                        ✅ <strong>ERFOLG:</strong> generateDesignData() function ist verfügbar und funktional!<br>
+                        <strong>Rückgabe-Typ:</strong> ${typeof designData}<br>
+                        <strong>Daten-Größe:</strong> ${JSON.stringify(designData).length} Zeichen<br>
+                        <details>
+                            <summary>Vollständige JSON-Daten anzeigen</summary>
+                            <pre>${JSON.stringify(designData, null, 2)}</pre>
+                        </details>
+                    </div>
+                `;
+
+                console.log('📊 [ADMIN TEST] Design data captured:', designData);
+
+            } catch (error) {
+                document.getElementById('designDataResults').innerHTML = `
+                    <div class="error">
+                        ❌ <strong>FEHLER:</strong> generateDesignData() function wirft einen Fehler!<br>
+                        <strong>Fehler:</strong> ${error.message}<br>
+                        <strong>Stack:</strong> <pre>${error.stack}</pre>
+                    </div>
+                `;
+                console.error('❌ [ADMIN TEST] generateDesignData() error:', error);
+            }
+        }
+
+        function runFullIntegrationTest() {
+            console.log('🚀 [ADMIN TEST] Starting full integration test...');
+
+            // Step 1: System Check
+            runSystemCheck();
+
+            // Step 2: Wait and test function
+            setTimeout(() => {
+                runDesignDataTest();
+
+                // Step 3: Simulate AJAX button behavior
+                setTimeout(() => {
+                    console.log('🔄 [ADMIN TEST] Simulating "Druckdaten aus DB laden" button click...');
+
+                    // This simulates the exact code from the admin integration
+                    let designDataJSON = null;
+                    try {
+                        if (typeof window.generateDesignData === 'function') {
+                            console.log('✅ [DESIGN SAVE] generateDesignData() function available');
+                            designDataJSON = window.generateDesignData();
+
+                            if (designDataJSON) {
+                                console.group('📊 [DESIGN SAVE] Design Data Successfully Captured');
+                                console.log('🔍 Data Structure:', {
+                                    timestamp: designDataJSON.timestamp || 'missing',
+                                    template_view_id: designDataJSON.template_view_id || 'missing',
+                                    elements_count: designDataJSON.elements ? designDataJSON.elements.length : 0,
+                                    data_size: JSON.stringify(designDataJSON).length + ' characters'
+                                });
+                                console.log('📋 Complete JSON Object:', designDataJSON);
+                                console.groupEnd();
+
+                                document.getElementById('integrationResults').innerHTML = `
+                                    <div class="success">
+                                        🎉 <strong>VOLLSTÄNDIGER INTEGRATION TEST ERFOLGREICH!</strong><br>
+                                        ✅ System verfügbar<br>
+                                        ✅ generateDesignData() funktional<br>
+                                        ✅ AJAX-Button-Simulation erfolgreich<br>
+                                        ✅ JSON-Daten erfasst (${JSON.stringify(designDataJSON).length} Zeichen)<br>
+                                        <br>
+                                        <strong>🎯 Admin-Kontext Integration: VOLLSTÄNDIG FUNKTIONAL!</strong>
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            console.error('❌ [DESIGN SAVE] generateDesignData() function not available');
+                            document.getElementById('integrationResults').innerHTML = `
+                                <div class="error">
+                                    ❌ <strong>INTEGRATION TEST FEHLGESCHLAGEN!</strong><br>
+                                    generateDesignData() function ist nicht verfügbar im Admin-Kontext.<br>
+                                    <br>
+                                    <strong>Mögliche Lösungen:</strong><br>
+                                    • Admin-Script-Loading überprüfen<br>
+                                    • WooCommerce Order Page Detection verifizieren<br>
+                                    • Design Data Capture Script-Dependencies prüfen
+                                </div>
+                            `;
+                        }
+                    } catch (error) {
+                        console.group('❌ [DESIGN SAVE] Design data capture failed');
+                        console.error('Error:', error.message);
+                        console.error('Stack:', error.stack);
+                        console.groupEnd();
+
+                        document.getElementById('integrationResults').innerHTML = `
+                            <div class="error">
+                                ❌ <strong>INTEGRATION TEST FEHLER!</strong><br>
+                                <strong>Fehler:</strong> ${error.message}<br>
+                            </div>
+                        `;
+                    }
+                }, 1000);
+            }, 500);
+        }
+
+        // Auto-run system check on page load
+        setTimeout(() => {
+            runSystemCheck();
+        }, 1000);
+    </script>
+</body>
+</html>

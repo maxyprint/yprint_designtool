@@ -142,6 +142,26 @@ class Octo_Print_Designer_Admin {
             true
         );
 
+        // 🎯 ADMIN CONTEXT FIX: Design Data Capture System Integration
+        // CRITICAL: Enable generateDesignData() function in WordPress admin context
+        if ($this->is_woocommerce_order_edit_page($hook)) {
+            wp_enqueue_script(
+                'octo-admin-optimized-capture',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
+                ['octo-fabric-global-exposure', 'jquery'],
+                $this->version . '-admin-context-fix',
+                true
+            );
+
+            wp_enqueue_script(
+                'octo-admin-enhanced-json',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-json-coordinate-system.js',
+                ['octo-admin-optimized-capture', 'jquery'],
+                $this->version . '-admin-json-fix',
+                true
+            );
+        }
+
         // 🧪 Load test suite in development mode (WP_DEBUG enabled)
         if (defined('WP_DEBUG') && WP_DEBUG) {
             wp_enqueue_script(
@@ -186,6 +206,19 @@ class Octo_Print_Designer_Admin {
 
         $screen = get_current_screen();
         return $screen && $screen->post_type === 'design_template';
+    }
+
+    // 🎯 ADMIN CONTEXT FIX: WooCommerce Order Page Detection
+    private function is_woocommerce_order_edit_page($hook) {
+        if (!in_array($hook, ['post.php', 'post-new.php'])) return false;
+
+        $screen = get_current_screen();
+        if (!$screen) return false;
+
+        // Check for WooCommerce order edit pages
+        return $screen->post_type === 'shop_order' ||
+               (isset($_GET['post_type']) && $_GET['post_type'] === 'shop_order') ||
+               (isset($_GET['post']) && get_post_type($_GET['post']) === 'shop_order');
     }
 
     public function save_reference_line_data() {
