@@ -91,31 +91,22 @@ class Octo_Print_Designer_Designer {
 // Fabric.js global verfügbar machen NACH dem Designer Bundle
 // Einfache window.fabric Verfügbarkeitsprüfung
 wp_add_inline_script('octo-print-designer-designer', '
-    console.log("Checking window.fabric availability after script load:", typeof window.fabric);
-    
+    // Optimized fabric availability check
     if (typeof window.fabric !== "undefined") {
-        console.log("✅ window.fabric is available");
-        console.log("Fabric.js details:", {
-            hasCanvas: typeof window.fabric.Canvas !== "undefined",
-            hasImage: typeof window.fabric.Image !== "undefined",
-            canvasInstances: window.fabric.Canvas?.getInstances?.().length || 0
-        });
+        if (typeof console !== "undefined" && console.log) {
+            console.log("✅ window.fabric ready");
+        }
     } else {
-        console.log("❌ window.fabric is not available");
-        
-        // Warte kurz und prüfe erneut
-        setTimeout(() => {
-            if (typeof window.fabric !== "undefined") {
-                console.log("✅ window.fabric became available after delay");
-            } else {
-                console.error("❌ window.fabric still not available after delay");
+        // Non-blocking fabric availability listener
+        document.addEventListener("fabricGlobalReady", function() {
+            if (typeof console !== "undefined" && console.log) {
+                console.log("✅ window.fabric ready via event");
             }
-        }, 1000);
+        });
     }
 ', 'after');
 
 $this->enqueue_design_loader();
-        $this->enqueue_design_loader(); // Diese Zeile hinzufügen
         
         wp_enqueue_style('octo-print-designer-toast-style');
         wp_enqueue_style('octo-print-designer-designer-style');
@@ -131,15 +122,17 @@ $this->enqueue_design_loader();
             }
         }
     
-        // Debug-Ausgabe für Design-Loading
-error_log('=== SHORTCODE DEBUG ===');
-error_log('design_id from URL: ' . ($design_id ? $design_id : 'none'));
-error_log('design_data available: ' . (!is_null($design_data) ? 'yes' : 'no'));
+        // Debug-Ausgabe für Design-Loading (nur in Development)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('=== SHORTCODE DEBUG ===');
+            error_log('design_id from URL: ' . ($design_id ? $design_id : 'none'));
+            error_log('design_data available: ' . (!is_null($design_data) ? 'yes' : 'no'));
 
-if ($design_data) {
-    error_log('Design data keys: ' . implode(', ', array_keys($design_data)));
-    error_log('Design data size: ' . strlen($design_data['design_data']) . ' characters');
-}
+            if ($design_data) {
+                error_log('Design data keys: ' . implode(', ', array_keys($design_data)));
+                error_log('Design data size: ' . strlen($design_data['design_data']) . ' characters');
+            }
+        }
 
 // JavaScript-Variablen für Auto-Loading bereitstellen
 $auto_load_data = [
@@ -924,14 +917,14 @@ private function enqueue_design_loader() {
         true // Im Footer laden
     );
     
-    // 🚨 SIMPLE FABRIC CHECK: Emergency loader should have fabric ready
+    // Optimized fabric check for design loader
     wp_add_inline_script('octo-print-designer-loader', '
-        console.log("🔄 DESIGN-LOADER: Checking fabric availability from emergency loader");
-
-        if (typeof window.fabric !== "undefined" && window.fabric.Canvas) {
-            console.log("✅ DESIGN-LOADER: window.fabric available from emergency loader");
+        if (typeof window.fabric === "undefined" || !window.fabric.Canvas) {
+            document.addEventListener("fabricGlobalReady", function() {
+                window.dispatchEvent(new CustomEvent("designLoaderReady"));
+            });
         } else {
-            console.warn("⚠️ DESIGN-LOADER: window.fabric not yet available, design-loader will wait for fabricGlobalReady event");
+            window.dispatchEvent(new CustomEvent("designLoaderReady"));
         }
     ', 'before');
 }
