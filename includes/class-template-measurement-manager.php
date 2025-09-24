@@ -108,12 +108,19 @@ class TemplateMeasurementManager {
         $template_sizes = $this->get_template_sizes($template_id);
         $valid_size_keys = array_column($template_sizes, 'id');
 
+        if (empty($valid_size_keys)) {
+            error_log('TemplateMeasurementManager: No valid size keys found for template ' . $template_id);
+            return false;
+        }
+
         // Start transaction
         $this->wpdb->query('START TRANSACTION');
 
         try {
             // Delete existing measurements for this template
             $this->wpdb->delete($this->table_name, ['template_id' => $template_id], ['%d']);
+
+            $insert_count = 0;
 
             // Insert new measurements
             foreach ($measurements_data as $size_key => $measurements) {
@@ -140,9 +147,15 @@ class TemplateMeasurementManager {
                     );
 
                     if ($insert_result === false) {
-                        throw new Exception("Failed to insert measurement: {$size_key}.{$measurement_key}");
+                        throw new Exception("Failed to insert measurement: {$size_key}.{$measurement_key}. Error: " . $this->wpdb->last_error);
                     }
+
+                    $insert_count++;
                 }
+            }
+
+            if ($insert_count === 0) {
+                throw new Exception("No valid measurements to insert");
             }
 
             $this->wpdb->query('COMMIT');
