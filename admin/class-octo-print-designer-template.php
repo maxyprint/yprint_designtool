@@ -130,6 +130,16 @@ class Octo_Print_Designer_Template {
             'normal',
             'high'
         );
+
+        // 🧠 AGENT 7 SOLUTION: Template Measurements Database Meta-Box
+        add_meta_box(
+            'template_measurements_database',
+            __('Template Measurements Database', 'octo-print-designer'),
+            array($this, 'render_measurements_database_meta_box'),
+            'design_template',
+            'normal',
+            'high'
+        );
     }
 
     /**
@@ -1507,4 +1517,328 @@ class Octo_Print_Designer_Template {
         <?php
     }
 
+    /**
+     * 🧠 AGENT 7 SOLUTION: Render the measurements database meta box
+     */
+    public function render_measurements_database_meta_box($post) {
+        wp_nonce_field('template_measurements_database', 'template_measurements_database_nonce');
+        ?>
+        <p><strong>Dynamic Template Measurements Database</strong></p>
+        <p>Manage precise measurements (±0.1cm) synchronized with Template Sizes. This system replaces hardcoded S/M/L/XL with dynamic size definitions.</p>
+
+        <!-- Template Measurements Database Interface -->
+        <div class="octo-measurement-management">
+            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <label for="template-select">Select Template:</label>
+                <select id="template-select" onchange="loadTemplateMeasurements()" style="margin-left: 10px; padding: 5px;">
+                    <option value="<?php echo $post->ID; ?>" selected><?php echo $post->post_title; ?></option>
+                </select>
+                <button type="button" class="button secondary" onclick="refreshTemplateList()" style="margin-left: 10px;">
+                    <span class="dashicons dashicons-update"></span> Refresh
+                </button>
+            </div>
+
+            <div id="template-sizes-section" style="display: none; margin-bottom: 20px; padding: 15px; background: #f1f8ff; border-radius: 8px;">
+                <h4>📐 Template Sizes:</h4>
+                <div id="template-sizes-display" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;"></div>
+                <button type="button" class="button secondary" onclick="syncTemplateSizes()">
+                    <span class="dashicons dashicons-update-alt"></span> Sync Sizes
+                </button>
+            </div>
+
+            <div id="measurements-table-container" style="display: none;">
+                <h4>📏 Measurements Table (±0.1cm Precision):</h4>
+                <div style="overflow-x: auto; border: 1px solid #e1e1e1; border-radius: 8px; background: white;">
+                    <table id="measurements-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: #2c3e50; color: white;">
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">Size</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">A (Chest)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">B (Hem Width)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">C (Height)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">D (Sleeve)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">E (Opening)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">F (Shoulder)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">G (Neck)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">H (Biceps)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">J (Rib Height)</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="measurements-tbody">
+                            <tr><td colspan="11" style="text-align: center; padding: 20px; color: #666;">Select a template to load measurements...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="button button-primary" onclick="saveAllMeasurements()">
+                        <span class="dashicons dashicons-saved"></span> Save All Measurements
+                    </button>
+                    <button type="button" class="button" onclick="validateMeasurements()">
+                        <span class="dashicons dashicons-analytics"></span> Validate Precision
+                    </button>
+                    <button type="button" class="button" onclick="exportMeasurements()">
+                        <span class="dashicons dashicons-download"></span> Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        jQuery(document).ready(function($) {
+            // 🧠 MEASUREMENT DATABASE JAVASCRIPT
+            let currentTemplateId = <?php echo $post->ID; ?>;
+            let measurementData = {};
+
+            // Make functions global
+            window.refreshTemplateList = function() {
+                console.log('🔄 Loading templates...');
+                $.post(ajaxurl, {
+                    action: 'get_design_templates_for_measurements'
+                }, function(response) {
+                    const select = $('#template-select');
+                    select.html('<option value="">Choose a template...</option>');
+
+                    if (response.success && response.data) {
+                        response.data.forEach(template => {
+                            const selected = template.id == currentTemplateId ? ' selected' : '';
+                            select.append('<option value="' + template.id + '"' + selected + '>' + template.title + '</option>');
+                        });
+                        console.log('✅ Templates loaded successfully');
+                        if (currentTemplateId) {
+                            loadTemplateMeasurements();
+                        }
+                    } else {
+                        console.log('❌ Failed to load templates');
+                    }
+                });
+            };
+
+            window.loadTemplateMeasurements = function() {
+                const templateId = $('#template-select').val() || currentTemplateId;
+                if (!templateId) {
+                    $('#template-sizes-section, #measurements-table-container').hide();
+                    return;
+                }
+
+                currentTemplateId = templateId;
+                console.log('🔄 Loading template measurements for ID:', templateId);
+
+                $.post(ajaxurl, {
+                    action: 'get_template_sizes_for_measurements',
+                    template_id: templateId
+                }, function(response) {
+                    if (response.success && response.data) {
+                        displayTemplateSizes(response.data);
+                        loadMeasurementTable(templateId);
+                    } else {
+                        console.log('❌ Failed to load template sizes');
+                    }
+                });
+            };
+
+            function displayTemplateSizes(sizes) {
+                const container = $('#template-sizes-display');
+                container.empty();
+
+                sizes.forEach(size => {
+                    container.append('<div style="background: #0073aa; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;"><strong>' + size.id + '</strong> - ' + size.name + '</div>');
+                });
+
+                $('#template-sizes-section').show();
+            }
+
+            function loadMeasurementTable(templateId) {
+                $.post(ajaxurl, {
+                    action: 'get_template_measurements_for_admin',
+                    template_id: templateId
+                }, function(response) {
+                    if (response.success) {
+                        measurementData = response.data.measurements || {};
+                        const sizes = response.data.sizes || [];
+                        buildMeasurementTable(sizes, measurementData);
+                        $('#measurements-table-container').show();
+                        console.log('✅ Measurements loaded successfully');
+                    } else {
+                        console.log('❌ Failed to load measurements');
+                    }
+                });
+            }
+
+            function buildMeasurementTable(sizes, measurements) {
+                const tbody = $('#measurements-tbody');
+                tbody.empty();
+
+                const measurementKeys = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J'];
+
+                sizes.forEach(size => {
+                    let rowHtml = '<tr><td style="padding: 12px 8px; background: #f8f9fa; font-weight: 600;"><strong>' + size.id + '</strong><br><small>' + size.name + '</small></td>';
+
+                    measurementKeys.forEach(key => {
+                        const value = measurements[size.id] && measurements[size.id][key] ? measurements[size.id][key].value_cm : '';
+                        rowHtml += '<td style="padding: 12px 8px; text-align: center;"><input type="number" step="0.1" min="0" max="1000" value="' + value + '" data-size="' + size.id + '" data-measurement="' + key + '" onchange="updateMeasurementValue(this)" style="width: 70px; text-align: center; border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px;"></td>';
+                    });
+
+                    rowHtml += '<td style="padding: 12px 8px; text-align: center;"><button type="button" class="button button-small" onclick="resetSizeMeasurements(\'' + size.id + '\')">Reset</button></td></tr>';
+                    tbody.append(rowHtml);
+                });
+            }
+
+            window.updateMeasurementValue = function(input) {
+                const sizeKey = input.dataset.size;
+                const measurementKey = input.dataset.measurement;
+                const value = parseFloat(input.value) || 0;
+
+                if (!measurementData[sizeKey]) {
+                    measurementData[sizeKey] = {};
+                }
+
+                measurementData[sizeKey][measurementKey] = {
+                    value_cm: value,
+                    label: getMeasurementLabel(measurementKey)
+                };
+
+                // Visual feedback for precision
+                if (value > 0 && (value * 10) % 1 !== 0) {
+                    input.style.backgroundColor = '#fff2cd';
+                } else {
+                    input.style.backgroundColor = '';
+                }
+            };
+
+            function getMeasurementLabel(key) {
+                const labels = {
+                    'A': 'Chest', 'B': 'Hem Width', 'C': 'Height from Shoulder',
+                    'D': 'Sleeve Length', 'E': 'Sleeve Opening', 'F': 'Shoulder to Shoulder',
+                    'G': 'Neck Opening', 'H': 'Biceps', 'J': 'Rib Height'
+                };
+                return labels[key] || key;
+            }
+
+            window.saveAllMeasurements = function() {
+                if (!currentTemplateId) {
+                    alert('No template selected');
+                    return;
+                }
+
+                console.log('💾 Saving measurements...');
+
+                $.post(ajaxurl, {
+                    action: 'save_template_measurements_from_admin',
+                    template_id: currentTemplateId,
+                    measurements: measurementData
+                }, function(response) {
+                    if (response.success) {
+                        alert('✅ All measurements saved successfully');
+                        console.log('✅ All measurements saved successfully');
+                    } else {
+                        alert('❌ Failed to save measurements: ' + (response.data || 'Unknown error'));
+                    }
+                });
+            };
+
+            window.validateMeasurements = function() {
+                if (!currentTemplateId) {
+                    alert('No template selected');
+                    return;
+                }
+
+                console.log('🔍 Validating precision...');
+
+                $.post(ajaxurl, {
+                    action: 'validate_template_measurements',
+                    template_id: currentTemplateId
+                }, function(response) {
+                    if (response.success) {
+                        const result = response.data;
+                        if (result.status === 'success') {
+                            alert('✅ Validation passed - All measurements within ±0.1cm tolerance');
+                        } else {
+                            alert('⚠️ Validation warnings: ' + result.errors.join(', '));
+                        }
+                    } else {
+                        alert('❌ Validation failed');
+                    }
+                });
+            };
+
+            window.syncTemplateSizes = function() {
+                if (!currentTemplateId) {
+                    alert('No template selected');
+                    return;
+                }
+
+                console.log('🔄 Synchronizing Template Sizes...');
+
+                $.post(ajaxurl, {
+                    action: 'sync_template_sizes_measurements',
+                    template_id: currentTemplateId
+                }, function(response) {
+                    if (response.success) {
+                        alert('✅ Template Sizes synchronized successfully');
+                        loadTemplateMeasurements();
+                    } else {
+                        alert('❌ Failed to sync Template Sizes');
+                    }
+                });
+            };
+
+            window.exportMeasurements = function() {
+                if (!currentTemplateId) {
+                    alert('No template selected');
+                    return;
+                }
+
+                console.log('📁 Exporting measurements...');
+
+                const csvContent = generateMeasurementsCSV();
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'template-' + currentTemplateId + '-measurements.csv';
+                a.click();
+
+                console.log('✅ Measurements exported successfully');
+            };
+
+            function generateMeasurementsCSV() {
+                const headers = ['Size', 'A (Chest)', 'B (Hem Width)', 'C (Height)', 'D (Sleeve)', 'E (Opening)', 'F (Shoulder)', 'G (Neck)', 'H (Biceps)', 'J (Rib Height)'];
+                let csv = headers.join(',') + '\n';
+
+                Object.keys(measurementData).forEach(sizeKey => {
+                    const row = [sizeKey];
+                    ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J'].forEach(key => {
+                        const value = measurementData[sizeKey] && measurementData[sizeKey][key] ? measurementData[sizeKey][key].value_cm : '';
+                        row.push(value);
+                    });
+                    csv += row.join(',') + '\n';
+                });
+
+                return csv;
+            }
+
+            window.resetSizeMeasurements = function(sizeKey) {
+                if (confirm('Reset all measurements for size ' + sizeKey + '?')) {
+                    $('input[data-size="' + sizeKey + '"]').each(function() {
+                        this.value = '';
+                        this.style.backgroundColor = '';
+                    });
+
+                    if (measurementData[sizeKey]) {
+                        delete measurementData[sizeKey];
+                    }
+
+                    console.log('🔄 Measurements reset for size ' + sizeKey);
+                }
+            };
+
+            // Initialize
+            console.log('🧠 MEASUREMENT UI: Initializing database interface...');
+            refreshTemplateList();
+        });
+        </script>
+        <?php
+    }
 }
