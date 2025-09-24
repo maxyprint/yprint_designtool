@@ -35,7 +35,8 @@ class Octo_Print_Designer_Admin {
 
     public function enqueue_scripts($hook) {
 
-        if (!$this->is_template_edit_page($hook)) return;
+        // 🎯 CRITICAL FIX: Enable scripts for BOTH template edit pages AND WooCommerce order pages
+        if (!$this->is_template_edit_page($hook) && !$this->is_woocommerce_order_edit_page($hook)) return;
 
         wp_enqueue_media();
         
