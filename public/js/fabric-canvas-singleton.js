@@ -159,8 +159,17 @@
         SingletonCanvas.__singletonWrapped = true;
         SingletonCanvas.__originalConstructor = OriginalCanvas;
 
-        // Replace global fabric.Canvas
-        global.fabric.Canvas = SingletonCanvas;
+        // Replace global fabric.Canvas (with error handling)
+        try {
+            global.fabric.Canvas = SingletonCanvas;
+        } catch (e) {
+            // Handle readonly property in strict mode
+            Object.defineProperty(global.fabric, 'Canvas', {
+                value: SingletonCanvas,
+                writable: false,
+                configurable: true
+            });
+        }
 
         console.log('✅ FABRIC SINGLETON: fabric.js Canvas constructor wrapped with singleton pattern');
         return true;
