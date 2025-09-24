@@ -782,6 +782,9 @@ class MultiViewPointToPointSelector {
         // AGENT 4 FIX: Performance optimization properties
         this.mouseMoveThrottle = false;
 
+        // AGENT 6 FIX: View switching state management
+        this.isViewSwitching = false;
+
         // AGENT 1: Debug state initialization
         this.debugState = {
             initializationSteps: [],
@@ -957,7 +960,7 @@ class MultiViewPointToPointSelector {
         if (!container) return;
 
         const viewTabs = Object.entries(this.templateViews).map(([viewId, viewData]) => `
-            <button class="view-tab" data-view-id="${viewId}">
+            <button type="button" class="view-tab" data-view-id="${viewId}">
                 📐 ${viewData.name}
                 <span class="view-lines-count" id="view-count-${viewId}">0</span>
             </button>
@@ -975,8 +978,35 @@ class MultiViewPointToPointSelector {
         // Add click handlers
         container.querySelectorAll('.view-tab').forEach(tab => {
             tab.addEventListener('click', async (e) => {
-                const viewId = e.target.dataset.viewId;
-                await this.switchToView(viewId);
+                // AGENT 2 FIX: Prevent page reload on view tab clicks
+                e.preventDefault();
+                e.stopPropagation();
+
+                // AGENT 4 FIX: Handle event bubbling from child elements (span)
+                let viewId = e.target.dataset.viewId;
+                if (!viewId && e.target.parentElement) {
+                    viewId = e.target.parentElement.dataset.viewId;
+                }
+
+                if (!viewId) {
+                    console.warn('AGENT 4: No viewId found in clicked element or parent:', e.target);
+                    return;
+                }
+
+                console.log('🎯 AGENT 6: View tab clicked - switching to view:', viewId, 'Current:', this.currentViewId);
+
+                // AGENT 6 FIX: Prevent multiple rapid clicks
+                if (this.isViewSwitching) {
+                    console.log('⚠️ AGENT 6: View switch already in progress, ignoring click');
+                    return;
+                }
+
+                this.isViewSwitching = true;
+                try {
+                    await this.switchToView(viewId);
+                } finally {
+                    this.isViewSwitching = false;
+                }
             });
         });
     }
