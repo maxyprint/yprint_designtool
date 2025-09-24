@@ -34,6 +34,9 @@ class Octo_Print_Designer_Activator {
         Octo_Print_Designer_User_Images::create_table();
         Octo_Print_Designer_Designer::create_table();
 
+        // 🧠 AGENT 3 DELIVERABLE: Template Measurement Database Integration
+        TemplateMeasurementManager::create_table();
+
 	}
 
 }
