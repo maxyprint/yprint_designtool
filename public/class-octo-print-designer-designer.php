@@ -34,12 +34,12 @@ class Octo_Print_Designer_Designer {
             name varchar(255) NOT NULL,
             product_name varchar(255) NOT NULL DEFAULT '',
             product_description text NOT NULL DEFAULT '',
-            product_images longtext NOT NULL DEFAULT '[]',
+            product_images longtext NOT NULL,
             design_data longtext NOT NULL,
             product_status enum('on', 'off', 'syncing') DEFAULT 'syncing',
             inventory_status enum('in_stock', 'out_of_stock') DEFAULT 'in_stock',
             is_enabled tinyint(1) DEFAULT 1,
-            variations longtext NOT NULL DEFAULT '{}',
+            variations longtext NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
@@ -660,14 +660,14 @@ wp_add_inline_script('octo-print-designer-designer', '
             if (!$image_url) continue;
 
             $formatted_views[$view_id] = array(
-                'name' => sanitize_text_field($view['name']),
-                'image' => absint($view['image']),
+                'name' => sanitize_text_field(isset($view['name']) ? $view['name'] : ''),
+                'image' => absint(isset($view['image']) ? $view['image'] : 0),
                 'image_url' => esc_url($image_url),
-                'colorOverlayEnabled' => (bool) $view['colorOverlayEnabled'],
-                'overlayOpacity' => (float) $view['overlayOpacity'],
-                'overlayCOlor' => sanitize_hex_color($view['overlayColor']),
-                'safeZone' => $this->sanitize_zone_data($view['safeZone']),
-                'imageZone' => $this->sanitize_zone_data($view['imageZone'])
+                'colorOverlayEnabled' => (bool) (isset($view['colorOverlayEnabled']) ? $view['colorOverlayEnabled'] : false),
+                'overlayOpacity' => (float) (isset($view['overlayOpacity']) ? $view['overlayOpacity'] : 0),
+                'overlayColor' => sanitize_hex_color(isset($view['overlayColor']) ? $view['overlayColor'] : ''),
+                'safeZone' => $this->sanitize_zone_data(isset($view['safeZone']) ? $view['safeZone'] : array()),
+                'imageZone' => $this->sanitize_zone_data(isset($view['imageZone']) ? $view['imageZone'] : array())
             );
         }
 
