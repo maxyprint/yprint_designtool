@@ -64,10 +64,10 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             return;
         }
 
-        // Point-to-Point JavaScript
+        // Multi-View Point-to-Point JavaScript
         wp_enqueue_script(
-            $this->plugin_name . '-point-to-point',
-            plugin_dir_url(__FILE__) . 'js/point-to-point-selector.js',
+            $this->plugin_name . '-multi-view-point-to-point',
+            plugin_dir_url(__FILE__) . 'js/multi-view-point-to-point-selector.js',
             array('jquery'),
             $this->version,
             true
@@ -332,13 +332,27 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         echo '<input type="hidden" id="template-id-input" value="' . esc_attr($post->ID) . '">';
         echo '<input type="hidden" id="template-image-url" value="' . esc_url($template_image_url) . '">';
 
-        // Container für Point-to-Point Interface
+        // Container für Multi-View Point-to-Point Interface
         echo '<div id="point-to-point-container"></div>';
 
         // Canvas für Template Image
         echo '<div class="template-canvas-container">';
         echo '<canvas id="template-canvas" width="600" height="400" style="border: 2px solid #ddd; max-width: 100%; height: auto; object-fit: contain;"></canvas>';
         echo '</div>';
+
+        // JavaScript Inline Script für Multi-View Initialization
+        echo '<script type="text/javascript">';
+        echo '// HIVE-MIND EMERGENCY FIX: Prevent old scripts from interfering';
+        echo 'document.addEventListener("DOMContentLoaded", function() {';
+        echo '    console.log("🧠 HIVE-MIND: Multi-View Point-to-Point Initialization");';
+        echo '    if (typeof initMultiViewPointToPointSelector === "function") {';
+        echo '        initMultiViewPointToPointSelector(' . esc_js($post->ID) . ');';
+        echo '        console.log("✅ Multi-View System initialized for template:", ' . esc_js($post->ID) . ');';
+        echo '    } else {';
+        echo '        console.error("❌ Multi-View Script not loaded - falling back to old system");';
+        echo '    }';
+        echo '});';
+        echo '</script>';
 
         // Zeige Status der aktuellen Referenzlinien
         $current_lines = get_post_meta($post->ID, '_reference_lines_data', true);

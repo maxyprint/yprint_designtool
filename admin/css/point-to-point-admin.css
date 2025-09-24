@@ -12,19 +12,22 @@
     border-radius: 8px;
 }
 
-/* Template Canvas */
+/* Template Canvas - HIVE-MIND FIX: Force proper sizing */
 #template-canvas {
     border: 2px solid #0073aa;
     border-radius: 4px;
     cursor: default;
     transition: border-color 0.2s ease;
-    max-width: 100%;
-    height: auto;
-    width: 600px;
-    max-height: 400px;
-    object-fit: contain;
-    display: block;
-    margin: 0 auto;
+    max-width: 100% !important;
+    height: auto !important;
+    width: 600px !important;
+    max-height: 400px !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+    /* Emergency override to prevent old script sizing */
+    min-width: 600px;
+    min-height: 400px;
 }
 
 #template-canvas:hover {
