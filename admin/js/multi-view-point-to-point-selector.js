@@ -811,17 +811,17 @@ class MultiViewPointToPointSelector {
         console.log('⚡ AGENT 6: Starting Multi-View Point-to-Point initialization');
 
         try {
-            // Step 1: Load measurement types first
-            console.log('⚡ AGENT 6: Step 1 - Loading measurement types');
+            // Step 1: Setup UI components FIRST
+            console.log('⚡ AGENT 6: Step 1 - Setting up UI components');
+            this.setupUI();
+
+            // Step 2: Load measurement types
+            console.log('⚡ AGENT 6: Step 2 - Loading measurement types');
             await this.loadMeasurementTypes();
 
-            // Step 2: Load template views
-            console.log('⚡ AGENT 6: Step 2 - Loading template views');
+            // Step 3: Load template views
+            console.log('⚡ AGENT 6: Step 3 - Loading template views');
             await this.loadTemplateViews();
-
-            // Step 3: Setup UI components
-            console.log('⚡ AGENT 6: Step 3 - Setting up UI components');
-            this.setupUI();
 
             // Step 4: Setup event listeners
             console.log('⚡ AGENT 6: Step 4 - Setting up event listeners');
