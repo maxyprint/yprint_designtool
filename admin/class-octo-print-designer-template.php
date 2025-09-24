@@ -1573,7 +1573,7 @@ class Octo_Print_Designer_Template {
         jQuery(document).ready(function($) {
             // 🧠 MEASUREMENT DATABASE JAVASCRIPT
             let currentTemplateId = <?php echo $post->ID; ?>;
-            let measurementData = Object.create(null); // 🧠 AGENT-2 FIX: Pure object without prototype
+            let measurementData = {}; // 🧠 AGENT-1 FINAL: Standard object for jQuery compatibility
 
             // Initialize template measurements immediately
             window.loadTemplateMeasurements = function() {
@@ -1660,9 +1660,17 @@ class Octo_Print_Designer_Template {
                     label: getMeasurementLabel(measurementKey)
                 };
 
-                // 🧠 AGENT-6 FIX: Simplified logging without potential corruption
-                console.log('🔍 UPDATE DEBUG - Measurement added:', sizeKey, measurementKey, value);
-                console.log('🔍 UPDATE DEBUG - Total measurements:', Object.keys(measurementData).length);
+                // 🧠 AGENT-5 FINAL: Direct property enumeration testing
+                console.log('🔍 UPDATE DEBUG - Added:', sizeKey, measurementKey, value);
+                console.log('🔍 UPDATE DEBUG - measurementData type:', typeof measurementData);
+                console.log('🔍 UPDATE DEBUG - measurementData instanceof Object:', measurementData instanceof Object);
+                console.log('🔍 UPDATE DEBUG - Object.keys length:', Object.keys(measurementData).length);
+                console.log('🔍 UPDATE DEBUG - Direct property check:', measurementData.hasOwnProperty(sizeKey));
+
+                // Agent-6: Verify object structure integrity
+                for (let key in measurementData) {
+                    console.log('🔍 VERIFY - Property:', key, 'Value type:', typeof measurementData[key]);
+                }
 
                 // Visual feedback for precision
                 if (value > 0 && (value * 10) % 1 !== 0) {
@@ -1702,13 +1710,22 @@ class Octo_Print_Designer_Template {
                 console.log('💾 Saving measurements for template:', currentTemplateId);
                 console.log('💾 Measurement data:', measurementData);
 
-                // 🧠 AGENT-6 FIX: Clean serialization without debug corruption
-                console.log('💾 Serializing measurements:', Object.keys(measurementData).length, 'sizes');
+                // 🧠 AGENT-2 FINAL: Explicit data validation and backup serialization
+                const validatedData = Object.assign({}, measurementData);
+                console.log('💾 Validated data keys:', Object.keys(validatedData));
+                console.log('💾 Validated data values:', Object.values(validatedData));
+
+                // Agent-3: Backup validation
+                if (Object.keys(validatedData).length === 0) {
+                    alert('❌ No measurement data to save. Please enter values first.');
+                    console.error('❌ Validated data is empty after Object.assign');
+                    return;
+                }
 
                 $.post(ajaxurl, {
                     action: 'save_template_measurements_from_admin',
                     template_id: currentTemplateId,
-                    measurements: measurementData // Let jQuery handle serialization
+                    measurements: validatedData // Use validated copy
                 }, function(response) {
                     console.log('🔍 AJAX Response received:', response);
                     if (response.success) {

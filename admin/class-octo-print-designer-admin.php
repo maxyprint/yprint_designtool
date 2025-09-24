@@ -1063,15 +1063,20 @@ class Octo_Print_Designer_Admin {
         $template_id = intval($_POST['template_id']); // 🧠 AGENT-4 FIX: Match working pattern
         $measurements_raw = $_POST['measurements'] ?? null;
 
-        // 🧠 AGENT-6 FIX: Direct measurement data handling (no JSON)
+        // 🧠 AGENT-4 FINAL: Direct measurement data handling with comprehensive debugging
         $measurements = $_POST['measurements'] ?? null;
 
-        // 🧠 AGENT DEBUG: Specific parameter validation
-        error_log('🔍 AJAX DEBUG - template_id: ' . $template_id);
-        error_log('🔍 AJAX DEBUG - measurements_raw type: ' . gettype($measurements_raw));
-        error_log('🔍 AJAX DEBUG - measurements_raw content: ' . print_r($measurements_raw, true));
-        error_log('🔍 AJAX DEBUG - measurements final type: ' . gettype($measurements));
-        error_log('🔍 AJAX DEBUG - measurements final content: ' . print_r($measurements, true));
+        // 🧠 AGENT-4 DEBUG: Comprehensive data structure analysis
+        error_log('🔍 PHP FINAL DEBUG - template_id: ' . $template_id);
+        error_log('🔍 PHP FINAL DEBUG - measurements type: ' . gettype($measurements));
+        error_log('🔍 PHP FINAL DEBUG - measurements is_array: ' . (is_array($measurements) ? 'YES' : 'NO'));
+        error_log('🔍 PHP FINAL DEBUG - measurements empty: ' . (empty($measurements) ? 'YES' : 'NO'));
+        error_log('🔍 PHP FINAL DEBUG - measurements count: ' . (is_array($measurements) ? count($measurements) : 'NOT_ARRAY'));
+        error_log('🔍 PHP FINAL DEBUG - measurements content: ' . print_r($measurements, true));
+
+        if (is_array($measurements)) {
+            error_log('🔍 PHP FINAL DEBUG - measurements keys: ' . implode(', ', array_keys($measurements)));
+        }
 
         if (!$template_id || !$measurements) {
             $error_msg = sprintf(
