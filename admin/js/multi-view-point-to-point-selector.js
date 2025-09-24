@@ -59,16 +59,24 @@ class MultiViewPointToPointSelector {
             if (data.success) {
                 this.templateViews = data.data.views;
                 console.log('🎯 Multi-View: Loaded', Object.keys(this.templateViews).length, 'views');
-                this.createViewSelector();
 
-                // Switch to first view
-                const firstViewId = Object.keys(this.templateViews)[0];
-                if (firstViewId) {
-                    await this.switchToView(firstViewId);
+                // If no multi-view data available, create single view fallback
+                if (Object.keys(this.templateViews).length === 0) {
+                    console.log('⚠️ No multi-view data found, creating single view fallback');
+                    await this.createSingleViewFallback();
+                } else {
+                    this.createViewSelector();
+
+                    // Switch to first view
+                    const firstViewId = Object.keys(this.templateViews)[0];
+                    if (firstViewId) {
+                        await this.switchToView(firstViewId);
+                    }
                 }
             } else {
                 console.error('Failed to load template views:', data.data);
-                this.showError('Fehler beim Laden der Template Views: ' + data.data);
+                console.log('⚠️ Creating single view fallback due to error');
+                await this.createSingleViewFallback();
             }
         } catch (error) {
             console.error('Error loading template views:', error);
@@ -681,6 +689,56 @@ class MultiViewPointToPointSelector {
         } catch (error) {
             console.error('Fehler beim Laden existierender Multi-View Referenzlinien:', error);
         }
+    }
+
+    /**
+     * Creates Single View Fallback when Multi-View data not available
+     */
+    async createSingleViewFallback() {
+        console.log('🔄 Creating single view fallback system');
+
+        // Create fallback view using legacy image loading
+        this.templateViews = {
+            'single': {
+                id: 'single',
+                name: 'Template View',
+                image_url: await this.loadLegacyTemplateImage(),
+                image_id: null,
+                safe_zone: {}
+            }
+        };
+
+        this.createViewSelector();
+        await this.switchToView('single');
+    }
+
+    /**
+     * Loads template image using legacy methods
+     */
+    async loadLegacyTemplateImage() {
+        try {
+            const response = await fetch(pointToPointAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'get_template_image',
+                    template_id: this.templateId,
+                    nonce: pointToPointAjax.nonce
+                })
+            });
+
+            const data = await response.json();
+            if (data.success && data.data.image_url) {
+                return data.data.image_url;
+            }
+        } catch (error) {
+            console.error('Error loading legacy template image:', error);
+        }
+
+        // Return placeholder if no image found
+        return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjlmOWY5Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNnB4IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+VGVtcGxhdGUgSW1hZ2U8L3RleHQ+Cjwvc3ZnPg==';
     }
 
     /**

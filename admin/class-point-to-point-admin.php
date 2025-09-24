@@ -45,6 +45,9 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         add_action('wp_ajax_save_multi_view_reference_lines', array($this, 'ajax_save_multi_view_reference_lines'));
         add_action('wp_ajax_get_multi_view_reference_lines', array($this, 'ajax_get_multi_view_reference_lines'));
 
+        // Legacy Template Image AJAX Handler für Single View Fallback
+        add_action('wp_ajax_get_template_image', array($this, 'ajax_get_template_image'));
+
         // Admin Enqueue Scripts Hook
         add_action('admin_enqueue_scripts', array($this, 'enqueue_point_to_point_scripts'));
 
@@ -334,7 +337,7 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Canvas für Template Image
         echo '<div class="template-canvas-container">';
-        echo '<canvas id="template-canvas" style="border: 2px solid #ddd; max-width: 100%; height: auto;"></canvas>';
+        echo '<canvas id="template-canvas" width="600" height="400" style="border: 2px solid #ddd; max-width: 100%; height: auto; object-fit: contain;"></canvas>';
         echo '</div>';
 
         // Zeige Status der aktuellen Referenzlinien
@@ -359,12 +362,35 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
     /**
      * Lädt alle Template Views mit Bildern aus _template_variations
+     * Optimiert mit Caching für Performance
      */
     private function get_template_views($post_id) {
+        // Caching für Performance - verhindert mehrfache DB-Abfragen
+        static $template_views_cache = array();
+
+        if (isset($template_views_cache[$post_id])) {
+            return $template_views_cache[$post_id];
+        }
+
         $template_variations = get_post_meta($post_id, '_template_variations', true);
         $views = array();
 
         if (empty($template_variations) || !is_array($template_variations)) {
+            // Try alternative meta fields for fallback
+            $print_template_image = get_post_meta($post_id, 'print_template_image', true);
+            if (!empty($print_template_image)) {
+                $views = array(
+                    'single' => array(
+                        'id' => 'single',
+                        'name' => 'Template View',
+                        'image_url' => $print_template_image,
+                        'image_id' => null,
+                        'safe_zone' => array()
+                    )
+                );
+            }
+
+            $template_views_cache[$post_id] = $views;
             return $views;
         }
 
@@ -392,6 +418,8 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             }
         }
 
+        // Cache the result für Performance
+        $template_views_cache[$post_id] = $views;
         return $views;
     }
 
@@ -585,6 +613,44 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         } catch (Exception $e) {
             error_log('Multi-View Load Error: ' . $e->getMessage());
             wp_send_json_error(__('Fehler beim Laden: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX Handler: Get Template Image (Legacy Fallback)
+     * Single View Fallback wenn Multi-View nicht verfügbar
+     */
+    public function ajax_get_template_image() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            $image_url = $this->get_template_image_url($template_id);
+
+            if (!$image_url) {
+                wp_send_json_error(__('Kein Template-Bild gefunden', 'octo-print-designer'));
+            }
+
+            wp_send_json_success(array(
+                'image_url' => $image_url,
+                'template_id' => $template_id,
+                'fallback_mode' => true
+            ));
+
+        } catch (Exception $e) {
+            error_log('Template Image Load Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden des Template-Bildes: ', 'octo-print-designer') . $e->getMessage());
         }
     }
 }
