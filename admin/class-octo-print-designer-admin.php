@@ -35,7 +35,18 @@ class Octo_Print_Designer_Admin {
 
     public function enqueue_scripts($hook) {
 
-        // 🔍 DEBUG: Log hook information for troubleshooting
+        // 🔍 DEBUG: Log hook information for troubleshooting (BROWSER CONSOLE)
+        $debug_script = "
+        <script>
+        console.log('🔧 [ADMIN DEBUG] enqueue_scripts called with hook: " . esc_js($hook) . "');
+        console.log('🔧 [ADMIN DEBUG] is_template_edit_page: " . ($this->is_template_edit_page($hook) ? 'YES' : 'NO') . "');
+        console.log('🔧 [ADMIN DEBUG] is_woocommerce_order_edit_page: " . ($this->is_woocommerce_order_edit_page($hook) ? 'YES' : 'NO') . "');
+        </script>";
+
+        // Output debug immediately to browser
+        echo $debug_script;
+
+        // Also log to PHP error log
         error_log("🔧 [ADMIN DEBUG] enqueue_scripts called with hook: " . $hook);
         error_log("🔧 [ADMIN DEBUG] is_template_edit_page: " . ($this->is_template_edit_page($hook) ? 'YES' : 'NO'));
         error_log("🔧 [ADMIN DEBUG] is_woocommerce_order_edit_page: " . ($this->is_woocommerce_order_edit_page($hook) ? 'YES' : 'NO'));
@@ -45,15 +56,19 @@ class Octo_Print_Designer_Admin {
             if ($screen) {
                 error_log("🔧 [ADMIN DEBUG] current_screen->post_type: " . ($screen->post_type ?? 'null'));
                 error_log("🔧 [ADMIN DEBUG] current_screen->id: " . ($screen->id ?? 'null'));
+                echo "<script>console.log('🔧 [ADMIN DEBUG] current_screen->post_type: " . esc_js($screen->post_type ?? 'null') . "');</script>";
+                echo "<script>console.log('🔧 [ADMIN DEBUG] current_screen->id: " . esc_js($screen->id ?? 'null') . "');</script>";
             }
         }
 
         // 🎯 CRITICAL FIX: Enable scripts for BOTH template edit pages AND WooCommerce order pages
         if (!$this->is_template_edit_page($hook) && !$this->is_woocommerce_order_edit_page($hook)) {
+            echo "<script>console.log('🔧 [ADMIN DEBUG] Scripts NOT loaded - neither template nor woocommerce order page');</script>";
             error_log("🔧 [ADMIN DEBUG] Scripts NOT loaded - neither template nor woocommerce order page");
             return;
         }
 
+        echo "<script>console.log('🔧 [ADMIN DEBUG] Scripts WILL be loaded!');</script>";
         error_log("🔧 [ADMIN DEBUG] Scripts WILL be loaded!");
 
         wp_enqueue_media();
