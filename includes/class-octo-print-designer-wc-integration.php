@@ -26,6 +26,12 @@ class Octo_Print_Designer_WC_Integration {
         add_filter('woocommerce_order_item_name', array($this, 'modify_order_item_name'), 10, 2);
         add_action('woocommerce_order_item_meta_end', array($this, 'add_design_preview_to_order_email'), 10, 3);
 
+        // NEW: Cart integration hook for JSON design data
+        add_filter('woocommerce_add_cart_item_data', array($this, 'add_design_data_to_cart'), 10, 3);
+
+        // NEW: Order integration hook for JSON design data persistence
+        add_action('woocommerce_checkout_create_order_line_item', array($this, 'save_design_data_to_order'), 10, 4);
+
         add_filter('woocommerce_order_item_display_meta_key', array($this, 'format_order_item_meta_display'), 10, 3);
         add_filter('woocommerce_order_item_display_meta_value', array($this, 'format_order_item_meta_value'), 10, 3);
         add_filter('woocommerce_admin_order_item_thumbnail', array($this, 'customize_order_item_thumbnail'), 10, 4);
@@ -701,22 +707,74 @@ private function check_yprint_dependency() {
                     progressContainer.append(progressText);
                     progressContainer.insertBefore(button.parent());
                     
+                    // STEP 1: Capture JSON from frontend with comprehensive logging
+                    console.log('🚀 [DESIGN SAVE] Starting design data capture process...');
+                    let designDataJSON = null;
+                    try {
+                        if (typeof window.generateDesignData === 'function') {
+                            console.log('✅ [DESIGN SAVE] generateDesignData() function available');
+                            designDataJSON = window.generateDesignData();
+
+                            if (designDataJSON) {
+                                console.group('📊 [DESIGN SAVE] Design Data Successfully Captured');
+                                console.log('🔍 Data Structure:', {
+                                    timestamp: designDataJSON.timestamp || 'missing',
+                                    template_view_id: designDataJSON.template_view_id || 'missing',
+                                    elements_count: designDataJSON.elements ? designDataJSON.elements.length : 0,
+                                    data_size: JSON.stringify(designDataJSON).length + ' characters'
+                                });
+                                console.log('📋 Complete JSON Object:', designDataJSON);
+                                console.groupEnd();
+                            } else {
+                                console.warn('⚠️ [DESIGN SAVE] generateDesignData() returned null/undefined');
+                            }
+                        } else {
+                            console.error('❌ [DESIGN SAVE] generateDesignData() function not available');
+                        }
+                    } catch (error) {
+                        console.group('❌ [DESIGN SAVE] Design data capture failed');
+                        console.error('Error:', error.message);
+                        console.error('Stack:', error.stack);
+                        console.groupEnd();
+                    }
+
+                    // STEP 2: Send to server with comprehensive AJAX logging
+                    console.log('📤 [AJAX SEND] Preparing server request with design data...');
+                    console.log('📋 [AJAX SEND] Request payload:', {
+                        action: 'octo_refresh_print_data',
+                        order_id: orderId,
+                        has_design_data: !!designDataJSON,
+                        data_size: designDataJSON ? JSON.stringify(designDataJSON).length : 0,
+                        nonce_present: !!$('#octo_print_provider_nonce').val()
+                    });
+
                     $.ajax({
                         url: ajaxurl,
                         type: 'POST',
                         data: {
                             action: 'octo_refresh_print_data',
                             order_id: orderId,
+                            design_data_json: designDataJSON, // NEW: Add JSON payload
                             nonce: $('#octo_print_provider_nonce').val()
                         },
                         beforeSend: function() {
+                            console.log('⏳ [AJAX SEND] Request started - sending to server...');
                             progressText.html('🔍 Suche Design-Items in Bestellung...');
                             button.text('🔄 Analysiere Bestellung...');
                         },
                         success: function(response) {
+                            console.group('✅ [AJAX SUCCESS] Server response received');
+                            console.log('📋 Response data:', response);
+                            console.log('🔍 Response details:', {
+                                success: response.success || false,
+                                message: response.data?.message || 'no message',
+                                debug_entries: response.data?.debug ? response.data.debug.length : 0
+                            });
+                            console.groupEnd();
+
                             progressText.html('📊 Verarbeite Server-Antwort...');
                             button.text('🔄 Verarbeite Daten...');
-                            
+
                             setTimeout(function() {
                                 progressContainer.remove();
                                 
@@ -757,8 +815,15 @@ private function check_yprint_dependency() {
                             }, 500);
                         },
                         error: function(xhr, status, error) {
+                            console.group('❌ [AJAX ERROR] Server request failed');
+                            console.error('XHR object:', xhr);
+                            console.error('Status:', status);
+                            console.error('Error:', error);
+                            console.error('Response text:', xhr.responseText);
+                            console.groupEnd();
+
                             progressContainer.remove();
-                            
+
                             var title = 'Netzwerkfehler';
                             var message = 'Verbindung zum Server fehlgeschlagen.';
                             var details = [
@@ -1802,7 +1867,42 @@ private function build_print_provider_email_content($order, $design_items, $note
         if (!$order) {
             wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
         }
-        
+
+        // NEW: Handle design data JSON with comprehensive logging
+        if (!empty($_POST['design_data_json'])) {
+            error_log("📥 [PHP RECEIVE] Design data JSON received for order {$order_id}");
+
+            $design_data_json = $_POST['design_data_json'];
+
+            error_log("🔍 [PHP VALIDATE] JSON data structure: " . print_r([
+                'is_array' => is_array($design_data_json),
+                'has_timestamp' => isset($design_data_json['timestamp']),
+                'has_template_id' => isset($design_data_json['template_view_id']),
+                'elements_count' => isset($design_data_json['elements']) ? count($design_data_json['elements']) : 0,
+                'data_size' => strlen(json_encode($design_data_json)) . ' chars'
+            ], true));
+
+            // Validate and sanitize JSON
+            if ($this->validate_design_data_json($design_data_json)) {
+                error_log("✅ [PHP VALIDATE] JSON validation successful");
+
+                // Store as order meta
+                $meta_result = update_post_meta($order_id, '_design_data', wp_slash(json_encode($design_data_json)));
+
+                if ($meta_result) {
+                    error_log("✅ [PHP STORE] Design data successfully stored in database for order {$order_id}");
+                    error_log("📊 [PHP STORE] Stored data size: " . strlen(json_encode($design_data_json)) . " characters");
+                } else {
+                    error_log("❌ [PHP STORE] Failed to store design data in database for order {$order_id}");
+                }
+            } else {
+                error_log("❌ [PHP VALIDATE] JSON validation failed for order {$order_id}");
+                error_log("🔍 [PHP VALIDATE] Invalid data: " . print_r($design_data_json, true));
+            }
+        } else {
+            error_log("⚠️ [PHP RECEIVE] No design data JSON received in request for order {$order_id}");
+        }
+
         // Refresh print data from database
         $refreshed_items = 0;
         $debug_info = array();
@@ -1930,10 +2030,84 @@ private function build_print_provider_email_content($order, $design_items, $note
             true
         );
         
+        // Check if stored design data can be retrieved
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        if ($stored_design_data) {
+            error_log("🔍 [PHP RETRIEVE] Found stored design data for order {$order_id}");
+            error_log("📊 [PHP RETRIEVE] Stored data preview: " . substr($stored_design_data, 0, 200) . '...');
+
+            $debug_info[] = "✅ Design JSON data found in database (" . strlen($stored_design_data) . " characters)";
+        } else {
+            error_log("⚠️ [PHP RETRIEVE] No stored design data found for order {$order_id}");
+        }
+
         wp_send_json_success(array(
             'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
-            'debug' => $debug_info
+            'debug' => $debug_info,
+            'stored_design_data_size' => $stored_design_data ? strlen($stored_design_data) : 0
         ));
+    }
+
+    /**
+     * NEW: JSON Validation Method
+     */
+    private function validate_design_data_json($json_data) {
+        if (!is_array($json_data)) return false;
+
+        // Required fields validation
+        $required_fields = ['timestamp', 'template_view_id', 'elements'];
+        foreach ($required_fields as $field) {
+            if (!isset($json_data[$field])) {
+                return false;
+            }
+        }
+
+        // Sanitize elements array
+        if (isset($json_data['elements']) && is_array($json_data['elements'])) {
+            foreach ($json_data['elements'] as &$element) {
+                if (isset($element['text'])) {
+                    $element['text'] = sanitize_text_field($element['text']);
+                }
+                if (isset($element['src'])) {
+                    $element['src'] = esc_url_raw($element['src']);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * NEW: Cart Integration Method
+     */
+    public function add_design_data_to_cart($cart_item_data, $product_id, $variation_id) {
+        // Check if design data is present in request
+        if (!empty($_POST['design_data_json'])) {
+            $design_data = $_POST['design_data_json'];
+
+            if ($this->validate_design_data_json($design_data)) {
+                $cart_item_data['_design_data_json'] = $design_data;
+
+                // Add unique key to prevent cart merging
+                $cart_item_data['unique_key'] = md5(microtime().rand());
+            }
+        }
+
+        return $cart_item_data;
+    }
+
+    /**
+     * NEW: Order Line Item Persistence
+     */
+    public function save_design_data_to_order($item, $cart_item_key, $values, $order) {
+        if (!empty($values['_design_data_json'])) {
+            $design_data = $values['_design_data_json'];
+
+            // Store in order item meta
+            $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+
+            error_log("📦 Design data saved to order item: " . $item->get_id());
+        }
     }
 
     /**

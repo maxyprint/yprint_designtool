@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Design Data Capture Verification</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #00ff00; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { text-align: center; border: 2px solid #00ff00; padding: 15px; margin-bottom: 20px; }
+        .section { background: #1a1a1a; border: 1px solid #333; margin: 15px 0; padding: 15px; }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .info { color: #00aaff; }
+        .code { background: #222; padding: 10px; border-left: 4px solid #00ff00; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .test-button { background: #001a00; border: 2px solid #00aa00; color: #00ff00; padding: 10px 20px; margin: 5px; cursor: pointer; font-family: monospace; }
+        .test-button:hover { background: #002200; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🧪 DESIGN DATA CAPTURE VERIFICATION</h1>
+            <p><strong>Goal:</strong> Verify complete JSON object generation for all design elements</p>
+        </div>
+
+        <!-- Test Controls -->
+        <div class="section">
+            <h2>🎮 Test Controls</h2>
+            <button class="test-button" onclick="runSystemCheck()">🔍 System Check</button>
+            <button class="test-button" onclick="testOptimizedCapture()">🚀 Test Optimized Capture</button>
+            <button class="test-button" onclick="testEnhancedJSON()">🏆 Test Enhanced JSON</button>
+            <button class="test-button" onclick="testCompleteFlow()">✅ Test Complete Flow</button>
+            <button class="test-button" onclick="clearResults()">🧹 Clear Results</button>
+        </div>
+
+        <!-- System Status -->
+        <div class="section">
+            <h2>📊 System Status</h2>
+            <div id="systemStatus" class="code">Click "System Check" to verify all components...</div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="section">
+            <h2>🧪 Test Results</h2>
+            <div id="testResults" class="code">Test results will appear here...</div>
+        </div>
+
+        <!-- JSON Output -->
+        <div class="section">
+            <h2>📋 JSON Output</h2>
+            <div id="jsonOutput" class="code">JSON objects will appear here when tests are run...</div>
+        </div>
+
+        <!-- Verification Checklist -->
+        <div class="section">
+            <h2>✅ Verification Checklist</h2>
+            <div id="checklist">
+                <div id="check1">❌ System components loaded</div>
+                <div id="check2">❌ Fabric.js available</div>
+                <div id="check3">❌ Canvas instances detected</div>
+                <div id="check4">❌ Optimized capture functional</div>
+                <div id="check5">❌ Enhanced JSON functional</div>
+                <div id="check6">❌ Template view ID extracted</div>
+                <div id="check7">❌ Coordinate system working</div>
+                <div id="check8">❌ Complete JSON structure</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global test state
+        let testResults = [];
+        let systemChecks = {};
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            testResults.push(logEntry);
+            updateTestResults();
+            console.log(logEntry);
+        }
+
+        function updateTestResults() {
+            document.getElementById('testResults').textContent = testResults.join('\n');
+        }
+
+        function updateChecklistItem(id, status, message = '') {
+            const element = document.getElementById(id);
+            if (element) {
+                const icon = status ? '✅' : '❌';
+                element.textContent = `${icon} ${element.textContent.substring(2)}${message ? ' - ' + message : ''}`;
+                element.className = status ? 'success' : 'error';
+            }
+        }
+
+        function runSystemCheck() {
+            log('🔍 SYSTEM CHECK: Starting comprehensive verification...', 'info');
+
+            // Check 1: System components
+            const hasOptimizedCapture = typeof window.optimizedCaptureInstance !== 'undefined';
+            const hasEnhancedJSON = typeof window.enhancedJSONSystem !== 'undefined';
+            systemChecks.components = hasOptimizedCapture && hasEnhancedJSON;
+            updateChecklistItem('check1', systemChecks.components);
+            log(`Components loaded: Optimized=${hasOptimizedCapture}, Enhanced=${hasEnhancedJSON}`, hasOptimizedCapture && hasEnhancedJSON ? 'success' : 'error');
+
+            // Check 2: Fabric.js
+            systemChecks.fabric = typeof window.fabric !== 'undefined' && window.fabric.Canvas;
+            updateChecklistItem('check2', systemChecks.fabric);
+            log(`Fabric.js: ${systemChecks.fabric ? 'Available' : 'Not available'}`, systemChecks.fabric ? 'success' : 'error');
+
+            // Check 3: Canvas detection
+            const canvasElements = document.querySelectorAll('canvas');
+            const fabricCanvases = Array.from(canvasElements).filter(c => c.__fabric);
+            systemChecks.canvas = fabricCanvases.length > 0;
+            updateChecklistItem('check3', systemChecks.canvas, `${fabricCanvases.length} found`);
+            log(`Canvas instances: ${fabricCanvases.length} fabric canvases detected`, systemChecks.canvas ? 'success' : 'warn');
+
+            // Update system status
+            document.getElementById('systemStatus').textContent = JSON.stringify(systemChecks, null, 2);
+
+            log('🔍 SYSTEM CHECK: Complete', 'info');
+        }
+
+        function testOptimizedCapture() {
+            log('🚀 TESTING: Optimized Design Data Capture...', 'info');
+
+            if (typeof window.optimizedCaptureInstance === 'undefined') {
+                log('❌ Optimized capture instance not found', 'error');
+                updateChecklistItem('check4', false);
+                return;
+            }
+
+            try {
+                const result = window.optimizedCaptureInstance.generateDesignData();
+                updateChecklistItem('check4', !result.error);
+
+                if (result.error) {
+                    log(`❌ Optimized capture error: ${result.error}`, 'error');
+                } else {
+                    log('✅ Optimized capture successful', 'success');
+                    log(`Elements captured: ${result.elements ? result.elements.length : 0}`, 'info');
+                    document.getElementById('jsonOutput').textContent = JSON.stringify(result, null, 2);
+                }
+            } catch (error) {
+                log(`❌ Optimized capture exception: ${error.message}`, 'error');
+                updateChecklistItem('check4', false);
+            }
+        }
+
+        function testEnhancedJSON() {
+            log('🏆 TESTING: Enhanced JSON Coordinate System...', 'info');
+
+            if (typeof window.enhancedJSONSystem === 'undefined') {
+                log('❌ Enhanced JSON system not found', 'error');
+                updateChecklistItem('check5', false);
+                return;
+            }
+
+            try {
+                const result = window.enhancedJSONSystem.generateDesignData();
+                updateChecklistItem('check5', !result.error);
+
+                if (result.error) {
+                    log(`❌ Enhanced JSON error: ${result.message}`, 'error');
+                } else {
+                    log('✅ Enhanced JSON successful', 'success');
+                    log(`Elements captured: ${result.elements ? result.elements.length : 0}`, 'info');
+                    updateChecklistItem('check6', result.template_view_id !== 'unknown');
+                    updateChecklistItem('check7', result.elements && result.elements.length > 0);
+                    updateChecklistItem('check8', !!(result.template_view_id && result.designed_on_area_px && result.elements));
+                    document.getElementById('jsonOutput').textContent = JSON.stringify(result, null, 2);
+                }
+            } catch (error) {
+                log(`❌ Enhanced JSON exception: ${error.message}`, 'error');
+                updateChecklistItem('check5', false);
+            }
+        }
+
+        function testCompleteFlow() {
+            log('✅ TESTING: Complete Design Data Capture Flow...', 'info');
+
+            // Test both systems
+            testOptimizedCapture();
+            testEnhancedJSON();
+
+            // Test global function
+            if (typeof window.generateDesignData === 'function') {
+                try {
+                    const result = window.generateDesignData();
+                    log('✅ Global generateDesignData() function working', 'success');
+                    log(`Global function result: ${result.error ? 'Error' : 'Success'}`, result.error ? 'error' : 'success');
+                } catch (error) {
+                    log(`❌ Global function error: ${error.message}`, 'error');
+                }
+            } else {
+                log('❌ Global generateDesignData() function not found', 'error');
+            }
+        }
+
+        function clearResults() {
+            testResults = [];
+            document.getElementById('testResults').textContent = 'Test results cleared...';
+            document.getElementById('jsonOutput').textContent = 'JSON objects will appear here when tests are run...';
+            log('🧹 Results cleared', 'info');
+        }
+
+        // Auto-run system check on load
+        window.addEventListener('load', function() {
+            setTimeout(runSystemCheck, 1000);
+        });
+    </script>
+</body>
+</html>
