@@ -397,28 +397,426 @@ private function check_yprint_dependency() {
         if (!$screen || $screen->id !== 'shop_order') {
             return;
         }
-        
+
         ?>
         <style type="text/css">
+            /* 🎨 PROFESSIONAL WORDPRESS ADMIN UI - Agent 6 Enhancement */
+
+            /* Design Preview Section */
+            #design-preview-section {
+                margin: 20px 0;
+                padding: 0;
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
+            }
+
+            .design-preview-header {
+                background: #f6f7f7;
+                border-bottom: 1px solid #c3c4c7;
+                padding: 12px 20px;
+                margin: 0;
+            }
+
+            .design-preview-header h3 {
+                margin: 0;
+                color: #1d2327;
+                font-size: 14px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .design-preview-content {
+                padding: 20px;
+            }
+
+            .design-status-indicator {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 8px;
+                border-radius: 3px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            .status-available {
+                background: #d1e7dd;
+                color: #0f5132;
+                border: 1px solid #a3cfbb;
+            }
+
+            .status-unavailable {
+                background: #fff3cd;
+                color: #664d03;
+                border: 1px solid #ffda6a;
+            }
+
+            /* Enhanced Buttons */
+            .design-preview-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 16px;
+                font-size: 13px;
+                line-height: 1.5;
+                border-radius: 3px;
+                text-decoration: none;
+                transition: all 0.2s ease;
+            }
+
+            .design-preview-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            .design-preview-btn:not(:disabled):hover {
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            /* Modal Enhancement */
+            #design-preview-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.7);
+                z-index: 999999;
+                display: none;
+                backdrop-filter: blur(2px);
+            }
+
+            .design-modal-container {
+                position: relative;
+                width: 95%;
+                max-width: 1200px;
+                height: 90%;
+                margin: 2.5% auto;
+                background: #fff;
+                border-radius: 4px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .design-modal-header {
+                background: #1d2327;
+                color: #fff;
+                padding: 16px 24px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #c3c4c7;
+            }
+
+            .design-modal-title {
+                margin: 0;
+                font-size: 16px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .design-modal-close {
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+                border: none;
+                border-radius: 3px;
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: background 0.2s ease;
+            }
+
+            .design-modal-close:hover {
+                background: rgba(255,255,255,0.2);
+            }
+
+            .design-modal-body {
+                flex: 1;
+                overflow: auto;
+                padding: 24px;
+                background: #f6f7f7;
+            }
+
+            /* Control Panel */
+            .design-control-panel {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                padding: 16px;
+                margin-bottom: 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: center;
+            }
+
+            .control-group {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .control-group label {
+                font-size: 12px;
+                font-weight: 600;
+                color: #1d2327;
+                margin: 0;
+            }
+
+            .control-button {
+                padding: 4px 8px;
+                font-size: 11px;
+                border: 1px solid #c3c4c7;
+                background: #fff;
+                color: #1d2327;
+                border-radius: 3px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .control-button:hover {
+                background: #f6f7f7;
+                border-color: #8c8f94;
+            }
+
+            .control-button.active {
+                background: #2271b1;
+                color: #fff;
+                border-color: #135e96;
+            }
+
+            .control-button.touching {
+                background: #f0f0f1;
+                transform: scale(0.98);
+            }
+
+            /* Canvas Container */
+            .design-canvas-wrapper {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                padding: 20px;
+                text-align: center;
+                box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
+            }
+
+            .design-canvas-container {
+                position: relative;
+                display: inline-block;
+                background: #fff;
+                border: 2px solid #c3c4c7;
+                border-radius: 4px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            #design-preview-canvas {
+                display: block;
+                max-width: 100%;
+                height: auto;
+            }
+
+            /* Loading States */
+            .design-loading {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 60px 20px;
+                color: #646970;
+            }
+
+            .loading-spinner {
+                width: 32px;
+                height: 32px;
+                border: 3px solid #f0f0f1;
+                border-top: 3px solid #2271b1;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin-bottom: 16px;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            /* Info Cards */
+            .info-card {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                padding: 16px;
+                margin-bottom: 16px;
+            }
+
+            .info-card-header {
+                font-size: 14px;
+                font-weight: 600;
+                color: #1d2327;
+                margin: 0 0 12px 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .info-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 16px;
+                font-size: 13px;
+            }
+
+            .info-item {
+                padding: 12px;
+                background: #f6f7f7;
+                border-radius: 3px;
+                border-left: 4px solid #2271b1;
+            }
+
+            .info-item strong {
+                display: block;
+                color: #1d2327;
+                margin-bottom: 4px;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* Error States */
+            .design-error {
+                background: #fcf2f2;
+                border: 1px solid #f87171;
+                border-radius: 4px;
+                padding: 16px;
+                text-align: center;
+                color: #7f1d1d;
+            }
+
+            .design-error h3 {
+                margin: 0 0 8px 0;
+                color: #991b1b;
+            }
+
+            /* Responsive Design */
+            @media (max-width: 782px) {
+                .design-modal-container {
+                    width: 98%;
+                    height: 95%;
+                    margin: 1% auto;
+                }
+
+                .design-modal-body {
+                    padding: 16px;
+                }
+
+                .design-control-panel {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                .control-group {
+                    justify-content: space-between;
+                }
+
+                .info-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            @media (max-width: 480px) {
+                .design-modal-container {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    border-radius: 0;
+                }
+
+                .design-canvas-wrapper {
+                    padding: 12px;
+                }
+            }
+
+            /* Legacy styles for backward compatibility */
             .design-images-list {
                 max-height: 200px;
                 overflow-y: auto;
-                border: 1px solid #ddd;
-                padding: 5px;
-                border-radius: 3px;
+                border: 1px solid #c3c4c7;
+                padding: 8px;
+                border-radius: 4px;
+                background: #f6f7f7;
             }
             .design-image-item {
-                margin-bottom: 5px;
-                padding: 3px;
-                border-bottom: 1px solid #f0f0f0;
+                margin-bottom: 8px;
+                padding: 8px;
+                border-bottom: 1px solid #e0e0e0;
+                background: #fff;
+                border-radius: 3px;
             }
             .design-image-item:last-child {
                 border-bottom: none;
+                margin-bottom: 0;
             }
             .design-preview-wrapper {
-                padding: 5px;
-                background: #f9f9f9;
-                border-radius: 3px;
+                padding: 8px;
+                background: #f6f7f7;
+                border-radius: 4px;
+                border: 1px solid #c3c4c7;
+            }
+
+            /* Accessibility Enhancements */
+            .sr-only {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            /* Focus states for keyboard navigation */
+            .control-button:focus,
+            .design-preview-btn:focus,
+            .design-modal-close:focus {
+                outline: 2px solid #2271b1;
+                outline-offset: 2px;
+            }
+
+            /* High contrast mode support */
+            @media (prefers-contrast: high) {
+                .info-item {
+                    border-left-width: 6px;
+                }
+
+                .status-available,
+                .status-unavailable {
+                    border-width: 2px;
+                }
+            }
+
+            /* Reduced motion for accessibility */
+            @media (prefers-reduced-motion: reduce) {
+                .design-preview-btn,
+                .control-button,
+                .design-modal-close {
+                    transition: none;
+                }
+
+                .loading-spinner {
+                    animation: none;
+                }
             }
         </style>
         <?php
@@ -2727,56 +3125,103 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Check if stored design data exists
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
         ?>
-        <div id="design-preview-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border: 2px solid #007cba; border-radius: 8px;">
-            <h3 style="margin-top: 0; color: #007cba; font-size: 16px;">🎨 Design Preview System</h3>
-
-            <div style="margin-bottom: 15px;">
-                <p style="margin: 5px 0; font-size: 13px;">
-                    <strong>Status:</strong>
-                    <?php if ($stored_design_data): ?>
-                        <span style="color: #28a745; font-weight: bold;">✅ Design data available</span>
-                    <?php else: ?>
-                        <span style="color: #ffc107; font-weight: bold;">⚠️ No preview data found</span>
-                    <?php endif; ?>
-                </p>
-                <p style="margin: 5px 0 15px 0; font-size: 12px; color: #666;">
-                    <?php if ($stored_design_data): ?>
-                        Design data is available for canvas preview. Click below to view the design.
-                    <?php else: ?>
-                        No design canvas data found in database. Preview may not be available.
-                    <?php endif; ?>
-                </p>
+        <div id="design-preview-section">
+            <div class="design-preview-header">
+                <h3>
+                    <span class="dashicons dashicons-art" style="font-size: 16px;"></span>
+                    Design Preview System
+                </h3>
             </div>
 
-            <button
-                type="button"
-                id="design-preview-btn"
-                class="button button-primary"
-                data-order-id="<?php echo esc_attr($order_id); ?>"
-                <?php echo $stored_design_data ? '' : 'disabled'; ?>
-                style="margin-right: 10px;">
-                🎨 View Design Preview
-            </button>
+            <div class="design-preview-content">
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <strong style="font-size: 13px; color: #1d2327;">Status:</strong>
+                        <?php if ($stored_design_data): ?>
+                            <span class="design-status-indicator status-available">
+                                <span class="dashicons dashicons-yes-alt" style="font-size: 14px;"></span>
+                                Design data available
+                            </span>
+                        <?php else: ?>
+                            <span class="design-status-indicator status-unavailable">
+                                <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
+                                No preview data found
+                            </span>
+                        <?php endif; ?>
+                    </div>
 
-            <?php if (!$stored_design_data): ?>
-                <p style="margin: 10px 0 0 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 12px; color: #856404;">
-                    <strong>💡 Tip:</strong> Design preview data is captured when customers complete their design.
-                    If this order was placed before the preview system was implemented, preview may not be available.
-                </p>
-            <?php endif; ?>
+                    <p style="margin: 0; font-size: 12px; color: #646970; line-height: 1.4;">
+                        <?php if ($stored_design_data): ?>
+                            Design data is available for interactive canvas preview with full editing capabilities.
+                        <?php else: ?>
+                            No design canvas data found. Preview may not be available for orders placed before the preview system was implemented.
+                        <?php endif; ?>
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <button
+                        type="button"
+                        id="design-preview-btn"
+                        class="button button-primary design-preview-btn"
+                        data-order-id="<?php echo esc_attr($order_id); ?>"
+                        <?php echo $stored_design_data ? '' : 'disabled'; ?>
+                        aria-label="<?php echo $stored_design_data ? 'Open design preview modal' : 'Design preview not available'; ?>">
+                        <span class="dashicons dashicons-visibility" style="font-size: 16px; margin-right: -2px;"></span>
+                        View Design Preview
+                    </button>
+
+                    <?php if ($stored_design_data): ?>
+                        <span style="font-size: 11px; color: #646970; display: flex; align-items: center; gap: 4px;">
+                            <span class="dashicons dashicons-info" style="font-size: 14px;"></span>
+                            Interactive preview with zoom and export options
+                        </span>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!$stored_design_data): ?>
+                    <div style="margin-top: 16px; padding: 12px; background: #fff3cd; border-left: 4px solid #dba617; border-radius: 0 4px 4px 0;">
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span class="dashicons dashicons-lightbulb" style="color: #b58900; margin-top: 2px;"></span>
+                            <div>
+                                <strong style="font-size: 12px; color: #856404; display: block; margin-bottom: 4px;">
+                                    Design Preview Information
+                                </strong>
+                                <p style="margin: 0; font-size: 11px; color: #856404; line-height: 1.4;">
+                                    Design preview data is captured when customers complete their design process.
+                                    This ensures the exact customer design is preserved for production and review.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
 
         <!-- Design Preview Modal -->
-        <div id="design-preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999999;">
-            <div style="position: relative; width: 90%; height: 90%; margin: 2.5% auto; background: white; border-radius: 8px; overflow: hidden;">
-                <div style="background: #007cba; color: white; padding: 15px; position: relative;">
-                    <h3 style="margin: 0; font-size: 18px;">🎨 Design Preview - Order #<?php echo $order->get_order_number(); ?></h3>
-                    <button id="close-preview-modal" type="button" style="position: absolute; top: 10px; right: 15px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 14px;">✕ Close</button>
+        <div id="design-preview-modal" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+            <div class="design-modal-container">
+                <div class="design-modal-header">
+                    <h3 id="modal-title" class="design-modal-title">
+                        <span class="dashicons dashicons-art"></span>
+                        Design Preview - Order #<?php echo $order->get_order_number(); ?>
+                    </h3>
+                    <button
+                        id="close-preview-modal"
+                        type="button"
+                        class="design-modal-close"
+                        aria-label="Close design preview modal">
+                        <span class="dashicons dashicons-no-alt"></span>
+                        Close
+                    </button>
                 </div>
-                <div id="design-preview-content" style="height: calc(100% - 60px); overflow: auto; padding: 20px;">
-                    <div id="design-preview-loading" style="text-align: center; padding: 50px;">
-                        <div class="spinner" style="visibility: visible; margin: 0 auto;"></div>
-                        <p>Loading design preview...</p>
+                <div class="design-modal-body">
+                    <div id="design-preview-content">
+                        <div id="design-preview-loading" class="design-loading">
+                            <div class="loading-spinner"></div>
+                            <p>Loading design preview...</p>
+                            <span class="sr-only">Please wait while the design preview loads</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2825,21 +3270,45 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 initializeDesignCanvas(response.data.design_data, response.data.template_data);
                             }
                         } else {
-                            $('#design-preview-content').html(
-                                '<div style="text-align: center; padding: 50px;">' +
-                                '<h3 style="color: #dc3545;">❌ Preview Error</h3>' +
-                                '<p>' + (response.data && response.data.message ? response.data.message : 'Failed to load design preview') + '</p>' +
-                                '</div>'
-                            );
+                            $('#design-preview-content').html(`
+                                <div class="design-error">
+                                    <h3>
+                                        <span class="dashicons dashicons-warning" style="font-size: 18px;"></span>
+                                        Preview Error
+                                    </h3>
+                                    <p>${response.data && response.data.message ? response.data.message : 'Failed to load design preview'}</p>
+                                    <button type="button" class="button" onclick="$('#design-preview-btn').click();">
+                                        <span class="dashicons dashicons-update"></span>
+                                        Try Again
+                                    </button>
+                                </div>
+                            `);
                         }
                     },
-                    error: function() {
-                        $('#design-preview-content').html(
-                            '<div style="text-align: center; padding: 50px;">' +
-                            '<h3 style="color: #dc3545;">🌐 Network Error</h3>' +
-                            '<p>Failed to load design preview due to network error.</p>' +
-                            '</div>'
-                        );
+                    error: function(xhr, status, error) {
+                        $('#design-preview-content').html(`
+                            <div class="design-error">
+                                <h3>
+                                    <span class="dashicons dashicons-cloud-upload" style="font-size: 18px;"></span>
+                                    Network Error
+                                </h3>
+                                <p>Failed to load design preview due to network error.</p>
+                                <div style="margin-top: 16px;">
+                                    <button type="button" class="button" onclick="$('#design-preview-btn').click();">
+                                        <span class="dashicons dashicons-update"></span>
+                                        Retry
+                                    </button>
+                                    <button type="button" class="button" onclick="$('#design-preview-modal').hide();" style="margin-left: 8px;">
+                                        <span class="dashicons dashicons-no-alt"></span>
+                                        Close
+                                    </button>
+                                </div>
+                                <details style="margin-top: 12px; font-size: 11px; color: #646970;">
+                                    <summary>Technical Details</summary>
+                                    <p>Status: ${status}<br>Error: ${error}</p>
+                                </details>
+                            </div>
+                        `);
                     }
                 });
             });
@@ -2857,25 +3326,35 @@ private function build_print_provider_email_content($order, $design_items, $note
             });
         });
 
-        // Initialize design canvas (will be called after AJAX loads design data)
+        // Initialize design canvas with professional UI (will be called after AJAX loads design data)
         function initializeDesignCanvas(designData, templateData) {
             try {
-                console.log('🎨 Initializing design canvas...', designData);
+                console.log('🎨 Initializing professional design canvas...', designData);
 
-                // Create canvas container
-                var canvasContainer = $('<div id="design-canvas-container" style="background: #f0f0f0; border: 2px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;"></div>');
-                var canvas = $('<canvas id="design-preview-canvas" width="600" height="400" style="background: white; border: 1px solid #ccc; max-width: 100%; height: auto;"></canvas>');
+                // Create canvas wrapper with professional styling
+                var canvasWrapper = $(`
+                    <div class="design-canvas-wrapper">
+                        <div class="info-card-header" style="text-align: center; margin-bottom: 16px;">
+                            <span class="dashicons dashicons-editor-paste-word"></span>
+                            Interactive Design Preview
+                        </div>
+                        <div class="design-canvas-container" id="design-canvas-container">
+                            <canvas id="design-preview-canvas" width="600" height="400"></canvas>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 11px; color: #646970; text-align: center;">
+                            <span class="dashicons dashicons-info" style="font-size: 12px;"></span>
+                            Use zoom controls above to adjust view • Export options available
+                        </div>
+                    </div>
+                `);
 
-                canvasContainer.append('<h4 style="margin-top: 0;">📐 Canvas Preview</h4>');
-                canvasContainer.append(canvas);
-
-                $('#design-preview-content').append(canvasContainer);
+                $('#design-preview-content').append(canvasWrapper);
 
                 // Initialize Fabric.js canvas
                 if (typeof fabric !== 'undefined') {
-                    var fabricCanvas = new fabric.Canvas('design-preview-canvas');
-                    fabricCanvas.setWidth(600);
-                    fabricCanvas.setHeight(400);
+                    window.designPreviewCanvas = new fabric.Canvas('design-preview-canvas');
+                    window.designPreviewCanvas.setWidth(600);
+                    window.designPreviewCanvas.setHeight(400);
 
                     // Process and add elements to canvas
                     if (designData.elements && Array.isArray(designData.elements)) {
@@ -2892,8 +3371,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                                         angle: element.angle || 0,
                                         selectable: false
                                     });
-                                    fabricCanvas.add(img);
-                                    fabricCanvas.renderAll();
+                                    window.designPreviewCanvas.add(img);
+                                    window.designPreviewCanvas.renderAll();
                                 });
                             } else if (element.type === 'text' && element.text) {
                                 var text = new fabric.Text(element.text, {
@@ -2905,21 +3384,197 @@ private function build_print_provider_email_content($order, $design_items, $note
                                     angle: element.angle || 0,
                                     selectable: false
                                 });
-                                fabricCanvas.add(text);
+                                window.designPreviewCanvas.add(text);
                             }
                         });
                     }
 
-                    fabricCanvas.renderAll();
+                    window.designPreviewCanvas.renderAll();
 
-                    console.log('✅ Canvas initialized successfully');
+                    // Initialize professional controls
+                    initializeDesignControls();
+
+                    console.log('✅ Professional canvas initialized successfully');
                 } else {
-                    canvasContainer.append('<p style="color: #dc3545;">⚠️ Fabric.js not loaded - canvas preview unavailable</p>');
+                    $('#design-canvas-container').html('<div class="design-error"><h3>Canvas Unavailable</h3><p>Fabric.js library not loaded - canvas preview unavailable</p></div>');
                 }
 
             } catch (error) {
                 console.error('❌ Error initializing canvas:', error);
-                $('#design-canvas-container').append('<p style="color: #dc3545;">❌ Error initializing canvas preview</p>');
+                $('#design-canvas-container').html('<div class="design-error"><h3>Initialization Error</h3><p>Error initializing canvas preview</p></div>');
+            }
+        }
+
+        // Initialize professional design controls
+        function initializeDesignControls() {
+            // Zoom controls
+            $('.control-button[data-zoom]').on('click', function() {
+                var $this = $(this);
+                var zoom = $this.data('zoom');
+
+                $('.control-button[data-zoom]').removeClass('active');
+                $this.addClass('active');
+
+                if (window.designPreviewCanvas) {
+                    if (zoom === 'fit') {
+                        // Fit canvas to container
+                        var container = $('#design-canvas-container');
+                        var containerWidth = container.width() - 40; // Account for padding
+                        var canvasWidth = window.designPreviewCanvas.getWidth();
+                        var scale = Math.min(containerWidth / canvasWidth, 1);
+
+                        window.designPreviewCanvas.setZoom(scale);
+                    } else {
+                        window.designPreviewCanvas.setZoom(parseFloat(zoom));
+                    }
+                    window.designPreviewCanvas.renderAll();
+                }
+            });
+
+            // View controls (Front/Back)
+            $('.control-button[data-view]').on('click', function() {
+                var $this = $(this);
+                if ($this.prop('disabled')) return;
+
+                $('.control-button[data-view]').removeClass('active');
+                $this.addClass('active');
+
+                // TODO: Implement view switching when multiple views are available
+                console.log('View switched to:', $this.data('view'));
+            });
+
+            // Export controls
+            $('#export-png').on('click', function() {
+                if (window.designPreviewCanvas) {
+                    // Export as PNG
+                    var link = document.createElement('a');
+                    link.download = 'design-preview.png';
+                    link.href = window.designPreviewCanvas.toDataURL('image/png');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Show success feedback
+                    $(this).html('<span class="dashicons dashicons-yes-alt" style="font-size: 12px;"></span> Downloaded!').prop('disabled', true);
+                    setTimeout(() => {
+                        $(this).html('<span class="dashicons dashicons-download" style="font-size: 12px;"></span> PNG').prop('disabled', false);
+                    }, 2000);
+                }
+            });
+
+            $('#export-print').on('click', function() {
+                if (window.designPreviewCanvas) {
+                    // Open print dialog with canvas
+                    var printWindow = window.open('', '_blank');
+                    var canvas = window.designPreviewCanvas.toDataURL('image/png');
+
+                    printWindow.document.write(`
+                        <html>
+                            <head>
+                                <title>Design Preview - Print</title>
+                                <style>
+                                    body { margin: 0; padding: 20px; text-align: center; }
+                                    img { max-width: 100%; height: auto; }
+                                    h1 { font-family: Arial, sans-serif; color: #333; }
+                                </style>
+                            </head>
+                            <body>
+                                <h1>Design Preview</h1>
+                                <img src="${canvas}" alt="Design Preview" />
+                                <script>window.onload = function() { window.print(); }</script>
+                            </body>
+                        </html>
+                    `);
+                    printWindow.document.close();
+                }
+            });
+
+            // Keyboard shortcuts
+            $(document).on('keydown.design-preview', function(e) {
+                if (!$('#design-preview-modal').is(':visible')) return;
+
+                switch(e.key) {
+                    case 'Escape':
+                        $('#close-preview-modal').click();
+                        break;
+                    case '1':
+                        $('.control-button[data-zoom="1"]').click();
+                        break;
+                    case '2':
+                        $('.control-button[data-zoom="2"]').click();
+                        break;
+                    case 'f':
+                        $('.control-button[data-zoom="fit"]').click();
+                        break;
+                }
+            });
+
+            // Clean up keyboard shortcuts when modal closes
+            $('#close-preview-modal, #design-preview-modal').on('click', function() {
+                $(document).off('keydown.design-preview');
+            });
+
+            // Mobile touch enhancements
+            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                // Add mobile-specific touch feedback
+                $('.control-button').on('touchstart', function() {
+                    $(this).addClass('touching');
+                }).on('touchend', function() {
+                    $(this).removeClass('touching');
+                });
+
+                // Enable canvas pan/zoom on mobile
+                if (window.designPreviewCanvas) {
+                    var hammertime = null;
+
+                    // Check if Hammer.js is available for advanced touch gestures
+                    if (typeof Hammer !== 'undefined') {
+                        hammertime = new Hammer(window.designPreviewCanvas.upperCanvasEl);
+                        hammertime.get('pinch').set({ enable: true });
+
+                        hammertime.on('pinchstart pinchmove', function(ev) {
+                            var zoom = window.designPreviewCanvas.getZoom() * ev.scale;
+                            zoom = Math.max(0.1, Math.min(3, zoom)); // Limit zoom range
+                            window.designPreviewCanvas.setZoom(zoom);
+                            window.designPreviewCanvas.renderAll();
+                        });
+                    }
+
+                    // Basic touch scrolling fallback
+                    var lastTouchY = 0;
+                    $(window.designPreviewCanvas.upperCanvasEl).on('touchstart', function(e) {
+                        lastTouchY = e.originalEvent.touches[0].clientY;
+                    }).on('touchmove', function(e) {
+                        e.preventDefault(); // Prevent page scroll
+                        var currentY = e.originalEvent.touches[0].clientY;
+                        var deltaY = lastTouchY - currentY;
+
+                        // Simple zoom on vertical scroll
+                        if (Math.abs(deltaY) > 5) {
+                            var zoom = window.designPreviewCanvas.getZoom();
+                            zoom += deltaY * 0.002;
+                            zoom = Math.max(0.25, Math.min(2, zoom));
+                            window.designPreviewCanvas.setZoom(zoom);
+                            window.designPreviewCanvas.renderAll();
+
+                            // Update active zoom button
+                            $('.control-button[data-zoom]').removeClass('active');
+                            var closestZoom = zoom <= 0.375 ? '0.25' :
+                                            zoom <= 0.75 ? '0.5' :
+                                            zoom <= 1.5 ? '1' : '2';
+                            $('.control-button[data-zoom="' + closestZoom + '"]').addClass('active');
+                        }
+
+                        lastTouchY = currentY;
+                    });
+                }
+            }
+
+            // Auto-adjust initial zoom on small screens
+            if ($(window).width() < 768) {
+                setTimeout(function() {
+                    $('.control-button[data-zoom="fit"]').click();
+                }, 100);
             }
         }
         </script>
@@ -2989,44 +3644,92 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log(sprintf("📊 [DB OPTIMIZER] JSON processing: %.2fms", $processing_time));
         }
 
-        // Build preview HTML
+        // Build preview HTML with professional design controls
         ob_start();
         ?>
+        <!-- Design Control Panel -->
+        <div class="design-control-panel">
+            <div class="control-group">
+                <label for="zoom-control">Zoom:</label>
+                <div style="display: flex; gap: 4px;">
+                    <button type="button" class="control-button" data-zoom="0.25">25%</button>
+                    <button type="button" class="control-button" data-zoom="0.5">50%</button>
+                    <button type="button" class="control-button active" data-zoom="1">100%</button>
+                    <button type="button" class="control-button" data-zoom="2">200%</button>
+                    <button type="button" class="control-button" data-zoom="fit">Fit</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>View:</label>
+                <div style="display: flex; gap: 4px;">
+                    <button type="button" class="control-button active" data-view="front">Front</button>
+                    <button type="button" class="control-button" data-view="back" disabled>Back</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Export:</label>
+                <div style="display: flex; gap: 4px;">
+                    <button type="button" class="control-button" id="export-png">
+                        <span class="dashicons dashicons-download" style="font-size: 12px;"></span>
+                        PNG
+                    </button>
+                    <button type="button" class="control-button" id="export-print">
+                        <span class="dashicons dashicons-printer" style="font-size: 12px;"></span>
+                        Print
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="design-preview-info">
-            <div style="background: #e8f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <h4 style="margin-top: 0; color: #007cba;">📊 Order Information</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 13px;">
-                    <div>
-                        <strong>Order Number:</strong><br>
+            <div class="info-card">
+                <h4 class="info-card-header">
+                    <span class="dashicons dashicons-info-outline"></span>
+                    Order Information
+                </h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Order Number</strong>
                         #<?php echo esc_html($order->get_order_number()); ?>
                     </div>
-                    <div>
-                        <strong>Order Date:</strong><br>
+                    <div class="info-item">
+                        <strong>Order Date</strong>
                         <?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?>
                     </div>
-                    <div>
-                        <strong>Customer:</strong><br>
+                    <div class="info-item">
+                        <strong>Customer</strong>
                         <?php echo esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()); ?>
                     </div>
-                    <div>
-                        <strong>Status:</strong><br>
+                    <div class="info-item">
+                        <strong>Status</strong>
                         <?php echo esc_html(wc_get_order_status_name($order->get_status())); ?>
                     </div>
                 </div>
             </div>
 
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <h4 style="margin-top: 0; color: #333;">🛍️ Order Items</h4>
-                <div style="max-height: 200px; overflow-y: auto;">
+            <div class="info-card">
+                <h4 class="info-card-header">
+                    <span class="dashicons dashicons-cart"></span>
+                    Order Items
+                </h4>
+                <div style="max-height: 240px; overflow-y: auto;">
                     <?php foreach ($order->get_items() as $item_id => $item): ?>
-                        <div style="padding: 10px; margin-bottom: 10px; background: white; border-radius: 4px; border-left: 4px solid <?php echo $this->get_design_meta($item, 'design_id') ? '#28a745' : '#6c757d'; ?>;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
-                                <div>
-                                    <strong><?php echo esc_html($item->get_name()); ?></strong>
+                        <div style="padding: 12px; margin-bottom: 8px; background: #f6f7f7; border-radius: 4px; border-left: 4px solid <?php echo $this->get_design_meta($item, 'design_id') ? '#00a32a' : '#646970'; ?>;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px;">
+                                <div style="flex: 1;">
+                                    <strong style="color: #1d2327;"><?php echo esc_html($item->get_name()); ?></strong>
                                     <?php if ($this->get_design_meta($item, 'design_id')): ?>
-                                        <br><span style="color: #28a745; font-size: 12px;">🎨 Design Item (ID: <?php echo esc_html($this->get_design_meta($item, 'design_id')); ?>)</span>
+                                        <br><span style="color: #00a32a; font-size: 11px; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                            <span class="dashicons dashicons-art" style="font-size: 12px;"></span>
+                                            Design Item (ID: <?php echo esc_html($this->get_design_meta($item, 'design_id')); ?>)
+                                        </span>
                                     <?php else: ?>
-                                        <br><span style="color: #6c757d; font-size: 12px;">📦 Standard Item</span>
+                                        <br><span style="color: #646970; font-size: 11px; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                            <span class="dashicons dashicons-products" style="font-size: 12px;"></span>
+                                            Standard Item
+                                        </span>
                                     <?php endif; ?>
                                 </div>
                                 <div style="text-align: right;">
@@ -3064,6 +3767,44 @@ private function build_print_provider_email_content($order, $design_items, $note
                         <div>
                             <strong>Data Size:</strong><br>
                             <?php echo esc_html(strlen($stored_design_data) . ' chars'); ?>
+                        </div>
+                    </div>
+
+                    <!-- 🎨 AGENT 3: NEW CANVAS PREVIEW CONTAINER -->
+                    <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 15px; border: 2px solid #28a745;">
+                        <h4 style="margin-top: 0; color: #007cba;">🎨 Canvas Preview - Agent 3 System</h4>
+
+                        <div style="margin-bottom: 15px;">
+                            <button type="button" id="agent3-render-canvas" class="button button-primary" style="margin-right: 10px;">
+                                🎯 Render Canvas Preview
+                            </button>
+                            <button type="button" id="agent3-export-preview" class="button button-secondary" style="margin-right: 10px;">
+                                📷 Export Preview
+                            </button>
+                            <span id="agent3-status" style="color: #666; font-size: 12px; font-style: italic;">
+                                Ready to render...
+                            </span>
+                        </div>
+
+                        <!-- Canvas Container for Agent 3 System -->
+                        <div id="agent3-canvas-container" style="
+                            min-height: 300px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            background: #f9f9f9;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 14px;
+                            color: #666;
+                        ">
+                            <div style="text-align: center;">
+                                <div style="font-size: 32px; margin-bottom: 10px;">🎨</div>
+                                <div>Click "Render Canvas Preview" to generate design preview</div>
+                                <div style="font-size: 12px; margin-top: 5px; color: #999;">
+                                    Using Agent 3 Canvas Rendering System
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -3111,11 +3852,226 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         $html = ob_get_clean();
 
+        // 🎨 AGENT 3: JavaScript Integration - Add canvas initialization script
+        if ($design_data) {
+            $html .= $this->generateAgent3CanvasScript($design_data, $order_id);
+        }
+
         wp_send_json_success(array(
             'html' => $html,
             'design_data' => $design_data,
             'template_data' => null, // Could be expanded later
+            'agent3_ready' => !empty($design_data),
+            'order_info' => array(
+                'id' => $order_id,
+                'number' => $order->get_order_number(),
+                'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
+            ),
             'message' => __('Design preview loaded successfully', 'octo-print-designer')
         ));
+    }
+
+    /**
+     * 🎨 AGENT 3: Generate Canvas Integration Script
+     * Creates JavaScript code to initialize the Agent 3 Canvas Rendering System
+     */
+    private function generateAgent3CanvasScript($design_data, $order_id) {
+        // Transform design data to Agent 3 format if needed
+        $agent3_design_data = $this->transformToAgent3Format($design_data);
+
+        ob_start();
+        ?>
+        <script type="text/javascript">
+        // 🎨 AGENT 3: Canvas Integration Script
+        (function() {
+            console.log('🎨 AGENT 3: Initializing Canvas Integration...');
+
+            // Wait for DOM and scripts to be ready
+            function initializeAgent3Canvas() {
+                // Check if Agent 3 classes are available
+                if (typeof window.AdminCanvasRenderer === 'undefined' ||
+                    typeof window.DesignPreviewGenerator === 'undefined') {
+                    console.log('⚠️ AGENT 3: Classes not loaded yet, retrying in 500ms...');
+                    setTimeout(initializeAgent3Canvas, 500);
+                    return;
+                }
+
+                console.log('✅ AGENT 3: Classes loaded, setting up canvas system...');
+
+                // Design data from PHP
+                const designData = <?php echo json_encode($agent3_design_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+                const orderInfo = {
+                    id: <?php echo intval($order_id); ?>,
+                    number: '<?php echo esc_js(wc_get_order($order_id)->get_order_number()); ?>'
+                };
+
+                let previewGenerator = null;
+                const statusElement = document.getElementById('agent3-status');
+                const renderButton = document.getElementById('agent3-render-canvas');
+                const exportButton = document.getElementById('agent3-export-preview');
+
+                function updateStatus(message, type = 'info') {
+                    if (statusElement) {
+                        const colors = {
+                            'info': '#666',
+                            'success': '#28a745',
+                            'error': '#dc3545',
+                            'warning': '#ffc107'
+                        };
+                        statusElement.textContent = message;
+                        statusElement.style.color = colors[type] || colors.info;
+                    }
+                    console.log(`🎨 AGENT 3 STATUS: ${message}`);
+                }
+
+                // Render Canvas Handler
+                if (renderButton) {
+                    renderButton.addEventListener('click', function() {
+                        updateStatus('Initializing canvas renderer...', 'info');
+                        renderButton.disabled = true;
+
+                        try {
+                            // Initialize preview generator if not already done
+                            if (!previewGenerator) {
+                                previewGenerator = new window.DesignPreviewGenerator();
+                                const success = previewGenerator.init('agent3-canvas-container', {
+                                    enableExport: true,
+                                    showDebugInfo: true
+                                });
+
+                                if (!success) {
+                                    throw new Error('Failed to initialize preview generator');
+                                }
+                            }
+
+                            // Clear and render
+                            updateStatus('Rendering design preview...', 'info');
+
+                            previewGenerator.generatePreview(designData, {
+                                loadingText: `Rendering Order #${orderInfo.number}...`,
+                                enableDebugInfo: true
+                            }).then(() => {
+                                updateStatus('✅ Canvas preview rendered successfully!', 'success');
+                                exportButton.disabled = false;
+                            }).catch(error => {
+                                console.error('❌ AGENT 3 RENDER ERROR:', error);
+                                updateStatus(`❌ Render Error: ${error.message}`, 'error');
+                            }).finally(() => {
+                                renderButton.disabled = false;
+                            });
+
+                        } catch (error) {
+                            console.error('❌ AGENT 3 INITIALIZATION ERROR:', error);
+                            updateStatus(`❌ Init Error: ${error.message}`, 'error');
+                            renderButton.disabled = false;
+                        }
+                    });
+                }
+
+                // Export Handler
+                if (exportButton) {
+                    exportButton.addEventListener('click', function() {
+                        if (!previewGenerator) {
+                            updateStatus('❌ Please render canvas first', 'warning');
+                            return;
+                        }
+
+                        try {
+                            updateStatus('Exporting preview...', 'info');
+
+                            const dataUrl = previewGenerator.exportPreview('image/png');
+
+                            // Create download
+                            const link = document.createElement('a');
+                            link.download = `design-preview-order-${orderInfo.number}-${Date.now()}.png`;
+                            link.href = dataUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+
+                            updateStatus('✅ Preview exported successfully!', 'success');
+
+                        } catch (error) {
+                            console.error('❌ AGENT 3 EXPORT ERROR:', error);
+                            updateStatus(`❌ Export Error: ${error.message}`, 'error');
+                        }
+                    });
+
+                    // Initially disabled until canvas is rendered
+                    exportButton.disabled = true;
+                }
+
+                updateStatus('Agent 3 Canvas System ready - click "Render Canvas Preview"', 'info');
+                console.log('✅ AGENT 3: Canvas integration setup complete');
+            }
+
+            // Initialize when ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeAgent3Canvas);
+            } else {
+                initializeAgent3Canvas();
+            }
+        })();
+        </script>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * 🎨 AGENT 3: Transform design data to Agent 3 compatible format
+     * Converts existing design data structure to Agent 3 canvas system format
+     */
+    private function transformToAgent3Format($design_data) {
+        if (!$design_data || !is_array($design_data)) {
+            return null;
+        }
+
+        // Check if data is already in Agent 3 format (view-based structure)
+        if (isset($design_data['elements']) && is_array($design_data['elements'])) {
+            // Convert element-based data to view-based Agent 3 format
+            return $this->convertElementsToViewFormat($design_data);
+        }
+
+        // If it's already view-based, return as-is
+        return $design_data;
+    }
+
+    /**
+     * Convert elements array to Agent 3 view-based format
+     */
+    private function convertElementsToViewFormat($design_data) {
+        $view_id = $design_data['template_view_id'] ?? 'default_view';
+        $system_id = $design_data['system_id'] ?? uniqid();
+
+        $images = [];
+
+        if (isset($design_data['elements']) && is_array($design_data['elements'])) {
+            foreach ($design_data['elements'] as $index => $element) {
+                if ($element['type'] === 'image' && !empty($element['src'])) {
+                    $images[] = [
+                        'id' => $element['id'] ?? 'img_' . $index,
+                        'url' => $element['src'],
+                        'transform' => [
+                            'left' => floatval($element['left'] ?? 0),
+                            'top' => floatval($element['top'] ?? 0),
+                            'scaleX' => floatval($element['scaleX'] ?? 1),
+                            'scaleY' => floatval($element['scaleY'] ?? 1),
+                            'angle' => floatval($element['angle'] ?? 0)
+                        ]
+                    ];
+                }
+                // Note: Text elements could be converted to images or handled separately
+                // For now, focusing on image elements for Agent 3 compatibility
+            }
+        }
+
+        return [
+            $view_id => [
+                'view_name' => 'Design View',
+                'system_id' => $system_id,
+                'variation_id' => $design_data['variation_id'] ?? $view_id,
+                'images' => $images
+            ]
+        ];
     }
 }

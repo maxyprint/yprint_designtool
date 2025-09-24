@@ -1,9 +1,10 @@
 /**
- * Template Editor Canvas Hook
+ * Template Editor Canvas Hook - jQuery-Free Version
  * Ensures Fabric.js canvas instances are exposed globally for reference line system
+ * AGENT 4 FIX: Eliminated jQuery dependency completely
  */
 
-(function($) {
+(function() {
     'use strict';
 
     // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context detection
@@ -11,9 +12,13 @@
 
     // Hook into TemplateEditor to expose canvas globally
     function hookTemplateEditor() {
-        if (isAdminContext && window.octoAdminContext.skip_canvas_polling) {
-            console.log('🧠 [CANVAS ADAPTER] Admin context detected - skipping canvas hooks');
-            return;
+        if (isAdminContext) {
+            if (window.octoAdminContext && window.octoAdminContext.skip_canvas_polling) {
+                console.log('🧠 [CANVAS ADAPTER] Admin context detected - skipping canvas hooks entirely');
+                // Early exit to prevent any canvas polling in admin
+                return;
+            }
+            console.log('🧠 [CANVAS ADAPTER] Admin context detected but polling not explicitly disabled');
         }
 
         console.log('🎯 CANVAS HOOK: Setting up TemplateEditor hooks...');
@@ -144,6 +149,12 @@
 
     // Enhanced polling with fabric instance validation and DOM Ready detection
     function startPollingFallback() {
+        // 🧠 AGENT FIX: CanvasSystemAdapter - Skip polling entirely in admin context
+        if (isAdminContext && window.octoAdminContext && window.octoAdminContext.skip_canvas_polling) {
+            console.log('🧠 [CANVAS ADAPTER] Skipping polling fallback - admin context with skip_canvas_polling enabled');
+            return;
+        }
+
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
         // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context timeout optimization
@@ -254,9 +265,9 @@
         setTimeout(waitForFabric, 100);
     }
 
-    // Initialize when DOM is ready
-    $(document).ready(function() {
-        console.log('🎯 CANVAS HOOK: Initializing canvas detection hooks...');
+    // Initialize when DOM is ready - VANILLA JS VERSION
+    function initializeCanvasHooks() {
+        console.log('🎯 CANVAS HOOK: Initializing canvas detection hooks (jQuery-free)...');
 
         // Start Fabric.js detection
         waitForFabric();
@@ -276,6 +287,14 @@
                 }
             }
         }, 100);
-    });
+    }
 
-})(jQuery);
+    // DOM Ready detection without jQuery
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeCanvasHooks);
+    } else {
+        // DOM already loaded
+        initializeCanvasHooks();
+    }
+
+})();

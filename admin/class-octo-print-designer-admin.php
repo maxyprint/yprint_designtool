@@ -89,6 +89,15 @@ class Octo_Print_Designer_Admin {
             true
         );
 
+        // 🔍 AGENT 7: SYSTEM VALIDATOR SCRIPT
+        wp_enqueue_script(
+            'octo-system-validator',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/system-validator.js',
+            [], // No dependencies - standalone validator
+            $this->version . '.validator',
+            true
+        );
+
         // 🎯 ARTEFAKT-GESTEUERTES SYSTEM: Admin Webpack Fabric Extraction
         // Phase 1: Immediate Fabric Extraction from Webpack Bundle
         wp_enqueue_script(
@@ -135,12 +144,12 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Phase 5: Canvas Hook (Now Singleton-Aware)
+        // Phase 5: Canvas Hook (Now Singleton-Aware + jQuery-Free)
         wp_enqueue_script(
             'octo-template-editor-canvas-hook',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-fabric-global-exposure', 'octo-canvas-initialization-controller', 'jquery'],
-            $this->version . '.4-singleton-aware',
+            ['octo-fabric-global-exposure', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency
+            $this->version . '.5-jquery-free',
             true
         );
 
@@ -174,16 +183,44 @@ class Octo_Print_Designer_Admin {
             wp_enqueue_script(
                 'octo-admin-optimized-capture',
                 OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
-                ['octo-fabric-global-exposure', 'jquery'],
-                $this->version . '-admin-context-fix',
+                ['octo-fabric-global-exposure'], // REMOVED jQuery dependency + reduced race conditions
+                $this->version . '-race-condition-fix',
                 true
             );
 
             wp_enqueue_script(
                 'octo-admin-enhanced-json',
                 OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-json-coordinate-system.js',
-                ['octo-admin-optimized-capture', 'jquery'],
-                $this->version . '-admin-json-fix',
+                ['octo-admin-optimized-capture'], // REMOVED jQuery dependency
+                $this->version . '-jquery-free-json',
+                true
+            );
+
+            // 🎨 AGENT 3: WooCommerce Admin Canvas Rendering System
+            // Phase 1: Admin Canvas Renderer (Pure Vanilla JS, no dependencies)
+            wp_enqueue_script(
+                'octo-admin-canvas-renderer',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/admin-canvas-renderer.js',
+                [], // NO dependencies - pure vanilla JS
+                $this->version . '.agent3-v1',
+                true
+            );
+
+            // Phase 2: Design Preview Generator (Data Processing Engine)
+            wp_enqueue_script(
+                'octo-design-preview-generator',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/design-preview-generator.js',
+                ['octo-admin-canvas-renderer'], // Only depends on canvas renderer
+                $this->version . '.agent3-v1',
+                true
+            );
+
+            // Phase 3: Admin Preview Integration (WooCommerce Integration Layer)
+            wp_enqueue_script(
+                'octo-admin-preview-integration',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/admin-preview-integration.js',
+                ['octo-design-preview-generator'], // Complete dependency chain
+                $this->version . '.agent3-v1',
                 true
             );
         }
@@ -224,6 +261,14 @@ class Octo_Print_Designer_Admin {
             plugin_dir_url(__FILE__) . 'css/octo-print-designer-admin.css',
             [],
             $this->version
+        );
+
+        // 🎨 AGENT 6: PROFESSIONAL UI ENHANCEMENT STYLES
+        wp_enqueue_style(
+            'octo-print-designer-admin-ui-enhancement',
+            plugin_dir_url(__FILE__) . 'css/admin-ui-enhancement.css',
+            ['octo-print-designer-admin'], // Load after base admin styles
+            $this->version . '.ui-enhanced'
         );
     }
 

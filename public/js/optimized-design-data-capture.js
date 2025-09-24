@@ -12,6 +12,15 @@
 
 class OptimizedDesignDataCapture {
     constructor() {
+        // 🧠 AGENT 4 FIX: Prevent duplicate class instantiation
+        if (window.OptimizedDesignDataCaptureInstance) {
+            console.warn('🚨 DUPLICATE WARNING: OptimizedDesignDataCapture already instantiated, returning existing instance');
+            return window.OptimizedDesignDataCaptureInstance;
+        }
+
+        // Store instance reference immediately
+        window.OptimizedDesignDataCaptureInstance = this;
+
         // 🧠 AGENT FIX: JavascriptPerformanceOptimizer - Admin context detection
         this.ADMIN_CONTEXT = (typeof window.octoAdminContext !== 'undefined') && window.octoAdminContext.context === 'woocommerce_admin';
         this.DEBUG_MODE = (typeof window.octoPrintDesignerDebug !== 'undefined') ? window.octoPrintDesignerDebug : false;
@@ -1098,9 +1107,14 @@ class OptimizedDesignDataCapture {
 // 🚀 ISSUE #18: Auto-initialization with production mode
 if (typeof window !== 'undefined') {
     const initializeOptimizedCapture = () => {
-        if (window.optimizedCaptureInstance) {
+        // 🧠 AGENT 4 FIX: Prevent duplicate OptimizedDesignDataCapture instances
+        if (window.optimizedCaptureInstance || window.OptimizedDesignDataCaptureInitialized) {
+            console.log('🔄 DUPLICATE PREVENTION: OptimizedDesignDataCapture already initialized, skipping...');
             return; // Already initialized
         }
+
+        // Set initialization flag immediately to prevent race conditions
+        window.OptimizedDesignDataCaptureInitialized = true;
 
         console.log('🚀 Auto-initializing Optimized Design Data Capture...');
         const instance = new OptimizedDesignDataCapture();

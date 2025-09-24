@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Agent 3 - WooCommerce Integration Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f1f1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #007cba, #00a0d2);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .status-box {
+            background: #e8f4ff;
+            border: 2px solid #007cba;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .button:hover {
+            background: #005a87;
+        }
+
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .button-secondary {
+            background: #666;
+        }
+
+        .button-secondary:hover {
+            background: #444;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .canvas-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .demo-data {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .demo-data pre {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Agent 3: WooCommerce Admin Integration Test</h1>
+            <p>Test für Order 5373 - Design Preview System</p>
+        </div>
+
+        <div class="status-box">
+            <h3>🔍 System Status</h3>
+            <div id="system-status">
+                <p>🔄 Checking Agent 3 components...</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Order 5373 Daten</h3>
+            <p><strong>Order Number:</strong> #5373</p>
+            <p><strong>Customer:</strong> Test Customer</p>
+            <p><strong>Status:</strong> Processing</p>
+            <p><strong>Design Data:</strong> Available</p>
+
+            <button class="button" id="simulate-ajax-call">
+                🎯 Simulate WooCommerce AJAX Call
+            </button>
+            <button class="button button-secondary" id="test-direct-render">
+                🎨 Test Direct Render
+            </button>
+            <button class="button button-secondary" id="clear-log">
+                🗑️ Clear Log
+            </button>
+
+            <div class="demo-data">
+                <h4>📄 Test Design Data (Order 5373 Format)</h4>
+                <pre id="test-data-display"></pre>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎨 Agent 3 Canvas Preview</h3>
+            <div>
+                <button class="button" id="agent3-render-canvas" disabled>
+                    🎯 Render Canvas Preview
+                </button>
+                <button class="button button-secondary" id="agent3-export-preview" disabled>
+                    📷 Export Preview
+                </button>
+                <span id="agent3-status" style="color: #666; font-size: 12px; font-style: italic; margin-left: 15px;">
+                    Waiting for initialization...
+                </span>
+            </div>
+
+            <div id="agent3-canvas-container" class="canvas-container">
+                <div style="text-align: center; color: #666;">
+                    <div style="font-size: 32px; margin-bottom: 10px;">🎨</div>
+                    <div>Agent 3 Canvas will render here</div>
+                    <div style="font-size: 12px; margin-top: 5px; color: #999;">
+                        Canvas-free design preview system
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 System Log</h3>
+            <div id="log" class="log">
+                🎯 AGENT 3 TEST: System initializing...<br>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent 3 Scripts (simulating WordPress enqueue) -->
+    <script src="admin/js/admin-canvas-renderer.js"></script>
+    <script src="admin/js/design-preview-generator.js"></script>
+    <script src="admin/js/admin-preview-integration.js"></script>
+
+    <script>
+        // 🎨 AGENT 3 TEST SYSTEM
+        const testSystem = {
+            log: function(message, type = 'info') {
+                const logElement = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                const colors = {
+                    'info': '#00ff00',
+                    'success': '#28a745',
+                    'error': '#ff6b6b',
+                    'warning': '#ffc107'
+                };
+
+                const color = colors[type] || colors.info;
+                logElement.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span><br>`;
+                logElement.scrollTop = logElement.scrollHeight;
+                console.log(`[AGENT 3 TEST] ${message}`);
+            },
+
+            // Test Design Data (Order 5373 format)
+            testDesignData: {
+                "167359_189542": {
+                    "view_name": "Design View",
+                    "system_id": "189542",
+                    "variation_id": "167359",
+                    "images": [
+                        {
+                            "id": "img_test_1",
+                            "url": "https://via.placeholder.com/200x100/FF6B6B/FFFFFF?text=Test+Logo+1",
+                            "transform": {"left": 127, "top": 100, "scaleX": 0.5, "scaleY": 0.5, "angle": 0}
+                        },
+                        {
+                            "id": "img_test_2",
+                            "url": "https://via.placeholder.com/150x150/4ECDC4/FFFFFF?text=Test+Logo+2",
+                            "transform": {"left": 200, "top": 150, "scaleX": 0.3, "scaleY": 0.3, "angle": 15}
+                        }
+                    ]
+                }
+            },
+
+            checkSystemStatus: function() {
+                this.log('🔍 Checking Agent 3 system components...');
+
+                const components = [
+                    { name: 'AdminCanvasRenderer', obj: window.AdminCanvasRenderer },
+                    { name: 'DesignPreviewGenerator', obj: window.DesignPreviewGenerator },
+                    { name: 'AdminPreviewIntegration', obj: window.AdminPreviewIntegration }
+                ];
+
+                let allLoaded = true;
+                const statusElement = document.getElementById('system-status');
+                let statusHTML = '';
+
+                components.forEach(component => {
+                    const loaded = typeof component.obj !== 'undefined';
+                    const icon = loaded ? '✅' : '❌';
+                    const status = loaded ? 'LOADED' : 'MISSING';
+
+                    statusHTML += `<p>${icon} ${component.name}: <strong>${status}</strong></p>`;
+                    this.log(`${icon} ${component.name}: ${status}`, loaded ? 'success' : 'error');
+
+                    if (!loaded) allLoaded = false;
+                });
+
+                statusElement.innerHTML = statusHTML;
+
+                if (allLoaded) {
+                    this.log('✅ All Agent 3 components loaded successfully!', 'success');
+                    document.getElementById('agent3-render-canvas').disabled = false;
+                    this.updateStatus('Agent 3 system ready - click "Render Canvas Preview"', 'success');
+                } else {
+                    this.log('❌ Some Agent 3 components are missing', 'error');
+                    this.updateStatus('❌ System components missing', 'error');
+                }
+
+                return allLoaded;
+            },
+
+            updateStatus: function(message, type = 'info') {
+                const statusElement = document.getElementById('agent3-status');
+                if (statusElement) {
+                    const colors = {
+                        'info': '#666',
+                        'success': '#28a745',
+                        'error': '#dc3545',
+                        'warning': '#ffc107'
+                    };
+                    statusElement.textContent = message;
+                    statusElement.style.color = colors[type] || colors.info;
+                }
+                this.log(`🎯 STATUS: ${message}`, type);
+            },
+
+            simulateWooCommerceAjax: function() {
+                this.log('🌐 Simulating WooCommerce AJAX call for Order 5373...', 'info');
+                this.log('📊 Loading design data from database...', 'info');
+
+                // Simulate processing delay
+                setTimeout(() => {
+                    this.log('✅ Design data loaded successfully', 'success');
+                    this.log(`📄 Data size: ${JSON.stringify(this.testDesignData).length} characters`, 'info');
+                    this.log('🎨 Initializing Agent 3 canvas system...', 'info');
+
+                    // Update display
+                    document.getElementById('test-data-display').textContent =
+                        JSON.stringify(this.testDesignData, null, 2);
+
+                    this.updateStatus('AJAX simulation complete - ready to render', 'success');
+                }, 1000);
+            },
+
+            initializeAgent3Canvas: function() {
+                if (!this.checkSystemStatus()) {
+                    this.log('❌ Cannot initialize - system components missing', 'error');
+                    return;
+                }
+
+                this.log('🎨 Initializing Agent 3 Canvas System...', 'info');
+
+                let previewGenerator = null;
+                const renderButton = document.getElementById('agent3-render-canvas');
+                const exportButton = document.getElementById('agent3-export-preview');
+
+                // Render Handler
+                renderButton.addEventListener('click', () => {
+                    this.log('🎯 Starting canvas render process...', 'info');
+                    this.updateStatus('Initializing canvas renderer...', 'info');
+                    renderButton.disabled = true;
+
+                    try {
+                        // Initialize preview generator
+                        if (!previewGenerator) {
+                            this.log('🔧 Creating DesignPreviewGenerator instance...', 'info');
+                            previewGenerator = new window.DesignPreviewGenerator();
+
+                            const success = previewGenerator.init('agent3-canvas-container', {
+                                enableExport: true,
+                                showDebugInfo: true
+                            });
+
+                            if (!success) {
+                                throw new Error('Failed to initialize preview generator');
+                            }
+                            this.log('✅ Preview generator initialized', 'success');
+                        }
+
+                        // Render design
+                        this.updateStatus('Rendering design preview...', 'info');
+                        this.log('🎨 Rendering test design data...', 'info');
+
+                        previewGenerator.generatePreview(this.testDesignData, {
+                            loadingText: 'Rendering Order #5373 Test...',
+                            enableDebugInfo: true
+                        }).then(() => {
+                            this.log('✅ Canvas preview rendered successfully!', 'success');
+                            this.updateStatus('✅ Canvas preview rendered successfully!', 'success');
+                            exportButton.disabled = false;
+                        }).catch(error => {
+                            this.log(`❌ Render Error: ${error.message}`, 'error');
+                            this.updateStatus(`❌ Render Error: ${error.message}`, 'error');
+                        }).finally(() => {
+                            renderButton.disabled = false;
+                        });
+
+                    } catch (error) {
+                        this.log(`❌ Initialization Error: ${error.message}`, 'error');
+                        this.updateStatus(`❌ Init Error: ${error.message}`, 'error');
+                        renderButton.disabled = false;
+                    }
+                });
+
+                // Export Handler
+                exportButton.addEventListener('click', () => {
+                    if (!previewGenerator) {
+                        this.log('❌ Please render canvas first', 'warning');
+                        this.updateStatus('❌ Please render canvas first', 'warning');
+                        return;
+                    }
+
+                    try {
+                        this.log('📷 Exporting preview...', 'info');
+                        this.updateStatus('Exporting preview...', 'info');
+
+                        const dataUrl = previewGenerator.exportPreview('image/png');
+
+                        // Create download
+                        const link = document.createElement('a');
+                        link.download = `agent3-test-order-5373-${Date.now()}.png`;
+                        link.href = dataUrl;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        this.log('✅ Preview exported successfully!', 'success');
+                        this.updateStatus('✅ Preview exported successfully!', 'success');
+
+                    } catch (error) {
+                        this.log(`❌ Export Error: ${error.message}`, 'error');
+                        this.updateStatus(`❌ Export Error: ${error.message}`, 'error');
+                    }
+                });
+
+                this.log('✅ Agent 3 Canvas System initialized', 'success');
+            }
+        };
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            testSystem.log('🚀 Agent 3 Test System starting...', 'info');
+
+            // Display test data
+            document.getElementById('test-data-display').textContent =
+                JSON.stringify(testSystem.testDesignData, null, 2);
+
+            // Check system status
+            setTimeout(() => {
+                testSystem.checkSystemStatus();
+                testSystem.initializeAgent3Canvas();
+            }, 500);
+
+            // Setup event handlers
+            document.getElementById('simulate-ajax-call').addEventListener('click', () => {
+                testSystem.simulateWooCommerceAjax();
+            });
+
+            document.getElementById('test-direct-render').addEventListener('click', () => {
+                testSystem.log('🎨 Testing direct render...', 'info');
+                document.getElementById('agent3-render-canvas').click();
+            });
+
+            document.getElementById('clear-log').addEventListener('click', () => {
+                document.getElementById('log').innerHTML = '📝 Log cleared.<br>';
+            });
+        });
+    </script>
+</body>
+</html>
