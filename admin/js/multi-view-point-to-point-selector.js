@@ -1569,6 +1569,29 @@ class MultiViewPointToPointSelector {
             saveButton.disabled = true;
             saveButton.textContent = 'Speichere...';
 
+            // AGENT 6 FIX: Ensure all view arrays exist and are properly formatted
+            const sanitizedData = {};
+            for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
+                if (Array.isArray(lines)) {
+                    // Filter out any invalid lines and ensure proper structure
+                    sanitizedData[viewId] = lines.filter(line =>
+                        line &&
+                        typeof line === 'object' &&
+                        line.measurement_key &&
+                        line.label &&
+                        typeof line.lengthPx === 'number' &&
+                        line.start && typeof line.start.x === 'number' && typeof line.start.y === 'number' &&
+                        line.end && typeof line.end.x === 'number' && typeof line.end.y === 'number'
+                    );
+                } else {
+                    // Convert non-arrays to empty arrays
+                    console.warn(`AGENT 6 FIX: Converting non-array data for view ${viewId} to empty array`);
+                    sanitizedData[viewId] = [];
+                }
+            }
+
+            console.log('🎯 AGENT 6: Sanitized data before sending:', sanitizedData);
+
             const response = await fetch(pointToPointAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1577,7 +1600,7 @@ class MultiViewPointToPointSelector {
                 body: new URLSearchParams({
                     action: 'save_multi_view_reference_lines',
                     template_id: this.templateId,
-                    multi_view_reference_lines: JSON.stringify(this.multiViewReferenceLines),
+                    multi_view_reference_lines: JSON.stringify(sanitizedData),
                     nonce: pointToPointAjax.nonce
                 })
             });
