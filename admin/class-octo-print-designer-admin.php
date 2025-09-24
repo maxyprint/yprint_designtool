@@ -244,13 +244,16 @@ class Octo_Print_Designer_Admin {
 
     // 🎯 ADMIN CONTEXT FIX: WooCommerce Order Page Detection
     private function is_woocommerce_order_edit_page($hook) {
-        if (!in_array($hook, ['post.php', 'post-new.php'])) return false;
+        // 🚨 CRITICAL FIX: WooCommerce uses 'woocommerce_page_wc-orders' hook, not 'post.php'!
+        $wc_order_hooks = ['post.php', 'post-new.php', 'woocommerce_page_wc-orders'];
+        if (!in_array($hook, $wc_order_hooks)) return false;
 
         $screen = get_current_screen();
         if (!$screen) return false;
 
         // Check for WooCommerce order edit pages
         return $screen->post_type === 'shop_order' ||
+               $screen->id === 'woocommerce_page_wc-orders' ||  // NEW: Modern WC orders page
                (isset($_GET['post_type']) && $_GET['post_type'] === 'shop_order') ||
                (isset($_GET['post']) && get_post_type($_GET['post']) === 'shop_order');
     }
