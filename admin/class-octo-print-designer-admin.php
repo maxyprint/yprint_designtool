@@ -30,6 +30,14 @@ class Octo_Print_Designer_Admin {
         // NEW: Canvas-Meta-Fields Synchronization Bridge
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_canvas_to_meta_fields', $this, 'sync_canvas_to_meta_fields');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_load_meta_fields_to_canvas', $this, 'load_meta_fields_to_canvas');
+
+        // 🧠 AGENT 3 DELIVERABLE: Measurement Database AJAX Handlers
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_design_templates_for_measurements', $this, 'get_design_templates_for_measurements');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_template_sizes_for_measurements', $this, 'get_template_sizes_for_measurements');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_template_measurements_for_admin', $this, 'get_template_measurements_for_admin');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_template_measurements_from_admin', $this, 'save_template_measurements_from_admin');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_validate_template_measurements', $this, 'validate_template_measurements');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_template_sizes_measurements', $this, 'sync_template_sizes_measurements');
     
     }
 
@@ -269,6 +277,14 @@ class Octo_Print_Designer_Admin {
             plugin_dir_url(__FILE__) . 'css/admin-ui-enhancement.css',
             ['octo-print-designer-admin'], // Load after base admin styles
             $this->version . '.ui-enhanced'
+        );
+
+        // 🧠 AGENT 5 DELIVERABLE: Measurement Table Styling
+        wp_enqueue_style(
+            'octo-measurement-table-styling',
+            plugin_dir_url(__FILE__) . 'css/measurement-table-styling.css',
+            ['octo-print-designer-admin-ui-enhancement'],
+            $this->version . '.measurement'
         );
     }
 
@@ -946,5 +962,180 @@ class Octo_Print_Designer_Admin {
         ]);
 
         echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - canvas polling disabled');</script>";
+    }
+
+    // 🧠 AGENT 3 DELIVERABLE: Measurement Database AJAX Handler Methods
+
+    /**
+     * Get all design templates for measurement management
+     */
+    public function get_design_templates_for_measurements() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $templates = get_posts([
+            'post_type' => 'design_template',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'orderby' => 'title',
+            'order' => 'ASC'
+        ]);
+
+        $template_data = [];
+        foreach ($templates as $template) {
+            $template_data[] = [
+                'id' => $template->ID,
+                'title' => $template->post_title
+            ];
+        }
+
+        wp_send_json_success($template_data);
+    }
+
+    /**
+     * Get Template Sizes for a specific template
+     */
+    public function get_template_sizes_for_measurements() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error('Missing template ID');
+            return;
+        }
+
+        // Use TemplateMeasurementManager to get sizes
+        if (class_exists('TemplateMeasurementManager')) {
+            $manager = new TemplateMeasurementManager();
+            $sizes = $manager->get_template_sizes($template_id);
+            wp_send_json_success($sizes);
+        } else {
+            wp_send_json_error('TemplateMeasurementManager not available');
+        }
+    }
+
+    /**
+     * Get measurements for admin interface
+     */
+    public function get_template_measurements_for_admin() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error('Missing template ID');
+            return;
+        }
+
+        if (class_exists('TemplateMeasurementManager')) {
+            $manager = new TemplateMeasurementManager();
+            $measurements = $manager->get_measurements($template_id);
+            $sizes = $manager->get_template_sizes($template_id);
+
+            wp_send_json_success([
+                'measurements' => $measurements,
+                'sizes' => $sizes
+            ]);
+        } else {
+            wp_send_json_error('TemplateMeasurementManager not available');
+        }
+    }
+
+    /**
+     * Save measurements from admin interface
+     */
+    public function save_template_measurements_from_admin() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $template_id = intval($_POST['template_id']);
+        $measurements = $_POST['measurements'];
+
+        if (!$template_id || !$measurements) {
+            wp_send_json_error('Missing template ID or measurements data');
+            return;
+        }
+
+        if (class_exists('TemplateMeasurementManager')) {
+            $manager = new TemplateMeasurementManager();
+
+            // Validate measurements first
+            $validation_errors = $manager->validate_measurements($measurements);
+            if (!empty($validation_errors)) {
+                wp_send_json_error('Validation failed: ' . implode(', ', $validation_errors));
+                return;
+            }
+
+            $result = $manager->save_measurements($template_id, $measurements);
+            if ($result) {
+                wp_send_json_success('Measurements saved successfully');
+            } else {
+                wp_send_json_error('Failed to save measurements');
+            }
+        } else {
+            wp_send_json_error('TemplateMeasurementManager not available');
+        }
+    }
+
+    /**
+     * Validate measurements precision
+     */
+    public function validate_template_measurements() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error('Missing template ID');
+            return;
+        }
+
+        if (class_exists('MeasurementValidationFramework')) {
+            $validator = new MeasurementValidationFramework();
+            $validation_results = $validator->validate_complete_system($template_id);
+            wp_send_json_success($validation_results);
+        } else {
+            wp_send_json_error('Validation framework not available');
+        }
+    }
+
+    /**
+     * Sync Template Sizes with measurement table
+     */
+    public function sync_template_sizes_measurements() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $template_id = intval($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error('Missing template ID');
+            return;
+        }
+
+        if (class_exists('TemplateMeasurementManager')) {
+            $manager = new TemplateMeasurementManager();
+            $result = $manager->sync_with_template_sizes($template_id);
+
+            if ($result) {
+                wp_send_json_success('Template Sizes synchronized successfully');
+            } else {
+                wp_send_json_error('Failed to sync Template Sizes');
+            }
+        } else {
+            wp_send_json_error('TemplateMeasurementManager not available');
+        }
     }
 }

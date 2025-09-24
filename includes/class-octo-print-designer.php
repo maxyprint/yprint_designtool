@@ -27,6 +27,13 @@ class Octo_Print_Designer {
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-websocket-integration.php';
 
+        // 🧠 Agent Implementation: Measurement Database Classes
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-template-measurement-manager.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-measurement-validation-framework.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-measurement-migration-script.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-template-sizes-integration-tester.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-deployment-readiness-certification.php';
+
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-template.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-admin.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-settings.php';
