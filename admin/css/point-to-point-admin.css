@@ -344,8 +344,198 @@ details pre {
     box-shadow: 0 0 0 1px #ddd;
 }
 
+/* Multi-View Template View Selector */
+.view-tabs-wrapper {
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.view-tabs-wrapper h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #0073aa;
+    font-size: 16px;
+}
+
+.view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.view-tab {
+    background: #f7f7f7;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.view-tab:hover {
+    background: #e7f3ff;
+    border-color: #0073aa;
+    color: #0073aa;
+}
+
+.view-tab.active {
+    background: #0073aa;
+    border-color: #005a87;
+    color: #fff;
+}
+
+.view-tab .view-lines-count {
+    background: #dc3232;
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.view-tab.active .view-lines-count {
+    background: #fff;
+    color: #0073aa;
+}
+
+/* Multi-View Point-to-Point Controls */
+.multi-view-point-to-point-controls {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.current-view-info {
+    background: #e7f3ff;
+    border: 1px solid #b8daff;
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.current-view-info h4 {
+    margin: 0;
+    color: #0073aa;
+    font-size: 14px;
+}
+
+.current-view-info #current-view-name {
+    font-weight: 700;
+    color: #005a87;
+}
+
+/* Multi-View Reference Lines Groups */
+.view-lines-group {
+    background: #f9f9f9;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.view-lines-group:last-child {
+    margin-bottom: 0;
+}
+
+.view-lines-group h5 {
+    margin: 0 0 12px 0;
+    color: #0073aa;
+    font-size: 15px;
+    font-weight: 600;
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 5px;
+}
+
+.reference-line-item.current-view {
+    background: #e7f3ff;
+    border-color: #b8daff;
+}
+
+.reference-line-item.current-view strong {
+    color: #005a87;
+}
+
+/* Multi-View Responsive Design */
+@media (max-width: 768px) {
+    .view-tabs {
+        flex-direction: column;
+    }
+
+    .view-tab {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .view-lines-group {
+        padding: 10px;
+    }
+
+    .multi-view-point-to-point-controls {
+        padding: 15px;
+    }
+}
+
+/* Multi-View Instructions Enhancement */
+.multi-view-point-to-point-controls .instructions {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    color: #856404;
+}
+
+.multi-view-point-to-point-controls .instructions h4,
+.multi-view-point-to-point-controls .instructions p strong {
+    color: #856404;
+}
+
+/* Multi-View Reference Lines List */
+.multi-view-reference-lines-list {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    margin-top: 20px;
+}
+
+.multi-view-reference-lines-list h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+    font-size: 16px;
+}
+
+#multi-view-lines-display em {
+    color: #666;
+    font-style: italic;
+    display: block;
+    text-align: center;
+    padding: 20px;
+}
+
 /* WordPress Admin compatibility */
 .postbox .point-to-point-controls {
+    border: none;
+    padding: 15px;
+    background: transparent;
+}
+
+.postbox .multi-view-point-to-point-controls {
     border: none;
     padding: 15px;
     background: transparent;
