@@ -111,8 +111,8 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             $post_type = get_post_type($_GET['post']);
         }
 
-        // Erweitere hier um deine Template Post Types
-        $template_post_types = array('product', 'template', 'octo_template');
+        // Alle Template-relevanten Post Types einschließen
+        $template_post_types = array('product', 'template', 'octo_template', 'design_template');
 
         return in_array($post_type, $template_post_types);
     }
@@ -286,12 +286,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
      * Fügt Meta Box für Reference Lines hinzu
      */
     public function add_template_reference_lines_meta_box() {
-        $post_types = array('product', 'template', 'octo_template');
+        // Alle Template-relevanten Post Types einschließen
+        $post_types = array('product', 'template', 'octo_template', 'design_template');
 
         foreach ($post_types as $post_type) {
             add_meta_box(
                 'template-reference-lines',
-                __('Template Referenzlinien Editor', 'octo-print-designer'),
+                __('🎯 Point-to-Point Reference Lines Editor', 'octo-print-designer'),
                 array($this, 'render_reference_lines_meta_box'),
                 $post_type,
                 'normal',
@@ -308,8 +309,14 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         $template_image_url = $this->get_template_image_url($post->ID);
 
         if (!$template_image_url) {
-            echo '<p><strong>' . __('Hinweis:', 'octo-print-designer') . '</strong> ' .
-                 __('Kein Template-Bild gefunden. Bitte lade ein Template-Bild hoch oder setze das print_template_image Meta-Feld.', 'octo-print-designer') . '</p>';
+            echo '<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 15px 0;">';
+            echo '<p><strong>⚠️ ' . __('Template-Bild erforderlich:', 'octo-print-designer') . '</strong></p>';
+            echo '<p>' . __('Für das Point-to-Point Interface wird ein Template-Bild benötigt. Bitte:', 'octo-print-designer') . '</p>';
+            echo '<ul style="margin-left: 20px;">';
+            echo '<li>' . __('Lade ein Beitragsbild hoch, oder', 'octo-print-designer') . '</li>';
+            echo '<li>' . __('Setze das "Print Template Image URL" Meta-Feld im "Data Foundation" Bereich', 'octo-print-designer') . '</li>';
+            echo '</ul>';
+            echo '</div>';
             return;
         }
 
@@ -325,14 +332,23 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         echo '<canvas id="template-canvas" style="border: 2px solid #ddd; max-width: 100%; height: auto;"></canvas>';
         echo '</div>';
 
-        // Aktuelle Referenzlinien anzeigen (für Debugging)
+        // Zeige Status der aktuellen Referenzlinien
         $current_lines = get_post_meta($post->ID, '_reference_lines_data', true);
         if (!empty($current_lines)) {
-            echo '<details style="margin-top: 15px;">';
-            echo '<summary>' . __('Aktuelle Referenzlinien (JSON)', 'octo-print-designer') . '</summary>';
-            echo '<pre style="background: #f9f9f9; padding: 10px; overflow-x: auto;">' .
+            echo '<div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 10px; border-radius: 4px; margin-top: 15px;">';
+            echo '<strong>✅ ' . sprintf(__('Gespeicherte Referenzlinien: %d', 'octo-print-designer'), count($current_lines)) . '</strong>';
+            echo '</div>';
+
+            echo '<details style="margin-top: 10px;">';
+            echo '<summary style="cursor: pointer; color: #0073aa;">' . __('🔍 JSON-Daten anzeigen (für Entwicklung)', 'octo-print-designer') . '</summary>';
+            echo '<pre style="background: #f9f9f9; padding: 10px; overflow-x: auto; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; max-height: 200px; overflow-y: auto;">' .
                  esc_html(json_encode($current_lines, JSON_PRETTY_PRINT)) . '</pre>';
             echo '</details>';
+        } else {
+            echo '<div style="background: #e7f3ff; border: 1px solid #b3d9ff; color: #0056b3; padding: 10px; border-radius: 4px; margin-top: 15px;">';
+            echo '<strong>ℹ️ ' . __('Keine Referenzlinien definiert', 'octo-print-designer') . '</strong><br>';
+            echo __('Verwende das Point-to-Point Interface oben, um Referenzlinien zu erstellen.', 'octo-print-designer');
+            echo '</div>';
         }
     }
 
