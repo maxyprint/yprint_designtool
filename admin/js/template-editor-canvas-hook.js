@@ -6,8 +6,16 @@
 (function($) {
     'use strict';
 
+    // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context detection
+    const isAdminContext = (typeof window.octoAdminContext !== 'undefined') && window.octoAdminContext.context === 'woocommerce_admin';
+
     // Hook into TemplateEditor to expose canvas globally
     function hookTemplateEditor() {
+        if (isAdminContext && window.octoAdminContext.skip_canvas_polling) {
+            console.log('🧠 [CANVAS ADAPTER] Admin context detected - skipping canvas hooks');
+            return;
+        }
+
         console.log('🎯 CANVAS HOOK: Setting up TemplateEditor hooks...');
 
         // Method 0: Non-invasive Canvas instance detection via prototype monitoring
@@ -138,7 +146,8 @@
     function startPollingFallback() {
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        const maxAttempts = 200; // 40 seconds - extended for async initialization
+        // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context timeout optimization
+        const maxAttempts = isAdminContext ? 5 : 200; // 2.5s in admin, 40s in editor
         const pollInterval = 50; // More frequent polling - every 50ms
 
         const poll = setInterval(() => {

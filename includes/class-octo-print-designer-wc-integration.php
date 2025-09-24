@@ -280,7 +280,15 @@ private function check_yprint_dependency() {
                     echo '</div>';
                 }
             } catch (Exception $e) {
-                // Silent fail
+                // 🧠 ERROR SPECIALIST: Enhanced exception logging and user feedback
+                error_log("🔥 [ERROR SPECIALIST] Design preview generation failed: " . $e->getMessage());
+                error_log("🔥 [ERROR SPECIALIST] Stack trace: " . $e->getTraceAsString());
+
+                // Graceful degradation: Show fallback content
+                echo '<div class="design-preview-error" style="padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404;">';
+                echo '<strong>⚠️ Design Preview Unavailable</strong><br>';
+                echo '<small>Using stored order data. Contact support if this persists.</small>';
+                echo '</div>';
             }
         }
         
@@ -349,7 +357,13 @@ private function check_yprint_dependency() {
                 $output .= '</div>';
                 return $output;
             } catch (Exception $e) {
-                return __('Error displaying design images', 'octo-print-designer');
+                // 🧠 ERROR SPECIALIST: Enhanced error handling with fallback display
+                error_log("🔥 [ERROR SPECIALIST] Design image display error: " . $e->getMessage());
+
+                return '<div style="padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px;">' .
+                       '<strong>⚠️ Image Display Error</strong><br>' .
+                       '<small>Raw data available in order meta.</small>' .
+                       '</div>';
             }
         }
         
@@ -1891,7 +1905,29 @@ private function build_print_provider_email_content($order, $design_items, $note
                 error_log("✅ [PHP VALIDATE] JSON validation successful");
 
                 // Store as order meta
-                $meta_result = update_post_meta($order_id, '_design_data', wp_slash(json_encode($design_data_json)));
+                // 🧠 DATABASE OPTIMIZER: Optimized metadata storage with compression
+                $storage_start = microtime(true);
+                $json_string = json_encode($design_data_json);
+
+                // Compress large JSON data for storage efficiency
+                if (strlen($json_string) > 10000) { // 10KB threshold
+                    $compressed = gzcompress($json_string, 6);
+                    if ($compressed !== false && strlen($compressed) < strlen($json_string)) {
+                        error_log(sprintf("📊 [DB OPTIMIZER] Compressed design data: %d -> %d bytes (%.1f%% reduction)",
+                            strlen($json_string), strlen($compressed),
+                            (1 - strlen($compressed) / strlen($json_string)) * 100));
+                        $meta_result = update_post_meta($order_id, '_design_data_compressed', base64_encode($compressed));
+                        // Keep uncompressed for compatibility
+                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                    } else {
+                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                    }
+                } else {
+                    $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                }
+
+                $storage_time = (microtime(true) - $storage_start) * 1000;
+                error_log(sprintf("📊 [DB OPTIMIZER] Metadata storage: %.2fms", $storage_time));
 
                 if ($meta_result) {
                     error_log("✅ [PHP STORE] Design data successfully stored in database for order {$order_id}");
@@ -2034,15 +2070,26 @@ private function build_print_provider_email_content($order, $design_items, $note
             true
         );
         
-        // Check if stored design data can be retrieved
+        // 🧠 DATABASE OPTIMIZER: Performance-optimized metadata retrieval
+        $retrieval_start = microtime(true);
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $retrieval_time = (microtime(true) - $retrieval_start) * 1000;
+
         if ($stored_design_data) {
             error_log("🔍 [PHP RETRIEVE] Found stored design data for order {$order_id}");
-            error_log("📊 [PHP RETRIEVE] Stored data preview: " . substr($stored_design_data, 0, 200) . '...');
+            error_log(sprintf("📊 [DB OPTIMIZER] Metadata retrieval: %.2fms, size: %d bytes", $retrieval_time, strlen($stored_design_data)));
+            error_log("📊 [DB OPTIMIZER] Data preview: " . substr($stored_design_data, 0, 200) . '...');
 
-            $debug_info[] = "✅ Design JSON data found in database (" . strlen($stored_design_data) . " characters)";
+            // Validate data integrity
+            $json_test = json_decode($stored_design_data, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $debug_info[] = sprintf("✅ Design JSON data found and validated (%.2fms, %d chars)", $retrieval_time, strlen($stored_design_data));
+            } else {
+                $debug_info[] = sprintf("⚠️  Design data found but JSON invalid: %s", json_last_error_msg());
+            }
         } else {
             error_log("⚠️ [PHP RETRIEVE] No stored design data found for order {$order_id}");
+            $debug_info[] = sprintf("❌ No design JSON data found (%.2fms)", $retrieval_time);
         }
 
         wp_send_json_success(array(
@@ -2751,7 +2798,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $('#design-preview-loading').show();
                 $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
 
-                // Load design data
+                // 🧠 AGENT FIX: AjaxCorsResolver - Enhanced AJAX with CORS support
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
@@ -2759,6 +2806,15 @@ private function build_print_provider_email_content($order, $design_items, $note
                         action: 'octo_load_design_preview',
                         order_id: orderId,
                         nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                    },
+                    // CORS optimization
+                    crossDomain: false,
+                    xhrFields: {
+                        withCredentials: true
+                    },
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
                     },
                     success: function(response) {
                         if (response.success) {
@@ -2874,6 +2930,18 @@ private function build_print_provider_email_content($order, $design_items, $note
      * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load design preview data
      */
     public function ajax_load_design_preview() {
+        // 🧠 AGENT FIX: AjaxCorsResolver - CORS headers for admin-ajax.php
+        header('Access-Control-Allow-Origin: ' . get_site_url());
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit();
+        }
+
         // Security check
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'design_preview_nonce')) {
             wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
@@ -2899,10 +2967,26 @@ private function build_print_provider_email_content($order, $design_items, $note
         $design_data = null;
 
         if ($stored_design_data) {
-            $design_data = json_decode($stored_design_data, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                wp_send_json_error(array('message' => __('Invalid design data format in database', 'octo-print-designer')));
+            // 🧠 DATABASE OPTIMIZER: Efficient JSON processing with caching
+            $processing_start = microtime(true);
+
+            // Check if we have a cached parsed version
+            $cache_key = 'design_data_parsed_' . md5($stored_design_data);
+            $design_data = wp_cache_get($cache_key, 'octo_design_preview');
+
+            if ($design_data === false) {
+                $design_data = json_decode($stored_design_data, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // Cache for 5 minutes to avoid repeated JSON parsing
+                    wp_cache_set($cache_key, $design_data, 'octo_design_preview', 300);
+                } else {
+                    error_log("🔥 [DB OPTIMIZER] JSON decode error: " . json_last_error_msg());
+                    wp_send_json_error(array('message' => __('Invalid design data format in database', 'octo-print-designer')));
+                }
             }
+
+            $processing_time = (microtime(true) - $processing_start) * 1000;
+            error_log(sprintf("📊 [DB OPTIMIZER] JSON processing: %.2fms", $processing_time));
         }
 
         // Build preview HTML

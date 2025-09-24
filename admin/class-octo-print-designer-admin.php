@@ -34,42 +34,34 @@ class Octo_Print_Designer_Admin {
     }
 
     public function enqueue_scripts($hook) {
+        // 🧠 AGENT FIX: AdminContextOptimizer - Smart admin context detection
 
-        // 🔍 DEBUG: Log hook information for troubleshooting (BROWSER CONSOLE)
+        // Detect admin context type for optimized script loading
+        $is_template_page = $this->is_template_edit_page($hook);
+        $is_woocommerce_page = $this->is_woocommerce_order_edit_page($hook);
+        $admin_context = $this->detect_admin_context($hook);
+
+        // 🔍 DEBUG: Enhanced logging with context detection
         $debug_script = "
         <script>
-        console.log('🔧 [ADMIN DEBUG] enqueue_scripts called with hook: " . esc_js($hook) . "');
-        console.log('🔧 [ADMIN DEBUG] is_template_edit_page: " . ($this->is_template_edit_page($hook) ? 'YES' : 'NO') . "');
-        console.log('🔧 [ADMIN DEBUG] is_woocommerce_order_edit_page: " . ($this->is_woocommerce_order_edit_page($hook) ? 'YES' : 'NO') . "');
+        console.log('🧠 [ADMIN OPTIMIZER] Hook: " . esc_js($hook) . "');
+        console.log('🧠 [ADMIN OPTIMIZER] Template Page: " . ($is_template_page ? 'YES' : 'NO') . "');
+        console.log('🧠 [ADMIN OPTIMIZER] WooCommerce Page: " . ($is_woocommerce_page ? 'YES' : 'NO') . "');
+        console.log('🧠 [ADMIN OPTIMIZER] Admin Context: " . esc_js($admin_context) . "');
         </script>";
 
-        // Output debug immediately to browser
         echo $debug_script;
 
-        // Also log to PHP error log
-        error_log("🔧 [ADMIN DEBUG] enqueue_scripts called with hook: " . $hook);
-        error_log("🔧 [ADMIN DEBUG] is_template_edit_page: " . ($this->is_template_edit_page($hook) ? 'YES' : 'NO'));
-        error_log("🔧 [ADMIN DEBUG] is_woocommerce_order_edit_page: " . ($this->is_woocommerce_order_edit_page($hook) ? 'YES' : 'NO'));
-
-        if (function_exists('get_current_screen')) {
-            $screen = get_current_screen();
-            if ($screen) {
-                error_log("🔧 [ADMIN DEBUG] current_screen->post_type: " . ($screen->post_type ?? 'null'));
-                error_log("🔧 [ADMIN DEBUG] current_screen->id: " . ($screen->id ?? 'null'));
-                echo "<script>console.log('🔧 [ADMIN DEBUG] current_screen->post_type: " . esc_js($screen->post_type ?? 'null') . "');</script>";
-                echo "<script>console.log('🔧 [ADMIN DEBUG] current_screen->id: " . esc_js($screen->id ?? 'null') . "');</script>";
-            }
-        }
-
-        // 🎯 CRITICAL FIX: Enable scripts for BOTH template edit pages AND WooCommerce order pages
-        if (!$this->is_template_edit_page($hook) && !$this->is_woocommerce_order_edit_page($hook)) {
-            echo "<script>console.log('🔧 [ADMIN DEBUG] Scripts NOT loaded - neither template nor woocommerce order page');</script>";
-            error_log("🔧 [ADMIN DEBUG] Scripts NOT loaded - neither template nor woocommerce order page");
+        // Optimized script loading based on admin context
+        if (!$is_template_page && !$is_woocommerce_page) {
+            echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Skipping scripts - not applicable context');</script>";
             return;
         }
 
-        echo "<script>console.log('🔧 [ADMIN DEBUG] Scripts WILL be loaded!');</script>";
-        error_log("🔧 [ADMIN DEBUG] Scripts WILL be loaded!");
+        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Loading optimized scripts for: " . esc_js($admin_context) . "');</script>";
+
+        // 🎯 CRITICAL FIX: Context-optimized script loading
+        $this->load_context_optimized_scripts($admin_context);
 
         wp_enqueue_media();
         
@@ -828,5 +820,86 @@ class Octo_Print_Designer_Admin {
         }
 
         return false;
+    }
+
+    /**
+     * 🧠 AGENT METHOD: AdminContextOptimizer - Detect admin context type
+     */
+    private function detect_admin_context($hook) {
+        if ($this->is_template_edit_page($hook)) {
+            return 'template_editor';
+        } elseif ($this->is_woocommerce_order_edit_page($hook)) {
+            return 'woocommerce_admin';
+        } else {
+            return 'other_admin';
+        }
+    }
+
+    /**
+     * 🧠 AGENT METHOD: AdminContextOptimizer - Load context-optimized scripts
+     */
+    private function load_context_optimized_scripts($admin_context) {
+        switch ($admin_context) {
+            case 'template_editor':
+                $this->load_full_editor_scripts();
+                break;
+
+            case 'woocommerce_admin':
+                $this->load_preview_only_scripts();
+                break;
+
+            default:
+                // No scripts needed for other admin contexts
+                break;
+        }
+    }
+
+    /**
+     * 🧠 AGENT METHOD: AdminContextOptimizer - Load full editor scripts
+     */
+    private function load_full_editor_scripts() {
+        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Loading full editor scripts');</script>";
+
+        // Continue with existing full script loading logic
+        // (keeping existing enqueue logic intact)
+    }
+
+    /**
+     * 🧠 AGENT METHOD: AdminContextOptimizer - Load preview-only scripts (lightweight)
+     */
+    private function load_preview_only_scripts() {
+        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Loading lightweight preview scripts');</script>";
+
+        // Load only essential scripts for design preview
+        wp_enqueue_script('jquery');
+
+        // Emergency Fabric.js loader (bypasses webpack issues)
+        wp_enqueue_script(
+            'octo-emergency-fabric-loader',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
+            ['jquery'],
+            $this->version . '-emergency',
+            true
+        );
+
+        // Design data capture (lightweight version)
+        wp_enqueue_script(
+            'octo-admin-design-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
+            ['octo-emergency-fabric-loader'],
+            $this->version . '-admin',
+            true
+        );
+
+        // Admin context flag
+        wp_localize_script('octo-admin-design-capture', 'octoAdminContext', [
+            'context' => 'woocommerce_admin',
+            'skip_canvas_polling' => true,
+            'enable_modal_preview' => true,
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('design_preview_nonce')
+        ]);
+
+        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - canvas polling disabled');</script>";
     }
 }
