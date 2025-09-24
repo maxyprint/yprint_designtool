@@ -45,6 +45,10 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_print_provider_api'));
         add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
 
+        // 🎨 DESIGN PREVIEW SYSTEM: WooCommerce Admin Integration
+        add_action('woocommerce_admin_order_data_after_order_details', array($this, 'add_design_preview_button'));
+        add_action('wp_ajax_octo_load_design_preview', array($this, 'ajax_load_design_preview'));
+
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
 
         // Product meta fields for sizing charts
@@ -2648,5 +2652,386 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
 
         return null;
+    }
+
+    /**
+     * 🎨 DESIGN PREVIEW SYSTEM: Add preview button to WooCommerce order details
+     */
+    public function add_design_preview_button($order) {
+        if (!$order instanceof WC_Order) {
+            return;
+        }
+
+        $order_id = $order->get_id();
+
+        // Check if order has design items
+        $has_design_items = false;
+        foreach ($order->get_items() as $item) {
+            if ($this->get_design_meta($item, 'design_id')) {
+                $has_design_items = true;
+                break;
+            }
+        }
+
+        if (!$has_design_items) {
+            return; // No design items, no preview needed
+        }
+
+        // Check if stored design data exists
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        ?>
+        <div id="design-preview-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border: 2px solid #007cba; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #007cba; font-size: 16px;">🎨 Design Preview System</h3>
+
+            <div style="margin-bottom: 15px;">
+                <p style="margin: 5px 0; font-size: 13px;">
+                    <strong>Status:</strong>
+                    <?php if ($stored_design_data): ?>
+                        <span style="color: #28a745; font-weight: bold;">✅ Design data available</span>
+                    <?php else: ?>
+                        <span style="color: #ffc107; font-weight: bold;">⚠️ No preview data found</span>
+                    <?php endif; ?>
+                </p>
+                <p style="margin: 5px 0 15px 0; font-size: 12px; color: #666;">
+                    <?php if ($stored_design_data): ?>
+                        Design data is available for canvas preview. Click below to view the design.
+                    <?php else: ?>
+                        No design canvas data found in database. Preview may not be available.
+                    <?php endif; ?>
+                </p>
+            </div>
+
+            <button
+                type="button"
+                id="design-preview-btn"
+                class="button button-primary"
+                data-order-id="<?php echo esc_attr($order_id); ?>"
+                <?php echo $stored_design_data ? '' : 'disabled'; ?>
+                style="margin-right: 10px;">
+                🎨 View Design Preview
+            </button>
+
+            <?php if (!$stored_design_data): ?>
+                <p style="margin: 10px 0 0 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 12px; color: #856404;">
+                    <strong>💡 Tip:</strong> Design preview data is captured when customers complete their design.
+                    If this order was placed before the preview system was implemented, preview may not be available.
+                </p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Design Preview Modal -->
+        <div id="design-preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999999;">
+            <div style="position: relative; width: 90%; height: 90%; margin: 2.5% auto; background: white; border-radius: 8px; overflow: hidden;">
+                <div style="background: #007cba; color: white; padding: 15px; position: relative;">
+                    <h3 style="margin: 0; font-size: 18px;">🎨 Design Preview - Order #<?php echo $order->get_order_number(); ?></h3>
+                    <button id="close-preview-modal" type="button" style="position: absolute; top: 10px; right: 15px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 14px;">✕ Close</button>
+                </div>
+                <div id="design-preview-content" style="height: calc(100% - 60px); overflow: auto; padding: 20px;">
+                    <div id="design-preview-loading" style="text-align: center; padding: 50px;">
+                        <div class="spinner" style="visibility: visible; margin: 0 auto;"></div>
+                        <p>Loading design preview...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Design Preview Button
+            $('#design-preview-btn').on('click', function() {
+                var button = $(this);
+                var orderId = button.data('order-id');
+
+                if (button.prop('disabled')) {
+                    return;
+                }
+
+                // Show modal
+                $('#design-preview-modal').show();
+                $('#design-preview-loading').show();
+                $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
+
+                // Load design data
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'octo_load_design_preview',
+                        order_id: orderId,
+                        nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#design-preview-content').html(response.data.html);
+
+                            // Initialize canvas if design data is available
+                            if (response.data.design_data) {
+                                initializeDesignCanvas(response.data.design_data, response.data.template_data);
+                            }
+                        } else {
+                            $('#design-preview-content').html(
+                                '<div style="text-align: center; padding: 50px;">' +
+                                '<h3 style="color: #dc3545;">❌ Preview Error</h3>' +
+                                '<p>' + (response.data && response.data.message ? response.data.message : 'Failed to load design preview') + '</p>' +
+                                '</div>'
+                            );
+                        }
+                    },
+                    error: function() {
+                        $('#design-preview-content').html(
+                            '<div style="text-align: center; padding: 50px;">' +
+                            '<h3 style="color: #dc3545;">🌐 Network Error</h3>' +
+                            '<p>Failed to load design preview due to network error.</p>' +
+                            '</div>'
+                        );
+                    }
+                });
+            });
+
+            // Close modal
+            $('#close-preview-modal, #design-preview-modal').on('click', function(e) {
+                if (e.target === this) {
+                    $('#design-preview-modal').hide();
+                }
+            });
+
+            // Prevent modal content clicks from closing modal
+            $('#design-preview-modal > div').on('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+
+        // Initialize design canvas (will be called after AJAX loads design data)
+        function initializeDesignCanvas(designData, templateData) {
+            try {
+                console.log('🎨 Initializing design canvas...', designData);
+
+                // Create canvas container
+                var canvasContainer = $('<div id="design-canvas-container" style="background: #f0f0f0; border: 2px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;"></div>');
+                var canvas = $('<canvas id="design-preview-canvas" width="600" height="400" style="background: white; border: 1px solid #ccc; max-width: 100%; height: auto;"></canvas>');
+
+                canvasContainer.append('<h4 style="margin-top: 0;">📐 Canvas Preview</h4>');
+                canvasContainer.append(canvas);
+
+                $('#design-preview-content').append(canvasContainer);
+
+                // Initialize Fabric.js canvas
+                if (typeof fabric !== 'undefined') {
+                    var fabricCanvas = new fabric.Canvas('design-preview-canvas');
+                    fabricCanvas.setWidth(600);
+                    fabricCanvas.setHeight(400);
+
+                    // Process and add elements to canvas
+                    if (designData.elements && Array.isArray(designData.elements)) {
+                        designData.elements.forEach(function(element, index) {
+                            console.log('Adding element to canvas:', element);
+
+                            if (element.type === 'image' && element.src) {
+                                fabric.Image.fromURL(element.src, function(img) {
+                                    img.set({
+                                        left: element.left || 0,
+                                        top: element.top || 0,
+                                        scaleX: element.scaleX || 1,
+                                        scaleY: element.scaleY || 1,
+                                        angle: element.angle || 0,
+                                        selectable: false
+                                    });
+                                    fabricCanvas.add(img);
+                                    fabricCanvas.renderAll();
+                                });
+                            } else if (element.type === 'text' && element.text) {
+                                var text = new fabric.Text(element.text, {
+                                    left: element.left || 0,
+                                    top: element.top || 0,
+                                    fontSize: element.fontSize || 20,
+                                    fill: element.fill || '#000000',
+                                    fontFamily: element.fontFamily || 'Arial',
+                                    angle: element.angle || 0,
+                                    selectable: false
+                                });
+                                fabricCanvas.add(text);
+                            }
+                        });
+                    }
+
+                    fabricCanvas.renderAll();
+
+                    console.log('✅ Canvas initialized successfully');
+                } else {
+                    canvasContainer.append('<p style="color: #dc3545;">⚠️ Fabric.js not loaded - canvas preview unavailable</p>');
+                }
+
+            } catch (error) {
+                console.error('❌ Error initializing canvas:', error);
+                $('#design-canvas-container').append('<p style="color: #dc3545;">❌ Error initializing canvas preview</p>');
+            }
+        }
+        </script>
+        <?php
+    }
+
+    /**
+     * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load design preview data
+     */
+    public function ajax_load_design_preview() {
+        // Security check
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'design_preview_nonce')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
+        }
+
+        // Check permissions
+        if (!current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'octo-print-designer')));
+        }
+
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Invalid order ID', 'octo-print-designer')));
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
+        }
+
+        // Get stored design data
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $design_data = null;
+
+        if ($stored_design_data) {
+            $design_data = json_decode($stored_design_data, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                wp_send_json_error(array('message' => __('Invalid design data format in database', 'octo-print-designer')));
+            }
+        }
+
+        // Build preview HTML
+        ob_start();
+        ?>
+        <div class="design-preview-info">
+            <div style="background: #e8f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin-top: 0; color: #007cba;">📊 Order Information</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 13px;">
+                    <div>
+                        <strong>Order Number:</strong><br>
+                        #<?php echo esc_html($order->get_order_number()); ?>
+                    </div>
+                    <div>
+                        <strong>Order Date:</strong><br>
+                        <?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?>
+                    </div>
+                    <div>
+                        <strong>Customer:</strong><br>
+                        <?php echo esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()); ?>
+                    </div>
+                    <div>
+                        <strong>Status:</strong><br>
+                        <?php echo esc_html(wc_get_order_status_name($order->get_status())); ?>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin-top: 0; color: #333;">🛍️ Order Items</h4>
+                <div style="max-height: 200px; overflow-y: auto;">
+                    <?php foreach ($order->get_items() as $item_id => $item): ?>
+                        <div style="padding: 10px; margin-bottom: 10px; background: white; border-radius: 4px; border-left: 4px solid <?php echo $this->get_design_meta($item, 'design_id') ? '#28a745' : '#6c757d'; ?>;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                                <div>
+                                    <strong><?php echo esc_html($item->get_name()); ?></strong>
+                                    <?php if ($this->get_design_meta($item, 'design_id')): ?>
+                                        <br><span style="color: #28a745; font-size: 12px;">🎨 Design Item (ID: <?php echo esc_html($this->get_design_meta($item, 'design_id')); ?>)</span>
+                                    <?php else: ?>
+                                        <br><span style="color: #6c757d; font-size: 12px;">📦 Standard Item</span>
+                                    <?php endif; ?>
+                                </div>
+                                <div style="text-align: right;">
+                                    <strong>Qty: <?php echo esc_html($item->get_quantity()); ?></strong><br>
+                                    <span style="font-size: 12px;"><?php echo wp_kses_post($order->get_formatted_line_subtotal($item)); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <?php if ($design_data): ?>
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: #28a745;">✅ Design Data Available</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 13px;">
+                        <div>
+                            <strong>Template View ID:</strong><br>
+                            <?php echo esc_html($design_data['template_view_id'] ?? 'N/A'); ?>
+                        </div>
+                        <div>
+                            <strong>Elements Count:</strong><br>
+                            <?php echo esc_html(isset($design_data['elements']) ? count($design_data['elements']) : 0); ?>
+                        </div>
+                        <div>
+                            <strong>Timestamp:</strong><br>
+                            <?php
+                            if (isset($design_data['timestamp'])) {
+                                echo esc_html(date('d.m.Y H:i:s', $design_data['timestamp']));
+                            } else {
+                                echo 'N/A';
+                            }
+                            ?>
+                        </div>
+                        <div>
+                            <strong>Data Size:</strong><br>
+                            <?php echo esc_html(strlen($stored_design_data) . ' chars'); ?>
+                        </div>
+                    </div>
+
+                    <?php if (isset($design_data['elements']) && is_array($design_data['elements'])): ?>
+                        <details style="margin-top: 15px;">
+                            <summary style="cursor: pointer; font-weight: bold; color: #007cba;">📝 Design Elements Details</summary>
+                            <div style="margin-top: 10px; max-height: 300px; overflow-y: auto; background: white; padding: 10px; border-radius: 4px;">
+                                <?php foreach ($design_data['elements'] as $index => $element): ?>
+                                    <div style="padding: 8px; margin-bottom: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px;">
+                                        <strong>Element <?php echo ($index + 1); ?>:</strong>
+                                        <?php echo esc_html($element['type'] ?? 'unknown'); ?>
+                                        <?php if (isset($element['text'])): ?>
+                                            - "<?php echo esc_html($element['text']); ?>"
+                                        <?php elseif (isset($element['src'])): ?>
+                                            - Image: <?php echo esc_html(basename($element['src'])); ?>
+                                        <?php endif; ?>
+                                        <br>
+                                        <small style="color: #666;">
+                                            Position: (<?php echo esc_html($element['left'] ?? '0'); ?>, <?php echo esc_html($element['top'] ?? '0'); ?>)
+                                            <?php if (isset($element['width']) && isset($element['height'])): ?>
+                                                | Size: <?php echo esc_html($element['width'] . 'x' . $element['height']); ?>
+                                            <?php endif; ?>
+                                        </small>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: #856404;">⚠️ No Design Preview Data</h4>
+                    <p style="margin: 0; font-size: 13px;">
+                        No design canvas data found for this order. This could happen if:
+                    </p>
+                    <ul style="margin: 10px 0 0 20px; font-size: 13px;">
+                        <li>The order was placed before the preview system was implemented</li>
+                        <li>The customer did not complete the design process properly</li>
+                        <li>There was an issue saving the design data during checkout</li>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+
+        $html = ob_get_clean();
+
+        wp_send_json_success(array(
+            'html' => $html,
+            'design_data' => $design_data,
+            'template_data' => null, // Could be expanded later
+            'message' => __('Design preview loaded successfully', 'octo-print-designer')
+        ));
     }
 }
