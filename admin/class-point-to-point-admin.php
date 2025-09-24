@@ -84,7 +84,7 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // AJAX Localization
         wp_localize_script(
-            $this->plugin_name . '-point-to-point',
+            $this->plugin_name . '-multi-view-point-to-point',
             'pointToPointAjax',
             array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
