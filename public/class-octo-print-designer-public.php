@@ -214,11 +214,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 FABRIC GLOBAL EXPOSER: Exposes fabric.js globally (SURGICAL FIX)
+        wp_register_script(
+            'octo-print-designer-fabric-global-exposer',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposer.js',
+            ['octo-print-designer-webpack-patch'], // Load after webpack patch
+            rand(),
+            true
+        );
+
         // 🎯 DESIGNER GLOBAL EXPOSER: Exposes DesignerWidget class globally from webpack bundle
         wp_register_script(
             'octo-print-designer-global-exposer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/designer-global-exposer.js',
-            ['octo-print-designer-webpack-patch'], // Load after webpack patch
+            ['octo-print-designer-fabric-global-exposer'], // Load after fabric exposer
             rand(),
             true
         );
