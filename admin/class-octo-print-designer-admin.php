@@ -1061,12 +1061,25 @@ class Octo_Print_Designer_Admin {
         error_log('🔍 AJAX DEBUG - Full $_POST data: ' . print_r($_POST, true));
 
         $template_id = intval($_POST['template_id'] ?? 0);
-        $measurements = $_POST['measurements'] ?? null;
+        $measurements_raw = $_POST['measurements'] ?? null;
+
+        // 🧠 AGENT-5 FIX: Handle JSON serialized measurements
+        $measurements = null;
+        if ($measurements_raw) {
+            if (is_string($measurements_raw)) {
+                $measurements = json_decode($measurements_raw, true);
+                error_log('🔍 PHP DEBUG - JSON decoded measurements: ' . print_r($measurements, true));
+            } else {
+                $measurements = $measurements_raw;
+            }
+        }
 
         // 🧠 AGENT DEBUG: Specific parameter validation
         error_log('🔍 AJAX DEBUG - template_id: ' . $template_id);
-        error_log('🔍 AJAX DEBUG - measurements type: ' . gettype($measurements));
-        error_log('🔍 AJAX DEBUG - measurements content: ' . print_r($measurements, true));
+        error_log('🔍 AJAX DEBUG - measurements_raw type: ' . gettype($measurements_raw));
+        error_log('🔍 AJAX DEBUG - measurements_raw content: ' . print_r($measurements_raw, true));
+        error_log('🔍 AJAX DEBUG - measurements final type: ' . gettype($measurements));
+        error_log('🔍 AJAX DEBUG - measurements final content: ' . print_r($measurements, true));
 
         if (!$template_id || !$measurements) {
             $error_msg = sprintf(

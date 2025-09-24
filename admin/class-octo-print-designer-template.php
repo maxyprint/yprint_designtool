@@ -1660,8 +1660,12 @@ class Octo_Print_Designer_Template {
                     label: getMeasurementLabel(measurementKey)
                 };
 
-                // 🧠 AGENT-5 DEBUG: Show updated measurement data
+                // 🧠 AGENT-2 FIX: Detailed structure logging for debugging
                 console.log('🔍 UPDATE DEBUG - Updated measurementData:', measurementData);
+                console.log('🔍 STRUCTURE DEBUG - measurementData type:', typeof measurementData);
+                console.log('🔍 STRUCTURE DEBUG - measurementData constructor:', measurementData.constructor.name);
+                console.log('🔍 STRUCTURE DEBUG - Object.keys():', Object.keys(measurementData));
+                console.log('🔍 STRUCTURE DEBUG - JSON.stringify():', JSON.stringify(measurementData));
 
                 // Visual feedback for precision
                 if (value > 0 && (value * 10) % 1 !== 0) {
@@ -1701,11 +1705,17 @@ class Octo_Print_Designer_Template {
                 console.log('💾 Saving measurements for template:', currentTemplateId);
                 console.log('💾 Measurement data:', measurementData);
 
-                $.post(ajaxurl, {
+                // 🧠 AGENT-4 FIX: Ensure proper serialization of measurement object
+                const measurementPayload = {
                     action: 'save_template_measurements_from_admin',
                     template_id: currentTemplateId,
-                    measurements: measurementData
-                }, function(response) {
+                    measurements: JSON.stringify(measurementData) // Explicit JSON serialization
+                };
+
+                console.log('🔍 SERIALIZATION DEBUG - Payload:', measurementPayload);
+                console.log('🔍 SERIALIZATION DEBUG - measurements type:', typeof measurementPayload.measurements);
+
+                $.post(ajaxurl, measurementPayload, function(response) {
                     console.log('🔍 AJAX Response received:', response);
                     if (response.success) {
                         alert('✅ All measurements saved successfully');

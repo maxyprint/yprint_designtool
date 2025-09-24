@@ -163,12 +163,24 @@
         try {
             global.fabric.Canvas = SingletonCanvas;
         } catch (e) {
-            // Handle readonly property in strict mode
-            Object.defineProperty(global.fabric, 'Canvas', {
-                value: SingletonCanvas,
-                writable: false,
-                configurable: true
-            });
+            // 🧠 AGENT-1 FIX: Check existing property descriptor before defineProperty
+            const existingDescriptor = Object.getOwnPropertyDescriptor(global.fabric, 'Canvas');
+
+            if (existingDescriptor && !existingDescriptor.configurable) {
+                console.log('⚠️ FABRIC SINGLETON: Canvas property is non-configurable, skipping redefinition');
+                return true; // Skip redefinition to prevent error
+            }
+
+            try {
+                Object.defineProperty(global.fabric, 'Canvas', {
+                    value: SingletonCanvas,
+                    writable: false,
+                    configurable: true
+                });
+            } catch (defineError) {
+                console.error('❌ FABRIC SINGLETON: Failed to define Canvas property:', defineError);
+                return false;
+            }
         }
 
         console.log('✅ FABRIC SINGLETON: fabric.js Canvas constructor wrapped with singleton pattern');
