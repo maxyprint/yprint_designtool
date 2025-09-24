@@ -779,6 +779,9 @@ class MultiViewPointToPointSelector {
         this.isDrawing = false;
         this.measurementTypes = {};
 
+        // AGENT 4 FIX: Performance optimization properties
+        this.mouseMoveThrottle = false;
+
         // AGENT 1: Debug state initialization
         this.debugState = {
             initializationSteps: [],
@@ -1205,12 +1208,19 @@ class MultiViewPointToPointSelector {
 
     onMouseMove(e) {
         if (this.points.length === 1 && this.selectedMeasurementKey && this.currentViewId) {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            // AGENT 1 FIX: Throttle canvas redraw to prevent infinite loop
+            if (this.mouseMoveThrottle) return;
 
-            this.redrawCanvas();
-            this.drawPreviewLine(this.points[0], { x, y });
+            this.mouseMoveThrottle = true;
+            requestAnimationFrame(() => {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                this.redrawCanvas();
+                this.drawPreviewLine(this.points[0], { x, y });
+                this.mouseMoveThrottle = false;
+            });
         }
     }
 
@@ -1236,6 +1246,9 @@ class MultiViewPointToPointSelector {
             view_id: this.currentViewId,
             view_name: this.currentView.name
         };
+
+        // AGENT 2 FIX: Ensure current view array exists before filter operation
+        this.updateCurrentViewReferenceLines();
 
         // Entferne existierende Linie mit gleichem measurement_key in aktueller View
         this.multiViewReferenceLines[this.currentViewId] = this.multiViewReferenceLines[this.currentViewId].filter(line =>
@@ -1268,7 +1281,7 @@ class MultiViewPointToPointSelector {
      * Canvas komplett neu zeichnen - AGENT 4: Enhanced with proper image scaling
      */
     redrawCanvas() {
-        console.log('🎨 AGENT 4: Redrawing canvas with scaling');
+        // AGENT 5 FIX: Removed console.log to prevent redraw spam
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -1278,7 +1291,7 @@ class MultiViewPointToPointSelector {
 
         // Template Image zeichnen with proper scaling
         if (this.currentImage && this.imageScaling) {
-            console.log('🎨 AGENT 4: Drawing scaled image:', this.imageScaling);
+            // AGENT 5 FIX: Removed scaling log to prevent spam
 
             this.ctx.drawImage(
                 this.currentImage,
