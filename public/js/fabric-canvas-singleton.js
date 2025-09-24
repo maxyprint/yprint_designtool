@@ -17,9 +17,17 @@
             return false;
         }
 
-        // Check if already wrapped
+        // Check if already wrapped - PREVENT MULTIPLE ATTEMPTS
         if (global.fabric.Canvas.__singletonWrapped) {
-            console.log('✅ FABRIC SINGLETON: fabric.js Canvas already wrapped');
+            console.log('✅ FABRIC SINGLETON: fabric.js Canvas already wrapped, skipping');
+            return true;
+        }
+
+        // 🧠 AGENT-5 FIX: Check property descriptor to prevent errors
+        const descriptor = Object.getOwnPropertyDescriptor(global.fabric, 'Canvas');
+        if (descriptor && !descriptor.configurable) {
+            console.log('⚠️ FABRIC SINGLETON: Canvas property non-configurable, marking as wrapped to prevent retries');
+            global.fabric.Canvas.__singletonWrapped = true;
             return true;
         }
 

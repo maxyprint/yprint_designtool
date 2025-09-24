@@ -1060,19 +1060,11 @@ class Octo_Print_Designer_Admin {
         // 🧠 AGENT DEBUG: Log all received POST data
         error_log('🔍 AJAX DEBUG - Full $_POST data: ' . print_r($_POST, true));
 
-        $template_id = intval($_POST['template_id'] ?? 0);
+        $template_id = intval($_POST['template_id']); // 🧠 AGENT-4 FIX: Match working pattern
         $measurements_raw = $_POST['measurements'] ?? null;
 
-        // 🧠 AGENT-5 FIX: Handle JSON serialized measurements
-        $measurements = null;
-        if ($measurements_raw) {
-            if (is_string($measurements_raw)) {
-                $measurements = json_decode($measurements_raw, true);
-                error_log('🔍 PHP DEBUG - JSON decoded measurements: ' . print_r($measurements, true));
-            } else {
-                $measurements = $measurements_raw;
-            }
-        }
+        // 🧠 AGENT-6 FIX: Direct measurement data handling (no JSON)
+        $measurements = $_POST['measurements'] ?? null;
 
         // 🧠 AGENT DEBUG: Specific parameter validation
         error_log('🔍 AJAX DEBUG - template_id: ' . $template_id);

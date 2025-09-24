@@ -1573,7 +1573,7 @@ class Octo_Print_Designer_Template {
         jQuery(document).ready(function($) {
             // 🧠 MEASUREMENT DATABASE JAVASCRIPT
             let currentTemplateId = <?php echo $post->ID; ?>;
-            let measurementData = {};
+            let measurementData = Object.create(null); // 🧠 AGENT-2 FIX: Pure object without prototype
 
             // Initialize template measurements immediately
             window.loadTemplateMeasurements = function() {
@@ -1660,12 +1660,9 @@ class Octo_Print_Designer_Template {
                     label: getMeasurementLabel(measurementKey)
                 };
 
-                // 🧠 AGENT-2 FIX: Detailed structure logging for debugging
-                console.log('🔍 UPDATE DEBUG - Updated measurementData:', measurementData);
-                console.log('🔍 STRUCTURE DEBUG - measurementData type:', typeof measurementData);
-                console.log('🔍 STRUCTURE DEBUG - measurementData constructor:', measurementData.constructor.name);
-                console.log('🔍 STRUCTURE DEBUG - Object.keys():', Object.keys(measurementData));
-                console.log('🔍 STRUCTURE DEBUG - JSON.stringify():', JSON.stringify(measurementData));
+                // 🧠 AGENT-6 FIX: Simplified logging without potential corruption
+                console.log('🔍 UPDATE DEBUG - Measurement added:', sizeKey, measurementKey, value);
+                console.log('🔍 UPDATE DEBUG - Total measurements:', Object.keys(measurementData).length);
 
                 // Visual feedback for precision
                 if (value > 0 && (value * 10) % 1 !== 0) {
@@ -1705,17 +1702,14 @@ class Octo_Print_Designer_Template {
                 console.log('💾 Saving measurements for template:', currentTemplateId);
                 console.log('💾 Measurement data:', measurementData);
 
-                // 🧠 AGENT-4 FIX: Ensure proper serialization of measurement object
-                const measurementPayload = {
+                // 🧠 AGENT-6 FIX: Clean serialization without debug corruption
+                console.log('💾 Serializing measurements:', Object.keys(measurementData).length, 'sizes');
+
+                $.post(ajaxurl, {
                     action: 'save_template_measurements_from_admin',
                     template_id: currentTemplateId,
-                    measurements: JSON.stringify(measurementData) // Explicit JSON serialization
-                };
-
-                console.log('🔍 SERIALIZATION DEBUG - Payload:', measurementPayload);
-                console.log('🔍 SERIALIZATION DEBUG - measurements type:', typeof measurementPayload.measurements);
-
-                $.post(ajaxurl, measurementPayload, function(response) {
+                    measurements: measurementData // Let jQuery handle serialization
+                }, function(response) {
                     console.log('🔍 AJAX Response received:', response);
                     if (response.success) {
                         alert('✅ All measurements saved successfully');
