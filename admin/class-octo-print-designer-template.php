@@ -1523,31 +1523,18 @@ class Octo_Print_Designer_Template {
     public function render_measurements_database_meta_box($post) {
         wp_nonce_field('template_measurements_database', 'template_measurements_database_nonce');
         ?>
-        <p><strong>Dynamic Template Measurements Database</strong></p>
-        <p>Manage precise measurements (±0.1cm) synchronized with Template Sizes. This system replaces hardcoded S/M/L/XL with dynamic size definitions.</p>
+        <p><strong>Template Measurements Database</strong></p>
+        <p>Manage precise measurements synchronized with Template Sizes. This system replaces hardcoded S/M/L/XL with dynamic size definitions.</p>
 
         <!-- Template Measurements Database Interface -->
         <div class="octo-measurement-management">
-            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                <label for="template-select">Select Template:</label>
-                <select id="template-select" onchange="loadTemplateMeasurements()" style="margin-left: 10px; padding: 5px;">
-                    <option value="<?php echo $post->ID; ?>" selected><?php echo $post->post_title; ?></option>
-                </select>
-                <button type="button" class="button secondary" onclick="refreshTemplateList()" style="margin-left: 10px;">
-                    <span class="dashicons dashicons-update"></span> Refresh
-                </button>
-            </div>
-
-            <div id="template-sizes-section" style="display: none; margin-bottom: 20px; padding: 15px; background: #f1f8ff; border-radius: 8px;">
+            <div id="template-sizes-section" style="margin-bottom: 20px; padding: 15px; background: #f1f8ff; border-radius: 8px;">
                 <h4>📐 Template Sizes:</h4>
                 <div id="template-sizes-display" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;"></div>
-                <button type="button" class="button secondary" onclick="syncTemplateSizes()">
-                    <span class="dashicons dashicons-update-alt"></span> Sync Sizes
-                </button>
             </div>
 
-            <div id="measurements-table-container" style="display: none;">
-                <h4>📏 Measurements Table (±0.1cm Precision):</h4>
+            <div id="measurements-table-container">
+                <h4>📏 Measurements Table:</h4>
                 <div style="overflow-x: auto; border: 1px solid #e1e1e1; border-radius: 8px; background: white;">
                     <table id="measurements-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
                         <thead>
@@ -1575,9 +1562,6 @@ class Octo_Print_Designer_Template {
                     <button type="button" class="button button-primary" onclick="saveAllMeasurements()">
                         <span class="dashicons dashicons-saved"></span> Save All Measurements
                     </button>
-                    <button type="button" class="button" onclick="validateMeasurements()">
-                        <span class="dashicons dashicons-analytics"></span> Validate Precision
-                    </button>
                     <button type="button" class="button" onclick="exportMeasurements()">
                         <span class="dashicons dashicons-download"></span> Export CSV
                     </button>
@@ -1591,47 +1575,21 @@ class Octo_Print_Designer_Template {
             let currentTemplateId = <?php echo $post->ID; ?>;
             let measurementData = {};
 
-            // Make functions global
-            window.refreshTemplateList = function() {
-                console.log('🔄 Loading templates...');
-                $.post(ajaxurl, {
-                    action: 'get_design_templates_for_measurements'
-                }, function(response) {
-                    const select = $('#template-select');
-                    select.html('<option value="">Choose a template...</option>');
-
-                    if (response.success && response.data) {
-                        response.data.forEach(template => {
-                            const selected = template.id == currentTemplateId ? ' selected' : '';
-                            select.append('<option value="' + template.id + '"' + selected + '>' + template.title + '</option>');
-                        });
-                        console.log('✅ Templates loaded successfully');
-                        if (currentTemplateId) {
-                            loadTemplateMeasurements();
-                        }
-                    } else {
-                        console.log('❌ Failed to load templates');
-                    }
-                });
-            };
-
+            // Initialize template measurements immediately
             window.loadTemplateMeasurements = function() {
-                const templateId = $('#template-select').val() || currentTemplateId;
-                if (!templateId) {
-                    $('#template-sizes-section, #measurements-table-container').hide();
+                if (!currentTemplateId) {
                     return;
                 }
 
-                currentTemplateId = templateId;
-                console.log('🔄 Loading template measurements for ID:', templateId);
+                console.log('🔄 Loading template measurements for ID:', currentTemplateId);
 
                 $.post(ajaxurl, {
                     action: 'get_template_sizes_for_measurements',
-                    template_id: templateId
+                    template_id: currentTemplateId
                 }, function(response) {
                     if (response.success && response.data) {
                         displayTemplateSizes(response.data);
-                        loadMeasurementTable(templateId);
+                        loadMeasurementTable(currentTemplateId);
                     } else {
                         console.log('❌ Failed to load template sizes');
                     }
@@ -1722,7 +1680,8 @@ class Octo_Print_Designer_Template {
                     return;
                 }
 
-                console.log('💾 Saving measurements...');
+                console.log('💾 Saving measurements for template:', currentTemplateId);
+                console.log('💾 Measurement data:', measurementData);
 
                 $.post(ajaxurl, {
                     action: 'save_template_measurements_from_admin',
@@ -1734,55 +1693,14 @@ class Octo_Print_Designer_Template {
                         console.log('✅ All measurements saved successfully');
                     } else {
                         alert('❌ Failed to save measurements: ' + (response.data || 'Unknown error'));
+                        console.error('❌ Save error response:', response);
                     }
+                }).fail(function(xhr, status, error) {
+                    alert('❌ AJAX error: ' + error);
+                    console.error('❌ AJAX error:', xhr.responseText);
                 });
             };
 
-            window.validateMeasurements = function() {
-                if (!currentTemplateId) {
-                    alert('No template selected');
-                    return;
-                }
-
-                console.log('🔍 Validating precision...');
-
-                $.post(ajaxurl, {
-                    action: 'validate_template_measurements',
-                    template_id: currentTemplateId
-                }, function(response) {
-                    if (response.success) {
-                        const result = response.data;
-                        if (result.status === 'success') {
-                            alert('✅ Validation passed - All measurements within ±0.1cm tolerance');
-                        } else {
-                            alert('⚠️ Validation warnings: ' + result.errors.join(', '));
-                        }
-                    } else {
-                        alert('❌ Validation failed');
-                    }
-                });
-            };
-
-            window.syncTemplateSizes = function() {
-                if (!currentTemplateId) {
-                    alert('No template selected');
-                    return;
-                }
-
-                console.log('🔄 Synchronizing Template Sizes...');
-
-                $.post(ajaxurl, {
-                    action: 'sync_template_sizes_measurements',
-                    template_id: currentTemplateId
-                }, function(response) {
-                    if (response.success) {
-                        alert('✅ Template Sizes synchronized successfully');
-                        loadTemplateMeasurements();
-                    } else {
-                        alert('❌ Failed to sync Template Sizes');
-                    }
-                });
-            };
 
             window.exportMeasurements = function() {
                 if (!currentTemplateId) {
@@ -1836,7 +1754,7 @@ class Octo_Print_Designer_Template {
 
             // Initialize
             console.log('🧠 MEASUREMENT UI: Initializing database interface...');
-            refreshTemplateList();
+            loadTemplateMeasurements();
         });
         </script>
         <?php
