@@ -3,12 +3,17 @@ class Octo_Print_Designer_Admin {
     private $plugin_name;
     private $version;
     private $template_manager;
+    private $point_to_point_admin;
 
     public function __construct($plugin_name, $version) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
-        
+
         $this->template_manager = new Octo_Print_Designer_Template();
+
+        // Gap 2: Point-to-Point Admin Integration
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-point-to-point-admin.php';
+        $this->point_to_point_admin = new Octo_Print_Designer_Point_To_Point_Admin($plugin_name, $version);
 
         $this->define_hooks();
     }
