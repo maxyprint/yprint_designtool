@@ -1648,6 +1648,9 @@ class Octo_Print_Designer_Template {
                 const measurementKey = input.dataset.measurement;
                 const value = parseFloat(input.value) || 0;
 
+                // 🧠 AGENT-5 DEBUG: Track measurement updates
+                console.log('🔍 UPDATE DEBUG - Size:', sizeKey, 'Measurement:', measurementKey, 'Value:', value);
+
                 if (!measurementData[sizeKey]) {
                     measurementData[sizeKey] = {};
                 }
@@ -1656,6 +1659,9 @@ class Octo_Print_Designer_Template {
                     value_cm: value,
                     label: getMeasurementLabel(measurementKey)
                 };
+
+                // 🧠 AGENT-5 DEBUG: Show updated measurement data
+                console.log('🔍 UPDATE DEBUG - Updated measurementData:', measurementData);
 
                 // Visual feedback for precision
                 if (value > 0 && (value * 10) % 1 !== 0) {
@@ -1676,7 +1682,19 @@ class Octo_Print_Designer_Template {
 
             window.saveAllMeasurements = function() {
                 if (!currentTemplateId) {
-                    alert('No template selected');
+                    alert('❌ No template selected');
+                    return;
+                }
+
+                // 🧠 AGENT-5 DEBUG: Validate data before transmission
+                console.log('🔍 PRE-SAVE DEBUG - template ID:', currentTemplateId);
+                console.log('🔍 PRE-SAVE DEBUG - measurementData:', measurementData);
+                console.log('🔍 PRE-SAVE DEBUG - measurementData keys:', Object.keys(measurementData));
+                console.log('🔍 PRE-SAVE DEBUG - measurementData empty?:', Object.keys(measurementData).length === 0);
+
+                if (Object.keys(measurementData).length === 0) {
+                    alert('❌ No measurements to save. Please enter measurements in the table first.');
+                    console.error('❌ measurementData is empty - user needs to enter values first');
                     return;
                 }
 
@@ -1688,6 +1706,7 @@ class Octo_Print_Designer_Template {
                     template_id: currentTemplateId,
                     measurements: measurementData
                 }, function(response) {
+                    console.log('🔍 AJAX Response received:', response);
                     if (response.success) {
                         alert('✅ All measurements saved successfully');
                         console.log('✅ All measurements saved successfully');
@@ -1697,7 +1716,12 @@ class Octo_Print_Designer_Template {
                     }
                 }).fail(function(xhr, status, error) {
                     alert('❌ AJAX error: ' + error);
-                    console.error('❌ AJAX error:', xhr.responseText);
+                    console.error('❌ AJAX error details:', {
+                        status: status,
+                        error: error,
+                        responseText: xhr.responseText,
+                        xhr: xhr
+                    });
                 });
             };
 
@@ -1752,9 +1776,15 @@ class Octo_Print_Designer_Template {
                 }
             };
 
-            // Initialize
-            console.log('🧠 MEASUREMENT UI: Initializing database interface...');
-            loadTemplateMeasurements();
+            // Initialize - Load template measurements automatically
+            console.log('🧠 MEASUREMENT UI: Initializing database interface for template:', currentTemplateId);
+
+            // Auto-load template sizes and measurements on page load
+            if (currentTemplateId) {
+                loadTemplateMeasurements();
+            } else {
+                console.error('❌ No template ID available for measurement loading');
+            }
         });
         </script>
         <?php

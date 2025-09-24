@@ -1057,11 +1057,25 @@ class Octo_Print_Designer_Admin {
             return;
         }
 
-        $template_id = intval($_POST['template_id']);
-        $measurements = $_POST['measurements'];
+        // 🧠 AGENT DEBUG: Log all received POST data
+        error_log('🔍 AJAX DEBUG - Full $_POST data: ' . print_r($_POST, true));
+
+        $template_id = intval($_POST['template_id'] ?? 0);
+        $measurements = $_POST['measurements'] ?? null;
+
+        // 🧠 AGENT DEBUG: Specific parameter validation
+        error_log('🔍 AJAX DEBUG - template_id: ' . $template_id);
+        error_log('🔍 AJAX DEBUG - measurements type: ' . gettype($measurements));
+        error_log('🔍 AJAX DEBUG - measurements content: ' . print_r($measurements, true));
 
         if (!$template_id || !$measurements) {
-            wp_send_json_error('Missing template ID or measurements data');
+            $error_msg = sprintf(
+                'Missing template ID (%s) or measurements data (%s)',
+                $template_id ? 'OK' : 'MISSING',
+                $measurements ? 'OK' : 'MISSING'
+            );
+            error_log('❌ AJAX DEBUG - Error: ' . $error_msg);
+            wp_send_json_error($error_msg);
             return;
         }
 
