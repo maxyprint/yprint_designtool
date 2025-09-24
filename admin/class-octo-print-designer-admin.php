@@ -35,8 +35,26 @@ class Octo_Print_Designer_Admin {
 
     public function enqueue_scripts($hook) {
 
+        // 🔍 DEBUG: Log hook information for troubleshooting
+        error_log("🔧 [ADMIN DEBUG] enqueue_scripts called with hook: " . $hook);
+        error_log("🔧 [ADMIN DEBUG] is_template_edit_page: " . ($this->is_template_edit_page($hook) ? 'YES' : 'NO'));
+        error_log("🔧 [ADMIN DEBUG] is_woocommerce_order_edit_page: " . ($this->is_woocommerce_order_edit_page($hook) ? 'YES' : 'NO'));
+
+        if (function_exists('get_current_screen')) {
+            $screen = get_current_screen();
+            if ($screen) {
+                error_log("🔧 [ADMIN DEBUG] current_screen->post_type: " . ($screen->post_type ?? 'null'));
+                error_log("🔧 [ADMIN DEBUG] current_screen->id: " . ($screen->id ?? 'null'));
+            }
+        }
+
         // 🎯 CRITICAL FIX: Enable scripts for BOTH template edit pages AND WooCommerce order pages
-        if (!$this->is_template_edit_page($hook) && !$this->is_woocommerce_order_edit_page($hook)) return;
+        if (!$this->is_template_edit_page($hook) && !$this->is_woocommerce_order_edit_page($hook)) {
+            error_log("🔧 [ADMIN DEBUG] Scripts NOT loaded - neither template nor woocommerce order page");
+            return;
+        }
+
+        error_log("🔧 [ADMIN DEBUG] Scripts WILL be loaded!");
 
         wp_enqueue_media();
         
