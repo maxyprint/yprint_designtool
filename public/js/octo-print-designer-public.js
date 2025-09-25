@@ -41,45 +41,66 @@
 	}
 
 	$(function() {
-		// 🎯 ISSUE #123 FIX: Use Canvas Initialization Controller
-		debugLog('info', '🎯 ISSUE #123 FIX: Using Canvas Initialization Controller for singleton management');
+		// 🧠 HIVE-MIND SOLUTION: Multi-Layer Singleton Architecture Integration
+		debugLog('info', '🧠 HIVE-MIND: Integrating with Multi-Layer Singleton Architecture');
 
-		// Wait for controller to be ready
-		function initializeWithController() {
+		// Wait for all singleton controllers to be ready
+		function initializeWithHiveMindArchitecture() {
+			// Check for Canvas Initialization Controller
 			if (!window.canvasInitializationController) {
-				debugLog('debug', '⏳ Waiting for Canvas Initialization Controller...');
+				debugLog('debug', '⏳ HIVE-MIND: Waiting for Canvas Initialization Controller...');
 				return false;
 			}
 
-			// Check controller status
+			// Check for Fabric Singleton Wrapper
+			if (!window.FabricCanvasSingleton && (!window.fabric || !window.fabric.Canvas.__singletonWrapped)) {
+				debugLog('debug', '⏳ HIVE-MIND: Waiting for Fabric Canvas Singleton...');
+				return false;
+			}
+
+			// Check for Script Load Coordinator
+			if (!window.scriptLoadCoordinator) {
+				debugLog('debug', '⏳ HIVE-MIND: Waiting for Script Load Coordinator...');
+				return false;
+			}
+
+			// Get controller status
 			const status = window.canvasInitializationController.getStatus();
-			debugLog('debug', '📊 Canvas Controller Status:', status);
+			debugLog('debug', '📊 HIVE-MIND: Canvas Controller Status:', status);
+
+			// Get fabric singleton stats
+			const fabricStats = window.fabric?.Canvas?.getStats ? window.fabric.Canvas.getStats() : {};
+			debugLog('debug', '📊 HIVE-MIND: Fabric Singleton Stats:', fabricStats);
+
+			// Get script coordinator stats
+			const scriptStats = window.scriptLoadCoordinator.getStats();
+			debugLog('debug', '📊 HIVE-MIND: Script Coordinator Stats:', scriptStats);
 
 			// If canvas already initialized, get existing instance
 			if (status.isInitialized) {
 				const existingCanvas = window.canvasInitializationController.getCanvas();
 				if (existingCanvas && window.designerWidgetInstance) {
-					debugLog('info', '✅ ISSUE #123 FIX: Canvas and DesignerWidget already initialized, reusing existing');
+					debugLog('info', '✅ HIVE-MIND: Canvas and DesignerWidget already initialized via singleton architecture');
 					return true;
 				}
 			}
 
 			// SINGLETON CHECK: Prevent duplicate widget instances
 			if (window.designerWidgetInstance) {
-				debugLog('debug', '🎯 SINGLETON: DesignerWidget instance already exists, reusing existing');
+				debugLog('debug', '🎯 HIVE-MIND: DesignerWidget instance already exists, reusing existing');
 				return true;
 			}
 
 			return false;
 		}
 
-		// Try immediate initialization with controller
-		if (initializeWithController()) {
+		// Try immediate initialization with Hive-Mind architecture
+		if (initializeWithHiveMindArchitecture()) {
 			return;
 		}
 
 		// Wait for designer bundle to load and expose DesignerWidget
-		function initializeDesignerWidget() {
+		async function initializeDesignerWidget() {
 			// PHASE 3 FIX: Singleton guard - prevent double initialization
 			if (window.designerWidgetInstance) {
 				debugLog('debug', '🛡️ SINGLETON: DesignerWidget already exists, skipping initialization');
@@ -98,14 +119,48 @@
 				console.log('🔍 CANVAS DEBUG: Both DesignerWidget and fabric.js are ready, creating instance...');
 
 				try {
-					window.designerWidgetInstance = new DesignerWidget();
-					console.log('✅ CANVAS DEBUG: DesignerWidget created successfully');
-					debugLog('info', '✅ GLOBAL INSTANCE: window.designerWidgetInstance created successfully');
-					return true;
+					// 🧠 HIVE-MIND: Use Canvas Initialization Controller for DesignerWidget
+					const canvasResult = await window.canvasInitializationController.initializeCanvas({
+						source: 'octo-print-designer-public.js',
+						width: 800,
+						height: 600,
+						backgroundColor: '#ffffff'
+					});
+
+					if (canvasResult.success) {
+						// Create DesignerWidget with controlled canvas
+						window.designerWidgetInstance = new DesignerWidget();
+
+						// Ensure DesignerWidget uses the singleton canvas
+						if (window.designerWidgetInstance && canvasResult.canvas) {
+							window.designerWidgetInstance.canvas = canvasResult.canvas;
+						}
+
+						console.log('✅ HIVE-MIND: DesignerWidget created with singleton canvas architecture');
+						debugLog('info', '✅ HIVE-MIND: Multi-layer singleton integration successful');
+
+						// Log agent validation metrics
+						const metrics = window.canvasInitializationController.getMetrics();
+						debugLog('debug', '📊 HIVE-MIND SUCCESS METRICS:', metrics);
+
+						return true;
+					} else {
+						console.error('❌ HIVE-MIND: Canvas initialization failed:', canvasResult.error);
+						return false;
+					}
 				} catch (error) {
-					console.error('❌ CANVAS DEBUG: DesignerWidget creation failed:', error);
-					debugLog('error', '❌ GLOBAL INSTANCE: DesignerWidget creation failed:', error);
-					return false;
+					console.error('❌ HIVE-MIND: DesignerWidget integration failed:', error);
+					debugLog('error', '❌ HIVE-MIND: Multi-layer singleton integration failed:', error);
+
+					// Fallback to direct creation for backward compatibility
+					try {
+						window.designerWidgetInstance = new DesignerWidget();
+						console.log('⚠️ HIVE-MIND: Fallback DesignerWidget creation successful');
+						return true;
+					} catch (fallbackError) {
+						console.error('❌ HIVE-MIND: Even fallback creation failed:', fallbackError);
+						return false;
+					}
 				}
 			}
 
