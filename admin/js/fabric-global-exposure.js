@@ -279,11 +279,12 @@
             return;
         }
 
-        // Special handling for waiting for templateEditors to be populated
+        // AGENT 2 FIX: Enhanced templateEditors detection with multiple timing strategies
         if (window.templateEditors instanceof Map && window.templateEditors.size === 0 && templateEditorWaitCount < maxTemplateEditorWait) {
             templateEditorWaitCount++;
-            const waitDelay = 200; // Wait 200ms for templateEditors to be populated
-            console.log(`🔧 FABRIC EXPOSURE: Waiting for templateEditors to be populated... ${templateEditorWaitCount}/${maxTemplateEditorWait}`);
+            // Progressive delay: faster initial attempts, slower later ones for efficiency
+            const waitDelay = Math.min(100 + (templateEditorWaitCount * 50), 500);
+            console.log(`🔧 FABRIC EXPOSURE: Waiting for templateEditors to be populated... ${templateEditorWaitCount}/${maxTemplateEditorWait} (delay: ${waitDelay}ms)`);
             setTimeout(attemptExposure, waitDelay);
             return;
         }
@@ -312,7 +313,7 @@
         // Immediate attempt
         attemptExposure();
 
-        // Also watch for templateEditors changes
+        // AGENT 2 FIX: Enhanced templateEditors monitoring with multiple event triggers
         let templateEditorsValue = window.templateEditors;
         Object.defineProperty(window, 'templateEditors', {
             get() { return templateEditorsValue; },
@@ -320,10 +321,28 @@
                 templateEditorsValue = newValue;
                 console.log('🔧 FABRIC EXPOSURE: templateEditors updated, retrying...');
                 if (!window.fabric) {
-                    setTimeout(attemptExposure, 100);
+                    // Multiple timing strategies for better detection
+                    setTimeout(attemptExposure, 50);   // Immediate retry
+                    setTimeout(attemptExposure, 200);  // Quick retry
+                    setTimeout(attemptExposure, 500);  // Delayed retry
                 }
             },
             configurable: true
+        });
+
+        // AGENT 2 FIX: Listen for fabric loading events from other scripts
+        window.addEventListener('fabricGlobalReady', function(event) {
+            console.log('🔧 FABRIC EXPOSURE: Received fabricGlobalReady event');
+            if (!window.fabric) {
+                setTimeout(attemptExposure, 50);
+            }
+        });
+
+        window.addEventListener('fabricCanvasReady', function(event) {
+            console.log('🔧 FABRIC EXPOSURE: Received fabricCanvasReady event');
+            if (!window.fabric && event.detail && event.detail.canvas) {
+                setTimeout(attemptExposure, 50);
+            }
         });
     });
 

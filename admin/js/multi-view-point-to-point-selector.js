@@ -832,7 +832,12 @@ class MultiViewPointToPointSelector {
             // Step 4: Setup event listeners
             console.log('⚡ AGENT 6: Step 4 - Setting up event listeners');
             this.setupEventListeners();
-            this.createIntegrationBridgeUI();
+
+            // CRITICAL FIX: Wait for DOM elements to be fully rendered before creating Integration Bridge
+            setTimeout(() => {
+                console.log('🎯 TIMING FIX: Creating Integration Bridge UI after DOM elements are available');
+                this.createIntegrationBridgeUI();
+            }, 150);
 
             // Step 5: Load existing reference lines
             console.log('⚡ AGENT 6: Step 5 - Loading existing reference lines');
@@ -2886,6 +2891,15 @@ class MultiViewPointToPointSelector {
                 allElements.forEach((el, index) => {
                     console.error(`   ${index + 1}. ${el.tagName} with classes: ${el.className}`);
                 });
+
+                // CRITICAL FIX: Try one more time after a longer delay if this is the first attempt
+                if (!this.integrationBridgeRetryAttempt) {
+                    this.integrationBridgeRetryAttempt = true;
+                    console.log('⏳ INTEGRATION BRIDGE: Retrying UI creation after DOM stabilization (500ms delay)...');
+                    setTimeout(() => {
+                        this.createIntegrationBridgeUI();
+                    }, 500);
+                }
                 return;
             }
 
@@ -4730,120 +4744,6 @@ class MultiViewPointToPointSelector {
         console.log('🔍 AGENT 7: Integration Bridge Methods Status:', status);
         return status;
     }
-}
-
-// Global Instance für Multi-View Template Editor
-let multiViewPointToPointSelector = null;
-
-/**
- * AGENT 6: Enhanced Multi-View Point-to-Point Selector initialization with error handling
- */
-function initMultiViewPointToPointSelector(templateId) {
-    console.log('⚡ AGENT 6: Global function initialization called for template:', templateId);
-
-    // CRISIS FIX: More flexible canvas detection
-    let canvas = document.getElementById('template-canvas');
-
-    // Fallback: Look for other canvas elements if template-canvas not found
-    if (!canvas) {
-        console.warn('⚠️ CANVAS CRISIS: template-canvas not found, searching for alternatives...');
-        const canvasElements = document.querySelectorAll('canvas');
-        console.log('🔍 CANVAS SEARCH: Found', canvasElements.length, 'canvas elements');
-
-        // Try to find a suitable canvas
-        for (let i = 0; i < canvasElements.length; i++) {
-            const canvasEl = canvasElements[i];
-            const canvasInfo = {
-                id: canvasEl.id || 'no-id',
-                classes: canvasEl.className || 'no-classes',
-                parent: canvasEl.parentElement?.className || 'no-parent'
-            };
-            console.log(`🔍 CANVAS ${i}:`, canvasInfo);
-
-            // Use first canvas that's not upper-canvas or lower-canvas (those are Fabric overlays)
-            if (!canvasEl.className.includes('upper-canvas') && !canvasEl.className.includes('lower-canvas')) {
-                canvas = canvasEl;
-                console.log('✅ CANVAS FOUND: Using canvas', i, 'as template canvas');
-                break;
-            }
-        }
-    }
-
-    // CRISIS FIX: More flexible container detection
-    let container = document.getElementById('point-to-point-container');
-
-    if (!container) {
-        console.warn('⚠️ CONTAINER CRISIS: point-to-point-container not found, searching for alternatives...');
-
-        // Try to find or create a suitable container
-        const candidateSelectors = [
-            '.template-canvas-container',
-            '.canvas-container',
-            '#template-editor',
-            '.template-editor-content'
-        ];
-
-        for (const selector of candidateSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                console.log('✅ CONTAINER FOUND: Using', selector, 'as container');
-                container = element;
-                break;
-            }
-        }
-
-        // Last resort: Create container
-        if (!container && canvas) {
-            console.log('🚨 EMERGENCY: Creating point-to-point container');
-            container = document.createElement('div');
-            container.id = 'point-to-point-container';
-            container.style.position = 'relative';
-            canvas.parentElement.appendChild(container);
-        }
-    }
-
-    if (!canvas) {
-        console.error('❌ CRITICAL: No suitable canvas element found in DOM');
-        console.error('🔍 DEBUGGING: Available elements:', {
-            canvasElements: document.querySelectorAll('canvas').length,
-            templateEditorElements: document.querySelectorAll('[class*="template"]').length,
-            allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
-        });
-        return null;
-    }
-
-    if (!container) {
-        console.error('❌ CRITICAL: No suitable container element found in DOM');
-        return null;
-    }
-
-    console.log('✅ AGENT 6: Required DOM elements found, creating MultiViewPointToPointSelector');
-
-    try {
-        multiViewPointToPointSelector = new MultiViewPointToPointSelector(canvas, templateId);
-
-        // Store globally for debugging
-        window.multiViewSelector = multiViewPointToPointSelector;
-
-        console.log('✅ AGENT 6: MultiViewPointToPointSelector instance created successfully');
-        return multiViewPointToPointSelector;
-
-    } catch (error) {
-        console.error('❌ AGENT 6: Failed to create MultiViewPointToPointSelector:', error);
-
-        // Display error to user
-        if (container) {
-            container.innerHTML = `
-                <div style="background: #f8d7da; border: 1px solid #f1aeb5; color: #721c24; padding: 15px; border-radius: 4px;">
-                    <strong>❌ Initialisierung fehlgeschlagen</strong><br>
-                    Das Multi-View Point-to-Point System konnte nicht gestartet werden.<br>
-                    <small>Error: ${error.message}</small>
-                </div>
-            `;
-        }
-
-        return null;
-    }
 
     /**
      * AGENT 4 INTEGRATION METHODS: Enhanced measurement dropdown functionality
@@ -4930,6 +4830,160 @@ function initMultiViewPointToPointSelector(templateId) {
         return await this.loadMeasurementTypes();
     }
 }
+
+// Global Instance für Multi-View Template Editor
+let multiViewPointToPointSelector = null;
+
+/**
+ * AGENT 6: Enhanced Multi-View Point-to-Point Selector initialization with error handling
+ */
+function initMultiViewPointToPointSelector(templateId) {
+    console.log('⚡ AGENT 6: Global function initialization called for template:', templateId);
+
+    // ENHANCED: Robust canvas detection with fabric.js priority
+    let canvas = null;
+
+    console.log('🔍 CANVAS DETECTION: Starting enhanced canvas search...');
+
+    // Method 1: Try to find existing Fabric.js canvas instance first (highest priority)
+    if (window.fabricCanvas) {
+        console.log('✅ CANVAS FOUND: Using existing window.fabricCanvas');
+        canvas = window.fabricCanvas.getElement();
+    } else if (window.templateEditors instanceof Map && window.templateEditors.size > 0) {
+        // Method 2: Check templateEditors Map
+        for (const [key, editor] of window.templateEditors.entries()) {
+            if (editor && editor.canvas && editor.canvas.getElement) {
+                console.log('✅ CANVAS FOUND: Using canvas from templateEditor:', key);
+                canvas = editor.canvas.getElement();
+                break;
+            }
+        }
+    } else if (window.variationsManager && window.variationsManager.editors instanceof Map) {
+        // Method 3: Check variationsManager
+        for (const [key, editor] of window.variationsManager.editors.entries()) {
+            if (editor && editor.canvas && editor.canvas.getElement) {
+                console.log('✅ CANVAS FOUND: Using canvas from variationsManager:', key);
+                canvas = editor.canvas.getElement();
+                break;
+            }
+        }
+    }
+
+    // Method 4: Fallback to DOM element search
+    if (!canvas) {
+        canvas = document.getElementById('template-canvas');
+        if (canvas) {
+            console.log('✅ CANVAS FOUND: Using template-canvas DOM element');
+        }
+    }
+
+    // Method 5: Last resort - search all canvas elements
+    if (!canvas) {
+        console.warn('⚠️ CANVAS FALLBACK: Searching all canvas elements...');
+        const canvasElements = document.querySelectorAll('canvas');
+        console.log('🔍 CANVAS SEARCH: Found', canvasElements.length, 'canvas elements');
+
+        for (let i = 0; i < canvasElements.length; i++) {
+            const canvasEl = canvasElements[i];
+            const canvasInfo = {
+                id: canvasEl.id || 'no-id',
+                classes: canvasEl.className || 'no-classes',
+                parent: canvasEl.parentElement?.className || 'no-parent',
+                hasFabric: !!canvasEl.__fabric
+            };
+            console.log(`🔍 CANVAS ${i}:`, canvasInfo);
+
+            // Prioritize canvas with Fabric.js attached
+            if (canvasEl.__fabric) {
+                canvas = canvasEl;
+                console.log('✅ CANVAS FOUND: Using Fabric.js canvas', i);
+                break;
+            }
+
+            // Otherwise use first non-overlay canvas
+            if (!canvasEl.className.includes('upper-canvas') && !canvasEl.className.includes('lower-canvas')) {
+                canvas = canvasEl;
+                console.log('✅ CANVAS FOUND: Using standard canvas', i);
+            }
+        }
+    }
+
+    // CRISIS FIX: More flexible container detection
+    let container = document.getElementById('point-to-point-container');
+
+    if (!container) {
+        console.warn('⚠️ CONTAINER CRISIS: point-to-point-container not found, searching for alternatives...');
+
+        // Try to find or create a suitable container
+        const candidateSelectors = [
+            '.template-canvas-container',
+            '.canvas-container',
+            '#template-editor',
+            '.template-editor-content'
+        ];
+
+        for (const selector of candidateSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log('✅ CONTAINER FOUND: Using', selector, 'as container');
+                container = element;
+                break;
+            }
+        }
+
+        // Last resort: Create container
+        if (!container && canvas) {
+            console.log('🚨 EMERGENCY: Creating point-to-point container');
+            container = document.createElement('div');
+            container.id = 'point-to-point-container';
+            container.style.position = 'relative';
+            canvas.parentElement.appendChild(container);
+        }
+    }
+
+    if (!canvas) {
+        console.error('❌ CRITICAL: No suitable canvas element found in DOM');
+        console.error('🔍 DEBUGGING: Available elements:', {
+            canvasElements: document.querySelectorAll('canvas').length,
+            templateEditorElements: document.querySelectorAll('[class*="template"]').length,
+            allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
+        });
+        return null;
+    }
+
+    if (!container) {
+        console.error('❌ CRITICAL: No suitable container element found in DOM');
+        return null;
+    }
+
+    console.log('✅ AGENT 6: Required DOM elements found, creating MultiViewPointToPointSelector');
+
+    try {
+        multiViewPointToPointSelector = new MultiViewPointToPointSelector(canvas, templateId);
+
+        // Store globally for debugging
+        window.multiViewSelector = multiViewPointToPointSelector;
+
+        console.log('✅ AGENT 6: MultiViewPointToPointSelector instance created successfully');
+        return multiViewPointToPointSelector;
+
+    } catch (error) {
+        console.error('❌ AGENT 6: Failed to create MultiViewPointToPointSelector:', error);
+
+        // Display error to user
+        if (container) {
+            container.innerHTML = `
+                <div style="background: #f8d7da; border: 1px solid #f1aeb5; color: #721c24; padding: 15px; border-radius: 4px;">
+                    <strong>❌ Initialisierung fehlgeschlagen</strong><br>
+                    Das Multi-View Point-to-Point System konnte nicht gestartet werden.<br>
+                    <small>Error: ${error.message}</small>
+                </div>
+            `;
+        }
+
+        return null;
+    }
+}
 // WordPress Admin Integration with delayed initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 DOM Content Loaded - Starting template editor detection...');
@@ -4954,7 +5008,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Check if template editor systems are ready
                 const canvasElements = document.querySelectorAll('canvas');
-                const templateEditorReady = window.templateEditors && Object.keys(window.templateEditors).length > 0;
+                const templateEditorReady = window.templateEditors &&
+                    (window.templateEditors instanceof Map ? window.templateEditors.size > 0 : Object.keys(window.templateEditors).length > 0);
                 const variationsManagerReady = window.variationsManager && window.variationsManager.editors;
                 const fabricReady = window.fabric && typeof window.fabric.Canvas === 'function';
 

@@ -957,16 +957,17 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Admin context flag
+        // Admin context flag - AGENT 2 FIX: Allow selective canvas detection
         wp_localize_script('octo-admin-design-capture', 'octoAdminContext', [
             'context' => 'woocommerce_admin',
-            'skip_canvas_polling' => true,
+            'skip_canvas_polling' => false, // CRITICAL: Enable canvas detection for template editor
+            'enable_selective_detection' => true, // Allow canvas detection only when needed
             'enable_modal_preview' => true,
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('design_preview_nonce')
         ]);
 
-        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - canvas polling disabled');</script>";
+        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - selective canvas detection enabled');</script>";
     }
 
     // 🧠 AGENT 3 DELIVERABLE: Measurement Database AJAX Handler Methods
