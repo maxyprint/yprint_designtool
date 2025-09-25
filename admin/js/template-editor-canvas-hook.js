@@ -7,18 +7,19 @@
 (function() {
     'use strict';
 
-    // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context detection
+    // 🧠 AGENT 2 FIX: Enhanced admin context detection with selective polling
     const isAdminContext = (typeof window.octoAdminContext !== 'undefined') && window.octoAdminContext.context === 'woocommerce_admin';
+    const allowSelectiveDetection = window.octoAdminContext && window.octoAdminContext.enable_selective_detection;
 
     // Hook into TemplateEditor to expose canvas globally
     function hookTemplateEditor() {
         if (isAdminContext) {
-            if (window.octoAdminContext && window.octoAdminContext.skip_canvas_polling) {
+            if (window.octoAdminContext && window.octoAdminContext.skip_canvas_polling && !allowSelectiveDetection) {
                 console.log('🧠 [CANVAS ADAPTER] Admin context detected - skipping canvas hooks entirely');
                 // Early exit to prevent any canvas polling in admin
                 return;
             }
-            console.log('🧠 [CANVAS ADAPTER] Admin context detected but polling not explicitly disabled');
+            console.log('🧠 [CANVAS ADAPTER] Admin context detected with selective detection enabled');
         }
 
         console.log('🎯 CANVAS HOOK: Setting up TemplateEditor hooks...');
@@ -149,17 +150,17 @@
 
     // Enhanced polling with fabric instance validation and DOM Ready detection
     function startPollingFallback() {
-        // 🧠 AGENT FIX: CanvasSystemAdapter - Skip polling entirely in admin context
-        if (isAdminContext && window.octoAdminContext && window.octoAdminContext.skip_canvas_polling) {
+        // 🧠 AGENT 2 FIX: CanvasSystemAdapter - Allow selective polling in admin context
+        if (isAdminContext && window.octoAdminContext && window.octoAdminContext.skip_canvas_polling && !allowSelectiveDetection) {
             console.log('🧠 [CANVAS ADAPTER] Skipping polling fallback - admin context with skip_canvas_polling enabled');
             return;
         }
 
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        // 🧠 AGENT FIX: CanvasSystemAdapter - Admin context timeout optimization
-        const maxAttempts = isAdminContext ? 5 : 200; // 2.5s in admin, 40s in editor
-        const pollInterval = 50; // More frequent polling - every 50ms
+        // 🧠 AGENT 2 FIX: Enhanced timeout configuration for template editor detection
+        const maxAttempts = isAdminContext && allowSelectiveDetection ? 20 : (isAdminContext ? 3 : 30); // 4s for selective detection
+        const pollInterval = isAdminContext && allowSelectiveDetection ? 200 : (isAdminContext ? 200 : 100); // Optimized intervals
 
         const poll = setInterval(() => {
             attempts++;
@@ -234,13 +235,31 @@
                 }
             }
 
-            // Enhanced logging every 2 seconds instead of every attempt
-            if (attempts % 40 === 0) {
+            // 5. AGENT 2 FIX: Enhanced template editor specific detection
+            if (isAdminContext && allowSelectiveDetection) {
+                // Look for WordPress template editor specific elements
+                const templateContainers = document.querySelectorAll('.wp-block-template-part, .edit-site-canvas-container, .interface-interface-skeleton__content');
+                for (const container of templateContainers) {
+                    const canvasInContainer = container.querySelector('canvas');
+                    if (canvasInContainer && canvasInContainer.__fabric && !window.fabricCanvas) {
+                        console.log('✅ CANVAS HOOK: Found template editor canvas!');
+                        window.fabricCanvas = canvasInContainer.__fabric;
+                        window.dispatchEvent(new CustomEvent('fabricCanvasReady', {
+                            detail: { canvas: canvasInContainer.__fabric, source: 'templateEditor' }
+                        }));
+                        clearInterval(poll);
+                        return;
+                    }
+                }
+            }
+
+            // AGENT 4: Reduced logging frequency to minimize performance impact
+            if (attempts % 10 === 0 || attempts === maxAttempts) {
                 console.log(`🔄 CANVAS HOOK: Polling attempt ${attempts}/${maxAttempts} - Checking fabric instances...`);
             }
 
             if (attempts >= maxAttempts) {
-                console.error('🚨 CANVAS HOOK: CRITICAL - Polling timeout after 40 seconds');
+                console.error('🚨 CANVAS HOOK: CRITICAL - Polling timeout after optimized duration');
                 console.error('🔍 Final state debug:', {
                     fabricAvailable: !!window.fabric,
                     templateEditors: window.templateEditors instanceof Map ? window.templateEditors.size : 'not-map',

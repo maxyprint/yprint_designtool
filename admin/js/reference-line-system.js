@@ -840,8 +840,8 @@
                 }
 
                 let attempts = 0;
-                const maxAttempts = 40; // Increased for async initialization detection
-                const baseDelay = 100; // More frequent checking for better responsiveness
+                const maxAttempts = 15; // AGENT 4: Reduced from 40 to 15 for better performance
+                const baseDelay = 200; // AGENT 4: Increased from 100ms to 200ms for better efficiency
                 let pollInterval = null;
 
                 const poll = () => {
@@ -853,8 +853,8 @@
                     }
 
                     attempts++;
-                    // 🟢 LOG-SPAM ELIMINATION: Only log every 5 attempts
-                    if (attempts % 5 === 1 || attempts === 1) {
+                    // AGENT 4: Further reduced logging - only at key intervals
+                    if (attempts % 5 === 0 || attempts === 1 || attempts === maxAttempts) {
                         console.log(`🔄 Canvas polling attempt ${attempts}/${maxAttempts}`);
                     }
 
@@ -873,8 +873,8 @@
                         return;
                     }
 
-                    // Progressive delay: 200ms, 400ms, 600ms, ..., max 2000ms
-                    const delay = Math.min(baseDelay * attempts, 2000);
+                    // AGENT 4: Exponential backoff for efficiency: 200ms, 400ms, 800ms, max 1500ms
+                    const delay = Math.min(baseDelay * Math.pow(1.5, attempts), 1500);
                     pollInterval = setTimeout(poll, delay);
                 };
 

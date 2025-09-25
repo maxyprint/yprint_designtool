@@ -30,8 +30,8 @@ class OptimizedDesignDataCapture {
         this.mockupDesignArea = null;
         this.initialized = false;
         this.retryCount = 0;
-        this.maxRetries = this.ADMIN_CONTEXT ? 2 : 5; // 🧠 AGENT FIX: Reduced retries in admin context
-        this.baseRetryDelay = 200;
+        this.maxRetries = this.ADMIN_CONTEXT ? 1 : 3; // AGENT 4: Further reduced retries for performance
+        this.baseRetryDelay = this.ADMIN_CONTEXT ? 500 : 300; // AGENT 4: Longer delays for efficiency
         this.canvasObserver = null;
 
         // Status tracking
@@ -213,7 +213,8 @@ class OptimizedDesignDataCapture {
      * Calculate retry delay with exponential backoff
      */
     calculateRetryDelay() {
-        return Math.min(this.baseRetryDelay * Math.pow(2, this.retryCount), 1000);
+        // AGENT 4: Optimized exponential backoff with better spacing
+        return Math.min(this.baseRetryDelay * Math.pow(1.8, this.retryCount), this.ADMIN_CONTEXT ? 2000 : 1500);
     }
 
     /**
@@ -1041,7 +1042,7 @@ class OptimizedDesignDataCapture {
     async waitForFabricInAdmin() {
         this.debugLog('info', '🧠 [JS OPTIMIZER] Waiting for Fabric.js in admin context...');
 
-        const maxWait = 10; // seconds (reduced from 40s)
+        const maxWait = 5; // AGENT 4: Further reduced from 10s to 5s for admin context
         let attempts = 0;
 
         const checkFabric = async () => {
