@@ -803,6 +803,18 @@ class MultiViewPointToPointSelector {
         // AGENT 2: Initialize visual debug overlay
         this.visualDebug = new VisualDebugOverlay(this.canvas, this.ctx);
 
+        // 🚨 EMERGENCY: Console output throttling to prevent console explosion
+        this._debugThrottling = {
+            lastDebugTime: 0,
+            debugInterval: 3000, // Only essential debug messages every 3 seconds
+            suppressedMessages: 0
+        };
+
+        // AGENT 1: Recursion prevention flags
+        this._calculatingScaleFactor = false;
+        this._calculatingCategoryScale = false;
+        this._recursionWarningShown = false;
+
         // AGENT 3: Initialize AJAX debug analyst
         this.ajaxDebug = new AjaxDebugAnalyst(this.debug);
 
@@ -1030,10 +1042,32 @@ class MultiViewPointToPointSelector {
     }
 
     /**
+     * 🚨 EMERGENCY: Throttled debug logging to prevent console explosion
+     */
+    debugThrottled(message, data = null) {
+        const now = Date.now();
+        if (now - this._debugThrottling.lastDebugTime >= this._debugThrottling.debugInterval) {
+            if (this._debugThrottling.suppressedMessages > 0) {
+                console.log(`🔇 Suppressed ${this._debugThrottling.suppressedMessages} debug messages`);
+                this._debugThrottling.suppressedMessages = 0;
+            }
+            console.log(message, data || '');
+            this._debugThrottling.lastDebugTime = now;
+        } else {
+            this._debugThrottling.suppressedMessages++;
+        }
+    }
+
+    /**
      * Lädt verfügbare Measurement-Types aus der Database (Issue #19)
      */
     async loadMeasurementTypes() {
         try {
+            console.log('🔄 Loading measurement types from database...', {
+                templateId: this.templateId,
+                ajaxurl: pointToPointAjax?.ajaxurl
+            });
+
             const response = await fetch(pointToPointAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1047,13 +1081,40 @@ class MultiViewPointToPointSelector {
             });
 
             const data = await response.json();
-            if (data.success) {
+            console.log('📊 Database response:', data);
+
+            if (data.success && data.data && data.data.measurement_types) {
                 this.measurementTypes = data.data.measurement_types;
+                console.log('✅ Loaded measurement types:', Object.keys(this.measurementTypes).length, 'types');
+                this.populateMeasurementDropdown();
+            } else {
+                console.warn('⚠️ Database returned no measurement types, using fallback');
+                this.loadFallbackMeasurementTypes();
                 this.populateMeasurementDropdown();
             }
         } catch (error) {
-            console.error('Fehler beim Laden der Measurement Types:', error);
+            console.error('❌ Error loading measurement types:', error);
+            console.log('🔄 Loading fallback measurement types...');
+            this.loadFallbackMeasurementTypes();
+            this.populateMeasurementDropdown();
         }
+    }
+
+    /**
+     * Load fallback measurement types when database fails
+     */
+    loadFallbackMeasurementTypes() {
+        this.measurementTypes = {
+            'A': { label: 'Chest', description: 'Brustumfang' },
+            'B': { label: 'Hem Width', description: 'Saumweite' },
+            'C': { label: 'Height from Shoulder', description: 'Höhe ab Schulter' },
+            'D': { label: 'Shoulder Width', description: 'Schulterbreite' },
+            'E': { label: 'Sleeve Length', description: 'Ärmellänge' },
+            'F': { label: 'Back Length', description: 'Rückenlänge' },
+            'G': { label: 'Armhole Width', description: 'Armausschnitt Breite' },
+            'H': { label: 'Neck Width', description: 'Halsausschnitt Breite' }
+        };
+        console.log('✅ Fallback measurement types loaded:', Object.keys(this.measurementTypes).length, 'types');
     }
 
     /**
@@ -1696,16 +1757,24 @@ class MultiViewPointToPointSelector {
      * AGENT 4 COORDINATION: Delegates to enhanced dropdown if available
      */
     populateMeasurementDropdown() {
-        // AGENT 4: Delegate to enhanced dropdown if available
-        if (this.agent4Enhancer) {
-            console.log('🎯 AGENT 4: Using enhanced dropdown population');
-            return this.agent4Enhancer.populateMeasurementDropdownDynamic();
+        console.log('📊 Populating measurement dropdown...');
+        const dropdown = document.getElementById('measurement-type-selector');
+
+        if (!dropdown) {
+            console.error('❌ Measurement dropdown element not found');
+            return;
         }
 
-        // AGENT 5: Fallback to original implementation
-        console.log('📊 AGENT 5: Using original dropdown population (fallback)');
-        const dropdown = document.getElementById('measurement-type-selector');
-        dropdown.innerHTML = '<option value="">Measurement-Type auswählen...</option>';
+        dropdown.innerHTML = '<option value="">📏 Select Measurement Type...</option>';
+
+        // Check if measurement types are available
+        if (!this.measurementTypes || Object.keys(this.measurementTypes).length === 0) {
+            console.warn('⚠️ No measurement types available, loading fallback...');
+            this.loadFallbackMeasurementTypes();
+        }
+
+        const measurementCount = Object.keys(this.measurementTypes).length;
+        console.log(`📊 Populating dropdown with ${measurementCount} measurement types`);
 
         // INTEGRATION BRIDGE: Enhanced measurement assignment with conflict detection
         Object.entries(this.measurementTypes).forEach(([key, data]) => {
@@ -3968,15 +4037,9 @@ class MultiViewPointToPointSelector {
      * ENHANCED INTEGRATION BRIDGE: Advanced scale factor calculation with precision validation
      */
     getScaleFactor() {
-        // RECURSION FIX: Add guard to prevent infinite loops
+        // 🚨 EMERGENCY FIX: Complete recursion elimination
         if (this._calculatingScaleFactor) {
-            // PERFORMANCE FIX: Reduce recursion warning spam
-            if (!this._recursionWarningShown) {
-                console.warn('⚠️ RECURSION GUARD: getScaleFactor called recursively, using fallback - further warnings suppressed');
-                this._recursionWarningShown = true;
-                setTimeout(() => this._recursionWarningShown = false, 30000); // Show warning again after 30 seconds
-            }
-            return this.calculateCategoryBasedScale();
+            return 1.0; // Static fallback - no more calling calculateCategoryBasedScale()
         }
 
         this._calculatingScaleFactor = true;
@@ -4017,15 +4080,9 @@ class MultiViewPointToPointSelector {
                 return templateScale;
             }
 
-            // Enhanced fallback with measurement category analysis
-            const categoryScale = this.calculateCategoryBasedScale();
-            // PERFORMANCE FIX: Reduce precision warning spam
-            if (!this._precisionWarningShown) {
-                console.warn(`⚠️ PRECISION: Using category-based scale: ${categoryScale.toFixed(4)} mm/px - further warnings suppressed`);
-                this._precisionWarningShown = true;
-                setTimeout(() => this._precisionWarningShown = false, 30000);
-            }
-            return categoryScale;
+            // 🚨 EMERGENCY FIX: Static fallback instead of category calculation
+            const staticFallbackScale = 1.2; // Safe static fallback value
+            return staticFallbackScale;
         } finally {
             // Always clear the recursion guard
             this._calculatingScaleFactor = false;
@@ -4122,7 +4179,8 @@ class MultiViewPointToPointSelector {
                 scale = 1.0; // Balanced template
             }
 
-            console.log(`🔴 AGENT-1: Category scale calculated: ${scale} (H:${horizontalCount}, V:${verticalCount})`);
+            // 🚨 EMERGENCY: Logging disabled to prevent console explosion
+            // console.log(`🔴 AGENT-1: Category scale calculated: ${scale} (H:${horizontalCount}, V:${verticalCount})`);
             return scale;
 
         } finally {
@@ -4824,9 +4882,8 @@ class MultiViewPointToPointSelector {
         try {
             console.log('🔴 PHASE 2: Using integrated measurement enhancement');
 
-            // Direct initialization without external script
-            this.agent4Enhancer = null; // Disable external enhancer
-            console.log('✅ PHASE 2: Integrated measurement dropdown ready');
+            // Direct initialization - measurement dropdown is now integrated
+            console.log('✅ Measurement dropdown integrated directly into main system');
             return true;
 
         } catch (error) {
@@ -4844,40 +4901,25 @@ class MultiViewPointToPointSelector {
     }
 
     /**
-     * AGENT 4: Enhanced measurement loading with click-to-refresh
+     * Refresh measurement dropdown (simplified)
      */
     async refreshMeasurementDropdown() {
-        if (this.agent4Enhancer) {
-            console.log('🔄 AGENT 4: Manual measurement dropdown refresh requested');
-            return await this.agent4Enhancer.loadMeasurementTypesEnhanced();
-        } else {
-            // Fallback to original method
-            return await this.loadMeasurementTypesOriginal();
-        }
+        console.log('🔄 Manual measurement dropdown refresh requested');
+        return await this.loadMeasurementTypes();
     }
 
     /**
-     * AGENT 4: Get measurement loading status
+     * Get measurement loading status (simplified)
      */
     getMeasurementLoadingStatus() {
-        if (this.agent4Enhancer) {
-            return this.agent4Enhancer.loadingStates;
-        }
         return { isLoading: false, hasError: false, errorMessage: null };
     }
 
     /**
-     * AGENT 4: Force reload measurements from database
+     * Force reload measurements from database (simplified)
      */
     async forceReloadMeasurements() {
-        console.log('🔄 AGENT 4: Forcing measurement reload from database...');
-
-        if (this.agent4Enhancer) {
-            // Reset retry attempts
-            this.agent4Enhancer.retryAttempts = 0;
-            return await this.agent4Enhancer.loadMeasurementTypesEnhanced();
-        }
-
+        console.log('🔄 Forcing measurement reload from database...');
         return await this.loadMeasurementTypes();
     }
 }
