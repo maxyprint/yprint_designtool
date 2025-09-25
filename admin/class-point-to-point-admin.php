@@ -2061,24 +2061,6 @@ class Octo_Print_Designer_Point_To_Point_Admin {
      * 🧠 AGENT 3: MISSING HELPER METHODS FOR ENHANCED AJAX HANDLER
      */
 
-    /**
-     * Get measurement category for better organization
-     */
-    private function get_measurement_category($measurement_key) {
-        $categories = array(
-            'A' => 'horizontal',
-            'B' => 'horizontal',
-            'C' => 'vertical',
-            'D' => 'horizontal',
-            'E' => 'vertical',
-            'F' => 'vertical',
-            'G' => 'horizontal',
-            'H' => 'horizontal',
-            'J' => 'detail'
-        );
-
-        return isset($categories[$measurement_key]) ? $categories[$measurement_key] : 'horizontal';
-    }
 
     /**
      * Assess readiness for precision calculations
