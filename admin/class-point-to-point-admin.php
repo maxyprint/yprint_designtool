@@ -149,6 +149,18 @@ class Octo_Print_Designer_Point_To_Point_Admin {
      * Lädt verfügbare Measurement Types für Template aus Issue #19 Database
      */
     public function ajax_get_template_measurements() {
+        // 🧠 AGENT-1 CORS FIX: Add CORS headers for XMLHttpRequest compatibility
+        header('Access-Control-Allow-Origin: ' . get_site_url());
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
             wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
@@ -164,28 +176,42 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         }
 
         try {
-            // Lade Measurement Types aus Issue #19 Implementation
+            // 🧠 AGENT-2 SYNCHRONIZATION FIX: Load actual measurements from database to sync with table
             if (class_exists('TemplateMeasurementManager')) {
                 $measurement_manager = new TemplateMeasurementManager();
                 $template_sizes = $measurement_manager->get_template_sizes($template_id);
 
-                // Definiere Standard Measurement Types (A-J)
-                $measurement_types = array(
-                    'A' => array('label' => 'Chest', 'description' => 'Brustumfang'),
-                    'B' => array('label' => 'Hem Width', 'description' => 'Saumweite'),
-                    'C' => array('label' => 'Height from Shoulder', 'description' => 'Höhe ab Schulter'),
-                    'D' => array('label' => 'Shoulder Width', 'description' => 'Schulterbreite'),
-                    'E' => array('label' => 'Sleeve Length', 'description' => 'Ärmellänge'),
-                    'F' => array('label' => 'Back Length', 'description' => 'Rückenlänge'),
-                    'G' => array('label' => 'Armhole Width', 'description' => 'Armausschnitt Breite'),
-                    'H' => array('label' => 'Neck Width', 'description' => 'Halsausschnitt Breite'),
-                    'J' => array('label' => 'Hem Height', 'description' => 'Saumhöhe')
-                );
+                // 🔄 SYNC FIX: Load actual measurements from database instead of hardcoded
+                $db_measurements = $measurement_manager->get_measurements($template_id);
+                $measurement_types = array();
+
+                // Extract unique measurement keys and create dropdown format
+                foreach ($db_measurements as $size_key => $measurements) {
+                    foreach ($measurements as $measurement_key => $measurement_data) {
+                        if (!isset($measurement_types[$measurement_key])) {
+                            $measurement_types[$measurement_key] = array(
+                                'label' => $measurement_data['label'] ?? $measurement_key,
+                                'description' => $measurement_data['description'] ?? $measurement_data['label'] ?? $measurement_key
+                            );
+                        }
+                    }
+                }
+
+                // If no database measurements, fall back to standard types
+                if (empty($measurement_types)) {
+                    error_log('🧠 AGENT-2: No database measurements found, using fallback types');
+                    $measurement_types = array(
+                        'A' => array('label' => 'Chest', 'description' => 'Brustumfang'),
+                        'B' => array('label' => 'Hem Width', 'description' => 'Saumweite'),
+                        'C' => array('label' => 'Height from Shoulder', 'description' => 'Höhe ab Schulter')
+                    );
+                }
 
                 wp_send_json_success(array(
                     'measurement_types' => $measurement_types,
                     'template_sizes' => $template_sizes,
-                    'template_id' => $template_id
+                    'template_id' => $template_id,
+                    'source' => 'database_sync'
                 ));
 
             } else {
@@ -214,6 +240,18 @@ class Octo_Print_Designer_Point_To_Point_Admin {
      * Speichert die erstellten Referenzlinien in _reference_lines_data Meta Field
      */
     public function ajax_save_reference_lines() {
+        // 🧠 AGENT-5 CORS FIX: Add CORS headers for save operations
+        header('Access-Control-Allow-Origin: ' . get_site_url());
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
             wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
@@ -535,6 +573,18 @@ class Octo_Print_Designer_Point_To_Point_Admin {
      * Speichert Reference Lines für alle Views
      */
     public function ajax_save_multi_view_reference_lines() {
+        // 🧠 AGENT-5 CORS FIX: Add CORS headers for multi-view save operations
+        header('Access-Control-Allow-Origin: ' . get_site_url());
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
             wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));

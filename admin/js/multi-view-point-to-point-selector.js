@@ -1080,8 +1080,32 @@ class MultiViewPointToPointSelector {
                 })
             });
 
-            const data = await response.json();
-            console.log('📊 Database response:', data);
+            // 🧠 AGENT-3 JSON PARSER FIX: Enhanced error handling for invalid JSON responses
+            let data;
+            const responseText = await response.text();
+            console.log('📊 Raw response text:', responseText);
+
+            try {
+                data = JSON.parse(responseText);
+                console.log('📊 Parsed JSON data:', data);
+            } catch (jsonError) {
+                console.error('❌ AGENT-3: JSON parsing failed:', jsonError.message);
+                console.log('📄 Response content:', responseText.substring(0, 500) + '...');
+
+                // Check if response contains HTML error message
+                if (responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
+                    console.error('🚨 AGENT-3: Server returned HTML instead of JSON - likely PHP error');
+                    throw new Error('Server returned HTML error page instead of JSON response');
+                }
+
+                // Check if response contains WordPress error
+                if (responseText.includes('wp_die') || responseText.includes('WordPress')) {
+                    console.error('🚨 AGENT-3: WordPress error in response');
+                    throw new Error('WordPress security or permission error');
+                }
+
+                throw new Error('Invalid JSON response: ' + jsonError.message);
+            }
 
             if (data.success && data.data && data.data.measurement_types) {
                 this.measurementTypes = data.data.measurement_types;
@@ -4884,6 +4908,83 @@ class MultiViewPointToPointSelector {
     async forceReloadMeasurements() {
         console.log('🔄 Forcing measurement reload from database...');
         return await this.loadMeasurementTypes();
+    }
+
+    /**
+     * 🧠 AGENT-4 NOTIFICATION SYSTEM: Show user notifications
+     * Provides visual feedback for save operations and errors
+     */
+    showNotification(message, type = 'info') {
+        console.log(`🔔 NOTIFICATION [${type.toUpperCase()}]: ${message}`);
+
+        // Create notification element if it doesn't exist
+        let notificationContainer = document.getElementById('multiview-notification-container');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'multiview-notification-container';
+            notificationContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                pointer-events: none;
+            `;
+            document.body.appendChild(notificationContainer);
+        }
+
+        // Create notification element
+        const notification = document.createElement('div');
+        const bgColor = type === 'success' ? '#4CAF50' :
+                        type === 'error' ? '#f44336' :
+                        type === 'warning' ? '#ff9800' : '#2196F3';
+
+        notification.style.cssText = `
+            background-color: ${bgColor};
+            color: white;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            pointer-events: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            max-width: 350px;
+        `;
+
+        const icon = type === 'success' ? '✅' :
+                    type === 'error' ? '❌' :
+                    type === 'warning' ? '⚠️' : '📋';
+
+        notification.innerHTML = `${icon} ${message}`;
+
+        notificationContainer.appendChild(notification);
+
+        // Animate in
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+        }, 10);
+
+        // Auto-remove notification
+        setTimeout(() => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, type === 'error' ? 5000 : 3000); // Errors stay longer
+
+        // Click to dismiss
+        notification.addEventListener('click', () => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        });
     }
 }
 
