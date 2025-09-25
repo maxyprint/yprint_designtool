@@ -3948,22 +3948,23 @@ class MultiViewPointToPointSelector {
             if (primaryLines && Array.isArray(primaryLines) && primaryLines.length > 0) {
                 // Use the most accurate primary reference line
                 const sortedPrimaryLines = primaryLines.sort((a, b) => {
-                const aPrecision = this.getPrecisionLevel(a.measurement_key);
-                const bPrecision = this.getPrecisionLevel(b.measurement_key);
-                return bPrecision - aPrecision; // Higher precision first
-            });
+                    const aPrecision = this.getPrecisionLevel(a.measurement_key);
+                    const bPrecision = this.getPrecisionLevel(b.measurement_key);
+                    return bPrecision - aPrecision; // Higher precision first
+                });
 
-            const primaryLine = sortedPrimaryLines[0];
-            const knownMeasurements = this.getKnownMeasurementDatabase();
+                const primaryLine = sortedPrimaryLines[0];
+                const knownMeasurements = this.getKnownMeasurementDatabase();
 
-            const knownLength = knownMeasurements[primaryLine.measurement_key]?.value;
-            if (knownLength && primaryLine.lengthPx > 0) {
-                const calculatedScale = knownLength / primaryLine.lengthPx;
+                const knownLength = knownMeasurements[primaryLine.measurement_key]?.value;
+                if (knownLength && primaryLine.lengthPx > 0) {
+                    const calculatedScale = knownLength / primaryLine.lengthPx;
 
-                // Validate scale factor reasonableness
-                if (calculatedScale > 0.1 && calculatedScale < 10) {
-                    console.log(`✅ PRECISION: Scale factor calculated: ${calculatedScale.toFixed(4)} mm/px from ${primaryLine.measurement_key}`);
-                    return calculatedScale;
+                    // Validate scale factor reasonableness
+                    if (calculatedScale > 0.1 && calculatedScale < 10) {
+                        console.log(`✅ PRECISION: Scale factor calculated: ${calculatedScale.toFixed(4)} mm/px from ${primaryLine.measurement_key}`);
+                        return calculatedScale;
+                    }
                 }
             }
 
@@ -4740,16 +4741,79 @@ let multiViewPointToPointSelector = null;
 function initMultiViewPointToPointSelector(templateId) {
     console.log('⚡ AGENT 6: Global function initialization called for template:', templateId);
 
-    const canvas = document.getElementById('template-canvas');
-    const container = document.getElementById('point-to-point-container');
+    // CRISIS FIX: More flexible canvas detection
+    let canvas = document.getElementById('template-canvas');
+
+    // Fallback: Look for other canvas elements if template-canvas not found
+    if (!canvas) {
+        console.warn('⚠️ CANVAS CRISIS: template-canvas not found, searching for alternatives...');
+        const canvasElements = document.querySelectorAll('canvas');
+        console.log('🔍 CANVAS SEARCH: Found', canvasElements.length, 'canvas elements');
+
+        // Try to find a suitable canvas
+        for (let i = 0; i < canvasElements.length; i++) {
+            const canvasEl = canvasElements[i];
+            const canvasInfo = {
+                id: canvasEl.id || 'no-id',
+                classes: canvasEl.className || 'no-classes',
+                parent: canvasEl.parentElement?.className || 'no-parent'
+            };
+            console.log(`🔍 CANVAS ${i}:`, canvasInfo);
+
+            // Use first canvas that's not upper-canvas or lower-canvas (those are Fabric overlays)
+            if (!canvasEl.className.includes('upper-canvas') && !canvasEl.className.includes('lower-canvas')) {
+                canvas = canvasEl;
+                console.log('✅ CANVAS FOUND: Using canvas', i, 'as template canvas');
+                break;
+            }
+        }
+    }
+
+    // CRISIS FIX: More flexible container detection
+    let container = document.getElementById('point-to-point-container');
+
+    if (!container) {
+        console.warn('⚠️ CONTAINER CRISIS: point-to-point-container not found, searching for alternatives...');
+
+        // Try to find or create a suitable container
+        const candidateSelectors = [
+            '.template-canvas-container',
+            '.canvas-container',
+            '#template-editor',
+            '.template-editor-content'
+        ];
+
+        for (const selector of candidateSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log('✅ CONTAINER FOUND: Using', selector, 'as container');
+                container = element;
+                break;
+            }
+        }
+
+        // Last resort: Create container
+        if (!container && canvas) {
+            console.log('🚨 EMERGENCY: Creating point-to-point container');
+            container = document.createElement('div');
+            container.id = 'point-to-point-container';
+            container.style.position = 'relative';
+            canvas.parentElement.appendChild(container);
+        }
+    }
 
     if (!canvas) {
-        console.error('❌ AGENT 6: Template canvas element not found in DOM');
+        console.error('❌ CRITICAL: No suitable canvas element found in DOM');
+        console.error('🔍 DEBUGGING: Available elements:', {
+            canvasElements: document.querySelectorAll('canvas').length,
+            templateEditorElements: document.querySelectorAll('[class*="template"]').length,
+            allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
+        });
         return null;
     }
 
     if (!container) {
-        console.error('❌ AGENT 6: Point-to-point container element not found in DOM');
+        console.error('❌ CRITICAL: No suitable container element found in DOM');
         return null;
     }
 
@@ -4866,8 +4930,10 @@ function initMultiViewPointToPointSelector(templateId) {
         return await this.loadMeasurementTypes();
     }
 }
-// WordPress Admin Integration
+// WordPress Admin Integration with delayed initialization
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 DOM Content Loaded - Starting template editor detection...');
+
     // Auto-Initialisierung wenn Template-Seite erkannt wird
     const templateIdElement = document.getElementById('template-id-input');
 
@@ -4875,8 +4941,56 @@ document.addEventListener('DOMContentLoaded', function() {
         const templateId = templateIdElement.value;
 
         if (templateId) {
-            console.log('🚀 Multi-View Point-to-Point System initializing for template:', templateId);
-            initMultiViewPointToPointSelector(templateId);
+            console.log('🚀 Multi-View Point-to-Point System detected for template:', templateId);
+
+            // CRISIS FIX: Wait for template editor to be fully initialized
+            let initAttempts = 0;
+            const maxAttempts = 20; // 10 seconds maximum
+            const attemptDelay = 500; // 500ms between attempts
+
+            const tryInitialization = () => {
+                initAttempts++;
+                console.log(`🔄 INIT ATTEMPT ${initAttempts}/${maxAttempts}: Checking for template editor readiness...`);
+
+                // Check if template editor systems are ready
+                const canvasElements = document.querySelectorAll('canvas');
+                const templateEditorReady = window.templateEditors && Object.keys(window.templateEditors).length > 0;
+                const variationsManagerReady = window.variationsManager && window.variationsManager.editors;
+                const fabricReady = window.fabric && typeof window.fabric.Canvas === 'function';
+
+                console.log('🔍 READINESS CHECK:', {
+                    canvasElements: canvasElements.length,
+                    templateEditorReady,
+                    variationsManagerReady,
+                    fabricReady,
+                    attempt: initAttempts
+                });
+
+                // Try initialization if conditions are met
+                if ((canvasElements.length > 0 && fabricReady) || initAttempts >= maxAttempts) {
+                    if (initAttempts >= maxAttempts) {
+                        console.warn('⚠️ TIMEOUT: Proceeding with initialization despite potential issues');
+                    }
+
+                    console.log('✅ CONDITIONS MET: Proceeding with MultiViewPointToPointSelector initialization');
+                    const result = initMultiViewPointToPointSelector(templateId);
+
+                    if (result) {
+                        console.log('🎉 SUCCESS: MultiViewPointToPointSelector initialized successfully');
+                    } else {
+                        console.error('❌ FAILURE: MultiViewPointToPointSelector initialization failed');
+                    }
+                } else {
+                    // Wait and try again
+                    console.log(`⏳ WAITING: Retrying in ${attemptDelay}ms...`);
+                    setTimeout(tryInitialization, attemptDelay);
+                }
+            };
+
+            // Start the initialization process with a small delay
+            setTimeout(tryInitialization, 100);
         }
+    } else {
+        console.log('ℹ️ No template ID found - MultiViewPointToPointSelector not needed');
     }
 });
