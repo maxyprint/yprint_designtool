@@ -2815,52 +2815,99 @@ class MultiViewPointToPointSelector {
      */
     createIntegrationBridgeUI() {
         console.log('🎯 INTEGRATION BRIDGE: Creating UI interface...');
-        const controlGroup = $('.point-to-point-controls').first();
-        console.log('🎯 INTEGRATION BRIDGE: Control group found:', controlGroup.length > 0);
-        if (controlGroup.length === 0) {
-            console.error('❌ INTEGRATION BRIDGE: No control group found - UI creation failed!');
-            return;
+
+        try {
+            // Check jQuery availability with fallback
+            const jQueryAvailable = typeof window.jQuery !== 'undefined' && typeof $ !== 'undefined';
+            console.log('🎯 INTEGRATION BRIDGE: jQuery available:', jQueryAvailable);
+
+            // Find control group using native DOM or jQuery fallback
+            let controlGroup;
+            if (jQueryAvailable) {
+                controlGroup = $('.point-to-point-controls').first();
+                console.log('🎯 INTEGRATION BRIDGE: Control group found (jQuery):', controlGroup.length > 0);
+            } else {
+                controlGroup = document.querySelector('.point-to-point-controls');
+                console.log('🎯 INTEGRATION BRIDGE: Control group found (native):', controlGroup !== null);
+                // Wrap in jQuery-like object for consistency
+                if (controlGroup) {
+                    controlGroup = {
+                        length: 1,
+                        after: (element) => {
+                            if (typeof element === 'string') {
+                                controlGroup.insertAdjacentHTML('afterend', element);
+                            } else {
+                                controlGroup.parentNode.insertBefore(element, controlGroup.nextSibling);
+                            }
+                        }
+                    };
+                } else {
+                    controlGroup = { length: 0 };
+                }
+            }
+
+            if (controlGroup.length === 0) {
+                console.error('❌ INTEGRATION BRIDGE: No control group found - UI creation failed!');
+                return;
+            }
+
+            // Create measurement assignment section HTML
+            const bridgeSectionHTML = `
+                <div class="integration-bridge-section" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;">
+                    <h4 style="margin: 0 0 10px 0; color: #333;">🎯 Integration Bridge - Measurement Assignment</h4>
+                    <div class="measurement-assignment-controls">
+                        <label for="measurement-type-selector" style="font-weight: bold; margin-right: 10px;">Measurement Type:</label>
+                        <select id="measurement-type-selector" class="form-select integration-bridge-selector" style="width: 200px; display: inline-block; margin-right: 15px;">
+                            <option value="A">A - Chest Width</option>
+                            <option value="B">B - Hem Width</option>
+                            <option value="C">C - Height from Shoulder</option>
+                            <option value="D">D - Shoulder Width</option>
+                            <option value="E">E - Sleeve Length</option>
+                            <option value="F">F - Collar Width</option>
+                        </select>
+                        <span class="integration-status" style="font-size: 12px; color: #666; margin-left: 10px;">Score: Loading...</span>
+                    </div>
+                    <div class="measurement-assignment-info" style="margin-top: 10px; font-size: 12px; color: #555;">
+                        💡 Assign measurement types to reference lines for PrecisionCalculator integration
+                    </div>
+                </div>
+            `;
+
+            // Insert the UI using appropriate method
+            if (jQueryAvailable) {
+                const bridgeSection = $(bridgeSectionHTML);
+                controlGroup.after(bridgeSection);
+            } else {
+                controlGroup.after(bridgeSectionHTML);
+            }
+
+            // Setup measurement type selector event with proper error handling
+            const measurementSelector = document.getElementById('measurement-type-selector');
+            if (measurementSelector) {
+                measurementSelector.addEventListener('change', (e) => {
+                    this.selectedMeasurementKey = e.target.value;
+                    this.debug.log(`🎯 INTEGRATION BRIDGE: Selected measurement type: ${this.selectedMeasurementKey}`);
+                });
+                console.log('🎯 INTEGRATION BRIDGE: Event listener attached successfully');
+            } else {
+                console.error('❌ INTEGRATION BRIDGE: Measurement selector not found after creation');
+            }
+
+            // Initialize with default selection
+            this.selectedMeasurementKey = 'A';
+            console.log('🎯 INTEGRATION BRIDGE: Default measurement key set to:', this.selectedMeasurementKey);
+
+            // Load current integration status
+            console.log('🎯 INTEGRATION BRIDGE: Loading initial status...');
+            this.updateIntegrationBridgeStatus();
+
+            console.log('✅ INTEGRATION BRIDGE: UI creation completed successfully');
+
+        } catch (error) {
+            console.error('❌ INTEGRATION BRIDGE: Critical error during UI creation:', error);
+            // Emergency fallback - create basic UI without jQuery
+            this.createEmergencyIntegrationUI();
         }
-
-        // Create measurement assignment section
-        const bridgeSection = $(`
-            <div class="integration-bridge-section" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;">
-                <h4 style="margin: 0 0 10px 0; color: #333;">🎯 Integration Bridge - Measurement Assignment</h4>
-                <div class="measurement-assignment-controls">
-                    <label for="measurement-type-selector" style="font-weight: bold; margin-right: 10px;">Measurement Type:</label>
-                    <select id="measurement-type-selector" class="form-select integration-bridge-selector" style="width: 200px; display: inline-block; margin-right: 15px;">
-                        <option value="A">A - Chest Width</option>
-                        <option value="B">B - Hem Width</option>
-                        <option value="C">C - Height from Shoulder</option>
-                        <option value="D">D - Shoulder Width</option>
-                        <option value="E">E - Sleeve Length</option>
-                        <option value="F">F - Collar Width</option>
-                    </select>
-                    <span class="integration-status" style="font-size: 12px; color: #666; margin-left: 10px;">Score: Loading...</span>
-                </div>
-                <div class="measurement-assignment-info" style="margin-top: 10px; font-size: 12px; color: #555;">
-                    💡 Assign measurement types to reference lines for PrecisionCalculator integration
-                </div>
-            </div>
-        `);
-
-        controlGroup.after(bridgeSection);
-
-        // Setup measurement type selector event
-        $('#measurement-type-selector').on('change', (e) => {
-            this.selectedMeasurementKey = e.target.value;
-            this.debug.log(`🎯 INTEGRATION BRIDGE: Selected measurement type: ${this.selectedMeasurementKey}`);
-        });
-
-        // Initialize with default selection
-        this.selectedMeasurementKey = 'A';
-        console.log('🎯 INTEGRATION BRIDGE: Default measurement key set to:', this.selectedMeasurementKey);
-
-        // Load current integration status
-        console.log('🎯 INTEGRATION BRIDGE: Loading initial status...');
-        this.updateIntegrationBridgeStatus();
-
-        console.log('✅ INTEGRATION BRIDGE: UI creation completed successfully');
     }
 
     /**
@@ -2871,17 +2918,40 @@ class MultiViewPointToPointSelector {
 
         // Test 1: UI Elements
         console.log('🧪 TEST 1: UI Elements Check');
-        const bridgeSection = $('.integration-bridge-section');
-        const dropdown = $('#measurement-type-selector');
-        const statusDisplay = $('.integration-status');
 
-        console.log('- Bridge section exists:', bridgeSection.length > 0);
-        console.log('- Dropdown exists:', dropdown.length > 0);
-        console.log('- Status display exists:', statusDisplay.length > 0);
+        // Check jQuery availability and use appropriate method
+        const jQueryAvailable = typeof $ !== 'undefined';
+        console.log('- jQuery available:', jQueryAvailable);
 
-        if (dropdown.length > 0) {
-            console.log('- Dropdown options count:', dropdown.find('option').length);
-            console.log('- Current selection:', dropdown.val());
+        let bridgeSection, dropdown, statusDisplay;
+
+        if (jQueryAvailable) {
+            bridgeSection = $('.integration-bridge-section');
+            dropdown = $('#measurement-type-selector');
+            statusDisplay = $('.integration-status');
+
+            console.log('- Bridge section exists (jQuery):', bridgeSection.length > 0);
+            console.log('- Dropdown exists (jQuery):', dropdown.length > 0);
+            console.log('- Status display exists (jQuery):', statusDisplay.length > 0);
+
+            if (dropdown.length > 0) {
+                console.log('- Dropdown options count:', dropdown.find('option').length);
+                console.log('- Current selection:', dropdown.val());
+            }
+        } else {
+            // Use native DOM
+            bridgeSection = document.querySelectorAll('.integration-bridge-section');
+            dropdown = document.getElementById('measurement-type-selector');
+            statusDisplay = document.querySelectorAll('.integration-status');
+
+            console.log('- Bridge section exists (native):', bridgeSection.length > 0);
+            console.log('- Dropdown exists (native):', dropdown !== null);
+            console.log('- Status display exists (native):', statusDisplay.length > 0);
+
+            if (dropdown) {
+                console.log('- Dropdown options count:', dropdown.options.length);
+                console.log('- Current selection:', dropdown.value);
+            }
         }
 
         // Test 2: Data Properties
@@ -2911,9 +2981,9 @@ class MultiViewPointToPointSelector {
 
         return {
             ui_elements: {
-                bridge_section: bridgeSection.length > 0,
-                dropdown: dropdown.length > 0,
-                status_display: statusDisplay.length > 0
+                bridge_section: jQueryAvailable ? bridgeSection.length > 0 : bridgeSection.length > 0,
+                dropdown: jQueryAvailable ? dropdown.length > 0 : dropdown !== null,
+                status_display: jQueryAvailable ? statusDisplay.length > 0 : statusDisplay.length > 0
             },
             data_properties: {
                 template_id: !!this.templateId,
@@ -2940,18 +3010,38 @@ class MultiViewPointToPointSelector {
         console.log('🧪 Testing get_integration_bridge_status...');
         console.log('- Request data:', statusData);
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: statusData,
-            success: (response) => {
-                console.log('✅ get_integration_bridge_status SUCCESS:', response);
-            },
-            error: (xhr, status, error) => {
-                console.error('❌ get_integration_bridge_status FAILED:', {xhr, status, error});
-                console.error('- Response text:', xhr.responseText);
-            }
-        });
+        // Use same AJAX method as other functions for consistency
+        if (typeof fetch !== 'undefined') {
+            const formData = new FormData();
+            Object.keys(statusData).forEach(key => formData.append(key, statusData[key]));
+
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
+                console.log('✅ get_integration_bridge_status SUCCESS (fetch):', response);
+            })
+            .catch(error => {
+                console.error('❌ get_integration_bridge_status FAILED (fetch):', error);
+            });
+        } else if (typeof $ !== 'undefined' && $.ajax) {
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: statusData,
+                success: (response) => {
+                    console.log('✅ get_integration_bridge_status SUCCESS (jQuery):', response);
+                },
+                error: (xhr, status, error) => {
+                    console.error('❌ get_integration_bridge_status FAILED (jQuery):', {xhr, status, error});
+                    console.error('- Response text:', xhr.responseText);
+                }
+            });
+        } else {
+            console.warn('⚠️ No AJAX method available for testing endpoints');
+        }
 
         // Test get_measurement_assignments
         const assignmentsData = {
@@ -2963,17 +3053,36 @@ class MultiViewPointToPointSelector {
         console.log('🧪 Testing get_measurement_assignments...');
         console.log('- Request data:', assignmentsData);
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: assignmentsData,
-            success: (response) => {
-                console.log('✅ get_measurement_assignments SUCCESS:', response);
-            },
-            error: (xhr, status, error) => {
-                console.error('❌ get_measurement_assignments FAILED:', {xhr, status, error});
-            }
-        });
+        if (typeof fetch !== 'undefined') {
+            const formData = new FormData();
+            Object.keys(assignmentsData).forEach(key => formData.append(key, assignmentsData[key]));
+
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
+                console.log('✅ get_measurement_assignments SUCCESS (fetch):', response);
+            })
+            .catch(error => {
+                console.error('❌ get_measurement_assignments FAILED (fetch):', error);
+            });
+        } else if (typeof $ !== 'undefined' && $.ajax) {
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: assignmentsData,
+                success: (response) => {
+                    console.log('✅ get_measurement_assignments SUCCESS (jQuery):', response);
+                },
+                error: (xhr, status, error) => {
+                    console.error('❌ get_measurement_assignments FAILED (jQuery):', {xhr, status, error});
+                }
+            });
+        } else {
+            console.warn('⚠️ No AJAX method available for testing endpoints');
+        }
     }
 
     /**
@@ -2982,29 +3091,74 @@ class MultiViewPointToPointSelector {
     updateIntegrationBridgeStatus() {
         if (!this.templateId) return;
 
-        const data = {
-            action: 'get_integration_bridge_status',
-            template_id: this.templateId,
-            nonce: window.pointToPointNonce
-        };
+        try {
+            const data = {
+                action: 'get_integration_bridge_status',
+                template_id: this.templateId,
+                nonce: window.pointToPointNonce
+            };
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: data,
-            success: (response) => {
-                if (response.success && response.data.bridge_status) {
-                    const status = response.data.bridge_status;
-                    const statusText = `Score: ${status.integration_score}% | Assignments: ${status.assignments_count} | Views: ${status.views_count}`;
-                    $('.integration-status').text(statusText).css('color', status.integration_score >= 80 ? '#4CAF50' : '#FF9800');
-                    this.debug.log(`🎯 INTEGRATION BRIDGE STATUS: ${statusText}`);
-                }
-            },
-            error: (xhr, status, error) => {
-                console.error('Integration Bridge Status Error:', error);
-                $('.integration-status').text('Status: Error').css('color', '#f44336');
+            // Use native fetch API as primary method with jQuery fallback
+            if (typeof fetch !== 'undefined') {
+                // Use modern fetch API
+                const formData = new FormData();
+                Object.keys(data).forEach(key => formData.append(key, data[key]));
+
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(response => {
+                    this.handleIntegrationStatusResponse(response);
+                })
+                .catch(error => {
+                    console.error('Integration Bridge Status Error (fetch):', error);
+                    this.updateIntegrationStatusDisplay('Status: Error', '#f44336');
+                });
+            } else if (typeof $ !== 'undefined' && $.ajax) {
+                // Fallback to jQuery AJAX
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: data,
+                    success: (response) => {
+                        this.handleIntegrationStatusResponse(response);
+                    },
+                    error: (xhr, status, error) => {
+                        console.error('Integration Bridge Status Error (jQuery):', error);
+                        this.updateIntegrationStatusDisplay('Status: Error', '#f44336');
+                    }
+                });
+            } else {
+                // Last resort: XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                Object.keys(data).forEach(key => formData.append(key, data[key]));
+
+                xhr.open('POST', ajaxurl, true);
+                xhr.onreadystatechange = () => {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                this.handleIntegrationStatusResponse(response);
+                            } catch (e) {
+                                console.error('Failed to parse response:', e);
+                                this.updateIntegrationStatusDisplay('Status: Parse Error', '#f44336');
+                            }
+                        } else {
+                            console.error('Integration Bridge Status Error (XHR):', xhr.statusText);
+                            this.updateIntegrationStatusDisplay('Status: Network Error', '#f44336');
+                        }
+                    }
+                };
+                xhr.send(formData);
             }
-        });
+        } catch (error) {
+            console.error('❌ INTEGRATION BRIDGE: Critical error in updateIntegrationBridgeStatus:', error);
+            this.updateIntegrationStatusDisplay('Status: Critical Error', '#f44336');
+        }
     }
 
     /**
@@ -3025,33 +3179,197 @@ class MultiViewPointToPointSelector {
             return;
         }
 
-        const data = {
-            action: 'save_measurement_assignment',
-            template_id: this.templateId,
-            measurement_key: this.selectedMeasurementKey,
-            reference_line_data: JSON.stringify(referenceLineData),
-            nonce: window.pointToPointNonce
-        };
+        try {
+            const data = {
+                action: 'save_measurement_assignment',
+                template_id: this.templateId,
+                measurement_key: this.selectedMeasurementKey,
+                reference_line_data: JSON.stringify(referenceLineData),
+                nonce: window.pointToPointNonce
+            };
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: data,
-            success: (response) => {
-                if (response.success) {
-                    this.debug.log(`✅ INTEGRATION BRIDGE: Assignment saved - Score: ${response.data.integration_score}%`);
-                    this.updateIntegrationBridgeStatus();
-                    this.showNotification(`Measurement assignment saved! Integration Score: ${response.data.integration_score}%`, 'success');
-                } else {
-                    console.error('Save Assignment Error:', response.data);
-                    this.showNotification('Failed to save measurement assignment', 'error');
-                }
-            },
-            error: (xhr, status, error) => {
-                console.error('Save Assignment AJAX Error:', error);
-                this.showNotification('Assignment save error', 'error');
+            // Use native fetch API as primary method with jQuery fallback
+            if (typeof fetch !== 'undefined') {
+                // Use modern fetch API
+                const formData = new FormData();
+                Object.keys(data).forEach(key => formData.append(key, data[key]));
+
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(response => {
+                    this.handleSaveAssignmentResponse(response);
+                })
+                .catch(error => {
+                    console.error('Save Assignment Error (fetch):', error);
+                    this.showNotification('Assignment save error', 'error');
+                });
+            } else if (typeof $ !== 'undefined' && $.ajax) {
+                // Fallback to jQuery AJAX
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: data,
+                    success: (response) => {
+                        this.handleSaveAssignmentResponse(response);
+                    },
+                    error: (xhr, status, error) => {
+                        console.error('Save Assignment AJAX Error:', error);
+                        this.showNotification('Assignment save error', 'error');
+                    }
+                });
+            } else {
+                // Last resort: XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                Object.keys(data).forEach(key => formData.append(key, data[key]));
+
+                xhr.open('POST', ajaxurl, true);
+                xhr.onreadystatechange = () => {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                this.handleSaveAssignmentResponse(response);
+                            } catch (e) {
+                                console.error('Failed to parse response:', e);
+                                this.showNotification('Assignment save parse error', 'error');
+                            }
+                        } else {
+                            console.error('Save Assignment Error (XHR):', xhr.statusText);
+                            this.showNotification('Assignment save network error', 'error');
+                        }
+                    }
+                };
+                xhr.send(formData);
             }
-        });
+        } catch (error) {
+            console.error('❌ INTEGRATION BRIDGE: Critical error in saveMeasurementAssignment:', error);
+            this.showNotification('Critical assignment save error', 'error');
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Helper method to handle integration status response
+     */
+    handleIntegrationStatusResponse(response) {
+        try {
+            if (response.success && response.data.bridge_status) {
+                const status = response.data.bridge_status;
+                const statusText = `Score: ${status.integration_score}% | Assignments: ${status.assignments_count} | Views: ${status.views_count}`;
+                const color = status.integration_score >= 80 ? '#4CAF50' : '#FF9800';
+                this.updateIntegrationStatusDisplay(statusText, color);
+                this.debug.log(`🎯 INTEGRATION BRIDGE STATUS: ${statusText}`);
+            } else {
+                console.warn('Integration Bridge Status: Invalid response format');
+                this.updateIntegrationStatusDisplay('Status: Invalid Response', '#f44336');
+            }
+        } catch (error) {
+            console.error('Error handling integration status response:', error);
+            this.updateIntegrationStatusDisplay('Status: Processing Error', '#f44336');
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Helper method to handle save assignment response
+     */
+    handleSaveAssignmentResponse(response) {
+        try {
+            if (response.success) {
+                this.debug.log(`✅ INTEGRATION BRIDGE: Assignment saved - Score: ${response.data.integration_score}%`);
+                this.updateIntegrationBridgeStatus();
+                this.showNotification(`Measurement assignment saved! Integration Score: ${response.data.integration_score}%`, 'success');
+            } else {
+                console.error('Save Assignment Error:', response.data);
+                this.showNotification('Failed to save measurement assignment', 'error');
+            }
+        } catch (error) {
+            console.error('Error handling save assignment response:', error);
+            this.showNotification('Response processing error', 'error');
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Helper method to update status display with native DOM
+     */
+    updateIntegrationStatusDisplay(statusText, color) {
+        try {
+            // Try jQuery first if available
+            if (typeof $ !== 'undefined') {
+                const statusElement = $('.integration-status');
+                if (statusElement.length > 0) {
+                    statusElement.text(statusText).css('color', color);
+                    return;
+                }
+            }
+
+            // Fallback to native DOM
+            const statusElement = document.querySelector('.integration-status');
+            if (statusElement) {
+                statusElement.textContent = statusText;
+                statusElement.style.color = color;
+            } else {
+                console.warn('Integration status display element not found');
+            }
+        } catch (error) {
+            console.error('Error updating integration status display:', error);
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Emergency UI creation without jQuery
+     */
+    createEmergencyIntegrationUI() {
+        console.log('🚨 INTEGRATION BRIDGE: Creating emergency UI (no jQuery)...');
+
+        try {
+            const controlGroup = document.querySelector('.point-to-point-controls');
+            if (!controlGroup) {
+                console.error('❌ INTEGRATION BRIDGE: No control group found for emergency UI');
+                return;
+            }
+
+            const emergencyBridgeHTML = `
+                <div class="integration-bridge-section emergency-ui" style="margin-top: 15px; padding: 15px; border: 2px solid #f44336; border-radius: 5px; background: #ffebee;">
+                    <h4 style="margin: 0 0 10px 0; color: #c62828;">⚡ Integration Bridge - Emergency Mode</h4>
+                    <div class="measurement-assignment-controls">
+                        <label for="measurement-type-selector-emergency" style="font-weight: bold; margin-right: 10px;">Measurement Type:</label>
+                        <select id="measurement-type-selector-emergency" class="form-select integration-bridge-selector" style="width: 200px; display: inline-block; margin-right: 15px;">
+                            <option value="A">A - Chest Width</option>
+                            <option value="B">B - Hem Width</option>
+                            <option value="C">C - Height from Shoulder</option>
+                            <option value="D">D - Shoulder Width</option>
+                            <option value="E">E - Sleeve Length</option>
+                            <option value="F">F - Collar Width</option>
+                        </select>
+                        <span class="integration-status" style="font-size: 12px; color: #f44336; margin-left: 10px;">Status: Emergency Mode</span>
+                    </div>
+                    <div class="measurement-assignment-info" style="margin-top: 10px; font-size: 12px; color: #666;">
+                        ⚡ Integration Bridge running in emergency mode (jQuery not available)
+                    </div>
+                </div>
+            `;
+
+            controlGroup.insertAdjacentHTML('afterend', emergencyBridgeHTML);
+
+            // Setup event listener for emergency selector
+            const emergencySelector = document.getElementById('measurement-type-selector-emergency');
+            if (emergencySelector) {
+                emergencySelector.addEventListener('change', (e) => {
+                    this.selectedMeasurementKey = e.target.value;
+                    console.log(`⚡ INTEGRATION BRIDGE (Emergency): Selected measurement type: ${this.selectedMeasurementKey}`);
+                });
+            }
+
+            // Set default
+            this.selectedMeasurementKey = 'A';
+            console.log('⚡ INTEGRATION BRIDGE: Emergency UI created successfully');
+
+        } catch (error) {
+            console.error('❌ INTEGRATION BRIDGE: Even emergency UI creation failed:', error);
+        }
     }
 
     /**
