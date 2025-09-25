@@ -1192,6 +1192,9 @@ class MultiViewPointToPointSelector {
                 <div class="control-group">
                     <button id="clear-current-view-lines-btn" class="button">🗑️ Aktuelle View löschen</button>
                     <button id="clear-all-views-lines-btn" class="button">🗑️ Alle Views löschen</button>
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        💾 Löschvorgänge werden dauerhaft in der Datenbank gespeichert
+                    </small>
                 </div>
 
                 <div class="control-group">
@@ -1567,48 +1570,177 @@ class MultiViewPointToPointSelector {
     }
 
     /**
-     * Löscht alle Referenzlinien der aktuellen View
+     * DELETION SYSTEM: Enhanced current view lines deletion with database persistence
+     * Löscht alle Referenzlinien der aktuellen View und persistiert die Änderung
      */
-    clearCurrentViewLines() {
+    async clearCurrentViewLines() {
         if (!this.currentViewId) {
-            alert('Keine View ausgewählt.');
+            this.showDeleteError('Keine View ausgewählt.');
             return;
         }
 
         const count = this.multiViewReferenceLines[this.currentViewId] ? this.multiViewReferenceLines[this.currentViewId].length : 0;
 
         if (count === 0) {
-            alert('Keine Referenzlinien in aktueller View vorhanden.');
+            this.showDeleteError('Keine Referenzlinien in aktueller View vorhanden.');
             return;
         }
 
-        if (confirm(`Alle ${count} Referenzlinien in "${this.currentView.name}" löschen?`)) {
-            this.multiViewReferenceLines[this.currentViewId] = [];
-            this.points = [];
-            this.redrawCanvas();
-            this.updateLinesDisplay();
-            this.updateViewCounts();
+        const viewName = this.currentView.name || 'Aktuelle View';
+
+        if (!confirm(`Alle ${count} Referenzlinien in "${viewName}" löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`)) {
+            return;
+        }
+
+        try {
+            // Show loading state
+            this.showDeleteProgress(`Lösche alle Referenzlinien in "${viewName}"...`);
+
+            const response = await this.ajaxDebug.debugFetch(pointToPointAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'delete_view_reference_lines',
+                    template_id: this.templateId,
+                    view_id: this.currentViewId,
+                    nonce: pointToPointAjax.nonce
+                })
+            }, 'DELETE_VIEW_REFERENCE_LINES');
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update local data structure with server response
+                this.multiViewReferenceLines = data.data.updated_multi_view_lines;
+
+                // Clear current drawing state
+                this.points = [];
+
+                // Update UI
+                this.redrawCanvas();
+                this.updateLinesDisplay();
+                this.updateViewCounts();
+
+                // Show success feedback
+                this.showDeleteSuccess(data.data.message);
+
+                // Update debug state
+                this.stateMonitor.trackState('deletion', 'view_reference_lines', {
+                    view_id: this.currentViewId,
+                    view_name: viewName,
+                    deleted_count: data.data.deleted_lines_count,
+                    total_remaining: data.data.total_lines_remaining
+                });
+
+                console.log('✅ DELETION SYSTEM: View reference lines deleted successfully', {
+                    viewId: this.currentViewId,
+                    viewName: viewName,
+                    deletedCount: data.data.deleted_lines_count,
+                    totalRemaining: data.data.total_lines_remaining
+                });
+
+            } else {
+                throw new Error(data.data || 'Löschen fehlgeschlagen');
+            }
+
+        } catch (error) {
+            console.error('❌ DELETION SYSTEM: Failed to delete view reference lines:', error);
+            this.showDeleteError(`Fehler beim Löschen der View-Referenzlinien: ${error.message}`);
+
+            // Log error to debug system
+            this.errorHandler.captureError('VIEW_REFERENCE_LINES_DELETION', error, {
+                viewId: this.currentViewId,
+                viewName: viewName,
+                expectedCount: count
+            });
+        } finally {
+            this.hideDeleteProgress();
         }
     }
 
     /**
-     * Löscht alle Referenzlinien in allen Views
+     * DELETION SYSTEM: Enhanced all views lines deletion with database persistence
+     * Löscht alle Referenzlinien in allen Views und persistiert die Änderung
      */
-    clearAllViewsLines() {
+    async clearAllViewsLines() {
         const totalCount = Object.values(this.multiViewReferenceLines).reduce((total, lines) =>
             total + (Array.isArray(lines) ? lines.length : 0), 0);
 
         if (totalCount === 0) {
-            alert('Keine Referenzlinien vorhanden.');
+            this.showDeleteError('Keine Referenzlinien vorhanden.');
             return;
         }
 
-        if (confirm(`Alle ${totalCount} Referenzlinien in allen Views löschen?`)) {
-            this.multiViewReferenceLines = {};
-            this.points = [];
-            this.redrawCanvas();
-            this.updateLinesDisplay();
-            this.updateViewCounts();
+        const viewsCount = Object.keys(this.multiViewReferenceLines).length;
+
+        if (!confirm(`Alle ${totalCount} Referenzlinien in ${viewsCount} Views löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden und löscht ALLE Referenzlinien dauerhaft.`)) {
+            return;
+        }
+
+        try {
+            // Show loading state
+            this.showDeleteProgress(`Lösche alle ${totalCount} Referenzlinien...`);
+
+            const response = await this.ajaxDebug.debugFetch(pointToPointAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'delete_all_reference_lines',
+                    template_id: this.templateId,
+                    nonce: pointToPointAjax.nonce
+                })
+            }, 'DELETE_ALL_REFERENCE_LINES');
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update local data structure with server response (should be empty)
+                this.multiViewReferenceLines = data.data.updated_multi_view_lines;
+
+                // Clear all drawing state
+                this.points = [];
+
+                // Update UI
+                this.redrawCanvas();
+                this.updateLinesDisplay();
+                this.updateViewCounts();
+
+                // Show success feedback
+                this.showDeleteSuccess(data.data.message);
+
+                // Update debug state
+                this.stateMonitor.trackState('deletion', 'all_reference_lines', {
+                    deleted_total: data.data.deleted_total_lines,
+                    deleted_views: data.data.deleted_views_count,
+                    template_id: this.templateId
+                });
+
+                console.log('✅ DELETION SYSTEM: All reference lines deleted successfully', {
+                    deletedTotal: data.data.deleted_total_lines,
+                    deletedViews: data.data.deleted_views_count,
+                    templateId: this.templateId
+                });
+
+            } else {
+                throw new Error(data.data || 'Löschen fehlgeschlagen');
+            }
+
+        } catch (error) {
+            console.error('❌ DELETION SYSTEM: Failed to delete all reference lines:', error);
+            this.showDeleteError(`Fehler beim Löschen aller Referenzlinien: ${error.message}`);
+
+            // Log error to debug system
+            this.errorHandler.captureError('ALL_REFERENCE_LINES_DELETION', error, {
+                templateId: this.templateId,
+                expectedTotalCount: totalCount,
+                expectedViewsCount: viewsCount
+            });
+        } finally {
+            this.hideDeleteProgress();
         }
     }
 
@@ -1655,8 +1787,8 @@ class MultiViewPointToPointSelector {
                         ${line.bridge_version ? `<span class="bridge-version">🌉 v${line.bridge_version}</span>` : ''}
                     </div>
                     <div class="line-actions">
-                        <button class="button-link remove-btn" onclick="multiViewPointToPointSelector.removeReferenceLine('${viewId}', '${line.measurement_key}')">
-                            🗑️ Entfernen
+                        <button class="button-link remove-btn" onclick="multiViewPointToPointSelector.removeReferenceLine('${viewId}', '${line.measurement_key}')" title="Dauerhaft aus Datenbank löschen">
+                            🗑️ Löschen
                         </button>
                     </div>
                 </div>
@@ -1732,19 +1864,95 @@ class MultiViewPointToPointSelector {
     }
 
     /**
-     * Entfernt eine spezifische Referenzlinie aus einer View
+     * DELETION SYSTEM: Enhanced removal with database persistence
+     * Entfernt eine spezifische Referenzlinie aus einer View und persistiert die Änderung
      */
-    removeReferenceLine(viewId, measurementKey) {
-        if (this.multiViewReferenceLines[viewId]) {
-            this.multiViewReferenceLines[viewId] = this.multiViewReferenceLines[viewId].filter(line =>
-                line.measurement_key !== measurementKey
-            );
+    async removeReferenceLine(viewId, measurementKey) {
+        if (!this.multiViewReferenceLines[viewId]) {
+            this.showDeleteError('View nicht gefunden');
+            return;
+        }
 
-            if (viewId === this.currentViewId) {
-                this.redrawCanvas();
+        const lineToDelete = this.multiViewReferenceLines[viewId].find(line => line.measurement_key === measurementKey);
+
+        if (!lineToDelete) {
+            this.showDeleteError('Referenzlinie nicht gefunden');
+            return;
+        }
+
+        const lineLabel = lineToDelete.label || measurementKey;
+
+        const viewName = Object.values(this.templateViews).find(v => v.id == viewId)?.name || `View ${viewId}`;
+
+        if (!confirm(`Referenzlinie "${lineLabel}" in View "${viewName}" löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`)) {
+            return;
+        }
+
+        try {
+            // Show loading state
+            this.showDeleteProgress(`Lösche Referenzlinie "${lineLabel}"...`);
+
+            const response = await this.ajaxDebug.debugFetch(pointToPointAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'delete_reference_line',
+                    template_id: this.templateId,
+                    view_id: viewId,
+                    measurement_key: measurementKey,
+                    nonce: pointToPointAjax.nonce
+                })
+            }, 'DELETE_REFERENCE_LINE');
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update local data structure with server response
+                this.multiViewReferenceLines = data.data.updated_multi_view_lines;
+
+                // Update UI
+                if (viewId === this.currentViewId) {
+                    this.redrawCanvas();
+                }
+                this.updateLinesDisplay();
+                this.updateViewCounts();
+
+                // Show success feedback
+                this.showDeleteSuccess(data.data.message);
+
+                // Update debug state
+                this.stateMonitor.trackState('deletion', 'single_reference_line', {
+                    deleted: lineToDelete,
+                    view_id: viewId,
+                    remaining_in_view: data.data.remaining_lines_in_view,
+                    total_remaining: data.data.total_lines_remaining
+                });
+
+                console.log('✅ DELETION SYSTEM: Single reference line deleted successfully', {
+                    deletedLine: lineToDelete,
+                    viewId: viewId,
+                    remainingInView: data.data.remaining_lines_in_view,
+                    totalRemaining: data.data.total_lines_remaining
+                });
+
+            } else {
+                throw new Error(data.data || 'Löschen fehlgeschlagen');
             }
-            this.updateLinesDisplay();
-            this.updateViewCounts();
+
+        } catch (error) {
+            console.error('❌ DELETION SYSTEM: Failed to delete reference line:', error);
+            this.showDeleteError(`Fehler beim Löschen: ${error.message}`);
+
+            // Log error to debug system
+            this.errorHandler.captureError('REFERENCE_LINE_DELETION', error, {
+                viewId: viewId,
+                measurementKey: measurementKey,
+                lineLabel: lineLabel
+            });
+        } finally {
+            this.hideDeleteProgress();
         }
     }
 
@@ -1940,59 +2148,174 @@ class MultiViewPointToPointSelector {
             `;
         }
     }
-}
 
-// Global Instance für Multi-View Template Editor
-let multiViewPointToPointSelector = null;
+    /**
+     * AGENT 4: Initialize PrecisionCalculator Integration Bridge
+     */
+    async initializePrecisionCalculatorBridge() {
+        console.log('🌉 AGENT 4: Initializing PrecisionCalculator Integration Bridge...');
 
-/**
- * AGENT 6: Enhanced Multi-View Point-to-Point Selector initialization with error handling
- */
-function initMultiViewPointToPointSelector(templateId) {
-    console.log('⚡ AGENT 6: Global function initialization called for template:', templateId);
+        try {
+            // Validate that the bridge system is ready
+            const validation = this.validateReferenceLineBridgeSystem();
 
-    const canvas = document.getElementById('template-canvas');
-    const container = document.getElementById('point-to-point-container');
+            console.log('🌉 AGENT 4: Bridge validation completed:', {
+                overallScore: validation.overall_score,
+                integrationReadiness: validation.integration_readiness,
+                criticalIssues: validation.critical_issues.length,
+                warnings: validation.warnings.length
+            });
 
-    if (!canvas) {
-        console.error('❌ AGENT 6: Template canvas element not found in DOM');
-        return null;
-    }
+            // Store bridge readiness status
+            this.bridgeInitialized = true;
+            this.bridgeStatus = {
+                initialized: true,
+                ready: validation.integration_readiness === 'ready',
+                score: validation.overall_score,
+                timestamp: Date.now()
+            };
 
-    if (!container) {
-        console.error('❌ AGENT 6: Point-to-point container element not found in DOM');
-        return null;
-    }
+            // Set up bridge communication patterns
+            if (validation.integration_readiness === 'ready') {
+                console.log('✅ AGENT 4: Integration Bridge fully ready for PrecisionCalculator');
+                this.setupBridgeCommunication();
+            } else if (validation.integration_readiness === 'warning') {
+                console.log('⚠️ AGENT 4: Integration Bridge partially ready - some optimizations needed');
+            } else {
+                console.log('❌ AGENT 4: Integration Bridge requires attention before full integration');
+            }
 
-    console.log('✅ AGENT 6: Required DOM elements found, creating MultiViewPointToPointSelector');
+            return this.bridgeStatus;
 
-    try {
-        multiViewPointToPointSelector = new MultiViewPointToPointSelector(canvas, templateId);
-
-        // Store globally for debugging
-        window.multiViewSelector = multiViewPointToPointSelector;
-
-        console.log('✅ AGENT 6: MultiViewPointToPointSelector instance created successfully');
-        return multiViewPointToPointSelector;
-
-    } catch (error) {
-        console.error('❌ AGENT 6: Failed to create MultiViewPointToPointSelector:', error);
-
-        // Display error to user
-        if (container) {
-            container.innerHTML = `
-                <div style="background: #f8d7da; border: 1px solid #f1aeb5; color: #721c24; padding: 15px; border-radius: 4px;">
-                    <strong>❌ Initialisierung fehlgeschlagen</strong><br>
-                    Das Multi-View Point-to-Point System konnte nicht gestartet werden.<br>
-                    <small>Error: ${error.message}</small>
-                </div>
-            `;
+        } catch (error) {
+            console.error('❌ AGENT 4: PrecisionCalculator Integration Bridge initialization failed:', error);
+            this.bridgeInitialized = false;
+            this.bridgeStatus = {
+                initialized: false,
+                ready: false,
+                error: error.message,
+                timestamp: Date.now()
+            };
+            return this.bridgeStatus;
         }
-
-        return null;
     }
 
-    // AGENT 4 ENHANCEMENT: PrecisionCalculator Bridge Methods
+    /**
+     * DELETION SYSTEM: User feedback methods for deletion operations
+     */
+    showDeleteProgress(message) {
+        // Create or update progress notification
+        let progressEl = document.getElementById('deletion-progress-notification');
+        if (!progressEl) {
+            progressEl = document.createElement('div');
+            progressEl.id = 'deletion-progress-notification';
+            progressEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #0073aa;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 4px;
+                z-index: 10000;
+                font-weight: bold;
+                max-width: 350px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            `;
+            document.body.appendChild(progressEl);
+        }
+        progressEl.innerHTML = `⏳ ${message}`;
+        progressEl.style.display = 'block';
+    }
+
+    showDeleteSuccess(message) {
+        // Create success notification
+        let successEl = document.getElementById('deletion-success-notification');
+        if (!successEl) {
+            successEl = document.createElement('div');
+            successEl.id = 'deletion-success-notification';
+            successEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #46b450;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 4px;
+                z-index: 10000;
+                font-weight: bold;
+                max-width: 350px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            `;
+            document.body.appendChild(successEl);
+        }
+        successEl.innerHTML = `✅ ${message}`;
+        successEl.style.display = 'block';
+
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+            successEl.style.display = 'none';
+        }, 3000);
+    }
+
+    showDeleteError(message) {
+        // Create error notification
+        let errorEl = document.getElementById('deletion-error-notification');
+        if (!errorEl) {
+            errorEl = document.createElement('div');
+            errorEl.id = 'deletion-error-notification';
+            errorEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #dc3232;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 4px;
+                z-index: 10000;
+                font-weight: bold;
+                max-width: 350px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            `;
+            document.body.appendChild(errorEl);
+        }
+        errorEl.innerHTML = `❌ ${message}`;
+        errorEl.style.display = 'block';
+
+        // Auto hide after 5 seconds
+        setTimeout(() => {
+            errorEl.style.display = 'none';
+        }, 5000);
+    }
+
+    hideDeleteProgress() {
+        const progressEl = document.getElementById('deletion-progress-notification');
+        if (progressEl) {
+            progressEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * AGENT 4: Setup bridge communication patterns
+     */
+    setupBridgeCommunication() {
+        // Store bridge instance globally for external access
+        window.integrationBridge = {
+            instance: this,
+            version: '1.0',
+            methods: {
+                validate: () => this.validateReferenceLineBridgeSystem(),
+                export: () => this.exportForPrecisionCalculation(),
+                getByMeasurement: (key) => this.getReferenceLinesByMeasurement(key),
+                getPrimary: () => this.getPrimaryReferenceLines()
+            }
+        };
+
+        console.log('🌉 AGENT 4: Bridge communication patterns established');
+        console.log('🌉 AGENT 4: Global bridge available at window.integrationBridge');
+    }
+
+    // AGENT 4 ENHANCEMENT: PrecisionCalculator Integration Bridge Methods
     /**
      * AGENT 4: Get reference lines formatted for PrecisionCalculator
      */
@@ -2092,882 +2415,448 @@ function initMultiViewPointToPointSelector(templateId) {
                 validation.summary.total_views++;
                 validation.summary.total_lines += lines.length;
 
-                lines.forEach((line, index) => {
-                    // Check if line has integration bridge data
-                    if (!line.linked_to_measurements) {
-                        validation.warnings.push(`View ${viewId}, Line ${index}: Not linked to measurements`);
-                    } else {
-                        validation.summary.linked_lines++;
-                    }
+                const linkedLines = lines.filter(line => line.linked_to_measurements === true);
+                const primaryLines = lines.filter(line => line.primary_reference === true);
 
-                    if (line.primary_reference) {
-                        validation.summary.primary_lines++;
-                    }
+                validation.summary.linked_lines += linkedLines.length;
+                validation.summary.primary_lines += primaryLines.length;
 
-                    // Validate required precision calculation fields
-                    if (!line.precision_level || typeof line.precision_level !== 'number') {
-                        validation.errors.push(`View ${viewId}, Line ${index}: Missing or invalid precision_level`);
+                // Validate individual lines
+                lines.forEach(line => {
+                    if (!line.measurement_key) {
+                        validation.errors.push(`View ${viewId}: Reference line missing measurement key`);
                         validation.valid = false;
                     }
 
-                    if (!line.measurement_category) {
-                        validation.warnings.push(`View ${viewId}, Line ${index}: Missing measurement_category`);
+                    if (!line.start_point || !line.end_point) {
+                        validation.errors.push(`View ${viewId}: Reference line missing start/end points`);
+                        validation.valid = false;
+                    }
+
+                    if (line.linked_to_measurements && !line.precision_level) {
+                        validation.warnings.push(`View ${viewId}: Linked line missing precision level`);
                     }
                 });
             }
         }
 
-        console.log('🎯 AGENT 4 BRIDGE: Validation result:', validation);
+        // Check for minimum requirements
+        if (validation.summary.linked_lines === 0) {
+            validation.errors.push('No reference lines are linked to measurements');
+            validation.valid = false;
+        }
+
+        if (validation.summary.primary_lines === 0) {
+            validation.warnings.push('No primary reference lines defined');
+        }
+
+        console.log('🎯 AGENT 4 BRIDGE: Validation completed:', validation);
         return validation;
     }
 
-    // AGENT 6 ENHANCEMENT: Multi-View Measurement Mapping Expert Methods
     /**
-     * AGENT 6: Create measurement mapping across multiple views
+     * AGENT 4: Comprehensive Reference Line Integration Bridge System Validation
+     * This is the main validation method that provides a complete system health check
      */
-    createMeasurementMapping() {
-        const measurementMap = {};
+    validateReferenceLineBridgeSystem() {
+        console.log('🌉 AGENT 4: Starting comprehensive Integration Bridge validation...');
 
-        // Create mapping structure
-        Object.keys(this.measurementTypes).forEach(measurementKey => {
-            measurementMap[measurementKey] = {
-                measurement_key: measurementKey,
-                label: this.measurementTypes[measurementKey].label,
-                views: {},
-                total_views: 0,
-                consistency_score: 0,
-                mapping_status: 'not_mapped'
-            };
-        });
+        const startTime = performance.now();
+        const timestamp = Date.now();
 
-        // Populate with existing reference lines
-        for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
-            if (Array.isArray(lines)) {
-                const viewName = this.templateViews?.find(v => v.id == viewId)?.name || `View ${viewId}`;
-
-                lines.forEach(line => {
-                    if (measurementMap[line.measurement_key]) {
-                        measurementMap[line.measurement_key].views[viewId] = {
-                            view_id: viewId,
-                            view_name: viewName,
-                            reference_line: line,
-                            pixel_length: line.lengthPx,
-                            precision_level: line.precision_level || 0.1,
-                            is_primary: line.primary_reference || false
-                        };
-                        measurementMap[line.measurement_key].total_views++;
-                    }
-                });
-            }
-        }
-
-        // Calculate consistency scores and mapping status
-        Object.keys(measurementMap).forEach(measurementKey => {
-            const mapping = measurementMap[measurementKey];
-            if (mapping.total_views === 0) {
-                mapping.mapping_status = 'not_mapped';
-                mapping.consistency_score = 0;
-            } else if (mapping.total_views === 1) {
-                mapping.mapping_status = 'single_view';
-                mapping.consistency_score = 50;
-            } else {
-                mapping.mapping_status = 'multi_view';
-                mapping.consistency_score = this.calculateMeasurementConsistency(mapping);
-            }
-        });
-
-        console.log('📊 AGENT 6: Measurement mapping created:', measurementMap);
-        return measurementMap;
-    }
-
-    /**
-     * AGENT 6: Calculate consistency score for cross-view measurements
-     */
-    calculateMeasurementConsistency(mapping) {
-        if (mapping.total_views < 2) return 50;
-
-        const pixelLengths = Object.values(mapping.views).map(v => v.pixel_length);
-        const average = pixelLengths.reduce((sum, len) => sum + len, 0) / pixelLengths.length;
-
-        // Calculate standard deviation
-        const variance = pixelLengths.reduce((sum, len) => sum + Math.pow(len - average, 2), 0) / pixelLengths.length;
-        const stdDev = Math.sqrt(variance);
-
-        // Convert to consistency score (lower deviation = higher score)
-        const consistencyScore = Math.max(0, Math.min(100, 100 - (stdDev / average * 100)));
-
-        return Math.round(consistencyScore);
-    }
-
-    /**
-     * AGENT 6: Get measurement correlation between views
-     */
-    getMeasurementCorrelation(measurementKey) {
-        const correlation = {
-            measurement_key: measurementKey,
-            views: [],
-            correlation_strength: 'none',
-            pixel_variance: 0,
+        // Initialize validation results structure
+        const validation = {
+            timestamp,
+            system_status: 'initializing',
+            validation_results: {},
+            overall_score: 0,
+            integration_readiness: 'unknown',
+            critical_issues: [],
+            warnings: [],
             recommendations: []
         };
 
-        // Collect all views with this measurement
-        for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
-            if (Array.isArray(lines)) {
-                const matchingLine = lines.find(line => line.measurement_key === measurementKey);
-                if (matchingLine) {
-                    correlation.views.push({
-                        view_id: viewId,
-                        view_name: this.templateViews?.find(v => v.id == viewId)?.name || `View ${viewId}`,
-                        pixel_length: matchingLine.lengthPx,
-                        precision_level: matchingLine.precision_level || 0.1,
-                        is_primary: matchingLine.primary_reference || false
-                    });
-                }
-            }
-        }
+        try {
+            // 1. Validate Template Context
+            validation.validation_results.template_context = this.validateTemplateContext();
 
-        if (correlation.views.length >= 2) {
-            const lengths = correlation.views.map(v => v.pixel_length);
-            const average = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
-            const variance = lengths.reduce((sum, len) => sum + Math.pow(len - average, 2), 0) / lengths.length;
+            // 2. Validate Reference Line Data Structure
+            validation.validation_results.reference_line_structure = this.validateReferenceLineStructure();
 
-            correlation.pixel_variance = Math.sqrt(variance);
+            // 3. Validate Integration Bridge Methods
+            validation.validation_results.bridge_methods = this.getBridgeMethodsStatus();
 
-            // Determine correlation strength
-            const coefficientOfVariation = (correlation.pixel_variance / average) * 100;
-            if (coefficientOfVariation < 5) {
-                correlation.correlation_strength = 'strong';
-            } else if (coefficientOfVariation < 15) {
-                correlation.correlation_strength = 'moderate';
+            // 4. Validate Precision Calculation Readiness
+            validation.validation_results.precision_readiness = this.validateForPrecisionCalculation();
+
+            // 5. Validate Multi-View Coordination
+            validation.validation_results.multi_view_coordination = this.validateMultiViewCoordination();
+
+            // 6. Calculate Integration Bridge Statistics
+            validation.validation_results.bridge_statistics = this.calculateIntegrationBridgeStats();
+
+            // Calculate overall score based on validation results
+            const scores = this.calculateValidationScores(validation.validation_results);
+            validation.overall_score = scores.overall;
+
+            // Determine integration readiness
+            if (scores.overall >= 90) {
+                validation.integration_readiness = 'ready';
+                validation.system_status = 'operational';
+            } else if (scores.overall >= 70) {
+                validation.integration_readiness = 'warning';
+                validation.system_status = 'partially_ready';
+                validation.warnings.push('System partially ready - some optimizations needed');
             } else {
-                correlation.correlation_strength = 'weak';
+                validation.integration_readiness = 'error';
+                validation.system_status = 'requires_attention';
+                validation.critical_issues.push('System requires critical fixes before integration');
             }
 
-            // Generate recommendations
-            if (correlation.correlation_strength === 'weak') {
-                correlation.recommendations.push('🔧 Review reference line placement for consistency');
-                correlation.recommendations.push('📏 Consider re-measuring with higher precision');
-            }
+            // Add specific recommendations based on validation results
+            this.generateValidationRecommendations(validation);
 
-            const primaryCount = correlation.views.filter(v => v.is_primary).length;
-            if (primaryCount === 0) {
-                correlation.recommendations.push('🎯 Designate one view as primary reference');
-            } else if (primaryCount > 1) {
-                correlation.recommendations.push('⚠️ Only one view should be marked as primary');
-            }
+            const endTime = performance.now();
+            console.log(`🌉 AGENT 4: Integration Bridge validation completed in ${(endTime - startTime).toFixed(2)}ms`);
+            console.log(`🌉 AGENT 4: Overall Score: ${validation.overall_score}% - Status: ${validation.integration_readiness}`);
+
+            return validation;
+
+        } catch (error) {
+            validation.system_status = 'error';
+            validation.integration_readiness = 'error';
+            validation.overall_score = 0;
+            validation.critical_issues.push(`Validation failed: ${error.message}`);
+
+            console.error('❌ AGENT 4: Integration Bridge validation failed:', error);
+            return validation;
         }
-
-        console.log(`📊 AGENT 6: Measurement correlation for ${measurementKey}:`, correlation);
-        return correlation;
     }
 
     /**
-     * AGENT 6: Export measurement mapping for external analysis
+     * AGENT 4: Validate template context and basic requirements
      */
-    exportMeasurementMapping() {
-        const mapping = this.createMeasurementMapping();
-        const exportData = {
-            template_id: this.templateId,
-            timestamp: Date.now(),
-            total_measurements: Object.keys(mapping).length,
-            mapped_measurements: Object.values(mapping).filter(m => m.mapping_status !== 'not_mapped').length,
-            multi_view_measurements: Object.values(mapping).filter(m => m.mapping_status === 'multi_view').length,
-            average_consistency: this.calculateAverageConsistency(mapping),
-            measurements: mapping,
-            recommendations: this.generateMappingRecommendations(mapping)
+    validateTemplateContext() {
+        const context = {
+            valid: true,
+            score: 0,
+            issues: [],
+            details: {}
         };
 
-        console.log('📊 AGENT 6: Measurement mapping export ready:', exportData);
-        return exportData;
-    }
-
-    /**
-     * AGENT 6: Calculate average consistency across all measurements
-     */
-    calculateAverageConsistency(mapping) {
-        const mappedMeasurements = Object.values(mapping).filter(m => m.mapping_status !== 'not_mapped');
-        if (mappedMeasurements.length === 0) return 0;
-
-        const totalScore = mappedMeasurements.reduce((sum, m) => sum + m.consistency_score, 0);
-        return Math.round(totalScore / mappedMeasurements.length);
-    }
-
-    /**
-     * AGENT 6: Generate system-wide mapping recommendations
-     */
-    generateMappingRecommendations(mapping) {
-        const recommendations = [];
-        const mappedCount = Object.values(mapping).filter(m => m.mapping_status !== 'not_mapped').length;
-        const totalCount = Object.keys(mapping).length;
-        const multiViewCount = Object.values(mapping).filter(m => m.mapping_status === 'multi_view').length;
-
-        // Coverage recommendations
-        const coveragePercentage = (mappedCount / totalCount) * 100;
-        if (coveragePercentage < 50) {
-            recommendations.push('📈 Increase measurement coverage - less than 50% of measurements are mapped');
-        } else if (coveragePercentage < 80) {
-            recommendations.push('📊 Good coverage - consider mapping remaining measurements for complete analysis');
+        // Check template ID
+        if (this.templateId) {
+            context.score += 20;
+            context.details.template_id = this.templateId;
         } else {
-            recommendations.push('✅ Excellent measurement coverage');
+            context.valid = false;
+            context.issues.push('Missing template ID');
+        }
+
+        // Check canvas element
+        if (this.canvas && this.ctx) {
+            context.score += 20;
+            context.details.canvas_ready = true;
+        } else {
+            context.valid = false;
+            context.issues.push('Canvas not properly initialized');
+        }
+
+        // Check debug system
+        if (this.debug) {
+            context.score += 10;
+            context.details.debug_system = true;
+        }
+
+        // Check template views
+        const viewCount = Object.keys(this.templateViews || {}).length;
+        if (viewCount > 0) {
+            context.score += 25;
+            context.details.view_count = viewCount;
+        } else {
+            context.issues.push('No template views available');
+        }
+
+        // Check measurement types
+        const measurementCount = Object.keys(this.measurementTypes || {}).length;
+        if (measurementCount > 0) {
+            context.score += 25;
+            context.details.measurement_count = measurementCount;
+        } else {
+            context.issues.push('No measurement types loaded');
+        }
+
+        return context;
+    }
+
+    /**
+     * AGENT 4: Validate reference line data structure integrity
+     */
+    validateReferenceLineStructure() {
+        const structure = {
+            valid: true,
+            score: 0,
+            issues: [],
+            details: {}
+        };
+
+        const lines = this.multiViewReferenceLines || {};
+        const totalViews = Object.keys(lines).length;
+        let totalLines = 0;
+        let validLines = 0;
+        let linkedLines = 0;
+        let primaryLines = 0;
+
+        // Analyze each view's reference lines
+        for (const [viewId, viewLines] of Object.entries(lines)) {
+            if (!Array.isArray(viewLines)) {
+                structure.issues.push(`View ${viewId}: Reference lines not in array format`);
+                continue;
+            }
+
+            totalLines += viewLines.length;
+
+            viewLines.forEach(line => {
+                // Check required fields
+                if (line.measurement_key && line.start && line.end && typeof line.lengthPx === 'number') {
+                    validLines++;
+
+                    if (line.linked_to_measurements) linkedLines++;
+                    if (line.primary_reference) primaryLines++;
+                } else {
+                    structure.issues.push(`View ${viewId}: Invalid reference line structure`);
+                }
+            });
+        }
+
+        // Calculate scores
+        if (totalLines > 0) {
+            const validityRatio = validLines / totalLines;
+            structure.score = Math.round(validityRatio * 100);
+        }
+
+        structure.details = {
+            total_views: totalViews,
+            total_lines: totalLines,
+            valid_lines: validLines,
+            linked_lines: linkedLines,
+            primary_lines: primaryLines,
+            validity_percentage: structure.score
+        };
+
+        if (totalLines === 0) {
+            structure.issues.push('No reference lines defined');
+        }
+
+        if (linkedLines === 0) {
+            structure.issues.push('No reference lines linked to measurements');
+        }
+
+        if (primaryLines === 0) {
+            structure.issues.push('No primary reference lines defined');
+        }
+
+        return structure;
+    }
+
+    /**
+     * AGENT 4: Validate multi-view coordination capabilities
+     */
+    validateMultiViewCoordination() {
+        const coordination = {
+            valid: true,
+            score: 0,
+            issues: [],
+            details: {}
+        };
+
+        // Check current view state
+        if (this.currentViewId && this.currentView) {
+            coordination.score += 30;
+            coordination.details.current_view = {
+                id: this.currentViewId,
+                name: this.currentView.name
+            };
+        } else {
+            coordination.issues.push('No current view selected');
+        }
+
+        // Check view switching capability
+        const totalViews = Object.keys(this.templateViews || {}).length;
+        if (totalViews > 1) {
+            coordination.score += 40;
+            coordination.details.multi_view_capable = true;
+            coordination.details.total_views = totalViews;
+        } else {
+            coordination.score += 20; // Single view is still functional
+            coordination.details.multi_view_capable = false;
+        }
+
+        // Check view data consistency
+        let viewsWithLines = 0;
+        for (const viewId of Object.keys(this.templateViews || {})) {
+            if (this.multiViewReferenceLines[viewId] && this.multiViewReferenceLines[viewId].length > 0) {
+                viewsWithLines++;
+            }
+        }
+
+        if (viewsWithLines > 0) {
+            coordination.score += 30;
+            coordination.details.views_with_data = viewsWithLines;
+        }
+
+        return coordination;
+    }
+
+    /**
+     * AGENT 4: Calculate validation scores from all validation results
+     */
+    calculateValidationScores(results) {
+        const weights = {
+            template_context: 0.2,
+            reference_line_structure: 0.25,
+            bridge_methods: 0.15,
+            precision_readiness: 0.2,
+            multi_view_coordination: 0.2
+        };
+
+        let totalScore = 0;
+        let totalWeight = 0;
+
+        for (const [category, result] of Object.entries(results)) {
+            if (weights[category] && result.score !== undefined) {
+                totalScore += result.score * weights[category];
+                totalWeight += weights[category];
+            }
+        }
+
+        return {
+            overall: totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0,
+            breakdown: Object.fromEntries(
+                Object.entries(results).map(([key, result]) => [key, result.score || 0])
+            )
+        };
+    }
+
+    /**
+     * AGENT 4: Generate specific recommendations based on validation results
+     */
+    generateValidationRecommendations(validation) {
+        const results = validation.validation_results;
+
+        // Template context recommendations
+        if (results.template_context?.score < 80) {
+            validation.recommendations.push('Initialize all template context components properly');
+        }
+
+        // Reference line recommendations
+        if (results.reference_line_structure?.score < 70) {
+            validation.recommendations.push('Add more reference lines and ensure proper data structure');
+        }
+
+        if (results.bridge_statistics?.linked === 0) {
+            validation.recommendations.push('Link reference lines to measurements for precision calculation');
+        }
+
+        if (results.bridge_statistics?.primary === 0) {
+            validation.recommendations.push('Define primary reference lines for accurate scaling');
+        }
+
+        // Method availability recommendations
+        if (results.bridge_methods?.completeness !== '100.0%') {
+            validation.recommendations.push('Ensure all Integration Bridge methods are properly implemented');
         }
 
         // Multi-view recommendations
-        if (multiViewCount === 0) {
-            recommendations.push('🔍 Create multi-view measurements for cross-view validation');
-        } else if (multiViewCount < mappedCount * 0.5) {
-            recommendations.push('📐 Consider adding more multi-view measurements for better precision');
+        if (results.multi_view_coordination?.score < 80) {
+            validation.recommendations.push('Improve multi-view coordination and data consistency');
         }
 
-        // Consistency recommendations
-        const avgConsistency = this.calculateAverageConsistency(mapping);
-        if (avgConsistency < 70) {
-            recommendations.push('⚠️ Low measurement consistency - review reference line placement');
-        } else if (avgConsistency < 85) {
-            recommendations.push('📏 Good consistency - minor adjustments may improve precision');
-        } else {
-            recommendations.push('🎯 Excellent measurement consistency');
+        // Performance recommendations
+        if (validation.overall_score < 90) {
+            validation.recommendations.push('Complete setup and configuration for optimal integration readiness');
         }
-
-        return recommendations;
-    }
-
-    // AGENT 7 ENHANCEMENT: Reference Line Bridge System Validator
-    /**
-     * AGENT 7: Comprehensive system validation for Reference Line Integration Bridge
-     */
-    validateReferenceLineBridgeSystem() {
-        console.log('🧪 AGENT 7: Starting comprehensive Reference Line Bridge System validation...');
-
-        const validation = {
-            timestamp: Date.now(),
-            system_status: 'validating',
-            validation_results: {
-                data_structure: this.validateDataStructure(),
-                measurement_mapping: this.validateMeasurementMapping(),
-                precision_calculator_bridge: this.validatePrecisionCalculatorBridge(),
-                ui_integration: this.validateUIIntegration(),
-                database_bridge: this.validateDatabaseBridge(),
-                multi_view_consistency: this.validateMultiViewConsistency(),
-                performance_metrics: this.validatePerformanceMetrics()
-            },
-            overall_score: 0,
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            integration_readiness: 'unknown'
-        };
-
-        // Calculate overall validation score
-        const results = validation.validation_results;
-        const scores = [
-            results.data_structure.score,
-            results.measurement_mapping.score,
-            results.precision_calculator_bridge.score,
-            results.ui_integration.score,
-            results.database_bridge.score,
-            results.multi_view_consistency.score,
-            results.performance_metrics.score
-        ];
-
-        validation.overall_score = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
-
-        // Collect critical issues and warnings
-        Object.values(results).forEach(result => {
-            validation.critical_issues.push(...result.critical_issues);
-            validation.warnings.push(...result.warnings);
-            validation.recommendations.push(...result.recommendations);
-        });
-
-        // Determine integration readiness
-        if (validation.overall_score >= 85 && validation.critical_issues.length === 0) {
-            validation.integration_readiness = 'production_ready';
-            validation.system_status = 'validated';
-        } else if (validation.overall_score >= 70 && validation.critical_issues.length <= 2) {
-            validation.integration_readiness = 'staging_ready';
-            validation.system_status = 'conditionally_validated';
-        } else {
-            validation.integration_readiness = 'development_required';
-            validation.system_status = 'validation_failed';
-        }
-
-        console.log('🧪 AGENT 7: System validation complete:', validation);
-        return validation;
     }
 
     /**
-     * AGENT 7: Validate data structure integrity
+     * AGENT 7: Quality assurance bridge method verification
      */
-    validateDataStructure() {
-        const result = {
-            category: 'Data Structure',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
+    getBridgeMethodsStatus() {
+        const bridgeMethods = ['getReferenceLinesByMeasurement', 'getPrimaryReferenceLines', 'exportForPrecisionCalculator', 'validateForPrecisionCalculation', 'validateReferenceLineBridgeSystem'];
+        const status = {
+            available: [],
+            missing: [],
+            functional: 0,
+            total: bridgeMethods.length,
+            score: 0
         };
 
-        let passedTests = 0;
-        let totalTests = 6;
-
-        // Test 1: multiViewReferenceLines structure
-        if (typeof this.multiViewReferenceLines === 'object' && this.multiViewReferenceLines !== null) {
-            passedTests++;
-            result.details.reference_lines_structure = '✅ Valid';
-        } else {
-            result.critical_issues.push('Invalid multiViewReferenceLines structure');
-            result.details.reference_lines_structure = '❌ Invalid';
-        }
-
-        // Test 2: measurementTypes availability
-        if (this.measurementTypes && Object.keys(this.measurementTypes).length > 0) {
-            passedTests++;
-            result.details.measurement_types = '✅ Available';
-        } else {
-            result.critical_issues.push('Missing measurementTypes data');
-            result.details.measurement_types = '❌ Missing';
-        }
-
-        // Test 3: templateViews structure
-        if (this.templateViews && Array.isArray(this.templateViews) && this.templateViews.length > 0) {
-            passedTests++;
-            result.details.template_views = '✅ Valid';
-        } else {
-            result.warnings.push('Template views not properly initialized');
-            result.details.template_views = '⚠️ Warning';
-        }
-
-        // Test 4: Integration bridge data validation
-        let bridgeDataValid = true;
-        for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
-            if (Array.isArray(lines)) {
-                lines.forEach((line, index) => {
-                    if (!line.hasOwnProperty('linked_to_measurements') ||
-                        !line.hasOwnProperty('precision_level') ||
-                        !line.hasOwnProperty('bridge_version')) {
-                        bridgeDataValid = false;
-                        result.warnings.push(`View ${viewId}, Line ${index}: Missing integration bridge data`);
-                    }
-                });
-            }
-        }
-        if (bridgeDataValid) {
-            passedTests++;
-            result.details.bridge_data = '✅ Complete';
-        } else {
-            result.details.bridge_data = '⚠️ Incomplete';
-        }
-
-        // Test 5: Canvas and UI elements
-        const canvas = document.getElementById('template-canvas');
-        const container = document.getElementById('point-to-point-container');
-        if (canvas && container) {
-            passedTests++;
-            result.details.ui_elements = '✅ Present';
-        } else {
-            result.critical_issues.push('Missing required UI elements');
-            result.details.ui_elements = '❌ Missing';
-        }
-
-        // Test 6: Performance monitoring
-        if (this.performanceMonitor && typeof this.performanceMonitor.enabled !== 'undefined') {
-            passedTests++;
-            result.details.performance_monitor = '✅ Active';
-        } else {
-            result.warnings.push('Performance monitoring not initialized');
-            result.details.performance_monitor = '⚠️ Inactive';
-        }
-
-        result.score = Math.round((passedTests / totalTests) * 100);
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate measurement mapping functionality
-     */
-    validateMeasurementMapping() {
-        const result = {
-            category: 'Measurement Mapping',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        try {
-            // Test mapping creation
-            const mapping = this.createMeasurementMapping();
-            const mappedCount = Object.values(mapping).filter(m => m.mapping_status !== 'not_mapped').length;
-            const totalCount = Object.keys(mapping).length;
-
-            result.details.mapping_coverage = `${mappedCount}/${totalCount} measurements mapped`;
-            result.details.mapping_percentage = Math.round((mappedCount / totalCount) * 100) + '%';
-
-            // Score based on coverage
-            const coverageScore = (mappedCount / totalCount) * 100;
-            result.score = Math.round(coverageScore);
-            result.status = result.score >= 70 ? 'passed' : result.score >= 50 ? 'warning' : 'failed';
-
-            if (result.score < 50) {
-                result.critical_issues.push('Low measurement mapping coverage');
-            } else if (result.score < 70) {
-                result.warnings.push('Moderate measurement mapping coverage');
-            }
-
-            result.details.multi_view_measurements = Object.values(mapping).filter(m => m.mapping_status === 'multi_view').length;
-            result.details.single_view_measurements = Object.values(mapping).filter(m => m.mapping_status === 'single_view').length;
-            result.details.unmapped_measurements = Object.values(mapping).filter(m => m.mapping_status === 'not_mapped').length;
-
-        } catch (error) {
-            result.critical_issues.push('Measurement mapping system failure: ' + error.message);
-            result.score = 0;
-            result.status = 'failed';
-        }
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate PrecisionCalculator bridge functionality
-     */
-    validatePrecisionCalculatorBridge() {
-        const result = {
-            category: 'PrecisionCalculator Bridge',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        let passedTests = 0;
-        let totalTests = 4;
-
-        // Test 1: Bridge methods availability
-        const bridgeMethods = ['getReferenceLinesByMeasurement', 'getPrimaryReferenceLines', 'exportForPrecisionCalculation', 'validateForPrecisionCalculation'];
-        let methodsAvailable = true;
-        bridgeMethods.forEach(method => {
-            if (typeof this[method] !== 'function') {
-                methodsAvailable = false;
-                result.critical_issues.push(`Missing bridge method: ${method}`);
-            }
-        });
-        if (methodsAvailable) {
-            passedTests++;
-            result.details.bridge_methods = '✅ All Available';
-        } else {
-            result.details.bridge_methods = '❌ Missing Methods';
-        }
-
-        // Test 2: Export functionality
-        try {
-            const exportData = this.exportForPrecisionCalculation();
-            if (exportData && exportData.template_id && exportData.views) {
-                passedTests++;
-                result.details.export_function = '✅ Working';
+        bridgeMethods.forEach(methodName => {
+            if (typeof this[methodName] === 'function') {
+                status.available.push(methodName);
+                status.functional++;
             } else {
-                result.critical_issues.push('Export function returns invalid data');
-                result.details.export_function = '❌ Invalid Data';
-            }
-        } catch (error) {
-            result.critical_issues.push('Export function failed: ' + error.message);
-            result.details.export_function = '❌ Error';
-        }
-
-        // Test 3: Validation functionality
-        try {
-            const validation = this.validateForPrecisionCalculation();
-            if (validation && validation.hasOwnProperty('valid') && validation.hasOwnProperty('summary')) {
-                passedTests++;
-                result.details.validation_function = '✅ Working';
-                result.details.validation_errors = validation.errors?.length || 0;
-                result.details.validation_warnings = validation.warnings?.length || 0;
-            } else {
-                result.critical_issues.push('Validation function returns invalid structure');
-                result.details.validation_function = '❌ Invalid Structure';
-            }
-        } catch (error) {
-            result.critical_issues.push('Validation function failed: ' + error.message);
-            result.details.validation_function = '❌ Error';
-        }
-
-        // Test 4: Primary reference lines functionality
-        try {
-            const primaryLines = this.getPrimaryReferenceLines();
-            if (Array.isArray(primaryLines)) {
-                passedTests++;
-                result.details.primary_lines_function = `✅ Returns ${primaryLines.length} primary lines`;
-            } else {
-                result.warnings.push('Primary lines function returns non-array');
-                result.details.primary_lines_function = '⚠️ Non-array Return';
-            }
-        } catch (error) {
-            result.critical_issues.push('Primary lines function failed: ' + error.message);
-            result.details.primary_lines_function = '❌ Error';
-        }
-
-        result.score = Math.round((passedTests / totalTests) * 100);
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate UI integration components
-     */
-    validateUIIntegration() {
-        const result = {
-            category: 'UI Integration',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        let passedTests = 0;
-        let totalTests = 4;
-
-        // Test 1: Enhanced dropdown functionality
-        try {
-            const dropdown = document.getElementById('measurement-type-selector');
-            if (dropdown && typeof this.checkMeasurementHasReferenceLines === 'function') {
-                passedTests++;
-                result.details.dropdown_enhancement = '✅ Working';
-            } else {
-                result.critical_issues.push('Enhanced dropdown functionality missing');
-                result.details.dropdown_enhancement = '❌ Missing';
-            }
-        } catch (error) {
-            result.critical_issues.push('Dropdown enhancement error: ' + error.message);
-            result.details.dropdown_enhancement = '❌ Error';
-        }
-
-        // Test 2: Integration bridge statistics
-        try {
-            if (typeof this.calculateIntegrationBridgeStats === 'function') {
-                const stats = this.calculateIntegrationBridgeStats();
-                if (stats && stats.hasOwnProperty('progressPercentage')) {
-                    passedTests++;
-                    result.details.bridge_statistics = `✅ Working (${stats.progressPercentage}% ready)`;
-                } else {
-                    result.warnings.push('Bridge statistics return invalid data');
-                    result.details.bridge_statistics = '⚠️ Invalid Data';
-                }
-            } else {
-                result.critical_issues.push('Bridge statistics function missing');
-                result.details.bridge_statistics = '❌ Missing';
-            }
-        } catch (error) {
-            result.critical_issues.push('Bridge statistics error: ' + error.message);
-            result.details.bridge_statistics = '❌ Error';
-        }
-
-        // Test 3: Enhanced lines display
-        const display = document.getElementById('multi-view-lines-display');
-        if (display && typeof this.updateLinesDisplay === 'function') {
-            passedTests++;
-            result.details.lines_display = '✅ Available';
-        } else {
-            result.critical_issues.push('Enhanced lines display not available');
-            result.details.lines_display = '❌ Missing';
-        }
-
-        // Test 4: Visual indicators
-        let visualIndicators = 0;
-        const testMeasurements = Object.keys(this.measurementTypes).slice(0, 3);
-        testMeasurements.forEach(key => {
-            if (typeof this.isPrimaryMeasurement === 'function') {
-                visualIndicators++;
-            }
-        });
-        if (visualIndicators === testMeasurements.length) {
-            passedTests++;
-            result.details.visual_indicators = '✅ Working';
-        } else {
-            result.warnings.push('Visual indicators partially working');
-            result.details.visual_indicators = '⚠️ Partial';
-        }
-
-        result.score = Math.round((passedTests / totalTests) * 100);
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate database bridge integration
-     */
-    validateDatabaseBridge() {
-        const result = {
-            category: 'Database Bridge',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        // Since we can't directly test AJAX endpoints in validation, we check prerequisites
-        let passedTests = 0;
-        let totalTests = 3;
-
-        // Test 1: AJAX configuration
-        if (typeof pointToPointAjax !== 'undefined' && pointToPointAjax.ajaxurl && pointToPointAjax.nonce) {
-            passedTests++;
-            result.details.ajax_config = '✅ Available';
-        } else {
-            result.critical_issues.push('AJAX configuration missing or incomplete');
-            result.details.ajax_config = '❌ Missing';
-        }
-
-        // Test 2: Save function availability
-        if (typeof this.saveMultiViewReferenceLines === 'function') {
-            passedTests++;
-            result.details.save_function = '✅ Available';
-        } else {
-            result.critical_issues.push('Save function not available');
-            result.details.save_function = '❌ Missing';
-        }
-
-        // Test 3: Load function availability
-        if (typeof this.loadExistingMultiViewReferenceLines === 'function') {
-            passedTests++;
-            result.details.load_function = '✅ Available';
-        } else {
-            result.critical_issues.push('Load function not available');
-            result.details.load_function = '❌ Missing';
-        }
-
-        result.score = Math.round((passedTests / totalTests) * 100);
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        if (result.score === 100) {
-            result.recommendations.push('Database bridge prerequisites validated - test with actual save/load operations');
-        }
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate multi-view consistency
-     */
-    validateMultiViewConsistency() {
-        const result = {
-            category: 'Multi-View Consistency',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        const viewCount = Object.keys(this.multiViewReferenceLines).length;
-        result.details.total_views = viewCount;
-
-        if (viewCount === 0) {
-            result.score = 0;
-            result.status = 'failed';
-            result.critical_issues.push('No views available for consistency validation');
-            result.details.consistency_check = '❌ No Data';
-            return result;
-        }
-
-        // Calculate consistency metrics
-        const measurements = {};
-        let totalLines = 0;
-        let consistentLines = 0;
-
-        for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
-            if (Array.isArray(lines)) {
-                totalLines += lines.length;
-                lines.forEach(line => {
-                    if (!measurements[line.measurement_key]) {
-                        measurements[line.measurement_key] = [];
-                    }
-                    measurements[line.measurement_key].push({
-                        view_id: viewId,
-                        pixel_length: line.lengthPx,
-                        precision_level: line.precision_level || 0.1
-                    });
-                });
-            }
-        }
-
-        // Check cross-view consistency
-        Object.entries(measurements).forEach(([measurementKey, viewData]) => {
-            if (viewData.length > 1) {
-                const lengths = viewData.map(v => v.pixel_length);
-                const average = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
-                const variance = lengths.reduce((sum, len) => sum + Math.pow(len - average, 2), 0) / lengths.length;
-                const coefficientOfVariation = (Math.sqrt(variance) / average) * 100;
-
-                if (coefficientOfVariation < 10) { // Consider consistent if CV < 10%
-                    consistentLines += viewData.length;
-                } else {
-                    result.warnings.push(`Measurement ${measurementKey} has high variance across views (CV: ${coefficientOfVariation.toFixed(1)}%)`);
-                }
-            } else {
-                consistentLines += 1; // Single view measurements are considered consistent
+                status.missing.push(methodName);
             }
         });
 
-        result.details.total_lines = totalLines;
-        result.details.consistent_lines = consistentLines;
-        result.details.unique_measurements = Object.keys(measurements).length;
-        result.details.multi_view_measurements = Object.values(measurements).filter(data => data.length > 1).length;
-
-        if (totalLines > 0) {
-            result.score = Math.round((consistentLines / totalLines) * 100);
-        } else {
-            result.score = 100; // No lines = perfectly consistent :)
-        }
-
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Validate performance metrics
-     */
-    validatePerformanceMetrics() {
-        const result = {
-            category: 'Performance Metrics',
-            score: 0,
-            status: 'unknown',
-            critical_issues: [],
-            warnings: [],
-            recommendations: [],
-            details: {}
-        };
-
-        let passedTests = 0;
-        let totalTests = 3;
-
-        // Test 1: Performance monitor availability
-        if (this.performanceMonitor && typeof this.performanceMonitor.getPerformanceStats === 'function') {
-            passedTests++;
-            result.details.performance_monitor = '✅ Available';
-
-            const stats = this.performanceMonitor.getPerformanceStats();
-            if (stats) {
-                result.details.performance_stats = `✅ ${stats.totalEvents} events tracked`;
-            }
-        } else {
-            result.warnings.push('Performance monitoring not available');
-            result.details.performance_monitor = '⚠️ Not Available';
-        }
-
-        // Test 2: Canvas performance optimization
-        if (this.mouseMoveThrottle !== undefined && typeof requestAnimationFrame !== 'undefined') {
-            passedTests++;
-            result.details.canvas_optimization = '✅ Throttling Active';
-        } else {
-            result.warnings.push('Canvas performance optimization missing');
-            result.details.canvas_optimization = '⚠️ Missing';
-        }
-
-        // Test 3: Memory usage tracking
-        if (typeof this.multiViewReferenceLines === 'object') {
-            const memoryEstimate = JSON.stringify(this.multiViewReferenceLines).length;
-            if (memoryEstimate < 100000) { // Less than 100KB is good
-                passedTests++;
-                result.details.memory_usage = `✅ ${(memoryEstimate / 1024).toFixed(1)}KB`;
-            } else {
-                result.warnings.push('High memory usage detected');
-                result.details.memory_usage = `⚠️ ${(memoryEstimate / 1024).toFixed(1)}KB`;
-            }
-        } else {
-            result.critical_issues.push('Memory usage cannot be estimated');
-            result.details.memory_usage = '❌ Cannot Estimate';
-        }
-
-        result.score = Math.round((passedTests / totalTests) * 100);
-        result.status = result.score >= 80 ? 'passed' : result.score >= 60 ? 'warning' : 'failed';
-
-        return result;
-    }
-
-    /**
-     * AGENT 7: Generate comprehensive validation report
-     */
-    generateValidationReport() {
-        const validation = this.validateReferenceLineBridgeSystem();
-
-        const reportHTML = `
-            <div class="validation-report">
-                <h2>🧪 Reference Line Integration Bridge - System Validation Report</h2>
-
-                <div class="validation-summary ${validation.system_status}">
-                    <h3>Overall Status: ${validation.system_status.toUpperCase()}</h3>
-                    <div class="score-display">
-                        <span class="score ${validation.overall_score >= 80 ? 'excellent' : validation.overall_score >= 60 ? 'good' : 'poor'}">${validation.overall_score}/100</span>
-                        <span class="readiness">${validation.integration_readiness.replace('_', ' ').toUpperCase()}</span>
-                    </div>
-                </div>
-
-                <div class="validation-categories">
-                    ${Object.entries(validation.validation_results).map(([category, result]) => `
-                        <div class="category-result ${result.status}">
-                            <h4>${result.category}: ${result.score}/100</h4>
-                            <div class="category-details">
-                                ${Object.entries(result.details).map(([key, value]) => `
-                                    <div class="detail-item">
-                                        <strong>${key.replace(/_/g, ' ')}:</strong> ${value}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-
-                ${validation.critical_issues.length > 0 ? `
-                    <div class="critical-issues">
-                        <h4>🚨 Critical Issues (${validation.critical_issues.length})</h4>
-                        <ul>
-                            ${validation.critical_issues.map(issue => `<li>${issue}</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-
-                ${validation.warnings.length > 0 ? `
-                    <div class="warnings">
-                        <h4>⚠️ Warnings (${validation.warnings.length})</h4>
-                        <ul>
-                            ${validation.warnings.map(warning => `<li>${warning}</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-
-                <div class="recommendations">
-                    <h4>💡 Recommendations</h4>
-                    <ul>
-                        ${validation.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                    </ul>
-                </div>
-
-                <div class="report-footer">
-                    <small>Generated by Agent 7 - Reference Line Bridge System Validator | ${new Date(validation.timestamp).toLocaleString()}</small>
-                </div>
-            </div>
-        `;
-
-        console.log('🧪 AGENT 7: Validation report generated');
-        return reportHTML;
+        status.score = Math.round((status.functional / status.total) * 100);
+        status.completeness = (status.functional / status.total * 100).toFixed(1) + '%';
+        console.log('🔍 AGENT 7: Integration Bridge Methods Status:', status);
+        return status;
     }
 }
 
+// Global Instance für Multi-View Template Editor
+let multiViewPointToPointSelector = null;
+
+/**
+ * AGENT 6: Enhanced Multi-View Point-to-Point Selector initialization with error handling
+ */
+function initMultiViewPointToPointSelector(templateId) {
+    console.log('⚡ AGENT 6: Global function initialization called for template:', templateId);
+
+    const canvas = document.getElementById('template-canvas');
+    const container = document.getElementById('point-to-point-container');
+
+    if (!canvas) {
+        console.error('❌ AGENT 6: Template canvas element not found in DOM');
+        return null;
+    }
+
+    if (!container) {
+        console.error('❌ AGENT 6: Point-to-point container element not found in DOM');
+        return null;
+    }
+
+    console.log('✅ AGENT 6: Required DOM elements found, creating MultiViewPointToPointSelector');
+
+    try {
+        multiViewPointToPointSelector = new MultiViewPointToPointSelector(canvas, templateId);
+
+        // Store globally for debugging
+        window.multiViewSelector = multiViewPointToPointSelector;
+
+        console.log('✅ AGENT 6: MultiViewPointToPointSelector instance created successfully');
+        return multiViewPointToPointSelector;
+
+    } catch (error) {
+        console.error('❌ AGENT 6: Failed to create MultiViewPointToPointSelector:', error);
+
+        // Display error to user
+        if (container) {
+            container.innerHTML = `
+                <div style="background: #f8d7da; border: 1px solid #f1aeb5; color: #721c24; padding: 15px; border-radius: 4px;">
+                    <strong>❌ Initialisierung fehlgeschlagen</strong><br>
+                    Das Multi-View Point-to-Point System konnte nicht gestartet werden.<br>
+                    <small>Error: ${error.message}</small>
+                </div>
+            `;
+        }
+
+        return null;
+    }
+}
 // WordPress Admin Integration
 document.addEventListener('DOMContentLoaded', function() {
     // Auto-Initialisierung wenn Template-Seite erkannt wird

@@ -45,6 +45,11 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         add_action('wp_ajax_save_multi_view_reference_lines', array($this, 'ajax_save_multi_view_reference_lines'));
         add_action('wp_ajax_get_multi_view_reference_lines', array($this, 'ajax_get_multi_view_reference_lines'));
 
+        // DELETION SYSTEM: Multi-View Reference Line Deletion AJAX Hooks
+        add_action('wp_ajax_delete_reference_line', array($this, 'ajax_delete_reference_line'));
+        add_action('wp_ajax_delete_view_reference_lines', array($this, 'ajax_delete_view_reference_lines'));
+        add_action('wp_ajax_delete_all_reference_lines', array($this, 'ajax_delete_all_reference_lines'));
+
         // AGENT 3 ENHANCEMENT: Integration Bridge AJAX Hooks
         add_action('wp_ajax_get_reference_lines_for_calculation', array($this, 'ajax_get_reference_lines_for_calculation'));
         add_action('wp_ajax_get_primary_reference_lines', array($this, 'ajax_get_primary_reference_lines'));
@@ -828,6 +833,244 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         } catch (Exception $e) {
             error_log('Primary Reference Lines Error: ' . $e->getMessage());
             wp_send_json_error(__('Fehler beim Laden der primären Referenzlinien: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * DELETION SYSTEM: Delete single reference line by view and measurement key
+     * AJAX Handler: Delete Reference Line
+     */
+    public function ajax_delete_reference_line() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+
+        if (!$template_id || !$view_id || !$measurement_key) {
+            wp_send_json_error(__('Template ID, View ID oder Measurement Key fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Load current multi-view reference lines
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+
+            if (empty($multi_view_lines)) {
+                wp_send_json_error(__('Keine Referenzlinien gefunden', 'octo-print-designer'));
+            }
+
+            // Check if view exists
+            if (!isset($multi_view_lines[$view_id])) {
+                wp_send_json_error(__('View nicht gefunden', 'octo-print-designer'));
+            }
+
+            // Find and remove the specific reference line
+            $line_found = false;
+            $deleted_line = null;
+
+            if (is_array($multi_view_lines[$view_id])) {
+                foreach ($multi_view_lines[$view_id] as $index => $line) {
+                    if (isset($line['measurement_key']) && $line['measurement_key'] === $measurement_key) {
+                        $deleted_line = $line;
+                        unset($multi_view_lines[$view_id][$index]);
+                        $line_found = true;
+                        break;
+                    }
+                }
+
+                // Re-index the array to prevent gaps
+                $multi_view_lines[$view_id] = array_values($multi_view_lines[$view_id]);
+            }
+
+            if (!$line_found) {
+                wp_send_json_error(__('Referenzlinie nicht gefunden', 'octo-print-designer'));
+            }
+
+            // Save updated data to database
+            $update_result = update_post_meta($template_id, '_multi_view_reference_lines_data', $multi_view_lines);
+
+            if ($update_result === false) {
+                throw new Exception('Database update failed');
+            }
+
+            // Calculate new statistics
+            $total_lines = 0;
+            foreach ($multi_view_lines as $view_lines) {
+                if (is_array($view_lines)) {
+                    $total_lines += count($view_lines);
+                }
+            }
+
+            wp_send_json_success(array(
+                'message' => sprintf(__('Referenzlinie "%s" erfolgreich gelöscht', 'octo-print-designer'), $deleted_line['label'] ?? $measurement_key),
+                'deleted_line' => $deleted_line,
+                'view_id' => $view_id,
+                'measurement_key' => $measurement_key,
+                'remaining_lines_in_view' => count($multi_view_lines[$view_id]),
+                'total_lines_remaining' => $total_lines,
+                'updated_multi_view_lines' => $multi_view_lines,
+                'template_id' => $template_id,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Delete Reference Line Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Löschen der Referenzlinie: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * DELETION SYSTEM: Delete all reference lines in a specific view
+     * AJAX Handler: Delete View Reference Lines
+     */
+    public function ajax_delete_view_reference_lines() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+
+        if (!$template_id || !$view_id) {
+            wp_send_json_error(__('Template ID oder View ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Load current multi-view reference lines
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+
+            if (empty($multi_view_lines)) {
+                wp_send_json_error(__('Keine Referenzlinien gefunden', 'octo-print-designer'));
+            }
+
+            // Check if view exists and has lines
+            if (!isset($multi_view_lines[$view_id]) || !is_array($multi_view_lines[$view_id])) {
+                wp_send_json_error(__('View nicht gefunden oder hat keine Referenzlinien', 'octo-print-designer'));
+            }
+
+            $deleted_lines_count = count($multi_view_lines[$view_id]);
+            $deleted_lines = $multi_view_lines[$view_id];
+
+            if ($deleted_lines_count === 0) {
+                wp_send_json_error(__('Keine Referenzlinien in dieser View vorhanden', 'octo-print-designer'));
+            }
+
+            // Clear the view's reference lines
+            $multi_view_lines[$view_id] = array();
+
+            // Save updated data to database
+            $update_result = update_post_meta($template_id, '_multi_view_reference_lines_data', $multi_view_lines);
+
+            if ($update_result === false) {
+                throw new Exception('Database update failed');
+            }
+
+            // Calculate new statistics
+            $total_lines = 0;
+            foreach ($multi_view_lines as $view_lines) {
+                if (is_array($view_lines)) {
+                    $total_lines += count($view_lines);
+                }
+            }
+
+            wp_send_json_success(array(
+                'message' => sprintf(__('%d Referenzlinien in View erfolgreich gelöscht', 'octo-print-designer'), $deleted_lines_count),
+                'deleted_lines' => $deleted_lines,
+                'deleted_lines_count' => $deleted_lines_count,
+                'view_id' => $view_id,
+                'total_lines_remaining' => $total_lines,
+                'updated_multi_view_lines' => $multi_view_lines,
+                'template_id' => $template_id,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Delete View Reference Lines Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Löschen der View-Referenzlinien: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * DELETION SYSTEM: Delete all reference lines in all views
+     * AJAX Handler: Delete All Reference Lines
+     */
+    public function ajax_delete_all_reference_lines() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Load current multi-view reference lines
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+
+            if (empty($multi_view_lines)) {
+                wp_send_json_error(__('Keine Referenzlinien gefunden', 'octo-print-designer'));
+            }
+
+            // Count existing lines for feedback
+            $total_deleted_lines = 0;
+            $deleted_views_data = array();
+
+            foreach ($multi_view_lines as $view_id => $view_lines) {
+                if (is_array($view_lines) && count($view_lines) > 0) {
+                    $deleted_views_data[$view_id] = array(
+                        'count' => count($view_lines),
+                        'lines' => $view_lines
+                    );
+                    $total_deleted_lines += count($view_lines);
+                }
+            }
+
+            if ($total_deleted_lines === 0) {
+                wp_send_json_error(__('Keine Referenzlinien zum Löschen vorhanden', 'octo-print-designer'));
+            }
+
+            // Clear all reference lines (reset to empty array)
+            $multi_view_lines = array();
+
+            // Save updated (empty) data to database
+            $update_result = update_post_meta($template_id, '_multi_view_reference_lines_data', $multi_view_lines);
+
+            if ($update_result === false) {
+                throw new Exception('Database update failed');
+            }
+
+            wp_send_json_success(array(
+                'message' => sprintf(__('Alle %d Referenzlinien erfolgreich gelöscht', 'octo-print-designer'), $total_deleted_lines),
+                'deleted_total_lines' => $total_deleted_lines,
+                'deleted_views_count' => count($deleted_views_data),
+                'deleted_views_data' => $deleted_views_data,
+                'updated_multi_view_lines' => $multi_view_lines,
+                'template_id' => $template_id,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Delete All Reference Lines Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Löschen aller Referenzlinien: ', 'octo-print-designer') . $e->getMessage());
         }
     }
 }
