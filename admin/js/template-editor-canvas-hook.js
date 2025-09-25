@@ -158,9 +158,9 @@
 
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        // 🔴 PHASE 4: Optimized timeout - reduced from 30 to 10 for better performance
-        const maxAttempts = isAdminContext && allowSelectiveDetection ? 20 : (isAdminContext ? 3 : 10); // Reduced timeout
-        const pollInterval = isAdminContext && allowSelectiveDetection ? 200 : (isAdminContext ? 200 : 100); // Optimized intervals
+        // 🚀 AGENT-2 PERFORMANCE OPTIMIZATION: Aggressive timeout reduction
+        const maxAttempts = isAdminContext && allowSelectiveDetection ? 8 : (isAdminContext ? 2 : 5); // Ultra-reduced attempts
+        const pollInterval = isAdminContext && allowSelectiveDetection ? 500 : (isAdminContext ? 300 : 200); // Slower but less spam
 
         const poll = setInterval(() => {
             attempts++;
@@ -253,9 +253,9 @@
                 }
             }
 
-            // AGENT 4: Reduced logging frequency to minimize performance impact
-            if (attempts % 10 === 0 || attempts === maxAttempts) {
-                console.log(`🔄 CANVAS HOOK: Polling attempt ${attempts}/${maxAttempts} - Checking fabric instances...`);
+            // 🎛️ AGENT-4 DEBUG REDUCTION: Only log final attempt to reduce console spam
+            if (attempts === maxAttempts) {
+                console.log(`🔄 CANVAS HOOK: Final polling attempt ${attempts}/${maxAttempts} - No canvas found`);
             }
 
             if (attempts >= maxAttempts) {

@@ -1776,65 +1776,28 @@ class MultiViewPointToPointSelector {
         const measurementCount = Object.keys(this.measurementTypes).length;
         console.log(`📊 Populating dropdown with ${measurementCount} measurement types`);
 
-        // INTEGRATION BRIDGE: Enhanced measurement assignment with conflict detection
+        // 🚨 AGENT-1 EMERGENCY: Simplified measurement assignment to prevent recursion cascade
         Object.entries(this.measurementTypes).forEach(([key, data]) => {
             const option = document.createElement('option');
             option.value = key;
 
-            // Check measurement status for enhanced integration bridge
-            const measurementStatus = this.getMeasurementIntegrationStatus(key);
-            const hasReferenceLines = this.checkMeasurementHasReferenceLines(key);
-            const isPrimary = this.isPrimaryMeasurement(key);
-            const hasConflicts = this.checkMeasurementConflicts(key);
-            const precisionLevel = this.getPrecisionLevel(key);
+            // 🚨 RECURSION PREVENTION: Skip intensive bridge methods during dropdown population
+            // These cause circular calls: getMeasurementIntegrationStatus → getReferenceLinesByMeasurement → getScaleFactor → cascade
+            // Use simplified status instead
 
-            let displayText = `${key} - ${data.label}`;
-            let statusIcon = '⭕';
-            let statusSuffix = '[NEW]';
+            // 🚨 AGENT-1 RECURSION FIX: Ultra-simplified status without bridge method calls
+            const category = this.getMeasurementCategory(key); // This is safe - no recursion
+            const statusIcon = '📏';
+            const statusSuffix = `[${category.toUpperCase()}]`;
 
-            // INTEGRATION BRIDGE: Advanced status determination
-            if (hasConflicts) {
-                statusIcon = '⚠️';
-                statusSuffix = '[CONFLICT]';
-                option.style.backgroundColor = '#ffe6e6';
-                option.style.color = '#c62d42';
-                option.disabled = true; // Prevent selection of conflicted measurements
-            } else if (isPrimary && hasReferenceLines) {
-                statusIcon = '🎯';
-                statusSuffix = `[PRIMARY-READY] P${precisionLevel}`;
-                option.style.backgroundColor = '#e8f5e8';
-                option.style.fontWeight = 'bold';
-                option.style.color = '#2d5016';
-            } else if (isPrimary) {
-                statusIcon = '🎯';
-                statusSuffix = '[PRIMARY-SETUP]';
-                option.style.backgroundColor = '#e8f5e8';
-                option.style.fontWeight = 'bold';
-            } else if (hasReferenceLines) {
-                statusIcon = '🔗';
-                statusSuffix = `[LINKED] P${precisionLevel}`;
-                option.style.backgroundColor = '#fff8e1';
-                option.style.color = '#8f6914';
-            } else {
-                statusIcon = '⭕';
-                statusSuffix = '[AVAILABLE]';
-                option.style.color = '#666';
-            }
-
-            // 🔴 PHASE 1: Static category lookup to prevent recursion
-            const staticCategoryMap = {
-                'A': 'horizontal', 'B': 'horizontal', 'D': 'horizontal', 'G': 'horizontal', 'H': 'horizontal',
-                'C': 'vertical', 'E': 'vertical', 'F': 'vertical', 'I': 'horizontal'
-            };
-            const category = staticCategoryMap[key] || 'general';
-            displayText = `${statusIcon} ${displayText} ${statusSuffix} [${category.toUpperCase()}]`;
-
+            const displayText = `${statusIcon} ${key} - ${data.label} ${statusSuffix}`;
             option.textContent = displayText;
+
+            // Basic safe styling without complex status checks
+            option.style.color = '#333';
             option.setAttribute('data-measurement-key', key);
             option.setAttribute('data-category', category);
-            option.setAttribute('data-precision', precisionLevel);
-            option.setAttribute('data-primary', isPrimary);
-            option.setAttribute('data-has-conflicts', hasConflicts);
+            // 🚨 AGENT-1: All recursion-causing variables removed
 
             dropdown.appendChild(option);
         });
@@ -5092,12 +5055,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // CRISIS FIX: Wait for template editor to be fully initialized
             let initAttempts = 0;
-            const maxAttempts = 20; // 10 seconds maximum
-            const attemptDelay = 500; // 500ms between attempts
+            const maxAttempts = 8; // 🚀 AGENT-2: Reduced from 20 to 8 attempts (4 seconds max)
+            const attemptDelay = 500; // Maintain same delay for stability
 
             const tryInitialization = () => {
                 initAttempts++;
-                console.log(`🔄 INIT ATTEMPT ${initAttempts}/${maxAttempts}: Checking for template editor readiness...`);
+                // 🎛️ AGENT-4 DEBUG REDUCTION: Only log every 3rd attempt and final attempt
+                if (initAttempts % 3 === 0 || initAttempts === maxAttempts) {
+                    console.log(`🔄 INIT ATTEMPT ${initAttempts}/${maxAttempts}: Checking for template editor readiness...`);
+                }
 
                 // Check if template editor systems are ready
                 const canvasElements = document.querySelectorAll('canvas');
