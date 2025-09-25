@@ -319,12 +319,14 @@ class Octo_Print_Designer_Admin {
     public function save_reference_line_data() {
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
-            wp_die('Security check failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
 
         // Check permissions
         if (!current_user_can('edit_posts')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
+            return;
         }
 
         $post_id = intval($_POST['post_id']);
@@ -368,12 +370,14 @@ class Octo_Print_Designer_Admin {
     public function delete_reference_line() {
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_template_nonce_action')) {
-            wp_die('Security check failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
 
         // Check permissions
         if (!current_user_can('edit_posts')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
+            return;
         }
 
         $post_id = intval($_POST['post_id']);
@@ -416,12 +420,14 @@ class Octo_Print_Designer_Admin {
     public function calculate_size_factors() {
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_size_definitions_nonce_action')) {
-            wp_die('Security check failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
 
         // Check permissions
         if (!current_user_can('edit_posts')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
+            return;
         }
 
         $post_id = intval($_POST['post_id']);
@@ -494,12 +500,14 @@ class Octo_Print_Designer_Admin {
     public function sync_sizes_to_woocommerce() {
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_size_definitions_nonce_action')) {
-            wp_die('Security check failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
 
         // Check permissions
         if (!current_user_can('edit_posts')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
+            return;
         }
 
         $post_id = intval($_POST['post_id']);

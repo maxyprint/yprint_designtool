@@ -62,12 +62,14 @@ class Octo_Print_Designer_Settings {
     public function test_api_connection() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'octo_print_api_test')) {
-            wp_die('Security check failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
 
         // Check permissions
         if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
+            return;
         }
 
         try {

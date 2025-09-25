@@ -166,11 +166,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -257,11 +259,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -318,11 +322,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_reference_lines() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -540,11 +546,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_template_views() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -590,11 +598,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -673,11 +683,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_multi_view_reference_lines() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -721,11 +733,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_template_image() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -759,11 +773,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_reference_lines_for_calculation() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -914,11 +930,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1108,11 +1126,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_delete_reference_line() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1198,11 +1218,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_delete_view_reference_lines() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1274,11 +1296,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_delete_all_reference_lines() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1345,11 +1369,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_save_measurement_assignment() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1421,11 +1447,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_measurement_assignments() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1476,11 +1504,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_validate_measurement_assignments() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1515,11 +1545,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_get_integration_bridge_status() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1549,11 +1581,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_calculate_precision_metrics() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -1817,11 +1851,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
 
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
@@ -2471,11 +2507,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
     public function ajax_synchronize_multi_view_references() {
         // Security Check
         if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
-            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            wp_send_json_error(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+            return;
         }
 
         if (!current_user_can('edit_posts')) {
-            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+            wp_send_json_error(__('Keine Berechtigung', 'octo-print-designer'));
+            return;
         }
 
         $template_id = absint($_POST['template_id']);
