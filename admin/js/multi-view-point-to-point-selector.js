@@ -54,7 +54,11 @@ class HiveMindDebugger {
                 break;
             case 'INFO':
             default:
-                console.log(fullMessage, data || '');
+                // PERFORMANCE FIX: Reduce console spam - throttle INFO logs
+                if (!this._lastInfoLog || Date.now() - this._lastInfoLog > 5000) {
+                    console.log(fullMessage, data || '');
+                    this._lastInfoLog = Date.now();
+                }
                 break;
         }
 
@@ -3947,7 +3951,12 @@ class MultiViewPointToPointSelector {
     getScaleFactor() {
         // RECURSION FIX: Add guard to prevent infinite loops
         if (this._calculatingScaleFactor) {
-            console.warn('⚠️ RECURSION GUARD: getScaleFactor called recursively, using fallback');
+            // PERFORMANCE FIX: Reduce recursion warning spam
+            if (!this._recursionWarningShown) {
+                console.warn('⚠️ RECURSION GUARD: getScaleFactor called recursively, using fallback - further warnings suppressed');
+                this._recursionWarningShown = true;
+                setTimeout(() => this._recursionWarningShown = false, 30000); // Show warning again after 30 seconds
+            }
             return this.calculateCategoryBasedScale();
         }
 
@@ -3991,7 +4000,12 @@ class MultiViewPointToPointSelector {
 
             // Enhanced fallback with measurement category analysis
             const categoryScale = this.calculateCategoryBasedScale();
-            console.warn(`⚠️ PRECISION: Using category-based scale: ${categoryScale.toFixed(4)} mm/px`);
+            // PERFORMANCE FIX: Reduce precision warning spam
+            if (!this._precisionWarningShown) {
+                console.warn(`⚠️ PRECISION: Using category-based scale: ${categoryScale.toFixed(4)} mm/px - further warnings suppressed`);
+                this._precisionWarningShown = true;
+                setTimeout(() => this._precisionWarningShown = false, 30000);
+            }
             return categoryScale;
         } finally {
             // Always clear the recursion guard
@@ -4092,7 +4106,12 @@ class MultiViewPointToPointSelector {
             }
         }
 
-        console.log(`🎯 AGENT 4 BRIDGE: Found ${primaryLines.length} primary reference lines`);
+        // PERFORMANCE FIX: Reduced console spam
+        if (!this._logSpamPrevented) {
+            console.log(`🎯 AGENT 4 BRIDGE: Found ${primaryLines.length} primary reference lines`);
+            this._logSpamPrevented = true;
+            setTimeout(() => this._logSpamPrevented = false, 5000); // Allow logging every 5 seconds
+        }
         return primaryLines;
     }
 
@@ -4214,10 +4233,13 @@ class MultiViewPointToPointSelector {
      * INTEGRATION BRIDGE: Get precision calculator bridge connection data
      */
     getPrecisionCalculatorBridgeData() {
+        // RECURSION FIX: Use cached scale factor to prevent infinite loop
+        const scaleFactor = this._calculatingScaleFactor ? 0.8 : this.getScaleFactor();
+
         return {
             template_id: this.templateId,
             bridge_version: '2.0',
-            scale_factor: this.getScaleFactor(),
+            scale_factor: scaleFactor,
             coordinate_system: 'multi_transform',
             measurement_mappings: this.getMeasurementMappings(),
             primary_references: this.getPrimaryReferenceLines(),
