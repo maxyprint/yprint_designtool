@@ -45,6 +45,10 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         add_action('wp_ajax_save_multi_view_reference_lines', array($this, 'ajax_save_multi_view_reference_lines'));
         add_action('wp_ajax_get_multi_view_reference_lines', array($this, 'ajax_get_multi_view_reference_lines'));
 
+        // AGENT 3 ENHANCEMENT: Integration Bridge AJAX Hooks
+        add_action('wp_ajax_get_reference_lines_for_calculation', array($this, 'ajax_get_reference_lines_for_calculation'));
+        add_action('wp_ajax_get_primary_reference_lines', array($this, 'ajax_get_primary_reference_lines'));
+
         // Legacy Template Image AJAX Handler für Single View Fallback
         add_action('wp_ajax_get_template_image', array($this, 'ajax_get_template_image'));
 
@@ -551,6 +555,18 @@ class Octo_Print_Designer_Point_To_Point_Admin {
                     if (!isset($line['measurement_key'], $line['label'], $line['lengthPx'], $line['start'], $line['end'])) {
                         throw new Exception('Unvollständige Referenzlinien-Daten in View: ' . $view_id);
                     }
+
+                    // AGENT 3 ENHANCEMENT: Validate integration bridge data
+                    if (isset($line['linked_to_measurements']) && $line['linked_to_measurements']) {
+                        if (!isset($line['measurement_category'], $line['precision_level'], $line['bridge_version'])) {
+                            error_log('AGENT 3 WARNING: Reference line missing integration bridge data: ' . json_encode($line));
+                        }
+
+                        // Validate precision level
+                        if (isset($line['precision_level']) && (!is_numeric($line['precision_level']) || $line['precision_level'] <= 0)) {
+                            throw new Exception('Invalid precision_level for reference line: ' . $line['measurement_key']);
+                        }
+                    }
                 }
                 $total_lines += count($view_lines);
             }
@@ -665,6 +681,153 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         } catch (Exception $e) {
             error_log('Template Image Load Error: ' . $e->getMessage());
             wp_send_json_error(__('Fehler beim Laden des Template-Bildes: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * AGENT 3 ENHANCEMENT: Get Reference Lines for PrecisionCalculator Integration
+     * Spezielle AJAX-Funktion für PrecisionCalculator Bridge
+     */
+    public function ajax_get_reference_lines_for_calculation() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+        $view_id = sanitize_text_field($_POST['view_id']);
+
+        if (!$template_id || !$measurement_key) {
+            wp_send_json_error(__('Template ID oder Measurement Key fehlen', 'octo-print-designer'));
+        }
+
+        try {
+            // Load multi-view reference lines
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+
+            if (empty($multi_view_lines)) {
+                wp_send_json_error(__('Keine Referenzlinien für dieses Template gefunden', 'octo-print-designer'));
+            }
+
+            // Find matching reference line for calculation
+            $matching_lines = array();
+
+            foreach ($multi_view_lines as $current_view_id => $view_lines) {
+                if (!empty($view_id) && $current_view_id !== $view_id) {
+                    continue; // Skip if specific view requested
+                }
+
+                if (is_array($view_lines)) {
+                    foreach ($view_lines as $line) {
+                        if ($line['measurement_key'] === $measurement_key &&
+                            isset($line['linked_to_measurements']) &&
+                            $line['linked_to_measurements']) {
+
+                            // AGENT 3: Prepare calculation-ready data
+                            $matching_lines[] = array(
+                                'measurement_key' => $line['measurement_key'],
+                                'label' => $line['label'],
+                                'lengthPx' => $line['lengthPx'],
+                                'view_id' => $current_view_id,
+                                'view_name' => $line['view_name'],
+                                'primary_reference' => $line['primary_reference'] ?? false,
+                                'measurement_category' => $line['measurement_category'] ?? 'unknown',
+                                'precision_level' => $line['precision_level'] ?? 0.1,
+                                'bridge_version' => $line['bridge_version'] ?? '1.0',
+                                'created_timestamp' => $line['created_timestamp'] ?? 0
+                            );
+                        }
+                    }
+                }
+            }
+
+            if (empty($matching_lines)) {
+                wp_send_json_error(__('Keine verknüpfte Referenzlinie für Measurement Key gefunden: ', 'octo-print-designer') . $measurement_key);
+            }
+
+            wp_send_json_success(array(
+                'reference_lines' => $matching_lines,
+                'template_id' => $template_id,
+                'measurement_key' => $measurement_key,
+                'total_found' => count($matching_lines)
+            ));
+
+        } catch (Exception $e) {
+            error_log('Reference Lines for Calculation Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden der Referenzlinien für Berechnung: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * AGENT 3 ENHANCEMENT: Get Primary Reference Lines for Scaling Calculations
+     */
+    public function ajax_get_primary_reference_lines() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Load multi-view reference lines
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+
+            if (empty($multi_view_lines)) {
+                wp_send_json_success(array(
+                    'primary_references' => array(),
+                    'template_id' => $template_id,
+                    'message' => 'Keine Referenzlinien gefunden'
+                ));
+            }
+
+            // Find all primary reference lines
+            $primary_references = array();
+
+            foreach ($multi_view_lines as $view_id => $view_lines) {
+                if (is_array($view_lines)) {
+                    foreach ($view_lines as $line) {
+                        if (isset($line['primary_reference']) && $line['primary_reference'] === true &&
+                            isset($line['linked_to_measurements']) && $line['linked_to_measurements']) {
+
+                            $primary_references[] = array(
+                                'measurement_key' => $line['measurement_key'],
+                                'label' => $line['label'],
+                                'lengthPx' => $line['lengthPx'],
+                                'view_id' => $view_id,
+                                'view_name' => $line['view_name'],
+                                'measurement_category' => $line['measurement_category'] ?? 'unknown',
+                                'precision_level' => $line['precision_level'] ?? 0.1,
+                                'bridge_version' => $line['bridge_version'] ?? '1.0'
+                            );
+                        }
+                    }
+                }
+            }
+
+            wp_send_json_success(array(
+                'primary_references' => $primary_references,
+                'template_id' => $template_id,
+                'total_primary' => count($primary_references),
+                'calculation_ready' => count($primary_references) > 0
+            ));
+
+        } catch (Exception $e) {
+            error_log('Primary Reference Lines Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden der primären Referenzlinien: ', 'octo-print-designer') . $e->getMessage());
         }
     }
 }
