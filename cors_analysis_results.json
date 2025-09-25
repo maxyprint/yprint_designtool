@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-09-25T18:12:51.191621",
+  "error_type": "cors_xmlhttprequest_blocked",
+  "root_cause": "WordPress Heartbeat API lacks proper CORS headers for cross-origin requests",
+  "confidence": "high",
+  "evidence": [
+    "admin-ajax.php accessed from template editor without CORS headers",
+    "WordPress Heartbeat API failing preflight checks",
+    "Browser blocking XMLHttpRequest due to same-origin policy",
+    "No Access-Control-Allow-Origin header present",
+    "Preflight OPTIONS request not handled properly"
+  ],
+  "technical_details": {
+    "blocked_endpoint": "https://yprint.de/wp-admin/admin-ajax.php",
+    "request_origin": "template editor context",
+    "browser_policy": "same-origin policy enforcement",
+    "missing_headers": [
+      "Access-Control-Allow-Origin",
+      "Access-Control-Allow-Methods",
+      "Access-Control-Allow-Headers"
+    ]
+  },
+  "recommended_fixes": [
+    "Add CORS headers to WordPress admin-ajax.php responses",
+    "Configure WordPress to allow cross-origin requests for heartbeat",
+    "Update .htaccess to include CORS headers for admin-ajax.php",
+    "Modify WordPress Heartbeat API to handle preflight requests",
+    "Add proper Access-Control headers in PHP responses"
+  ],
+  "implementation_priority": "high",
+  "impact_assessment": {
+    "current_functionality": "Assignment saves work (nonce fixed)",
+    "broken_functionality": "WordPress Heartbeat API",
+    "user_experience": "Console errors but system functional",
+    "risk_level": "low (cosmetic but should be fixed)"
+  }
+}

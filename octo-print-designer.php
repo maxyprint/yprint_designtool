@@ -71,6 +71,26 @@ register_activation_hook( __FILE__, 'activate_octo_print_designer' );
 register_deactivation_hook( __FILE__, 'deactivate_octo_print_designer' );
 
 /**
+ * Add CORS headers to WordPress AJAX requests to fix XMLHttpRequest errors
+ * This resolves the "XMLHttpRequest cannot load admin-ajax.php due to access control checks" error
+ */
+add_action('wp_ajax_heartbeat', 'add_cors_headers_to_ajax', 1);
+add_action('wp_ajax_nopriv_heartbeat', 'add_cors_headers_to_ajax', 1);
+
+function add_cors_headers_to_ajax() {
+    // Add CORS headers for WordPress Heartbeat API
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+
+    // Handle preflight OPTIONS requests
+    if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+        http_response_code(200);
+        exit(0);
+    }
+}
+
+/**
  * The core plugin class that is used to define internationalization,
  * admin-specific hooks, and public-facing site hooks.
  */
