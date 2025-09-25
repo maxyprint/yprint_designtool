@@ -279,12 +279,12 @@
             return;
         }
 
-        // AGENT 2 FIX: Enhanced templateEditors detection with multiple timing strategies
+        // 🔵 AGENT-2 ENHANCED CANVAS DETECTION: Multiple fallback strategies for image visibility
         if (window.templateEditors instanceof Map && window.templateEditors.size === 0 && templateEditorWaitCount < maxTemplateEditorWait) {
             templateEditorWaitCount++;
-            // Progressive delay: faster initial attempts, slower later ones for efficiency
-            const waitDelay = Math.min(100 + (templateEditorWaitCount * 50), 500);
-            console.log(`🔧 FABRIC EXPOSURE: Waiting for templateEditors to be populated... ${templateEditorWaitCount}/${maxTemplateEditorWait} (delay: ${waitDelay}ms)`);
+            // Accelerated timing for critical canvas restoration
+            const waitDelay = Math.min(50 + (templateEditorWaitCount * 25), 300);
+            console.log(`🔵 AGENT-2: Fast templateEditors detection... ${templateEditorWaitCount}/${maxTemplateEditorWait} (${waitDelay}ms)`);
             setTimeout(attemptExposure, waitDelay);
             return;
         }
