@@ -158,8 +158,8 @@
 
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        // 🧠 AGENT 2 FIX: Enhanced timeout configuration for template editor detection
-        const maxAttempts = isAdminContext && allowSelectiveDetection ? 20 : (isAdminContext ? 3 : 30); // 4s for selective detection
+        // 🔴 PHASE 4: Optimized timeout - reduced from 30 to 10 for better performance
+        const maxAttempts = isAdminContext && allowSelectiveDetection ? 20 : (isAdminContext ? 3 : 10); // Reduced timeout
         const pollInterval = isAdminContext && allowSelectiveDetection ? 200 : (isAdminContext ? 200 : 100); // Optimized intervals
 
         const poll = setInterval(() => {
