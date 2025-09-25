@@ -3215,7 +3215,7 @@ class MultiViewPointToPointSelector {
             const data = {
                 action: 'get_integration_bridge_status',
                 template_id: this.templateId,
-                nonce: window.pointToPointNonce
+                nonce: pointToPointAjax.nonce
             };
 
             // Use native fetch API as primary method with jQuery fallback
@@ -3318,7 +3318,7 @@ class MultiViewPointToPointSelector {
                 template_id: this.templateId,
                 measurement_key: this.selectedMeasurementKey,
                 reference_line_data: JSON.stringify(referenceLineData),
-                nonce: window.pointToPointNonce
+                nonce: pointToPointAjax.nonce
             };
 
             // Use native fetch API as primary method with jQuery fallback
