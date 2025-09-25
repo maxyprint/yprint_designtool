@@ -287,6 +287,161 @@ class TemplateMeasurementManager {
     }
 
     /**
+     * 🎯 AGENT 2: Get unique measurement types with metadata for Integration Bridge UI
+     *
+     * @param int $template_id Template post ID
+     * @return array Array of measurement types with labels and metadata
+     */
+    public function get_measurement_types($template_id) {
+        $results = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT DISTINCT measurement_key, measurement_label,
+                 COUNT(DISTINCT size_key) as size_count,
+                 MIN(value_cm) as min_value,
+                 MAX(value_cm) as max_value,
+                 AVG(value_cm) as avg_value
+                 FROM {$this->table_name}
+                 WHERE template_id = %d
+                 GROUP BY measurement_key, measurement_label
+                 ORDER BY measurement_key",
+                $template_id
+            ),
+            ARRAY_A
+        );
+
+        $measurement_types = array();
+        foreach ($results as $row) {
+            $measurement_types[$row['measurement_key']] = array(
+                'label' => $row['measurement_label'],
+                'key' => $row['measurement_key'],
+                'size_count' => intval($row['size_count']),
+                'min_value' => floatval($row['min_value']),
+                'max_value' => floatval($row['max_value']),
+                'avg_value' => round(floatval($row['avg_value']), 2),
+                'category' => $this->get_measurement_category_from_key($row['measurement_key']),
+                'description' => $this->get_measurement_description_from_key($row['measurement_key'])
+            );
+        }
+
+        return $measurement_types;
+    }
+
+    /**
+     * 🔍 AGENT 2: Get measurement values for specific measurement type across all sizes
+     *
+     * @param int $template_id Template post ID
+     * @param string $measurement_key Measurement key (A, B, C, etc.)
+     * @return array Array of size_key => value_cm pairs
+     */
+    public function get_measurement_values_by_type($template_id, $measurement_key) {
+        $results = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT size_key, value_cm FROM {$this->table_name}
+                WHERE template_id = %d AND measurement_key = %s
+                ORDER BY size_key",
+                $template_id, $measurement_key
+            ),
+            ARRAY_A
+        );
+
+        $values = array();
+        foreach ($results as $row) {
+            $values[$row['size_key']] = floatval($row['value_cm']);
+        }
+
+        return $values;
+    }
+
+    /**
+     * 📊 AGENT 2: Get comprehensive measurement statistics for template
+     *
+     * @param int $template_id Template post ID
+     * @return array Statistics about measurements
+     */
+    public function get_measurement_statistics($template_id) {
+        $measurements = $this->get_measurements($template_id);
+        $template_sizes = $this->get_template_sizes($template_id);
+
+        $stats = array(
+            'total_sizes' => count($template_sizes),
+            'total_measurement_types' => 0,
+            'total_measurements' => 0,
+            'coverage_percentage' => 0,
+            'measurement_types' => array(),
+            'size_coverage' => array()
+        );
+
+        // Count unique measurement types
+        $unique_types = array();
+        foreach ($measurements as $size_key => $size_measurements) {
+            foreach ($size_measurements as $measurement_key => $measurement_info) {
+                $unique_types[$measurement_key] = true;
+            }
+        }
+
+        $stats['total_measurement_types'] = count($unique_types);
+
+        // Calculate coverage for each size
+        foreach ($template_sizes as $size) {
+            $size_key = $size['id'];
+            $measurements_in_size = isset($measurements[$size_key]) ? count($measurements[$size_key]) : 0;
+            $stats['total_measurements'] += $measurements_in_size;
+
+            $stats['size_coverage'][$size_key] = array(
+                'name' => $size['name'] ?? $size_key,
+                'measurement_count' => $measurements_in_size,
+                'coverage_percentage' => $stats['total_measurement_types'] > 0 ?
+                    round(($measurements_in_size / $stats['total_measurement_types']) * 100, 1) : 0
+            );
+        }
+
+        // Overall coverage percentage
+        $total_possible = $stats['total_sizes'] * $stats['total_measurement_types'];
+        $stats['coverage_percentage'] = $total_possible > 0 ?
+            round(($stats['total_measurements'] / $total_possible) * 100, 1) : 0;
+
+        return $stats;
+    }
+
+    /**
+     * 🏷️ Get measurement category from key
+     */
+    private function get_measurement_category_from_key($measurement_key) {
+        $categories = array(
+            'A' => 'horizontal',
+            'B' => 'horizontal',
+            'C' => 'vertical',
+            'D' => 'horizontal',
+            'E' => 'vertical',
+            'F' => 'vertical',
+            'G' => 'horizontal',
+            'H' => 'horizontal',
+            'J' => 'detail'
+        );
+
+        return isset($categories[$measurement_key]) ? $categories[$measurement_key] : 'horizontal';
+    }
+
+    /**
+     * 📝 Get measurement description from key
+     */
+    private function get_measurement_description_from_key($measurement_key) {
+        $descriptions = array(
+            'A' => 'Brustumfang - Horizontal measurement across chest',
+            'B' => 'Saumweite - Width of the garment at the hem',
+            'C' => 'Höhe ab Schulter - Vertical length from shoulder point',
+            'D' => 'Schulterbreite - Distance between shoulder seams',
+            'E' => 'Ärmellänge - Length of the sleeve',
+            'F' => 'Rückenlänge - Back length measurement',
+            'G' => 'Armausschnitt Breite - Armhole width measurement',
+            'H' => 'Halsausschnitt Breite - Neckline width',
+            'J' => 'Saumhöhe - Height of hem detail'
+        );
+
+        return isset($descriptions[$measurement_key]) ? $descriptions[$measurement_key] : 'Custom measurement type';
+    }
+
+    /**
      * 🧪 Validate measurement data
      *
      * @param array $measurements_data Measurement data to validate

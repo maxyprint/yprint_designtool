@@ -840,6 +840,10 @@ class MultiViewPointToPointSelector {
 
             console.log('✅ AGENT 6: Multi-View Point-to-Point initialization complete');
 
+            // AGENT 4 ENHANCEMENT: Initialize enhanced measurement dropdown
+            console.log('⚡ AGENT 4: Step 6 - Initializing enhanced measurement dropdown');
+            await this.initializeAgent4MeasurementDropdown();
+
             // AGENT 4 ENHANCEMENT: Initialize PrecisionCalculator Integration
             await this.initializePrecisionCalculatorBridge();
 
@@ -1678,8 +1682,17 @@ class MultiViewPointToPointSelector {
 
     /**
      * AGENT 5 ENHANCEMENT: Fills dropdown with integration bridge indicators
+     * AGENT 4 COORDINATION: Delegates to enhanced dropdown if available
      */
     populateMeasurementDropdown() {
+        // AGENT 4: Delegate to enhanced dropdown if available
+        if (this.agent4Enhancer) {
+            console.log('🎯 AGENT 4: Using enhanced dropdown population');
+            return this.agent4Enhancer.populateMeasurementDropdownDynamic();
+        }
+
+        // AGENT 5: Fallback to original implementation
+        console.log('📊 AGENT 5: Using original dropdown population (fallback)');
         const dropdown = document.getElementById('measurement-type-selector');
         dropdown.innerHTML = '<option value="">Measurement-Type auswählen...</option>';
 
@@ -2822,34 +2835,61 @@ class MultiViewPointToPointSelector {
             console.log('🎯 INTEGRATION BRIDGE: jQuery available:', jQueryAvailable);
 
             // Find control group using native DOM or jQuery fallback
+            // AGENT 3 FIX: Robust selector with fallback for both multi-view and legacy selectors
             let controlGroup;
+            const selectors = ['.multi-view-point-to-point-controls', '.point-to-point-controls'];
+
             if (jQueryAvailable) {
-                controlGroup = $('.point-to-point-controls').first();
-                console.log('🎯 INTEGRATION BRIDGE: Control group found (jQuery):', controlGroup.length > 0);
+                // Try both selectors with jQuery
+                for (const selector of selectors) {
+                    controlGroup = $(selector).first();
+                    if (controlGroup.length > 0) {
+                        console.log(`🎯 INTEGRATION BRIDGE: Control group found (jQuery) with selector: ${selector}`);
+                        break;
+                    }
+                }
+                if (!controlGroup || controlGroup.length === 0) {
+                    console.log('🎯 INTEGRATION BRIDGE: No control group found with jQuery, trying selectors:', selectors);
+                }
             } else {
-                controlGroup = document.querySelector('.point-to-point-controls');
-                console.log('🎯 INTEGRATION BRIDGE: Control group found (native):', controlGroup !== null);
-                // Wrap in jQuery-like object for consistency
-                if (controlGroup) {
-                    controlGroup = {
-                        length: 1,
-                        after: (element) => {
-                            if (typeof element === 'string') {
-                                controlGroup.insertAdjacentHTML('afterend', element);
-                            } else {
-                                controlGroup.parentNode.insertBefore(element, controlGroup.nextSibling);
+                // Try both selectors with native DOM
+                for (const selector of selectors) {
+                    const foundElement = document.querySelector(selector);
+                    if (foundElement) {
+                        console.log(`🎯 INTEGRATION BRIDGE: Control group found (native) with selector: ${selector}`);
+                        // Wrap in jQuery-like object for consistency
+                        controlGroup = {
+                            length: 1,
+                            after: (element) => {
+                                if (typeof element === 'string') {
+                                    foundElement.insertAdjacentHTML('afterend', element);
+                                } else {
+                                    foundElement.parentNode.insertBefore(element, foundElement.nextSibling);
+                                }
                             }
-                        }
-                    };
-                } else {
+                        };
+                        break;
+                    }
+                }
+                if (!controlGroup) {
                     controlGroup = { length: 0 };
+                    console.log('🎯 INTEGRATION BRIDGE: No control group found with native DOM, tried selectors:', selectors);
                 }
             }
 
-            if (controlGroup.length === 0) {
+            if (!controlGroup || controlGroup.length === 0) {
                 console.error('❌ INTEGRATION BRIDGE: No control group found - UI creation failed!');
+                console.error('❌ INTEGRATION BRIDGE: Tried selectors:', selectors);
+                console.error('❌ INTEGRATION BRIDGE: Available elements with class containing "point-to-point":');
+                // Debug: show what elements are actually available
+                const allElements = document.querySelectorAll('[class*="point-to-point"]');
+                allElements.forEach((el, index) => {
+                    console.error(`   ${index + 1}. ${el.tagName} with classes: ${el.className}`);
+                });
                 return;
             }
+
+            console.log('✅ INTEGRATION BRIDGE: Control group found successfully - proceeding with UI creation');
 
             // Create measurement assignment section HTML
             const bridgeSectionHTML = `
@@ -3325,9 +3365,21 @@ class MultiViewPointToPointSelector {
         console.log('🚨 INTEGRATION BRIDGE: Creating emergency UI (no jQuery)...');
 
         try {
-            const controlGroup = document.querySelector('.point-to-point-controls');
+            // AGENT 3 FIX: Robust selector with fallback for emergency UI
+            const selectors = ['.multi-view-point-to-point-controls', '.point-to-point-controls'];
+            let controlGroup = null;
+
+            for (const selector of selectors) {
+                controlGroup = document.querySelector(selector);
+                if (controlGroup) {
+                    console.log(`🚨 INTEGRATION BRIDGE: Emergency control group found with selector: ${selector}`);
+                    break;
+                }
+            }
+
             if (!controlGroup) {
                 console.error('❌ INTEGRATION BRIDGE: No control group found for emergency UI');
+                console.error('❌ INTEGRATION BRIDGE: Tried selectors:', selectors);
                 return;
             }
 
@@ -3879,13 +3931,23 @@ class MultiViewPointToPointSelector {
      * ENHANCED INTEGRATION BRIDGE: Advanced scale factor calculation with precision validation
      */
     getScaleFactor() {
-        // Try to get scale from primary reference lines with enhanced validation
-        const primaryLines = this.getPrimaryReferenceLines();
-        const precisionCalculatorData = this.getPrecisionCalculatorBridgeData();
+        // RECURSION FIX: Add guard to prevent infinite loops
+        if (this._calculatingScaleFactor) {
+            console.warn('⚠️ RECURSION GUARD: getScaleFactor called recursively, using fallback');
+            return this.calculateCategoryBasedScale();
+        }
 
-        if (primaryLines && primaryLines.reference_lines && primaryLines.reference_lines.length > 0) {
-            // Use the most accurate primary reference line
-            const sortedPrimaryLines = primaryLines.reference_lines.sort((a, b) => {
+        this._calculatingScaleFactor = true;
+
+        try {
+            // Try to get scale from primary reference lines with enhanced validation
+            const primaryLines = this.getPrimaryReferenceLines();
+            // RECURSION FIX: Removed call to getPrecisionCalculatorBridgeData() that caused infinite loop
+
+            // DATA STRUCTURE FIX: primaryLines is an array, not an object with reference_lines property
+            if (primaryLines && Array.isArray(primaryLines) && primaryLines.length > 0) {
+                // Use the most accurate primary reference line
+                const sortedPrimaryLines = primaryLines.sort((a, b) => {
                 const aPrecision = this.getPrecisionLevel(a.measurement_key);
                 const bPrecision = this.getPrecisionLevel(b.measurement_key);
                 return bPrecision - aPrecision; // Higher precision first
@@ -3904,19 +3966,22 @@ class MultiViewPointToPointSelector {
                     return calculatedScale;
                 }
             }
-        }
 
-        // Try alternative calculation using template measurements
-        const templateScale = this.calculateTemplateScale();
-        if (templateScale > 0) {
-            console.log(`✅ PRECISION: Template scale factor: ${templateScale.toFixed(4)} mm/px`);
-            return templateScale;
-        }
+            // Try alternative calculation using template measurements
+            const templateScale = this.calculateTemplateScale();
+            if (templateScale > 0) {
+                console.log(`✅ PRECISION: Template scale factor: ${templateScale.toFixed(4)} mm/px`);
+                return templateScale;
+            }
 
-        // Enhanced fallback with measurement category analysis
-        const categoryScale = this.calculateCategoryBasedScale();
-        console.warn(`⚠️ PRECISION: Using category-based scale: ${categoryScale.toFixed(4)} mm/px`);
-        return categoryScale;
+            // Enhanced fallback with measurement category analysis
+            const categoryScale = this.calculateCategoryBasedScale();
+            console.warn(`⚠️ PRECISION: Using category-based scale: ${categoryScale.toFixed(4)} mm/px`);
+            return categoryScale;
+        } finally {
+            // Always clear the recursion guard
+            this._calculatingScaleFactor = false;
+        }
     }
 
     /**
@@ -4714,6 +4779,91 @@ function initMultiViewPointToPointSelector(templateId) {
         }
 
         return null;
+    }
+
+    /**
+     * AGENT 4 INTEGRATION METHODS: Enhanced measurement dropdown functionality
+     */
+
+    /**
+     * AGENT 4: Initialize enhanced measurement dropdown with database integration
+     */
+    async initializeAgent4MeasurementDropdown() {
+        console.log('🚀 AGENT 4: Initializing enhanced measurement dropdown...');
+
+        try {
+            // Load the AGENT 4 enhancement script if not already loaded
+            if (!window.Agent4MeasurementDropdownEnhancer) {
+                await this.loadAgent4EnhancementScript();
+            }
+
+            // Create the enhancer instance
+            this.agent4Enhancer = new Agent4MeasurementDropdownEnhancer(this);
+            this.agent4Enhancer.initializeStyles();
+            this.agent4Enhancer.initializeDropdownInteractivity();
+
+            // Replace the standard loadMeasurementTypes with enhanced version
+            this.loadMeasurementTypesOriginal = this.loadMeasurementTypes;
+            this.loadMeasurementTypes = () => this.agent4Enhancer.loadMeasurementTypesEnhanced();
+
+            console.log('✅ AGENT 4: Enhanced measurement dropdown initialized successfully');
+            return true;
+
+        } catch (error) {
+            console.error('❌ AGENT 4: Failed to initialize enhanced measurement dropdown:', error);
+            return false;
+        }
+    }
+
+    /**
+     * AGENT 4: Load enhancement script dynamically
+     */
+    async loadAgent4EnhancementScript() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = pointToPointAjax.pluginUrl + '/admin/js/agent4-measurement-dropdown-enhancement.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    /**
+     * AGENT 4: Enhanced measurement loading with click-to-refresh
+     */
+    async refreshMeasurementDropdown() {
+        if (this.agent4Enhancer) {
+            console.log('🔄 AGENT 4: Manual measurement dropdown refresh requested');
+            return await this.agent4Enhancer.loadMeasurementTypesEnhanced();
+        } else {
+            // Fallback to original method
+            return await this.loadMeasurementTypesOriginal();
+        }
+    }
+
+    /**
+     * AGENT 4: Get measurement loading status
+     */
+    getMeasurementLoadingStatus() {
+        if (this.agent4Enhancer) {
+            return this.agent4Enhancer.loadingStates;
+        }
+        return { isLoading: false, hasError: false, errorMessage: null };
+    }
+
+    /**
+     * AGENT 4: Force reload measurements from database
+     */
+    async forceReloadMeasurements() {
+        console.log('🔄 AGENT 4: Forcing measurement reload from database...');
+
+        if (this.agent4Enhancer) {
+            // Reset retry attempts
+            this.agent4Enhancer.retryAttempts = 0;
+            return await this.agent4Enhancer.loadMeasurementTypesEnhanced();
+        }
+
+        return await this.loadMeasurementTypes();
     }
 }
 // WordPress Admin Integration

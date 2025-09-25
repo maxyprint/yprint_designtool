@@ -61,6 +61,9 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         add_action('wp_ajax_get_integration_bridge_status', array($this, 'ajax_get_integration_bridge_status'));
         add_action('wp_ajax_calculate_precision_metrics', array($this, 'ajax_calculate_precision_metrics'));
 
+        // AGENT 2 DATABASE INTEGRATOR: New AJAX endpoint for fetching measurement types from database
+        add_action('wp_ajax_get_database_measurement_types', array($this, 'ajax_get_database_measurement_types'));
+
         // Legacy Template Image AJAX Handler für Single View Fallback
         add_action('wp_ajax_get_template_image', array($this, 'ajax_get_template_image'));
 
@@ -1530,5 +1533,203 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         }
 
         return $metrics;
+    }
+
+    /**
+     * AGENT 2 DATABASE INTEGRATOR: Get measurement types from wp_template_measurements table
+     *
+     * This endpoint fetches measurement types directly from the database instead of using hardcoded values.
+     * It provides dynamic measurement data based on what's actually stored in the wp_template_measurements table.
+     */
+    public function ajax_get_database_measurement_types() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Initialize TemplateMeasurementManager for database access
+            $measurement_manager = null;
+            if (class_exists('TemplateMeasurementManager')) {
+                $measurement_manager = new TemplateMeasurementManager();
+            } else {
+                throw new Exception('TemplateMeasurementManager class not found');
+            }
+
+            // Get template sizes from database
+            $template_sizes = $measurement_manager->get_template_sizes($template_id);
+
+            if (empty($template_sizes)) {
+                wp_send_json_error(__('Keine Template-Größen definiert', 'octo-print-designer'));
+            }
+
+            // Get all measurements for this template from database
+            $measurements_data = $measurement_manager->get_measurements($template_id);
+
+            // Extract unique measurement types from database
+            $database_measurement_types = array();
+
+            foreach ($measurements_data as $size_key => $measurements) {
+                foreach ($measurements as $measurement_key => $measurement_info) {
+                    if (!isset($database_measurement_types[$measurement_key])) {
+                        $database_measurement_types[$measurement_key] = array(
+                            'label' => $measurement_info['label'],
+                            'description' => $this->get_measurement_description($measurement_key),
+                            'category' => $this->get_measurement_category($measurement_key),
+                            'found_in_sizes' => array()
+                        );
+                    }
+
+                    // Track which sizes have this measurement
+                    if (!in_array($size_key, $database_measurement_types[$measurement_key]['found_in_sizes'])) {
+                        $database_measurement_types[$measurement_key]['found_in_sizes'][] = $size_key;
+                    }
+                }
+            }
+
+            // If no measurements in database, provide fallback with common measurement types
+            if (empty($database_measurement_types)) {
+                $database_measurement_types = $this->get_fallback_measurement_types();
+            }
+
+            // Calculate coverage statistics
+            $coverage_stats = $this->calculate_measurement_coverage($template_sizes, $measurements_data);
+
+            wp_send_json_success(array(
+                'measurement_types' => $database_measurement_types,
+                'template_sizes' => $template_sizes,
+                'coverage_stats' => $coverage_stats,
+                'data_source' => 'database',
+                'template_id' => $template_id,
+                'total_measurement_types' => count($database_measurement_types),
+                'total_sizes' => count($template_sizes),
+                'total_measurements' => $this->count_total_measurements($measurements_data)
+            ));
+
+        } catch (Exception $e) {
+            error_log('Database Measurement Types Ajax Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden der Measurement Types aus der Datenbank: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get measurement description for better UI display
+     */
+    private function get_measurement_description($measurement_key) {
+        $descriptions = array(
+            'A' => 'Brustumfang - Horizontal measurement across chest',
+            'B' => 'Saumweite - Width of the garment at the hem',
+            'C' => 'Höhe ab Schulter - Vertical length from shoulder point',
+            'D' => 'Schulterbreite - Distance between shoulder seams',
+            'E' => 'Ärmellänge - Length of the sleeve',
+            'F' => 'Rückenlänge - Back length measurement',
+            'G' => 'Armausschnitt Breite - Armhole width measurement',
+            'H' => 'Halsausschnitt Breite - Neckline width',
+            'J' => 'Saumhöhe - Height of hem detail'
+        );
+
+        return isset($descriptions[$measurement_key]) ? $descriptions[$measurement_key] : 'Custom measurement type';
+    }
+
+    /**
+     * Get fallback measurement types when database is empty
+     */
+    private function get_fallback_measurement_types() {
+        return array(
+            'A' => array(
+                'label' => 'Chest',
+                'description' => 'Brustumfang - Horizontal measurement across chest',
+                'category' => 'horizontal',
+                'found_in_sizes' => array()
+            ),
+            'B' => array(
+                'label' => 'Hem Width',
+                'description' => 'Saumweite - Width of the garment at the hem',
+                'category' => 'horizontal',
+                'found_in_sizes' => array()
+            ),
+            'C' => array(
+                'label' => 'Height from Shoulder',
+                'description' => 'Höhe ab Schulter - Vertical length from shoulder point',
+                'category' => 'vertical',
+                'found_in_sizes' => array()
+            ),
+            'D' => array(
+                'label' => 'Shoulder Width',
+                'description' => 'Schulterbreite - Distance between shoulder seams',
+                'category' => 'horizontal',
+                'found_in_sizes' => array()
+            ),
+            'E' => array(
+                'label' => 'Sleeve Length',
+                'description' => 'Ärmellänge - Length of the sleeve',
+                'category' => 'vertical',
+                'found_in_sizes' => array()
+            ),
+            'F' => array(
+                'label' => 'Back Length',
+                'description' => 'Rückenlänge - Back length measurement',
+                'category' => 'vertical',
+                'found_in_sizes' => array()
+            )
+        );
+    }
+
+    /**
+     * Calculate measurement coverage statistics
+     */
+    private function calculate_measurement_coverage($template_sizes, $measurements_data) {
+        $total_sizes = count($template_sizes);
+        $total_possible_measurements = 0;
+        $total_actual_measurements = 0;
+        $coverage_by_measurement = array();
+
+        foreach ($template_sizes as $size) {
+            $size_key = $size['id'];
+            $measurements_in_size = isset($measurements_data[$size_key]) ? count($measurements_data[$size_key]) : 0;
+            $total_actual_measurements += $measurements_in_size;
+        }
+
+        // Count unique measurement types
+        $unique_measurement_types = array();
+        foreach ($measurements_data as $size_key => $measurements) {
+            foreach ($measurements as $measurement_key => $measurement_info) {
+                $unique_measurement_types[$measurement_key] = true;
+            }
+        }
+
+        $total_possible_measurements = $total_sizes * count($unique_measurement_types);
+        $coverage_percentage = $total_possible_measurements > 0 ?
+            round(($total_actual_measurements / $total_possible_measurements) * 100, 1) : 0;
+
+        return array(
+            'total_sizes' => $total_sizes,
+            'unique_measurement_types' => count($unique_measurement_types),
+            'total_possible_measurements' => $total_possible_measurements,
+            'total_actual_measurements' => $total_actual_measurements,
+            'coverage_percentage' => $coverage_percentage
+        );
+    }
+
+    /**
+     * Count total measurements in the data
+     */
+    private function count_total_measurements($measurements_data) {
+        $total = 0;
+        foreach ($measurements_data as $size_measurements) {
+            if (is_array($size_measurements)) {
+                $total += count($size_measurements);
+            }
+        }
+        return $total;
     }
 }
