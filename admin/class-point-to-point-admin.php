@@ -54,6 +54,13 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         add_action('wp_ajax_get_reference_lines_for_calculation', array($this, 'ajax_get_reference_lines_for_calculation'));
         add_action('wp_ajax_get_primary_reference_lines', array($this, 'ajax_get_primary_reference_lines'));
 
+        // INTEGRATION BRIDGE: Enhanced Measurement Assignment AJAX Endpoints
+        add_action('wp_ajax_save_measurement_assignment', array($this, 'ajax_save_measurement_assignment'));
+        add_action('wp_ajax_get_measurement_assignments', array($this, 'ajax_get_measurement_assignments'));
+        add_action('wp_ajax_validate_measurement_assignments', array($this, 'ajax_validate_measurement_assignments'));
+        add_action('wp_ajax_get_integration_bridge_status', array($this, 'ajax_get_integration_bridge_status'));
+        add_action('wp_ajax_calculate_precision_metrics', array($this, 'ajax_calculate_precision_metrics'));
+
         // Legacy Template Image AJAX Handler für Single View Fallback
         add_action('wp_ajax_get_template_image', array($this, 'ajax_get_template_image'));
 
@@ -1072,5 +1079,456 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             error_log('Delete All Reference Lines Error: ' . $e->getMessage());
             wp_send_json_error(__('Fehler beim Löschen aller Referenzlinien: ', 'octo-print-designer') . $e->getMessage());
         }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Save measurement assignment with enhanced data structure
+     */
+    public function ajax_save_measurement_assignment() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+        $reference_line_data = json_decode(stripslashes($_POST['reference_line_data']), true);
+
+        if (!$template_id || !$measurement_key || !$reference_line_data) {
+            wp_send_json_error(__('Erforderliche Daten fehlen', 'octo-print-designer'));
+        }
+
+        try {
+            // Get current measurement assignments
+            $assignments = get_post_meta($template_id, '_measurement_assignments', true);
+            if (!is_array($assignments)) {
+                $assignments = array();
+            }
+
+            // Enhanced assignment data structure
+            $assignment = array(
+                'measurement_key' => $measurement_key,
+                'measurement_label' => $this->get_measurement_label($measurement_key),
+                'measurement_category' => $this->get_measurement_category($measurement_key),
+                'precision_level' => $this->get_precision_level($measurement_key),
+                'reference_line_data' => $reference_line_data,
+                'bridge_version' => '2.1',
+                'coordinate_system' => 'enhanced_multi_transform',
+                'transformation_quality' => $reference_line_data['transformation_quality'] ?? 0,
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            );
+
+            // Validate assignment for conflicts
+            $validation_result = $this->validate_measurement_assignment($assignment, $assignments);
+            if (!$validation_result['valid']) {
+                wp_send_json_error(array(
+                    'message' => __('Measurement assignment validation failed', 'octo-print-designer'),
+                    'validation_errors' => $validation_result['errors']
+                ));
+            }
+
+            // Save assignment
+            $assignments[$measurement_key] = $assignment;
+            $update_result = update_post_meta($template_id, '_measurement_assignments', $assignments);
+
+            if ($update_result === false) {
+                throw new Exception('Database update failed');
+            }
+
+            // Calculate integration score
+            $integration_score = $this->calculate_integration_bridge_score($template_id);
+
+            wp_send_json_success(array(
+                'message' => __('Measurement assignment saved successfully', 'octo-print-designer'),
+                'assignment' => $assignment,
+                'integration_score' => $integration_score,
+                'validation_result' => $validation_result,
+                'total_assignments' => count($assignments)
+            ));
+
+        } catch (Exception $e) {
+            error_log('Save Measurement Assignment Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Speichern: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Get measurement assignments with enhanced metadata
+     */
+    public function ajax_get_measurement_assignments() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Get measurement assignments
+            $assignments = get_post_meta($template_id, '_measurement_assignments', true);
+            if (!is_array($assignments)) {
+                $assignments = array();
+            }
+
+            // Get multi-view reference lines for context
+            $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+            if (!is_array($multi_view_lines)) {
+                $multi_view_lines = array();
+            }
+
+            // Calculate comprehensive status
+            $status = array(
+                'total_assignments' => count($assignments),
+                'integration_score' => $this->calculate_integration_bridge_score($template_id),
+                'conflict_count' => $this->count_assignment_conflicts($assignments),
+                'precision_ready_count' => $this->count_precision_ready_assignments($assignments),
+                'bridge_version' => '2.1',
+                'last_updated' => $this->get_last_assignment_update($assignments)
+            );
+
+            wp_send_json_success(array(
+                'assignments' => $assignments,
+                'multi_view_lines' => $multi_view_lines,
+                'status' => $status,
+                'template_id' => $template_id
+            ));
+
+        } catch (Exception $e) {
+            error_log('Get Measurement Assignments Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden der Assignments: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Validate measurement assignments for conflicts
+     */
+    public function ajax_validate_measurement_assignments() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            $assignments = get_post_meta($template_id, '_measurement_assignments', true);
+            if (!is_array($assignments)) {
+                $assignments = array();
+            }
+
+            $validation_result = $this->comprehensive_assignment_validation($assignments, $template_id);
+
+            wp_send_json_success(array(
+                'validation_result' => $validation_result,
+                'template_id' => $template_id,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Validate Measurement Assignments Error: ' . $e->getMessage());
+            wp_send_json_error(__('Validation error: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Get comprehensive integration bridge status
+     */
+    public function ajax_get_integration_bridge_status() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            $bridge_status = $this->calculate_comprehensive_bridge_status($template_id);
+
+            wp_send_json_success(array(
+                'bridge_status' => $bridge_status,
+                'template_id' => $template_id,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Get Integration Bridge Status Error: ' . $e->getMessage());
+            wp_send_json_error(__('Status error: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * INTEGRATION BRIDGE: Calculate precision metrics for measurements
+     */
+    public function ajax_calculate_precision_metrics() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = isset($_POST['measurement_key']) ? sanitize_text_field($_POST['measurement_key']) : null;
+
+        if (!$template_id) {
+            wp_send_json_error(__('Template ID fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            $precision_metrics = $this->calculate_measurement_precision_metrics($template_id, $measurement_key);
+
+            wp_send_json_success(array(
+                'precision_metrics' => $precision_metrics,
+                'template_id' => $template_id,
+                'measurement_key' => $measurement_key,
+                'timestamp' => current_time('timestamp')
+            ));
+
+        } catch (Exception $e) {
+            error_log('Calculate Precision Metrics Error: ' . $e->getMessage());
+            wp_send_json_error(__('Precision calculation error: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    // INTEGRATION BRIDGE: Helper methods for enhanced functionality
+
+    private function get_measurement_label($measurement_key) {
+        $labels = array(
+            'A' => 'Chest Width',
+            'B' => 'Hem Width',
+            'C' => 'Height from Shoulder',
+            'D' => 'Shoulder Width',
+            'E' => 'Sleeve Length',
+            'F' => 'Collar Width'
+        );
+        return isset($labels[$measurement_key]) ? $labels[$measurement_key] : $measurement_key;
+    }
+
+    private function get_measurement_category($measurement_key) {
+        $categories = array(
+            'A' => 'horizontal',
+            'B' => 'horizontal',
+            'C' => 'vertical',
+            'D' => 'horizontal',
+            'E' => 'vertical',
+            'F' => 'detail'
+        );
+        return isset($categories[$measurement_key]) ? $categories[$measurement_key] : 'horizontal';
+    }
+
+    private function get_precision_level($measurement_key) {
+        $precision_levels = array(
+            'A' => 5, // Primary measurement - highest precision
+            'C' => 5, // Primary measurement - highest precision
+            'D' => 4, // Important secondary measurement
+            'B' => 3, // Standard measurement
+            'E' => 3, // Standard measurement
+            'F' => 2  // Detail measurement
+        );
+        return isset($precision_levels[$measurement_key]) ? $precision_levels[$measurement_key] : 3;
+    }
+
+    private function validate_measurement_assignment($assignment, $existing_assignments) {
+        $errors = array();
+        $warnings = array();
+
+        // Check for duplicate assignments
+        if (isset($existing_assignments[$assignment['measurement_key']])) {
+            $warnings[] = 'Overwriting existing assignment for ' . $assignment['measurement_key'];
+        }
+
+        // Check transformation quality
+        if (isset($assignment['transformation_quality']) && $assignment['transformation_quality'] < 80) {
+            $warnings[] = 'Low transformation quality: ' . $assignment['transformation_quality'] . '%';
+        }
+
+        // Validate precision level
+        if ($assignment['precision_level'] < 1 || $assignment['precision_level'] > 5) {
+            $errors[] = 'Invalid precision level: ' . $assignment['precision_level'];
+        }
+
+        return array(
+            'valid' => empty($errors),
+            'errors' => $errors,
+            'warnings' => $warnings
+        );
+    }
+
+    private function calculate_integration_bridge_score($template_id) {
+        $assignments = get_post_meta($template_id, '_measurement_assignments', true);
+        if (!is_array($assignments)) {
+            return 0;
+        }
+
+        $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true);
+        if (!is_array($multi_view_lines)) {
+            return 0;
+        }
+
+        $score = 0;
+        $max_score = 100;
+
+        // Assignment coverage (40 points)
+        $assignment_coverage = count($assignments) > 0 ? min(40, count($assignments) * 8) : 0;
+        $score += $assignment_coverage;
+
+        // Data quality (30 points)
+        $quality_score = 0;
+        foreach ($assignments as $assignment) {
+            if (isset($assignment['transformation_quality'])) {
+                $quality_score += $assignment['transformation_quality'] * 0.3;
+            }
+        }
+        $score += min(30, $quality_score);
+
+        // Multi-view coordination (20 points)
+        $view_count = count($multi_view_lines);
+        $coordination_score = $view_count > 0 ? min(20, $view_count * 5) : 0;
+        $score += $coordination_score;
+
+        // Bridge version compatibility (10 points)
+        $version_score = 0;
+        foreach ($assignments as $assignment) {
+            if (isset($assignment['bridge_version']) && $assignment['bridge_version'] === '2.1') {
+                $version_score += 2;
+            }
+        }
+        $score += min(10, $version_score);
+
+        return min($max_score, round($score));
+    }
+
+    private function count_assignment_conflicts($assignments) {
+        // Implementation for counting conflicts
+        $conflicts = 0;
+        $categories = array();
+
+        foreach ($assignments as $assignment) {
+            $category = $assignment['measurement_category'] ?? 'unknown';
+            if (!isset($categories[$category])) {
+                $categories[$category] = 0;
+            }
+            $categories[$category]++;
+        }
+
+        // Check for category conflicts (simplified logic)
+        foreach ($categories as $count) {
+            if ($count > 3) { // More than 3 measurements in same category
+                $conflicts++;
+            }
+        }
+
+        return $conflicts;
+    }
+
+    private function count_precision_ready_assignments($assignments) {
+        $ready_count = 0;
+        foreach ($assignments as $assignment) {
+            if (isset($assignment['transformation_quality']) &&
+                $assignment['transformation_quality'] >= 80 &&
+                isset($assignment['precision_level']) &&
+                $assignment['precision_level'] >= 3) {
+                $ready_count++;
+            }
+        }
+        return $ready_count;
+    }
+
+    private function get_last_assignment_update($assignments) {
+        $latest = null;
+        foreach ($assignments as $assignment) {
+            if (isset($assignment['updated_at'])) {
+                if (!$latest || strtotime($assignment['updated_at']) > strtotime($latest)) {
+                    $latest = $assignment['updated_at'];
+                }
+            }
+        }
+        return $latest;
+    }
+
+    private function comprehensive_assignment_validation($assignments, $template_id) {
+        return array(
+            'valid' => true,
+            'score' => $this->calculate_integration_bridge_score($template_id),
+            'conflicts' => $this->count_assignment_conflicts($assignments),
+            'precision_ready' => $this->count_precision_ready_assignments($assignments),
+            'total_assignments' => count($assignments),
+            'bridge_version' => '2.1'
+        );
+    }
+
+    private function calculate_comprehensive_bridge_status($template_id) {
+        $assignments = get_post_meta($template_id, '_measurement_assignments', true) ?: array();
+        $multi_view_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true) ?: array();
+
+        return array(
+            'integration_score' => $this->calculate_integration_bridge_score($template_id),
+            'assignments_count' => count($assignments),
+            'views_count' => count($multi_view_lines),
+            'conflicts_count' => $this->count_assignment_conflicts($assignments),
+            'precision_ready_count' => $this->count_precision_ready_assignments($assignments),
+            'bridge_version' => '2.1',
+            'status' => count($assignments) > 0 ? 'active' : 'inactive',
+            'last_updated' => $this->get_last_assignment_update($assignments)
+        );
+    }
+
+    private function calculate_measurement_precision_metrics($template_id, $measurement_key = null) {
+        $assignments = get_post_meta($template_id, '_measurement_assignments', true) ?: array();
+
+        if ($measurement_key && isset($assignments[$measurement_key])) {
+            $assignment = $assignments[$measurement_key];
+            return array(
+                'measurement_key' => $measurement_key,
+                'precision_level' => $assignment['precision_level'] ?? 3,
+                'transformation_quality' => $assignment['transformation_quality'] ?? 0,
+                'category' => $assignment['measurement_category'] ?? 'unknown',
+                'bridge_ready' => ($assignment['transformation_quality'] ?? 0) >= 80
+            );
+        }
+
+        // Return metrics for all measurements
+        $metrics = array();
+        foreach ($assignments as $key => $assignment) {
+            $metrics[$key] = array(
+                'precision_level' => $assignment['precision_level'] ?? 3,
+                'transformation_quality' => $assignment['transformation_quality'] ?? 0,
+                'category' => $assignment['measurement_category'] ?? 'unknown',
+                'bridge_ready' => ($assignment['transformation_quality'] ?? 0) >= 80
+            );
+        }
+
+        return $metrics;
     }
 }
