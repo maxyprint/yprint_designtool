@@ -188,13 +188,13 @@
                 }
             }, 100);
 
-            // 🚨 FAILSAFE: Clear interval after 10 seconds (reduced from 30s)
+            // 🚨 AGENT 1 OPTIMIZATION: Ultra-fast timeout - 4 seconds for production perfection
             setTimeout(() => {
                 if (this.editorCheckInterval) {
-                    console.log('🚨 Canvas detection timeout - clearing interval');
+                    console.log('🚨 AGENT 1: Canvas detection timeout optimized - clearing interval (4s limit)');
                     clearInterval(this.editorCheckInterval);
                 }
-            }, 10000);
+            }, 4000);
         }
 
         async checkCanvasFromEditors() {
@@ -840,8 +840,8 @@
                 }
 
                 let attempts = 0;
-                const maxAttempts = 15; // AGENT 4: Reduced from 40 to 15 for better performance
-                const baseDelay = 200; // AGENT 4: Increased from 100ms to 200ms for better efficiency
+                const maxAttempts = 10; // AGENT 1: Reduced from 15 to 10 for under 5s total
+                const baseDelay = 100; // AGENT 1: Reduced to 100ms for faster initial detection
                 let pollInterval = null;
 
                 const poll = () => {
@@ -873,8 +873,8 @@
                         return;
                     }
 
-                    // AGENT 4: Exponential backoff for efficiency: 200ms, 400ms, 800ms, max 1500ms
-                    const delay = Math.min(baseDelay * Math.pow(1.5, attempts), 1500);
+                    // AGENT 1: Optimized exponential backoff: 100ms, 200ms, 400ms, max 500ms for <5s total
+                    const delay = Math.min(baseDelay * Math.pow(2, Math.min(attempts, 3)), 500);
                     pollInterval = setTimeout(poll, delay);
                 };
 

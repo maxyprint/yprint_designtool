@@ -158,9 +158,9 @@
 
         console.log('🎯 CANVAS HOOK: Starting enhanced deterministic polling...');
         let attempts = 0;
-        // 🚀 AGENT-2 PERFORMANCE OPTIMIZATION: Aggressive timeout reduction
-        const maxAttempts = isAdminContext && allowSelectiveDetection ? 8 : (isAdminContext ? 2 : 5); // Ultra-reduced attempts
-        const pollInterval = isAdminContext && allowSelectiveDetection ? 500 : (isAdminContext ? 300 : 200); // Slower but less spam
+        // 🚀 AGENT 1 OPTIMIZATION: Ultra-fast detection for <5s production goal
+        const maxAttempts = isAdminContext && allowSelectiveDetection ? 6 : (isAdminContext ? 2 : 4); // Further reduced for speed
+        const pollInterval = isAdminContext && allowSelectiveDetection ? 300 : (isAdminContext ? 200 : 150); // Faster polling
 
         const poll = setInterval(() => {
             attempts++;
