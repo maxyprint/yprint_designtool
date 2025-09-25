@@ -768,7 +768,7 @@ class MultiViewPointToPointSelector {
         // Multi-View Properties
         this.currentView = null;
         this.currentViewId = null;
-        this.templateViews = {};
+        this.templateViews = {}; // Object structure: { viewId: {id, name, image_url, ...} }
         this.currentImage = null;
 
         // Point-to-Point Properties
@@ -860,6 +860,80 @@ class MultiViewPointToPointSelector {
     }
 
     /**
+     * DEFENSIVE PROGRAMMING: Helper method to safely get view name by ID
+     * Handles both object and potential array structures
+     */
+    getViewNameById(viewId) {
+        try {
+            // Handle null/undefined templateViews
+            if (!this.templateViews) {
+                console.warn('⚠️ templateViews is null/undefined, returning fallback name');
+                return `View ${viewId}`;
+            }
+
+            // Handle object structure (correct way)
+            if (typeof this.templateViews === 'object' && !Array.isArray(this.templateViews)) {
+                const view = this.templateViews[viewId];
+                return view?.name || `View ${viewId}`;
+            }
+
+            // Handle array structure (fallback for data inconsistencies)
+            if (Array.isArray(this.templateViews)) {
+                const view = this.templateViews.find(v => v.id == viewId);
+                return view?.name || `View ${viewId}`;
+            }
+
+            // Handle unexpected data types
+            console.warn('⚠️ templateViews has unexpected type:', typeof this.templateViews);
+            return `View ${viewId}`;
+        } catch (error) {
+            console.error('❌ Error in getViewNameById:', error);
+            return `View ${viewId}`;
+        }
+    }
+
+    /**
+     * DEFENSIVE PROGRAMMING: Validates and fixes templateViews structure
+     */
+    validateTemplateViewsStructure() {
+        try {
+            // Ensure templateViews is initialized
+            if (!this.templateViews) {
+                console.warn('⚠️ templateViews is null/undefined, initializing as empty object');
+                this.templateViews = {};
+                return false;
+            }
+
+            // Check if it's an object (correct structure)
+            if (typeof this.templateViews === 'object' && !Array.isArray(this.templateViews)) {
+                return true;
+            }
+
+            // If it's an array, convert to object structure
+            if (Array.isArray(this.templateViews)) {
+                console.warn('⚠️ templateViews is array, converting to object structure');
+                const converted = {};
+                this.templateViews.forEach(view => {
+                    if (view && view.id) {
+                        converted[view.id] = view;
+                    }
+                });
+                this.templateViews = converted;
+                return true;
+            }
+
+            // Handle other unexpected types
+            console.error('❌ templateViews has invalid type:', typeof this.templateViews);
+            this.templateViews = {};
+            return false;
+        } catch (error) {
+            console.error('❌ Error validating templateViews structure:', error);
+            this.templateViews = {};
+            return false;
+        }
+    }
+
+    /**
      * Lädt alle Template Views aus Template Variations
      */
     async loadTemplateViews() {
@@ -878,7 +952,18 @@ class MultiViewPointToPointSelector {
 
             const data = await response.json();
             if (data.success) {
-                this.templateViews = data.data.views;
+                // DEFENSIVE PROGRAMMING: Validate incoming data structure
+                if (data.data && data.data.views) {
+                    this.templateViews = data.data.views;
+
+                    // Validate and fix structure if needed
+                    if (!this.validateTemplateViewsStructure()) {
+                        console.warn('⚠️ templateViews structure validation failed, using fallback');
+                    }
+                } else {
+                    console.warn('⚠️ Invalid views data received, initializing empty templateViews');
+                    this.templateViews = {};
+                }
 
                 // AGENT 3: Enhanced template views debugging
                 console.log('📊 AGENT 3: Template Views AJAX response:', {
@@ -1016,12 +1101,33 @@ class MultiViewPointToPointSelector {
 
     /**
      * Wechselt zu einer anderen View
+     * DEFENSIVE PROGRAMMING: Enhanced error handling and validation
      */
     async switchToView(viewId) {
-        if (!this.templateViews[viewId]) {
-            console.error('View not found:', viewId);
-            return;
-        }
+        try {
+            // DEFENSIVE: Validate templateViews structure first
+            this.validateTemplateViewsStructure();
+
+            // Check if viewId is valid
+            if (!viewId) {
+                console.error('❌ switchToView: No viewId provided');
+                return false;
+            }
+
+            // Check if view exists
+            if (!this.templateViews || !this.templateViews[viewId]) {
+                console.error('❌ switchToView: View not found:', viewId, 'Available views:', Object.keys(this.templateViews || {}));
+
+                // Try to recover by switching to first available view
+                const availableViews = Object.keys(this.templateViews || {});
+                if (availableViews.length > 0) {
+                    const fallbackViewId = availableViews[0];
+                    console.warn('🔄 Switching to fallback view:', fallbackViewId);
+                    return await this.switchToView(fallbackViewId);
+                }
+
+                return false;
+            }
 
         this.currentViewId = viewId;
         this.currentView = this.templateViews[viewId];
@@ -1042,10 +1148,35 @@ class MultiViewPointToPointSelector {
         this.redrawCanvas();
         this.updateLinesDisplay();
 
-        // Update UI
-        this.updateViewInfo();
+            // Update UI
+            this.updateViewInfo();
 
-        console.log('🔄 Switched to view:', this.currentView.name, '(ID:', viewId, ')');
+            console.log('🔄 Switched to view:', this.currentView.name, '(ID:', viewId, ')');
+            return true;
+
+        } catch (error) {
+            console.error('❌ Critical error in switchToView:', error);
+
+            // Try emergency recovery
+            try {
+                console.warn('🚨 Attempting emergency view recovery...');
+
+                // Reset to safe state
+                this.currentViewId = null;
+                this.currentView = null;
+
+                // Try to create single view fallback
+                if (Object.keys(this.templateViews || {}).length === 0) {
+                    await this.createSingleViewFallback();
+                }
+
+                return false;
+            } catch (recoveryError) {
+                console.error('💥 Emergency recovery failed:', recoveryError);
+                this.showError('Kritischer Fehler beim Wechseln der View. System Neustart erforderlich.');
+                return false;
+            }
+        }
     }
 
     /**
@@ -1746,13 +1877,27 @@ class MultiViewPointToPointSelector {
 
     /**
      * AGENT 5 ENHANCEMENT: Enhanced Multi-View lines display with integration bridge visual indicators
+     * DEFENSIVE PROGRAMMING: Added comprehensive error handling and validation
      */
     updateLinesDisplay() {
-        const display = document.getElementById('multi-view-lines-display');
-        if (!display) return;
+        try {
+            const display = document.getElementById('multi-view-lines-display');
+            if (!display) {
+                console.warn('⚠️ multi-view-lines-display element not found');
+                return;
+            }
 
-        const totalLines = Object.values(this.multiViewReferenceLines).reduce((total, lines) =>
-            total + (Array.isArray(lines) ? lines.length : 0), 0);
+            // DEFENSIVE: Validate templateViews structure before proceeding
+            this.validateTemplateViewsStructure();
+
+            // DEFENSIVE: Validate multiViewReferenceLines structure
+            if (!this.multiViewReferenceLines || typeof this.multiViewReferenceLines !== 'object') {
+                console.warn('⚠️ multiViewReferenceLines is invalid, initializing empty structure');
+                this.multiViewReferenceLines = {};
+            }
+
+            const totalLines = Object.values(this.multiViewReferenceLines).reduce((total, lines) =>
+                total + (Array.isArray(lines) ? lines.length : 0), 0);
 
         if (totalLines === 0) {
             display.innerHTML = `
@@ -1770,7 +1915,7 @@ class MultiViewPointToPointSelector {
         const viewsHTML = Object.entries(this.multiViewReferenceLines).map(([viewId, lines]) => {
             if (!Array.isArray(lines) || lines.length === 0) return '';
 
-            const viewName = this.templateViews.find(v => v.id == viewId)?.name || `View ${viewId}`;
+            const viewName = this.getViewNameById(viewId);
             const linesHTML = lines.map(line => `
                 <div class="reference-line-item ${viewId === this.currentViewId ? 'current-view' : ''} ${line.primary_reference ? 'primary-reference' : ''} ${line.linked_to_measurements ? 'integration-linked' : 'not-linked'}">
                     <div class="line-header">
@@ -1821,7 +1966,25 @@ class MultiViewPointToPointSelector {
             </div>
         `;
 
-        display.innerHTML = bridgeSummaryHTML + viewsHTML;
+            display.innerHTML = bridgeSummaryHTML + viewsHTML;
+        } catch (error) {
+            console.error('❌ Critical error in updateLinesDisplay:', error);
+
+            // Fallback display in case of critical error
+            const display = document.getElementById('multi-view-lines-display');
+            if (display) {
+                display.innerHTML = `
+                    <div class="integration-status error">
+                        <em>⚠️ Fehler beim Anzeigen der Referenzlinien</em>
+                        <p><small>System wird repariert... Bitte versuchen Sie es erneut.</small></p>
+                        <details>
+                            <summary>Technische Details</summary>
+                            <code>${error.message}</code>
+                        </details>
+                    </div>
+                `;
+            }
+        }
     }
 
     /**
@@ -1882,7 +2045,7 @@ class MultiViewPointToPointSelector {
 
         const lineLabel = lineToDelete.label || measurementKey;
 
-        const viewName = Object.values(this.templateViews).find(v => v.id == viewId)?.name || `View ${viewId}`;
+        const viewName = this.getViewNameById(viewId);
 
         if (!confirm(`Referenzlinie "${lineLabel}" in View "${viewName}" löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`)) {
             return;
@@ -2059,23 +2222,73 @@ class MultiViewPointToPointSelector {
 
     /**
      * Creates Single View Fallback when Multi-View data not available
+     * DEFENSIVE PROGRAMMING: Enhanced with comprehensive error handling
      */
     async createSingleViewFallback() {
-        console.log('🔄 Creating single view fallback system');
+        try {
+            console.log('🔄 Creating single view fallback system');
 
-        // Create fallback view using legacy image loading
-        this.templateViews = {
-            'single': {
-                id: 'single',
-                name: 'Template View',
-                image_url: await this.loadLegacyTemplateImage(),
-                image_id: null,
-                safe_zone: {}
+            // Always ensure templateViews is properly initialized as an object
+            this.templateViews = {};
+
+            let imageUrl = null;
+            try {
+                imageUrl = await this.loadLegacyTemplateImage();
+            } catch (imageError) {
+                console.warn('⚠️ Failed to load legacy image, using placeholder:', imageError.message);
+                imageUrl = null; // Will be handled in UI
             }
-        };
 
-        this.createViewSelector();
-        await this.switchToView('single');
+            // Create fallback view with defensive structure
+            this.templateViews = {
+                'single': {
+                    id: 'single',
+                    name: 'Template View',
+                    image_url: imageUrl,
+                    image_id: null,
+                    safe_zone: {}
+                }
+            };
+
+            // Validate the structure we just created
+            if (!this.validateTemplateViewsStructure()) {
+                console.error('❌ Failed to create valid templateViews structure in fallback');
+                throw new Error('Fallback structure validation failed');
+            }
+
+            this.createViewSelector();
+            const switchResult = await this.switchToView('single');
+
+            if (!switchResult) {
+                console.warn('⚠️ Switch to single view failed, but templateViews is initialized');
+            }
+
+            console.log('✅ Single view fallback system created successfully');
+            return true;
+
+        } catch (error) {
+            console.error('❌ Critical error in createSingleViewFallback:', error);
+
+            // Last resort - create minimal structure
+            try {
+                this.templateViews = {
+                    'emergency': {
+                        id: 'emergency',
+                        name: 'Emergency View',
+                        image_url: null,
+                        image_id: null,
+                        safe_zone: {}
+                    }
+                };
+
+                console.log('🚨 Created emergency fallback templateViews structure');
+                return false;
+            } catch (emergencyError) {
+                console.error('💥 Even emergency fallback failed:', emergencyError);
+                this.templateViews = {}; // Ensure it's at least an empty object
+                return false;
+            }
+        }
     }
 
     /**
@@ -2334,7 +2547,7 @@ class MultiViewPointToPointSelector {
                     allLines.push({
                         ...line,
                         view_id: viewId,
-                        view_name: this.templateViews?.find(v => v.id == viewId)?.name || 'Unknown'
+                        view_name: this.getViewNameById(viewId)
                     });
                 });
             }
@@ -2357,7 +2570,7 @@ class MultiViewPointToPointSelector {
                     primaryLines.push({
                         ...line,
                         view_id: viewId,
-                        view_name: this.templateViews?.find(v => v.id == viewId)?.name || 'Unknown'
+                        view_name: this.getViewNameById(viewId)
                     });
                 });
             }
@@ -2382,7 +2595,7 @@ class MultiViewPointToPointSelector {
         for (const [viewId, lines] of Object.entries(this.multiViewReferenceLines)) {
             if (Array.isArray(lines) && lines.length > 0) {
                 exportData.views[viewId] = {
-                    view_name: this.templateViews?.find(v => v.id == viewId)?.name || 'Unknown',
+                    view_name: this.getViewNameById(viewId),
                     reference_lines: lines.filter(line => line.linked_to_measurements === true),
                     primary_lines: lines.filter(line => line.primary_reference === true),
                     total_lines: lines.length
