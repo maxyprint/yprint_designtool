@@ -48,6 +48,11 @@ class Octo_Print_Designer_Point_To_Point_Admin {
         // Legacy Template Image AJAX Handler für Single View Fallback
         add_action('wp_ajax_get_template_image', array($this, 'ajax_get_template_image'));
 
+        // Issue #22 Enhancement: Real-time measurement validation endpoints
+        add_action('wp_ajax_validate_measurement_realtime', array($this, 'ajax_validate_measurement_realtime'));
+        add_action('wp_ajax_get_expected_measurement_value', array($this, 'ajax_get_expected_measurement_value'));
+        add_action('wp_ajax_save_measurement_assignment', array($this, 'ajax_save_measurement_assignment'));
+
         // Admin Enqueue Scripts Hook
         add_action('admin_enqueue_scripts', array($this, 'enqueue_point_to_point_scripts'));
 
@@ -69,6 +74,24 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             $this->plugin_name . '-multi-view-point-to-point',
             plugin_dir_url(__FILE__) . 'js/multi-view-point-to-point-selector.js',
             array('jquery'),
+            $this->version,
+            true
+        );
+
+        // Enhanced Measurement Interface - Issue #22
+        wp_enqueue_script(
+            $this->plugin_name . '-enhanced-measurement-interface',
+            plugin_dir_url(__FILE__) . 'js/enhanced-measurement-interface.js',
+            array('jquery', $this->plugin_name . '-multi-view-point-to-point'),
+            $this->version,
+            true
+        );
+
+        // Enhanced Canvas Renderer - Issue #22 Visual Feedback
+        wp_enqueue_script(
+            $this->plugin_name . '-enhanced-canvas-renderer',
+            plugin_dir_url(__FILE__) . 'js/enhanced-canvas-renderer.js',
+            array('jquery', $this->plugin_name . '-enhanced-measurement-interface'),
             $this->version,
             true
         );
@@ -666,5 +689,321 @@ class Octo_Print_Designer_Point_To_Point_Admin {
             error_log('Template Image Load Error: ' . $e->getMessage());
             wp_send_json_error(__('Fehler beim Laden des Template-Bildes: ', 'octo-print-designer') . $e->getMessage());
         }
+    }
+
+    /**
+     * AJAX Handler: Real-time measurement validation
+     * Issue #22 Enhancement: Validates measurement as user creates reference lines
+     */
+    public function ajax_validate_measurement_realtime() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+        $pixel_length = floatval($_POST['pixel_length']);
+        $view_id = sanitize_text_field($_POST['view_id'] ?? '');
+
+        if (!$template_id || !$measurement_key) {
+            wp_send_json_error(__('Template ID oder Measurement Key fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Get template physical dimensions for pixel-to-cm conversion
+            $template_width_cm = floatval(get_post_meta($template_id, '_template_physical_width_cm', true)) ?: 60.0;
+            $template_height_cm = floatval(get_post_meta($template_id, '_template_physical_height_cm', true)) ?: 80.0;
+
+            // Calculate approximate scale (assuming 600px canvas width)
+            $pixel_to_cm_scale = $template_width_cm / 600;
+            $measured_cm = $pixel_length * $pixel_to_cm_scale;
+
+            // Get expected measurement values from database (Issue #19 integration)
+            $expected_values = $this->get_expected_measurement_values($template_id, $measurement_key);
+
+            // Calculate validation scores
+            $validation_result = $this->calculate_measurement_validation($measured_cm, $expected_values, $measurement_key);
+
+            wp_send_json_success(array(
+                'validation' => $validation_result,
+                'measured_cm' => round($measured_cm, 1),
+                'pixel_length' => $pixel_length,
+                'scale_factor' => $pixel_to_cm_scale,
+                'expected_values' => $expected_values,
+                'measurement_key' => $measurement_key,
+                'view_id' => $view_id
+            ));
+
+        } catch (Exception $e) {
+            error_log('Real-time Validation Error: ' . $e->getMessage());
+            wp_send_json_error(__('Validierungsfehler: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX Handler: Get expected measurement value for a specific measurement type
+     * Issue #22 Enhancement: Provides expected values for UI feedback
+     */
+    public function ajax_get_expected_measurement_value() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+        $size_key = sanitize_text_field($_POST['size_key'] ?? 'M');
+
+        if (!$template_id || !$measurement_key) {
+            wp_send_json_error(__('Template ID oder Measurement Key fehlt', 'octo-print-designer'));
+        }
+
+        try {
+            // Get expected values using TemplateMeasurementManager (Issue #19)
+            if (class_exists('TemplateMeasurementManager')) {
+                $measurement_manager = new TemplateMeasurementManager();
+                $specific_value = $measurement_manager->get_specific_measurement($template_id, $size_key, $measurement_key);
+
+                if ($specific_value !== null) {
+                    wp_send_json_success(array(
+                        'expected_value' => $specific_value,
+                        'measurement_key' => $measurement_key,
+                        'size_key' => $size_key,
+                        'template_id' => $template_id,
+                        'label' => $this->get_measurement_label($measurement_key)
+                    ));
+                }
+            }
+
+            // Fallback to default expected values if no database data
+            $default_values = $this->get_default_measurement_values();
+            $expected_value = $default_values[$measurement_key] ?? 50.0;
+
+            wp_send_json_success(array(
+                'expected_value' => $expected_value,
+                'measurement_key' => $measurement_key,
+                'size_key' => $size_key,
+                'template_id' => $template_id,
+                'label' => $this->get_measurement_label($measurement_key),
+                'fallback' => true
+            ));
+
+        } catch (Exception $e) {
+            error_log('Expected Value Load Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Laden der erwarteten Werte: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX Handler: Save measurement assignment with reference line
+     * Issue #22 Enhancement: Automatic assignment workflow
+     */
+    public function ajax_save_measurement_assignment() {
+        // Security Check
+        if (!wp_verify_nonce($_POST['nonce'], 'point_to_point_nonce')) {
+            wp_die(__('Sicherheitsprüfung fehlgeschlagen', 'octo-print-designer'));
+        }
+
+        if (!current_user_can('edit_posts')) {
+            wp_die(__('Keine Berechtigung', 'octo-print-designer'));
+        }
+
+        $template_id = absint($_POST['template_id']);
+        $measurement_key = sanitize_text_field($_POST['measurement_key']);
+        $reference_line_data = sanitize_textarea_field($_POST['reference_line_data']);
+
+        if (!$template_id || !$measurement_key || !$reference_line_data) {
+            wp_send_json_error(__('Erforderliche Daten fehlen', 'octo-print-designer'));
+        }
+
+        try {
+            // Decode reference line data
+            $line_data = json_decode(stripslashes($reference_line_data), true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception('JSON Dekodierung fehlgeschlagen: ' . json_last_error_msg());
+            }
+
+            // Enhanced data structure with automatic assignment
+            $enhanced_line_data = array_merge($line_data, array(
+                'measurement_key' => $measurement_key,
+                'label' => $this->get_measurement_label($measurement_key),
+                'auto_assigned' => true,
+                'assigned_at' => current_time('mysql'),
+                'precision_level' => 0.1, // ±0.1cm as per requirements
+                'bridge_version' => '2.0' // Issue #22 version
+            ));
+
+            // Save to multi-view reference lines
+            $current_lines = get_post_meta($template_id, '_multi_view_reference_lines_data', true) ?: array();
+
+            $view_id = $enhanced_line_data['view_id'] ?? 'default';
+            if (!isset($current_lines[$view_id])) {
+                $current_lines[$view_id] = array();
+            }
+
+            // Add or update the measurement line
+            $current_lines[$view_id][] = $enhanced_line_data;
+
+            // Save updated data
+            $result = update_post_meta($template_id, '_multi_view_reference_lines_data', $current_lines);
+
+            if ($result === false) {
+                throw new Exception('Fehler beim Speichern der Measurement Assignment');
+            }
+
+            // Log for debugging
+            error_log('Measurement Assignment saved: Template ' . $template_id . ', Measurement ' . $measurement_key);
+
+            wp_send_json_success(array(
+                'message' => sprintf(
+                    __('Measurement %s erfolgreich zugewiesen', 'octo-print-designer'),
+                    $measurement_key
+                ),
+                'measurement_key' => $measurement_key,
+                'template_id' => $template_id,
+                'reference_line_data' => $enhanced_line_data,
+                'total_lines' => count($current_lines[$view_id])
+            ));
+
+        } catch (Exception $e) {
+            error_log('Measurement Assignment Error: ' . $e->getMessage());
+            wp_send_json_error(__('Fehler beim Speichern der Zuweisung: ', 'octo-print-designer') . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper: Get expected measurement values from database or defaults
+     */
+    private function get_expected_measurement_values($template_id, $measurement_key) {
+        if (class_exists('TemplateMeasurementManager')) {
+            $measurement_manager = new TemplateMeasurementManager();
+            $measurements = $measurement_manager->get_measurements($template_id);
+
+            // Get average value across all sizes for this measurement
+            $values = array();
+            foreach ($measurements as $size_data) {
+                if (isset($size_data[$measurement_key])) {
+                    $values[] = $size_data[$measurement_key]['value_cm'];
+                }
+            }
+
+            if (!empty($values)) {
+                return array(
+                    'average' => array_sum($values) / count($values),
+                    'min' => min($values),
+                    'max' => max($values),
+                    'count' => count($values)
+                );
+            }
+        }
+
+        // Fallback to defaults
+        $defaults = $this->get_default_measurement_values();
+        $default_value = $defaults[$measurement_key] ?? 50.0;
+
+        return array(
+            'average' => $default_value,
+            'min' => $default_value * 0.8,
+            'max' => $default_value * 1.2,
+            'count' => 1,
+            'fallback' => true
+        );
+    }
+
+    /**
+     * Helper: Calculate measurement validation scores
+     */
+    private function calculate_measurement_validation($measured_cm, $expected_values, $measurement_key) {
+        $expected_avg = $expected_values['average'];
+        $deviation = abs($measured_cm - $expected_avg);
+        $deviation_percentage = ($deviation / $expected_avg) * 100;
+
+        // Determine validation status
+        if ($deviation_percentage <= 5) {
+            $status = 'excellent';
+            $accuracy = 95 + (5 - $deviation_percentage);
+        } elseif ($deviation_percentage <= 15) {
+            $status = 'good';
+            $accuracy = 85 + (15 - $deviation_percentage) * 0.67;
+        } elseif ($deviation_percentage <= 25) {
+            $status = 'acceptable';
+            $accuracy = 75 + (25 - $deviation_percentage) * 0.4;
+        } else {
+            $status = 'needs_attention';
+            $accuracy = max(50, 75 - ($deviation_percentage - 25) * 0.5);
+        }
+
+        return array(
+            'status' => $status,
+            'accuracy' => round($accuracy, 1),
+            'deviation_cm' => round($deviation, 2),
+            'deviation_percentage' => round($deviation_percentage, 1),
+            'within_tolerance' => $deviation <= 0.1, // ±0.1cm requirement
+            'recommendation' => $this->generate_measurement_recommendation($status, $deviation_percentage)
+        );
+    }
+
+    /**
+     * Helper: Generate measurement recommendations
+     */
+    private function generate_measurement_recommendation($status, $deviation_percentage) {
+        switch ($status) {
+            case 'excellent':
+                return __('Excellent measurement accuracy!', 'octo-print-designer');
+            case 'good':
+                return __('Good measurement, within acceptable range.', 'octo-print-designer');
+            case 'acceptable':
+                return __('Measurement acceptable but could be more precise.', 'octo-print-designer');
+            default:
+                return sprintf(
+                    __('Measurement deviates by %.1f%%. Consider adjusting points.', 'octo-print-designer'),
+                    $deviation_percentage
+                );
+        }
+    }
+
+    /**
+     * Helper: Get measurement labels
+     */
+    private function get_measurement_label($measurement_key) {
+        $labels = array(
+            'A' => __('Chest Width', 'octo-print-designer'),
+            'B' => __('Hem Width', 'octo-print-designer'),
+            'C' => __('Height from Shoulder', 'octo-print-designer'),
+            'D' => __('Sleeve Length', 'octo-print-designer'),
+            'E' => __('Sleeve Opening', 'octo-print-designer'),
+            'F' => __('Shoulder to Shoulder', 'octo-print-designer'),
+            'G' => __('Neck Opening', 'octo-print-designer'),
+            'H' => __('Biceps', 'octo-print-designer'),
+            'J' => __('Rib Height', 'octo-print-designer')
+        );
+
+        return $labels[$measurement_key] ?? $measurement_key;
+    }
+
+    /**
+     * Helper: Get default measurement values
+     */
+    private function get_default_measurement_values() {
+        return array(
+            'A' => 60.0, // Chest
+            'B' => 56.0, // Hem Width
+            'C' => 68.0, // Height from Shoulder
+            'D' => 26.5, // Sleeve Length
+            'E' => 19.0, // Sleeve Opening
+            'F' => 54.5, // Shoulder to Shoulder
+            'G' => 20.0, // Neck Opening
+            'H' => 24.5, // Biceps
+            'J' => 2.0   // Rib Height
+        );
     }
 }

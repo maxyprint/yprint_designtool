@@ -8,11 +8,35 @@
             <span class="dashicons dashicons-marker"></span>
             <?php esc_html_e('Edit Safe Zone', 'octo-print-designer'); ?>
         </button>
-        <button type="button" class="button mode-select" data-mode="referenceline">
-            <span class="dashicons dashicons-grid-view"></span>
-            <?php esc_html_e('Edit Reference Line', 'octo-print-designer'); ?>
+        <button type="button" class="button mode-select" data-mode="measurement" id="measurement-mode-btn">
+            <span class="dashicons dashicons-chart-line"></span>
+            <?php esc_html_e('Define Measurement', 'octo-print-designer'); ?>
         </button>
     </div>
+
+    <!-- Enhanced Measurement Type Selector - Issue #22 Implementation -->
+    <div class="toolbar-group measurement-selector-group" id="measurement-selector-group" style="display: none;">
+        <label for="measurement-type-select" class="measurement-label">
+            <span class="dashicons dashicons-analytics"></span>
+            <?php esc_html_e('Measurement Type:', 'octo-print-designer'); ?>
+        </label>
+        <select id="measurement-type-select" class="measurement-type-dropdown">
+            <option value=""><?php esc_html_e('Select measurement...', 'octo-print-designer'); ?></option>
+            <option value="A"><?php esc_html_e('A - Chest Width', 'octo-print-designer'); ?></option>
+            <option value="B"><?php esc_html_e('B - Hem Width', 'octo-print-designer'); ?></option>
+            <option value="C"><?php esc_html_e('C - Height from Shoulder', 'octo-print-designer'); ?></option>
+            <option value="D"><?php esc_html_e('D - Sleeve Length', 'octo-print-designer'); ?></option>
+            <option value="E"><?php esc_html_e('E - Sleeve Opening', 'octo-print-designer'); ?></option>
+            <option value="F"><?php esc_html_e('F - Shoulder to Shoulder', 'octo-print-designer'); ?></option>
+            <option value="G"><?php esc_html_e('G - Neck Opening', 'octo-print-designer'); ?></option>
+            <option value="H"><?php esc_html_e('H - Biceps', 'octo-print-designer'); ?></option>
+            <option value="J"><?php esc_html_e('J - Rib Height', 'octo-print-designer'); ?></option>
+        </select>
+        <div class="measurement-preview" id="measurement-preview">
+            <span class="preview-label"><?php esc_html_e('Click two points on template', 'octo-print-designer'); ?></span>
+        </div>
+    </div>
+
     <div class="toolbar-group">
         <button type="button" class="button zoomIn">
             <span class="dashicons dashicons-plus"></span>
@@ -36,26 +60,30 @@
 
 </div>
 
-<!-- Reference Line Selection Modal -->
-<div id="reference-line-modal" class="octo-modal" style="display: none;">
-    <div class="octo-modal-content">
-        <div class="octo-modal-header">
-            <h3><?php esc_html_e('Select Reference Line Type', 'octo-print-designer'); ?></h3>
-            <span class="octo-modal-close">&times;</span>
+<!-- Enhanced Measurement Interface - Issue #22 Status Display -->
+<div id="measurement-status-panel" class="measurement-status-panel" style="display: none;">
+    <div class="status-content">
+        <div class="status-header">
+            <h4><?php esc_html_e('Measurement Status', 'octo-print-designer'); ?></h4>
+            <button type="button" class="status-close" aria-label="<?php esc_attr_e('Close', 'octo-print-designer'); ?>">&times;</button>
         </div>
-        <div class="octo-modal-body">
-            <p><?php esc_html_e('Choose the type of reference line to create for size calculations:', 'octo-print-designer'); ?></p>
-            <div class="reference-line-options">
-                <button type="button" class="button button-primary select-reference-type" data-type="chest_width">
-                    <span class="dashicons dashicons-leftright"></span>
-                    <?php esc_html_e('Chest Width', 'octo-print-designer'); ?>
-                    <small class="description"><?php esc_html_e('Horizontal measurement across the chest area', 'octo-print-designer'); ?></small>
-                </button>
-                <button type="button" class="button button-primary select-reference-type" data-type="shoulder_height">
-                    <span class="dashicons dashicons-arrow-up-alt"></span>
-                    <?php esc_html_e('Height from Shoulder', 'octo-print-designer'); ?>
-                    <small class="description"><?php esc_html_e('Vertical measurement from shoulder to bottom', 'octo-print-designer'); ?></small>
-                </button>
+        <div class="status-body">
+            <div class="current-measurement">
+                <span class="measurement-type-label"></span>
+                <span class="measurement-value"></span>
+            </div>
+            <div class="measurement-guidance">
+                <div class="guidance-text"><?php esc_html_e('Click two points on the template to define this measurement', 'octo-print-designer'); ?></div>
+                <div class="expected-value" style="display: none;">
+                    <span><?php esc_html_e('Expected:', 'octo-print-designer'); ?></span>
+                    <span class="expected-value-text"></span>
+                </div>
+            </div>
+            <div class="measurement-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%;"></div>
+                </div>
+                <span class="progress-text"><?php esc_html_e('Select first point', 'octo-print-designer'); ?></span>
             </div>
         </div>
     </div>

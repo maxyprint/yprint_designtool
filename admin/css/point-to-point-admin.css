@@ -538,6 +538,303 @@ details pre {
     padding: 20px;
 }
 
+/* Enhanced Measurement Type Selector - Issue #22 Implementation */
+.toolbar-group.measurement-selector-group {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    background: #f0f8ff;
+    border: 2px solid #0073aa;
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin: 0 8px;
+    transition: all 0.3s ease;
+}
+
+.toolbar-group.measurement-selector-group.active {
+    background: #e7f3ff;
+    box-shadow: 0 2px 8px rgba(0, 115, 170, 0.15);
+}
+
+.measurement-label {
+    font-weight: 600;
+    color: #0073aa;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.measurement-label .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.measurement-type-dropdown {
+    min-width: 220px;
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    background: #fff;
+    color: #23282d;
+    transition: all 0.2s ease;
+}
+
+.measurement-type-dropdown:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+    outline: none;
+}
+
+.measurement-type-dropdown option {
+    padding: 6px 8px;
+    font-weight: 500;
+}
+
+.measurement-preview {
+    background: #fff;
+    border: 2px dashed #ccc;
+    border-radius: 4px;
+    padding: 8px 12px;
+    min-width: 180px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.measurement-preview.active {
+    border-color: #0073aa;
+    background: #f8fcff;
+}
+
+.preview-label {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
+
+.preview-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0073aa;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Measurement Status Panel */
+.measurement-status-panel {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 300px;
+    background: #fff;
+    border: 2px solid #0073aa;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.measurement-status-panel .status-content {
+    padding: 0;
+}
+
+.measurement-status-panel .status-header {
+    background: #0073aa;
+    color: #fff;
+    padding: 12px 15px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.measurement-status-panel .status-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.measurement-status-panel .status-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s ease;
+}
+
+.measurement-status-panel .status-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.measurement-status-panel .status-body {
+    padding: 15px;
+}
+
+.measurement-status-panel .current-measurement {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #f8fcff;
+    border-radius: 4px;
+    border: 1px solid #e3f2fd;
+}
+
+.measurement-type-label {
+    font-weight: 600;
+    color: #0073aa;
+}
+
+.measurement-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    background: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+}
+
+.measurement-guidance {
+    margin-bottom: 15px;
+}
+
+.guidance-text {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.expected-value {
+    font-size: 12px;
+    color: #28a745;
+    font-weight: 500;
+}
+
+.measurement-progress {
+    margin-bottom: 10px;
+}
+
+.progress-bar {
+    background: #f1f1f1;
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #0073aa, #00a0d2);
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Enhanced Mode Button Styles */
+#measurement-mode-btn {
+    background: linear-gradient(135deg, #0073aa, #00a0d2);
+    color: #fff;
+    border-color: #005a87;
+    font-weight: 600;
+    position: relative;
+    overflow: hidden;
+}
+
+#measurement-mode-btn:hover {
+    background: linear-gradient(135deg, #005a87, #0073aa);
+    border-color: #004368;
+}
+
+#measurement-mode-btn.active {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border-color: #1e7e34;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+#measurement-mode-btn .dashicons {
+    margin-right: 4px;
+}
+
+/* Responsive Design for Enhanced Interface */
+@media (max-width: 768px) {
+    .toolbar-group.measurement-selector-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .measurement-type-dropdown {
+        min-width: 100%;
+    }
+
+    .measurement-preview {
+        min-width: 100%;
+    }
+
+    .measurement-status-panel {
+        position: fixed;
+        top: auto;
+        bottom: 20px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        transform: none;
+    }
+
+    .measurement-status-panel .status-body {
+        padding: 12px;
+    }
+}
+
+/* Animation for status panel */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* Measurement validation states */
+.measurement-preview.valid {
+    border-color: #28a745;
+    background: #f8fff9;
+}
+
+.measurement-preview.warning {
+    border-color: #ffc107;
+    background: #fffdf5;
+}
+
+.measurement-preview.invalid {
+    border-color: #dc3545;
+    background: #fff8f8;
+}
+
 /* WordPress Admin compatibility */
 .postbox .point-to-point-controls {
     border: none;
@@ -554,4 +851,10 @@ details pre {
 .postbox .template-canvas-container {
     background: #f9f9f9;
     border: 1px solid #e1e1e1;
+}
+
+/* Enhanced toolbar integration */
+.template-editor-toolbar .toolbar-group.measurement-selector-group {
+    margin-left: 10px;
+    flex: 0 0 auto;
 }
