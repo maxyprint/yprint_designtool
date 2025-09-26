@@ -249,11 +249,31 @@ class Octo_Print_Designer_Admin {
             );
         }
 
+        // Admin Console Log Copier (Admin-only)
+        if (current_user_can('administrator')) {
+            wp_enqueue_script(
+                'octo-admin-console-log-copier',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/admin-console-log-copier.js',
+                ['jquery'],
+                $this->version . '.console-copier',
+                true
+            );
+        }
+
         wp_localize_script('octo-print-designer-admin', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('octo_print_designer_nonce'),
             'postId' => get_the_ID()
         ]);
+
+        // Admin-specific localization for console log copier
+        if (current_user_can('administrator')) {
+            wp_localize_script('octo-print-designer-admin', 'octoPrintDesignerAdmin', [
+                'isAdmin' => true,
+                'userId' => get_current_user_id(),
+                'userRole' => 'administrator'
+            ]);
+        }
 
         // NEW: Canvas-Meta-Fields Sync Configuration
         wp_localize_script('octo-print-designer-admin', 'octoPrintDesignerSync', [
