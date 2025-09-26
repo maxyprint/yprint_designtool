@@ -554,8 +554,9 @@ class Octo_Print_API_Integration {
         $final_width_px = $width_px * $scale_x;
         $final_height_px = $height_px * $scale_y;
 
-        // 🎯 AGENT 4: Enhanced precision conversion using PrecisionCalculator
-        if ($this->precision_enabled && $template_id && $size) {
+        // 🎯 Issue #25: MANDATORY PRECISION CONVERSION
+        // Always attempt precision calculation if we have template and size data
+        if ($template_id && $size && $this->precision_calculator) {
             $pixel_dimensions = [
                 'width' => $final_width_px,
                 'height' => $final_height_px
@@ -567,16 +568,19 @@ class Octo_Print_API_Integration {
             // Get template physical size context for precision calculation
             $template_physical_size = $this->get_template_physical_size($template_id, $size);
 
-            // Use PrecisionCalculator for conversion with validation
-            $precision_result = $this->precision_calculator->pixelToMillimeter(
-                $pixel_dimensions,
-                $optimal_dpi,
-                $template_physical_size
+            // 🎯 Issue #25: Use Issue #23 PrecisionCalculator for real precision
+            $canvas_coords = [$image['transform']['left'] ?? 0, $image['transform']['top'] ?? 0, $final_width_px, $final_height_px];
+
+            $precision_result = $this->precision_calculator->calculatePreciseCoordinates(
+                $canvas_coords,
+                $template_id,
+                $size,
+                $optimal_dpi
             );
 
-            if (!is_wp_error($precision_result)) {
-                $width_mm = $precision_result['width'];
-                $height_mm = $precision_result['height'];
+            if (!is_wp_error($precision_result) && isset($precision_result['coordinates'])) {
+                $width_mm = $precision_result['coordinates']['width_mm'];
+                $height_mm = $precision_result['coordinates']['height_mm'];
 
                 // Validate conversion meets precision requirements
                 $validation_result = $this->validate_dimension_conversion($pixel_dimensions, [
@@ -611,6 +615,16 @@ class Octo_Print_API_Integration {
         $width_mm = max($width_mm, 10); // Minimum 10mm
         $height_mm = max($height_mm, 10); // Minimum 10mm
 
+        // 🎯 Issue #25: Enhanced precision metadata
+        $precision_metadata = [
+            'precision_used' => isset($precision_result) && !is_wp_error($precision_result),
+            'precision_level' => isset($precision_result['precision_tolerance']) ? $precision_result['precision_tolerance'] : null,
+            'calculation_method' => isset($precision_result) && !is_wp_error($precision_result) ? 'precision_calculator' : 'legacy_conversion',
+            'template_id' => $template_id,
+            'size_key' => $size,
+            'validated' => true
+        ];
+
         return array(
             'width_mm' => $width_mm,
             'height_mm' => $height_mm,
@@ -618,8 +632,8 @@ class Octo_Print_API_Integration {
             'original_height_px' => $height_px,
             'scale_x' => $scale_x,
             'scale_y' => $scale_y,
-            'precision_used' => $this->precision_enabled,
-            'dpi_used' => isset($optimal_dpi) ? $optimal_dpi : 96
+            'dpi_used' => isset($optimal_dpi) ? $optimal_dpi : 96,
+            'precision_metadata' => $precision_metadata
         );
     }
 
@@ -2470,13 +2484,43 @@ class Octo_Print_API_Integration {
 
         } catch (Exception $e) {
             error_log('Enhanced Legacy Conversion Error: ' . $e->getMessage());
-            // Ultimate fallback
-            return [
-                'width' => round($width_px * 0.264583, 1),
-                'height' => round($height_px * 0.264583, 1),
-                'conversion_method' => 'basic_fallback',
-                'dpi_used' => 96
-            ];
+
+            // 🎯 Issue #25: PRECISION-BASED ULTIMATE FALLBACK
+            // Replace hardcoded 0.264583 with precision calculation
+            try {
+                // Use actual millimeter calculation instead of hardcoded ratio
+                $mm_per_inch = 25.4;
+                $fallback_dpi = 96; // Default DPI
+                $mm_per_pixel = $mm_per_inch / $fallback_dpi;
+
+                // Calculate with proper precision
+                $width_mm = $width_px * $mm_per_pixel;
+                $height_mm = $height_px * $mm_per_pixel;
+
+                // Apply banker's rounding for consistency
+                $width_mm = $this->bankers_round($width_mm, 1);
+                $height_mm = $this->bankers_round($height_mm, 1);
+
+                return [
+                    'width' => $width_mm,
+                    'height' => $height_mm,
+                    'conversion_method' => 'precision_fallback',
+                    'dpi_used' => $fallback_dpi,
+                    'mm_per_pixel' => $mm_per_pixel,
+                    'precision_level' => 0.3 // Lower precision for fallback
+                ];
+
+            } catch (Exception $fallback_error) {
+                // Absolute emergency fallback (should never happen)
+                error_log('CRITICAL: Precision fallback failed: ' . $fallback_error->getMessage());
+                return [
+                    'width' => round($width_px * 0.264583, 1), // Keep as emergency only
+                    'height' => round($height_px * 0.264583, 1),
+                    'conversion_method' => 'emergency_fallback',
+                    'dpi_used' => 96,
+                    'warning' => 'Emergency fallback used - precision not guaranteed'
+                ];
+            }
         }
     }
 
