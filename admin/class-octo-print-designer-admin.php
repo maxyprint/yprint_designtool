@@ -157,19 +157,37 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Phase 5: Canvas Hook (Now Singleton-Aware + jQuery-Free)
+        // Phase 5: Optimized Canvas Detection (Performance Enhanced)
         wp_enqueue_script(
-            'octo-template-editor-canvas-hook',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-fabric-global-exposure', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency
-            $this->version . '.5-jquery-free',
+            'octo-optimized-canvas-detection',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/optimized-canvas-detection.js',
+            ['octo-fabric-global-exposure'], // Minimal dependencies for performance
+            $this->version . '.5-performance',
             true
+        );
+
+        // Phase 6: Optimized AJAX Manager (Performance Enhanced)
+        wp_enqueue_script(
+            'octo-optimized-ajax-manager',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/optimized-ajax-manager.js',
+            ['jquery'], // Only requires jQuery for AJAX
+            $this->version . '.6-ajax-performance',
+            true
+        );
+
+        // Phase 7: Dependency Optimizer (Load Performance Monitor)
+        wp_enqueue_script(
+            'octo-dependency-optimizer',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/dependency-optimizer.js',
+            [], // Load early to monitor other scripts
+            $this->version . '.7-dependency-perf',
+            false // Load in head for early monitoring
         );
 
         wp_enqueue_script(
             'octo-reference-line-system',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
-            ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
+            ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-optimized-canvas-detection', 'jquery'],
             $this->version . '.5',
             true
         );
@@ -185,7 +203,7 @@ class Octo_Print_Designer_Admin {
         wp_enqueue_script(
             'octo-canvas-meta-fields-sync',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-fields-sync.js',
-            ['octo-reference-line-system', 'octo-template-editor-canvas-hook', 'jquery'],
+            ['octo-reference-line-system', 'octo-optimized-canvas-detection', 'jquery'],
             $this->version . '.1',
             true
         );
