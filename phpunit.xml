@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         backupGlobals="false"
+         backupStaticAttributes="false"
+         bootstrap="tests/bootstrap.php"
+         cacheResultFile=".phpunit.result.cache"
+         colors="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         verbose="true">
+
+    <testsuites>
+        <testsuite name="unit">
+            <directory>./tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>./tests/Integration</directory>
+        </testsuite>
+        <testsuite name="performance">
+            <directory>./tests/Performance</directory>
+        </testsuite>
+        <testsuite name="all">
+            <directory>./tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">./includes</directory>
+            <directory suffix=".php">./admin</directory>
+            <directory suffix=".php">./public</directory>
+        </include>
+        <exclude>
+            <directory suffix=".php">./tests</directory>
+            <directory suffix=".php">./vendor</directory>
+            <directory suffix=".php">./node_modules</directory>
+            <file>./octo-print-designer.php</file>
+            <file>./uninstall.php</file>
+            <directory suffix=".php">./languages</directory>
+        </exclude>
+    </coverage>
+
+    <php>
+        <!-- WordPress Test Environment -->
+        <const name="WP_TESTS_DOMAIN" value="example.org" />
+        <const name="WP_TESTS_EMAIL" value="admin@example.org" />
+        <const name="WP_TESTS_TITLE" value="Test Blog" />
+        <const name="WP_PHP_BINARY" value="php" />
+
+        <!-- Database Configuration for Testing -->
+        <const name="DB_NAME" value="wordpress_test" />
+        <const name="DB_USER" value="root" />
+        <const name="DB_PASSWORD" value="" />
+        <const name="DB_HOST" value="localhost" />
+        <const name="DB_CHARSET" value="utf8" />
+        <const name="DB_COLLATE" value="" />
+
+        <!-- WordPress Authentication -->
+        <const name="AUTH_KEY" value="testing" />
+        <const name="SECURE_AUTH_KEY" value="testing" />
+        <const name="LOGGED_IN_KEY" value="testing" />
+        <const name="NONCE_KEY" value="testing" />
+        <const name="AUTH_SALT" value="testing" />
+        <const name="SECURE_AUTH_SALT" value="testing" />
+        <const name="LOGGED_IN_SALT" value="testing" />
+        <const name="NONCE_SALT" value="testing" />
+
+        <!-- WordPress Configuration -->
+        <const name="WP_DEBUG" value="true" />
+        <const name="WP_DEBUG_LOG" value="false" />
+        <const name="WP_DEBUG_DISPLAY" value="false" />
+        <const name="SCRIPT_DEBUG" value="true" />
+        <const name="WP_TESTS_MULTISITE" value="false" />
+
+        <!-- Plugin Specific Constants -->
+        <const name="OCTO_PRINT_DESIGNER_VERSION" value="1.0.9" />
+        <const name="OCTO_PRINT_DESIGNER_TESTING" value="true" />
+
+        <!-- Precision Testing Constants -->
+        <const name="MEASUREMENT_PRECISION_TOLERANCE" value="0.1" />
+        <const name="COORDINATE_CONVERSION_TOLERANCE" value="0.01" />
+
+        <!-- Performance Testing Thresholds -->
+        <const name="MAX_CALCULATION_TIME_MS" value="100" />
+        <const name="MAX_API_RESPONSE_TIME_MS" value="2000" />
+        <const name="MAX_DATABASE_QUERY_TIME_MS" value="50" />
+
+        <!-- Test Data Configuration -->
+        <const name="TEST_TEMPLATE_ID" value="999" />
+        <const name="TEST_PRODUCT_ID" value="998" />
+        <const name="TEST_USER_ID" value="997" />
+
+        <!-- Environment Variables -->
+        <env name="WP_MULTISITE" value="0" />
+        <env name="WP_TESTS_CONFIG_PATH" value="" />
+    </php>
+
+    <logging>
+        <log type="coverage-html" target="coverage-html"/>
+        <log type="coverage-clover" target="coverage.xml"/>
+        <log type="coverage-text" target="php://stdout" showUncoveredFiles="true"/>
+        <log type="junit" target="junit.xml"/>
+    </logging>
+
+</phpunit>

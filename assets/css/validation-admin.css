@@ -1,0 +1,581 @@
+/**
+ * Enhanced Measurement Validation - Admin Interface Styles
+ *
+ * Provides styling for the validation dashboard, real-time feedback,
+ * and measurement quality indicators.
+ */
+
+/* ==========================================================================
+   Validation Dashboard
+   ========================================================================== */
+
+.validation-dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.validation-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.validation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.validation-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #50575e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.validation-card .card-value {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 10px 0;
+    line-height: 1.2;
+}
+
+/* Card value color coding */
+.card-value.accuracy-score[data-score^="9"] { color: #46b450; } /* 90-100% - Green */
+.card-value.accuracy-score[data-score^="8"] { color: #46b450; } /* 80-89% - Green */
+.card-value.accuracy-score[data-score^="7"] { color: #ffb900; } /* 70-79% - Yellow */
+.card-value.accuracy-score[data-score^="6"] { color: #ffb900; } /* 60-69% - Yellow */
+.card-value.accuracy-score { color: #dc3232; } /* <60% - Red */
+
+.card-value.error-rate[data-rate="0"] { color: #46b450; }
+.card-value.error-rate[data-rate^="0."] { color: #46b450; }
+.card-value.error-rate { color: #dc3232; }
+
+/* ==========================================================================
+   Validation Sections
+   ========================================================================== */
+
+.validation-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 8px;
+    margin: 20px 0;
+    padding: 20px;
+}
+
+.validation-section h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f1;
+    color: #1d2327;
+}
+
+/* ==========================================================================
+   Real-time Validation Form
+   ========================================================================== */
+
+.validation-form {
+    max-width: 1000px;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 15px;
+}
+
+.form-row label {
+    min-width: 100px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.form-row select,
+.form-row input {
+    flex: 1;
+    max-width: 300px;
+}
+
+.measurement-inputs {
+    margin: 30px 0;
+}
+
+.measurement-inputs h4 {
+    margin-bottom: 15px;
+    color: #1d2327;
+    border-bottom: 1px solid #f0f0f1;
+    padding-bottom: 5px;
+}
+
+.measurement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.measurement-input-group {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 15px;
+    border-left: 4px solid #72aee6;
+}
+
+.measurement-input-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #1d2327;
+}
+
+.measurement-input-group input {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.realtime-feedback {
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Real-time feedback styles */
+.feedback-valid {
+    color: #46b450;
+    font-weight: 600;
+}
+
+.feedback-invalid {
+    color: #dc3232;
+    font-weight: 600;
+}
+
+.feedback-error {
+    color: #dc3232;
+    font-weight: 600;
+}
+
+.form-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f1;
+}
+
+.form-actions .button {
+    margin-right: 10px;
+}
+
+/* ==========================================================================
+   Validation Results
+   ========================================================================== */
+
+.validation-results {
+    margin-top: 30px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #72aee6;
+}
+
+.validation-results h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #1d2327;
+}
+
+.validation-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.summary-item {
+    background: #fff;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #c3c4c7;
+}
+
+.summary-item strong {
+    display: block;
+    font-size: 12px;
+    color: #50575e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+/* Status indicators */
+.status-valid { color: #46b450; font-weight: bold; }
+.status-precision_failed { color: #dc3232; font-weight: bold; }
+.status-coordinate_failed { color: #dc3232; font-weight: bold; }
+.status-business_logic_failed { color: #ffb900; font-weight: bold; }
+
+.validation-feedback {
+    background: #fff;
+    border-radius: 6px;
+    padding: 15px;
+    border-left: 4px solid #72aee6;
+}
+
+.validation-feedback h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #1d2327;
+}
+
+.validation-feedback ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.validation-feedback li {
+    margin-bottom: 5px;
+}
+
+.feedback-info { color: #72aee6; }
+.feedback-warning { color: #ffb900; }
+.feedback-error { color: #dc3232; }
+
+/* ==========================================================================
+   Template Consistency Check
+   ========================================================================== */
+
+.consistency-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.consistency-options {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.consistency-options label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.consistency-results {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 15px;
+    min-height: 50px;
+    border-left: 4px solid #00a32a;
+}
+
+.consistency-summary h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #1d2327;
+}
+
+.consistency-recommendations {
+    background: #fff;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+    border-left: 4px solid #ffb900;
+}
+
+.consistency-recommendations h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #1d2327;
+}
+
+/* ==========================================================================
+   Validation History Table
+   ========================================================================== */
+
+.validation-history-table {
+    margin-top: 20px;
+}
+
+.validation-history-table table {
+    width: 100%;
+}
+
+.validation-history-table .accuracy-score {
+    font-weight: bold;
+}
+
+.validation-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.validation-status.valid {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.validation-status.warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.validation-status.invalid {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.validation-status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* ==========================================================================
+   Template Validation Metabox
+   ========================================================================== */
+
+.measurement-validation-metabox {
+    padding: 0;
+}
+
+.validation-summary h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #1d2327;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.no-measurements {
+    color: #646970;
+    font-style: italic;
+    margin: 20px 0;
+}
+
+.size-validation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.size-validation-item {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid #c3c4c7;
+}
+
+.size-validation-item h5 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: #1d2327;
+}
+
+.validation-actions {
+    margin: 20px 0;
+    padding: 20px 0;
+    border-top: 1px solid #f0f0f1;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.validation-actions .button {
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+.validation-details {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+    min-height: 50px;
+}
+
+/* ==========================================================================
+   Validation Reports
+   ========================================================================== */
+
+.validation-reports-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.validation-reports-section h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #1d2327;
+    border-bottom: 2px solid #f0f0f1;
+    padding-bottom: 10px;
+}
+
+.report-results {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 20px;
+    min-height: 100px;
+    border-left: 4px solid #2271b1;
+}
+
+/* ==========================================================================
+   Loading States and Animations
+   ========================================================================== */
+
+.spinner.is-active {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iNyIgc3Ryb2tlPSIjYzNjNGM3IiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0ibTEwIDNhNyA3IDAgMCAxIDcgNyIgc3Ryb2tlPSIjMDA3Y2JhIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K');
+    background-repeat: no-repeat;
+    background-position: center;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 782px) {
+    .validation-dashboard-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .form-row label {
+        min-width: auto;
+        margin-bottom: 5px;
+    }
+
+    .form-row select,
+    .form-row input {
+        max-width: none;
+        width: 100%;
+    }
+
+    .measurement-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .validation-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .size-validation-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .consistency-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    .validation-section {
+        padding: 15px;
+    }
+
+    .validation-card {
+        padding: 15px;
+    }
+
+    .card-value {
+        font-size: 24px !important;
+    }
+}
+
+/* ==========================================================================
+   Dark Mode Support (if enabled)
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .validation-card {
+        background: #2c3338;
+        border-color: #3c434a;
+        color: #f0f0f1;
+    }
+
+    .validation-section {
+        background: #2c3338;
+        border-color: #3c434a;
+        color: #f0f0f1;
+    }
+
+    .measurement-input-group {
+        background: #1d2327;
+        border-left-color: #72aee6;
+    }
+
+    .validation-results,
+    .consistency-results,
+    .report-results,
+    .validation-details {
+        background: #1d2327;
+        color: #f0f0f1;
+    }
+
+    .summary-item {
+        background: #1d2327;
+        border-color: #3c434a;
+        color: #f0f0f1;
+    }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+    .validation-section {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .validation-dashboard-cards {
+        display: block;
+    }
+
+    .validation-card {
+        display: inline-block;
+        width: 24%;
+        margin: 1%;
+        box-shadow: none;
+        border: 1px solid #000;
+    }
+
+    .form-actions,
+    .consistency-controls {
+        display: none;
+    }
+}

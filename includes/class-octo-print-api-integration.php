@@ -9,11 +9,14 @@
  */
 
 class Octo_Print_API_Integration {
-    
+
     private static $instance;
     private $api_base_url = 'https://api.allesklardruck.de';
     private $app_id;
     private $api_key;
+    private $precision_calculator;
+    private $measurement_manager;
+    private $precision_enabled;
     
     public static function get_instance() {
         if (null === self::$instance) {
@@ -24,6 +27,7 @@ class Octo_Print_API_Integration {
 
     private function __construct() {
         $this->load_credentials();
+        $this->init_precision_calculator();
         $this->init_hooks();
     }
 
@@ -33,6 +37,20 @@ class Octo_Print_API_Integration {
     private function load_credentials() {
         $this->app_id = get_option('octo_allesklardruck_app_id', '');
         $this->api_key = get_option('octo_allesklardruck_api_key', '');
+    }
+
+    /**
+     * Initialize PrecisionCalculator for enhanced coordinate precision
+     */
+    private function init_precision_calculator() {
+        $this->precision_calculator = new PrecisionCalculator();
+        $this->measurement_manager = new TemplateMeasurementManager();
+        $this->precision_enabled = get_option('octo_api_precision_mode', true);
+
+        // Log precision calculator initialization
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AllesKlarDruck API: PrecisionCalculator initialized for enhanced coordinate precision');
+        }
     }
 
     /**
@@ -156,10 +174,50 @@ class Octo_Print_API_Integration {
         
         // Get print specifications summary
         $print_specs_summary = $this->get_print_specifications_summary($order);
-        
-        // Create enhanced preview with print specifications info
+
+        // Validate payload precision
+        $precision_status = array();
+        if ($this->precision_enabled) {
+            $precision_validation = $this->validate_api_payload_precision($payload);
+            $precision_status = array(
+                'enabled' => true,
+                'valid' => !is_wp_error($precision_validation),
+                'errors' => is_wp_error($precision_validation) ? $precision_validation->get_error_data() : []
+            );
+        } else {
+            $precision_status = array(
+                'enabled' => false,
+                'valid' => null,
+                'errors' => []
+            );
+        }
+
+        // Create enhanced preview with print specifications and precision info
         $preview_html = '<div style="font-family: monospace; background: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">';
         $preview_html .= '<h3 style="margin-top: 0;">AllesKlarDruck API Payload Preview</h3>';
+
+        // Add precision status section
+        if ($precision_status['enabled']) {
+            $precision_color = $precision_status['valid'] ? '#28a745' : '#dc3545';
+            $precision_icon = $precision_status['valid'] ? '✅' : '⚠️';
+            $precision_text = $precision_status['valid'] ? 'Precision validation passed' : 'Precision validation issues found';
+
+            $preview_html .= '<div style="background: ' . ($precision_status['valid'] ? '#d4edda' : '#f8d7da') . '; border: 1px solid ' . ($precision_status['valid'] ? '#c3e6cb' : '#f5c6cb') . '; border-radius: 4px; padding: 10px; margin-bottom: 15px;">';
+            $preview_html .= '<h4 style="margin: 0 0 10px 0; color: ' . $precision_color . ';">' . $precision_icon . ' Precision Status</h4>';
+            $preview_html .= '<p style="margin: 0; color: #333;">' . $precision_text . '</p>';
+
+            if (!$precision_status['valid'] && !empty($precision_status['errors'])) {
+                $preview_html .= '<ul style="margin: 10px 0 0 20px; color: #721c24;">';
+                foreach (array_slice($precision_status['errors'], 0, 5) as $error) {
+                    $preview_html .= '<li>' . esc_html($error) . '</li>';
+                }
+                if (count($precision_status['errors']) > 5) {
+                    $preview_html .= '<li>... and ' . (count($precision_status['errors']) - 5) . ' more issues</li>';
+                }
+                $preview_html .= '</ul>';
+            }
+            $preview_html .= '</div>';
+        }
         
         // Add print specifications summary
         if (!empty($print_specs_summary)) {
@@ -184,7 +242,8 @@ class Octo_Print_API_Integration {
         wp_send_json_success(array(
             'preview' => $preview_html,
             'payload' => $payload,
-            'print_specs_summary' => $print_specs_summary
+            'print_specs_summary' => $print_specs_summary,
+            'precision_status' => $precision_status
         ));
     }
 
@@ -271,7 +330,28 @@ class Octo_Print_API_Integration {
             'shipping' => $shipping,
             'orderPositions' => $order_positions
         );
-        
+
+        // Validate payload precision if precision mode is enabled
+        if ($this->precision_enabled) {
+            $precision_validation = $this->validate_api_payload_precision($payload);
+            if (is_wp_error($precision_validation)) {
+                error_log('API Precision Validation Failed: ' . $precision_validation->get_error_message());
+
+                // Log validation errors but don't fail the API call (backward compatibility)
+                $validation_errors = $precision_validation->get_error_data();
+                if (is_array($validation_errors)) {
+                    foreach ($validation_errors as $error) {
+                        error_log('API Precision Error Detail: ' . $error);
+                    }
+                }
+            } else {
+                // Log successful validation
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('API Precision: Payload precision validation successful');
+                }
+            }
+        }
+
         return $payload;
     }
 
@@ -390,8 +470,8 @@ class Octo_Print_API_Integration {
                     continue;
                 }
                 
-                // Convert pixel dimensions to millimeters
-                $print_dimensions = $this->convert_to_print_dimensions($image);
+                // Convert pixel dimensions to millimeters with precision
+                $print_dimensions = $this->convert_to_print_dimensions($image, $template_id, $design_item['size_name']);
                 
                 // Enhanced position mapping with all available data
                 $position = $this->map_view_to_position(
@@ -405,7 +485,8 @@ class Octo_Print_API_Integration {
                 $print_coordinates = $this->convert_canvas_to_print_coordinates(
                     $image['transform_data'] ?? array(),
                     $design_item['template_id'],
-                    $position
+                    $position,
+                    $design_item['size_name']
                 );
                 
                 // Get print specifications configuration
@@ -454,76 +535,164 @@ class Octo_Print_API_Integration {
     }
 
     /**
-     * Convert pixel dimensions to millimeters for printing
+     * Convert pixel dimensions to millimeters for printing with enhanced precision
      */
-    private function convert_to_print_dimensions($image) {
+    private function convert_to_print_dimensions($image, $template_id = null, $size = null) {
         // Get original dimensions
-        $width_px = isset($image['original_width_px']) ? $image['original_width_px'] : 
+        $width_px = isset($image['original_width_px']) ? $image['original_width_px'] :
                    (isset($image['transform']['width']) ? $image['transform']['width'] : 0);
-        $height_px = isset($image['original_height_px']) ? $image['original_height_px'] : 
+        $height_px = isset($image['original_height_px']) ? $image['original_height_px'] :
                     (isset($image['transform']['height']) ? $image['transform']['height'] : 0);
-        
+
         // Get scale factors
-        $scale_x = isset($image['scale_x']) ? $image['scale_x'] : 
+        $scale_x = isset($image['scale_x']) ? $image['scale_x'] :
                   (isset($image['transform']['scaleX']) ? $image['transform']['scaleX'] : 1);
-        $scale_y = isset($image['scale_y']) ? $image['scale_y'] : 
+        $scale_y = isset($image['scale_y']) ? $image['scale_y'] :
                   (isset($image['transform']['scaleY']) ? $image['transform']['scaleY'] : 1);
-        
+
         // Calculate final pixel dimensions
         $final_width_px = $width_px * $scale_x;
         $final_height_px = $height_px * $scale_y;
-        
-        // Convert to millimeters (1 pixel = 0.264583 mm at 96 DPI)
-        $width_mm = round($final_width_px * 0.264583, 1);
-        $height_mm = round($final_height_px * 0.264583, 1);
-        
+
+        // 🎯 AGENT 4: Enhanced precision conversion using PrecisionCalculator
+        if ($this->precision_enabled && $template_id && $size) {
+            $pixel_dimensions = [
+                'width' => $final_width_px,
+                'height' => $final_height_px
+            ];
+
+            // Detect optimal DPI for template/size combination
+            $optimal_dpi = $this->detect_optimal_dpi($template_id, $size);
+
+            // Get template physical size context for precision calculation
+            $template_physical_size = $this->get_template_physical_size($template_id, $size);
+
+            // Use PrecisionCalculator for conversion with validation
+            $precision_result = $this->precision_calculator->pixelToMillimeter(
+                $pixel_dimensions,
+                $optimal_dpi,
+                $template_physical_size
+            );
+
+            if (!is_wp_error($precision_result)) {
+                $width_mm = $precision_result['width'];
+                $height_mm = $precision_result['height'];
+
+                // Validate conversion meets precision requirements
+                $validation_result = $this->validate_dimension_conversion($pixel_dimensions, [
+                    'width' => $width_mm,
+                    'height' => $height_mm
+                ], $optimal_dpi, $template_physical_size);
+
+                if (is_wp_error($validation_result)) {
+                    error_log('API Precision Validation Warning: ' . $validation_result->get_error_message());
+                }
+
+                // Log precision conversion success
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("API Precision: Converted {$final_width_px}x{$final_height_px}px to {$width_mm}x{$height_mm}mm using {$optimal_dpi} DPI");
+                }
+            } else {
+                // Fallback to advanced legacy conversion with enhanced rounding
+                error_log('API Precision Warning: ' . $precision_result->get_error_message() . ' - Using enhanced legacy conversion');
+                $conversion_result = $this->enhanced_legacy_conversion($final_width_px, $final_height_px, $optimal_dpi);
+                $width_mm = $conversion_result['width'];
+                $height_mm = $conversion_result['height'];
+            }
+        } else {
+            // Enhanced legacy conversion for backward compatibility
+            $optimal_dpi = $this->detect_optimal_dpi($template_id, $size);
+            $conversion_result = $this->enhanced_legacy_conversion($final_width_px, $final_height_px, $optimal_dpi);
+            $width_mm = $conversion_result['width'];
+            $height_mm = $conversion_result['height'];
+        }
+
         // Ensure minimum dimensions
         $width_mm = max($width_mm, 10); // Minimum 10mm
         $height_mm = max($height_mm, 10); // Minimum 10mm
-        
+
         return array(
             'width_mm' => $width_mm,
             'height_mm' => $height_mm,
             'original_width_px' => $width_px,
             'original_height_px' => $height_px,
             'scale_x' => $scale_x,
-            'scale_y' => $scale_y
+            'scale_y' => $scale_y,
+            'precision_used' => $this->precision_enabled,
+            'dpi_used' => isset($optimal_dpi) ? $optimal_dpi : 96
         );
     }
 
     /**
-     * Convert canvas coordinates to print area coordinates for AllesKlarDruck API
+     * Convert canvas coordinates to print area coordinates for AllesKlarDruck API with enhanced precision
      */
-    private function convert_canvas_to_print_coordinates($transform_data, $template_id = null, $position = 'front') {
+    private function convert_canvas_to_print_coordinates($transform_data, $template_id = null, $position = 'front', $size = null) {
         // Canvas-Dimensionen (template-spezifisch konfigurierbar)
         $canvas_config = $this->get_canvas_config($template_id, $position);
-        
+
         $canvas_width = $canvas_config['width'];
         $canvas_height = $canvas_config['height'];
         $print_area_width_mm = $canvas_config['print_area_width_mm'];
         $print_area_height_mm = $canvas_config['print_area_height_mm'];
-        
+
         // Transform-Daten aus WordPress
         $left_px = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
         $top_px = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
-        
-        // Canvas-Koordinaten zu Millimeter umrechnen
-        $pixel_to_mm_x = $print_area_width_mm / $canvas_width;
-        $pixel_to_mm_y = $print_area_height_mm / $canvas_height;
-        
-        // Berechne Position in mm (von top-left des Druckbereichs)
-        $offset_x_mm = round($left_px * $pixel_to_mm_x, 1);
-        $offset_y_mm = round($top_px * $pixel_to_mm_y, 1);
-        
+
+        // Enhanced precision conversion using PrecisionCalculator
+        if ($this->precision_enabled && $template_id && $size) {
+            $canvas_coords = array(
+                'x' => $left_px,
+                'y' => $top_px,
+                'canvas_width' => $canvas_width,
+                'canvas_height' => $canvas_height,
+                'print_area_width_mm' => $print_area_width_mm,
+                'print_area_height_mm' => $print_area_height_mm
+            );
+
+            // Use PrecisionCalculator for coordinate conversion
+            $precision_result = $this->calculate_precise_coordinates($canvas_coords, $template_id, $size);
+
+            if (!is_wp_error($precision_result)) {
+                $coordinates_mm = $precision_result['coordinates_mm'];
+                $offset_x_mm = $coordinates_mm['x'] ?? 0;
+                $offset_y_mm = $coordinates_mm['y'] ?? 0;
+
+                // Log precision conversion
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    $accuracy = $precision_result['accuracy_score'];
+                    error_log("API Precision: Canvas coordinates ({$left_px}, {$top_px})px converted to ({$offset_x_mm}, {$offset_y_mm})mm with {$accuracy}% accuracy");
+                }
+            } else {
+                // Fallback to legacy calculation
+                error_log('API Precision Warning: ' . $precision_result->get_error_message() . ' - Using legacy coordinate conversion');
+
+                $pixel_to_mm_x = $print_area_width_mm / $canvas_width;
+                $pixel_to_mm_y = $print_area_height_mm / $canvas_height;
+
+                $offset_x_mm = round($left_px * $pixel_to_mm_x, 1);
+                $offset_y_mm = round($top_px * $pixel_to_mm_y, 1);
+            }
+        } else {
+            // Legacy calculation for backward compatibility
+            $pixel_to_mm_x = $print_area_width_mm / $canvas_width;
+            $pixel_to_mm_y = $print_area_height_mm / $canvas_height;
+
+            $offset_x_mm = round($left_px * $pixel_to_mm_x, 1);
+            $offset_y_mm = round($top_px * $pixel_to_mm_y, 1);
+        }
+
         // Validierung: Position muss im Druckbereich bleiben
         $offset_x_mm = max(0, min($offset_x_mm, $print_area_width_mm));
         $offset_y_mm = max(0, min($offset_y_mm, $print_area_height_mm));
-        
+
         return array(
             'offset_x_mm' => $offset_x_mm,
             'offset_y_mm' => $offset_y_mm,
             'canvas_left_px' => $left_px,
-            'canvas_top_px' => $top_px
+            'canvas_top_px' => $top_px,
+            'precision_used' => $this->precision_enabled && $template_id && $size,
+            'canvas_config' => $canvas_config
         );
     }
 
@@ -1985,6 +2154,507 @@ class Octo_Print_API_Integration {
         }
         
         return $summary;
+    }
+
+    /**
+     * 🎯 AGENT 4: Enhanced DPI Detection with Multi-DPI Awareness
+     * Detect optimal DPI for template/size combination with advanced algorithms
+     */
+    private function detect_optimal_dpi($template_id, $size) {
+        try {
+            // Get template-specific DPI configuration
+            $template_dpi_config = get_option('octo_api_template_dpi_config', array());
+            $config_key = $template_id . '_' . $size;
+
+            if (isset($template_dpi_config[$config_key])) {
+                $configured_dpi = intval($template_dpi_config[$config_key]);
+
+                // Validate configured DPI is supported
+                $supported_dpis = [72, 96, 150, 300];
+                if (in_array($configured_dpi, $supported_dpis)) {
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log("API DPI: Using configured DPI {$configured_dpi} for template {$template_id}, size {$size}");
+                    }
+                    return $configured_dpi;
+                }
+            }
+
+            // Get measurement data to determine optimal DPI
+            $measurements = $this->measurement_manager->get_measurements($template_id);
+            if (!empty($measurements) && isset($measurements[$size])) {
+                $size_measurements = $measurements[$size];
+
+                // Enhanced DPI selection based on multiple factors
+                $optimal_dpi = $this->calculate_optimal_dpi_from_measurements($size_measurements, $template_id);
+
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("API DPI: Calculated optimal DPI {$optimal_dpi} for template {$template_id}, size {$size} based on measurements");
+                }
+
+                return $optimal_dpi;
+            }
+
+            // Fallback: Check template type for default DPI selection
+            $template_type = get_post_meta($template_id, '_template_type', true);
+            $default_dpi = $this->get_template_type_default_dpi($template_type);
+
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("API DPI: Using default DPI {$default_dpi} for template type '{$template_type}'");
+            }
+
+            return $default_dpi;
+
+        } catch (Exception $e) {
+            error_log('API DPI Detection Error: ' . $e->getMessage() . ' - Falling back to 96 DPI');
+            return 96; // Safe fallback
+        }
+    }
+
+    /**
+     * Get template physical size data
+     */
+    private function get_template_physical_size($template_id, $size) {
+        $measurements = $this->measurement_manager->get_measurements($template_id);
+
+        if (!isset($measurements[$size])) {
+            return null;
+        }
+
+        $size_measurements = $measurements[$size];
+
+        // Build physical size context
+        $physical_size = array();
+
+        if (isset($size_measurements['A'])) {
+            $physical_size['chest_cm'] = $size_measurements['A']['value_cm'];
+        }
+        if (isset($size_measurements['B'])) {
+            $physical_size['hem_width_cm'] = $size_measurements['B']['value_cm'];
+        }
+        if (isset($size_measurements['C'])) {
+            $physical_size['height_cm'] = $size_measurements['C']['value_cm'];
+        }
+
+        // Add correction factor based on template type
+        $template_type = get_post_meta($template_id, '_template_type', true);
+        switch ($template_type) {
+            case 'hoodie':
+                $physical_size['correction_factor'] = 1.05; // Slightly larger for hoodies
+                break;
+            case 'tank_top':
+                $physical_size['correction_factor'] = 0.95; // Slightly smaller for tank tops
+                break;
+            default:
+                $physical_size['correction_factor'] = 1.0;  // Standard for t-shirts
+        }
+
+        return $physical_size;
+    }
+
+    /**
+     * Calculate precise coordinates using PrecisionCalculator
+     */
+    private function calculate_precise_coordinates($canvas_coords, $template_id, $size) {
+        if (!$this->precision_enabled || !$template_id || !$size) {
+            return new WP_Error('precision_disabled', 'Precision calculation not available');
+        }
+
+        // Detect optimal DPI
+        $optimal_dpi = $this->detect_optimal_dpi($template_id, $size);
+
+        // Use PrecisionCalculator for advanced coordinate calculation
+        $precision_result = $this->precision_calculator->calculatePreciseCoordinates(
+            $canvas_coords,
+            $template_id,
+            $size,
+            $optimal_dpi
+        );
+
+        if (is_wp_error($precision_result)) {
+            error_log('API Precision Error: ' . $precision_result->get_error_message());
+            return $precision_result;
+        }
+
+        // Log successful precision calculation
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $accuracy = $precision_result['accuracy_score'];
+            $time = $precision_result['processing_time_ms'];
+            error_log("API Precision: Calculated coordinates with {$accuracy}% accuracy in {$time}ms");
+        }
+
+        return $precision_result;
+    }
+
+    // Removed duplicate method - using enhanced version below
+
+    /**
+     * Get precision performance metrics
+     */
+    public function get_precision_metrics() {
+        if (!$this->precision_calculator) {
+            return new WP_Error('precision_not_available', 'PrecisionCalculator not initialized');
+        }
+
+        return $this->precision_calculator->getPerformanceMetrics();
+    }
+
+    /**
+     * Enable or disable precision mode
+     */
+    public function set_precision_mode($enabled) {
+        $this->precision_enabled = (bool) $enabled;
+        update_option('octo_api_precision_mode', $this->precision_enabled);
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $status = $this->precision_enabled ? 'enabled' : 'disabled';
+            error_log("AllesKlarDruck API: Precision mode {$status}");
+        }
+    }
+
+    // ====================================================================================
+    // 🎯 AGENT 4: ENHANCED PRECISION PIPELINE - Supporting Methods
+    // ====================================================================================
+
+    /**
+     * 🧮 Calculate optimal DPI from measurement data
+     *
+     * @param array $size_measurements Size-specific measurements
+     * @param int $template_id Template ID for context
+     * @return int Optimal DPI value
+     */
+    private function calculate_optimal_dpi_from_measurements($size_measurements, $template_id) {
+        try {
+            $dpi_score = 96; // Default baseline
+
+            // Factor 1: Size-based DPI selection
+            if (isset($size_measurements['A'])) { // Chest measurement
+                $chest_cm = $size_measurements['A']['value_cm'];
+                if ($chest_cm > 65) {
+                    $dpi_score = 300; // Ultra-high DPI for XXL+ sizes
+                } elseif ($chest_cm > 55) {
+                    $dpi_score = 150; // High DPI for large sizes
+                } elseif ($chest_cm > 40) {
+                    $dpi_score = 96;  // Standard DPI for medium sizes
+                } else {
+                    $dpi_score = 72;  // Lower DPI for small sizes
+                }
+            }
+
+            // Factor 2: Template complexity adjustment
+            $template_complexity = get_post_meta($template_id, '_template_complexity', true);
+            switch ($template_complexity) {
+                case 'complex':
+                    $dpi_score = min(300, $dpi_score * 1.5); // Increase for complex templates
+                    break;
+                case 'simple':
+                    $dpi_score = max(72, $dpi_score * 0.8); // Decrease for simple templates
+                    break;
+            }
+
+            // Factor 3: Ensure supported DPI
+            $supported_dpis = [72, 96, 150, 300];
+            $closest_dpi = 96;
+            $min_diff = PHP_INT_MAX;
+
+            foreach ($supported_dpis as $supported_dpi) {
+                $diff = abs($dpi_score - $supported_dpi);
+                if ($diff < $min_diff) {
+                    $min_diff = $diff;
+                    $closest_dpi = $supported_dpi;
+                }
+            }
+
+            return $closest_dpi;
+
+        } catch (Exception $e) {
+            error_log('API DPI Calculation Error: ' . $e->getMessage());
+            return 96; // Safe fallback
+        }
+    }
+
+    /**
+     * 🎨 Get default DPI for template type
+     *
+     * @param string $template_type Template type identifier
+     * @return int Default DPI for template type
+     */
+    private function get_template_type_default_dpi($template_type) {
+        $template_dpi_defaults = [
+            'hoodie' => 150,      // Complex templates need higher DPI
+            'polo_shirt' => 96,   // Standard templates
+            't_shirt' => 96,      // Standard templates
+            'tank_top' => 72,     // Simple templates can use lower DPI
+            'sweatshirt' => 150,  // Complex templates
+            'custom' => 96        // Default for custom templates
+        ];
+
+        return $template_dpi_defaults[$template_type] ?? 96;
+    }
+
+    /**
+     * ✅ Validate dimension conversion accuracy
+     *
+     * @param array $pixel_dimensions Original pixel dimensions
+     * @param array $mm_dimensions Converted millimeter dimensions
+     * @param int $dpi DPI used for conversion
+     * @param array $template_physical_size Template physical context
+     * @return true|WP_Error Validation result
+     */
+    private function validate_dimension_conversion($pixel_dimensions, $mm_dimensions, $dpi, $template_physical_size) {
+        try {
+            $tolerance = 0.1; // ±0.1mm requirement
+
+            foreach (['width', 'height'] as $dimension) {
+                if (isset($pixel_dimensions[$dimension]) && isset($mm_dimensions[$dimension])) {
+                    $pixel_value = $pixel_dimensions[$dimension];
+                    $mm_value = $mm_dimensions[$dimension];
+
+                    // Calculate expected conversion for validation
+                    $mm_per_inch = 25.4;
+                    $expected_mm = ($pixel_value / $dpi) * $mm_per_inch;
+
+                    // Check if conversion meets tolerance
+                    $difference = abs($mm_value - $expected_mm);
+                    if ($difference > $tolerance) {
+                        return new WP_Error(
+                            'conversion_tolerance_exceeded',
+                            "Conversion tolerance exceeded for {$dimension}: expected {$expected_mm}mm, got {$mm_value}mm (difference: {$difference}mm)"
+                        );
+                    }
+                }
+            }
+
+            return true;
+
+        } catch (Exception $e) {
+            return new WP_Error('validation_error', 'Dimension validation failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🔄 Enhanced legacy conversion with advanced rounding
+     *
+     * @param float $width_px Width in pixels
+     * @param float $height_px Height in pixels
+     * @param int $dpi DPI for conversion
+     * @return array Converted dimensions with enhanced precision
+     */
+    private function enhanced_legacy_conversion($width_px, $height_px, $dpi = 96) {
+        try {
+            // Use precise conversion factor
+            $mm_per_inch = 25.4;
+            $mm_per_pixel = $mm_per_inch / $dpi;
+
+            // Apply DPI-specific precision adjustments
+            $precision_factors = [
+                72  => 1.0,    // Standard screen DPI
+                96  => 1.0,    // Windows standard DPI
+                150 => 0.998,  // Slight adjustment for high-DPI
+                300 => 0.995   // Print DPI with precision adjustment
+            ];
+
+            $precision_factor = $precision_factors[$dpi] ?? 1.0;
+            $adjusted_mm_per_pixel = $mm_per_pixel * $precision_factor;
+
+            // Apply advanced rounding (Banker's rounding)
+            $width_mm = $this->bankers_round($width_px * $adjusted_mm_per_pixel, 1);
+            $height_mm = $this->bankers_round($height_px * $adjusted_mm_per_pixel, 1);
+
+            return [
+                'width' => $width_mm,
+                'height' => $height_mm,
+                'conversion_method' => 'enhanced_legacy',
+                'dpi_used' => $dpi,
+                'precision_factor' => $precision_factor
+            ];
+
+        } catch (Exception $e) {
+            error_log('Enhanced Legacy Conversion Error: ' . $e->getMessage());
+            // Ultimate fallback
+            return [
+                'width' => round($width_px * 0.264583, 1),
+                'height' => round($height_px * 0.264583, 1),
+                'conversion_method' => 'basic_fallback',
+                'dpi_used' => 96
+            ];
+        }
+    }
+
+    /**
+     * 🎯 Banker's rounding implementation (round half to even)
+     *
+     * @param float $value Value to round
+     * @param int $precision Decimal precision
+     * @return float Banker's rounded value
+     */
+    private function bankers_round($value, $precision = 0) {
+        $factor = pow(10, $precision);
+        $scaled_value = $value * $factor;
+
+        // Check if we're at exactly halfway
+        $fractional_part = $scaled_value - floor($scaled_value);
+
+        if (abs($fractional_part - 0.5) < PHP_FLOAT_EPSILON) {
+            // We're at exactly halfway - round to even
+            $integer_part = floor($scaled_value);
+            if ($integer_part % 2 === 0) {
+                return floor($scaled_value) / $factor; // Round down to even
+            } else {
+                return ceil($scaled_value) / $factor;  // Round up to even
+            }
+        } else {
+            // Not at halfway - use normal rounding
+            return round($scaled_value) / $factor;
+        }
+    }
+
+    /**
+     * 🔍 Enhanced API payload precision validation
+     *
+     * @param array $payload_data Complete API payload
+     * @return true|WP_Error Validation result with detailed error information
+     */
+    public function validate_api_payload_precision($payload_data) {
+        if (!$this->precision_enabled) {
+            return true; // Skip validation if precision is disabled
+        }
+
+        try {
+            $validation_errors = [];
+            $precision_warnings = [];
+
+            if (isset($payload_data['orderPositions'])) {
+                foreach ($payload_data['orderPositions'] as $position_index => $position) {
+                    if (isset($position['printPositions'])) {
+                        foreach ($position['printPositions'] as $print_index => $print_position) {
+                            // Enhanced coordinate validation
+                            $validation_result = $this->validate_print_position_coordinates(
+                                $print_position,
+                                $position_index,
+                                $print_index
+                            );
+
+                            if (is_wp_error($validation_result)) {
+                                $validation_errors[] = $validation_result->get_error_message();
+                            }
+
+                            // Check for precision warnings
+                            $warning_result = $this->check_precision_warnings($print_position, $position_index, $print_index);
+                            if (!empty($warning_result)) {
+                                $precision_warnings = array_merge($precision_warnings, $warning_result);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Log warnings if any
+            if (!empty($precision_warnings)) {
+                error_log('API Precision Warnings: ' . implode('; ', $precision_warnings));
+            }
+
+            if (!empty($validation_errors)) {
+                return new WP_Error('precision_validation_failed', 'Enhanced payload precision validation failed', [
+                    'errors' => $validation_errors,
+                    'warnings' => $precision_warnings
+                ]);
+            }
+
+            return true;
+
+        } catch (Exception $e) {
+            return new WP_Error('validation_exception', 'Payload validation exception: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ Validate individual print position coordinates
+     *
+     * @param array $print_position Print position data
+     * @param int $position_index Position index for error reporting
+     * @param int $print_index Print index for error reporting
+     * @return true|WP_Error Validation result
+     */
+    private function validate_print_position_coordinates($print_position, $position_index, $print_index) {
+        $coordinates = [
+            'width' => $print_position['width'] ?? 0,
+            'height' => $print_position['height'] ?? 0,
+            'offsetX' => $print_position['offsetX'] ?? 0,
+            'offsetY' => $print_position['offsetY'] ?? 0
+        ];
+
+        foreach ($coordinates as $coord_type => $coord_value) {
+            if (!is_numeric($coord_value)) {
+                return new WP_Error(
+                    'non_numeric_coordinate',
+                    "Position {$position_index}, Print {$print_index}: {$coord_type} is not numeric (value: {$coord_value})"
+                );
+            }
+
+            // Enhanced precision tolerance check (0.1mm requirement)
+            $tolerance = 0.1;
+            $remainder = fmod($coord_value, $tolerance);
+
+            // Allow values that are within tolerance (considering floating point precision)
+            $epsilon = 0.001; // Small epsilon for floating point comparison
+            if ($remainder > $epsilon && $remainder < ($tolerance - $epsilon)) {
+                return new WP_Error(
+                    'precision_tolerance_exceeded',
+                    "Position {$position_index}, Print {$print_index}: {$coord_type} ({$coord_value}mm) exceeds ±{$tolerance}mm precision tolerance (remainder: {$remainder})"
+                );
+            }
+
+            // Check for reasonable value ranges
+            if ($coord_value < 0) {
+                return new WP_Error(
+                    'negative_coordinate',
+                    "Position {$position_index}, Print {$print_index}: {$coord_type} cannot be negative ({$coord_value}mm)"
+                );
+            }
+
+            if (in_array($coord_type, ['width', 'height']) && $coord_value > 500) {
+                return new WP_Error(
+                    'unrealistic_dimension',
+                    "Position {$position_index}, Print {$print_index}: {$coord_type} seems unrealistic ({$coord_value}mm > 500mm)"
+                );
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * ⚠️ Check for precision warnings (non-blocking)
+     *
+     * @param array $print_position Print position data
+     * @param int $position_index Position index
+     * @param int $print_index Print index
+     * @return array Array of warning messages
+     */
+    private function check_precision_warnings($print_position, $position_index, $print_index) {
+        $warnings = [];
+
+        $coordinates = [
+            'width' => $print_position['width'] ?? 0,
+            'height' => $print_position['height'] ?? 0,
+            'offsetX' => $print_position['offsetX'] ?? 0,
+            'offsetY' => $print_position['offsetY'] ?? 0
+        ];
+
+        foreach ($coordinates as $coord_type => $coord_value) {
+            // Check for excessive precision (more than 0.01mm)
+            $decimal_places = strlen(substr(strrchr($coord_value, "."), 1));
+            if ($decimal_places > 2) {
+                $warnings[] = "Position {$position_index}, Print {$print_index}: {$coord_type} has excessive precision ({$decimal_places} decimal places)";
+            }
+
+            // Check for very small dimensions
+            if (in_array($coord_type, ['width', 'height']) && $coord_value < 5) {
+                $warnings[] = "Position {$position_index}, Print {$print_index}: {$coord_type} is very small ({$coord_value}mm < 5mm)";
+            }
+        }
+
+        return $warnings;
     }
 
 

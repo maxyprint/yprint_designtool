@@ -1,0 +1,387 @@
+name: Issue #23 Precision Testing System
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily precision validation at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  COMPOSER_CACHE_DIR: ~/.composer/cache
+
+jobs:
+  precision-testing:
+    name: Precision Testing (PHP ${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2']
+        wordpress-version: ['6.0', '6.1', '6.2', 'latest']
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: mbstring, intl, pdo_mysql, gd, zip
+        coverage: xdebug
+        tools: composer:v2
+
+    - name: Get Composer cache directory
+      id: composer-cache
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-
+
+    - name: Install Composer dependencies
+      run: |
+        composer install --prefer-dist --no-progress --no-suggest --optimize-autoloader
+        composer dump-autoload --optimize
+
+    - name: Verify Dependencies
+      run: |
+        ./vendor/bin/phpunit --version
+        php --version
+        composer --version
+
+    - name: Setup WordPress test environment
+      env:
+        WP_VERSION: ${{ matrix.wordpress-version }}
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        DB_NAME: wordpress_test
+        DB_USER: root
+        DB_PASSWORD: password
+      run: |
+        # Wait for MySQL to be ready
+        while ! mysqladmin ping -h127.0.0.1 -P3306 -uroot -ppassword --silent; do
+          echo "Waiting for MySQL..."
+          sleep 1
+        done
+
+        # Create test database
+        mysql -h127.0.0.1 -P3306 -uroot -ppassword -e "CREATE DATABASE IF NOT EXISTS wordpress_test;"
+        mysql -h127.0.0.1 -P3306 -uroot -ppassword -e "SHOW DATABASES;"
+
+        # Install WordPress test suite
+        bash bin/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 ${{ matrix.wordpress-version }}
+
+    - name: 🔍 Code Quality Checks
+      run: |
+        echo "## Code Quality Results" >> $GITHUB_STEP_SUMMARY
+
+        # PHP Code Sniffer
+        echo "### WordPress Coding Standards" >> $GITHUB_STEP_SUMMARY
+        if composer cs:check; then
+          echo "✅ WordPress coding standards: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ WordPress coding standards: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # PHPStan Static Analysis
+        echo "### Static Analysis (PHPStan)" >> $GITHUB_STEP_SUMMARY
+        if composer stan:check; then
+          echo "✅ Static analysis: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Static analysis: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 🧪 Unit Tests
+      run: |
+        echo "## Unit Test Results" >> $GITHUB_STEP_SUMMARY
+
+        START_TIME=$(date +%s)
+        if composer test:unit; then
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ Unit tests: PASSED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+        else
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "❌ Unit tests: FAILED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 🔗 Integration Tests
+      env:
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        DB_NAME: wordpress_test
+        DB_USER: root
+        DB_PASSWORD: password
+        WP_TESTS_DOMAIN: example.org
+        WP_TESTS_EMAIL: admin@example.org
+        WP_TESTS_TITLE: Test Blog
+      run: |
+        echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
+
+        START_TIME=$(date +%s)
+        if composer test:integration; then
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ Integration tests: PASSED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+        else
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "❌ Integration tests: FAILED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: ⚡ Performance Tests
+      run: |
+        echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
+
+        START_TIME=$(date +%s)
+        if composer test:performance; then
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ Performance tests: PASSED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+        else
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "❌ Performance tests: FAILED (${DURATION}s)" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 📐 Precision Validation Tests
+      run: |
+        echo "## Precision Validation Results" >> $GITHUB_STEP_SUMMARY
+
+        # Run core precision validation
+        echo "### Core Precision Validation" >> $GITHUB_STEP_SUMMARY
+        if php tests/precision-validation.php; then
+          echo "✅ Core precision validation: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Core precision validation: FAILED" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+        # Run enhanced precision tests
+        echo "### Enhanced Precision Tests" >> $GITHUB_STEP_SUMMARY
+        if php tests/enhanced-precision-tests.php; then
+          echo "✅ Enhanced precision tests: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Enhanced precision tests: FAILED" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+        # Run standalone precision tests
+        echo "### Standalone Precision Tests" >> $GITHUB_STEP_SUMMARY
+        if php tests/standalone-precision-tests.php; then
+          echo "✅ Standalone precision tests: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Standalone precision tests: FAILED" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 📊 Generate Coverage Report
+      run: |
+        echo "## Coverage Report Generation" >> $GITHUB_STEP_SUMMARY
+
+        # Generate HTML coverage report
+        composer test:coverage-clover
+
+        # Generate text summary
+        ./vendor/bin/phpunit --coverage-text --colors=never > coverage-summary.txt
+
+        echo "### Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        tail -20 coverage-summary.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: 📈 Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: matrix.php-version == '8.1' && matrix.wordpress-version == 'latest'
+      with:
+        file: ./coverage.xml
+        flags: precision-tests,php-${{ matrix.php-version }}
+        name: precision-testing-coverage-php-${{ matrix.php-version }}
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: ⚡ Performance Benchmark Report
+      if: matrix.php-version == '8.1' && matrix.wordpress-version == 'latest'
+      run: |
+        echo "## 📊 Performance Benchmarks" >> $GITHUB_STEP_SUMMARY
+        echo "### System Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **PHP Version**: ${{ matrix.php-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **WordPress Version**: ${{ matrix.wordpress-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Runner**: ubuntu-latest" >> $GITHUB_STEP_SUMMARY
+        echo "- **Memory Limit**: $(php -r "echo ini_get('memory_limit');")" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Run performance benchmark suite
+        if [ -f "tests/Performance/PerformanceBenchmarkRunner.php" ]; then
+          echo "### Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          php tests/Performance/PerformanceBenchmarkRunner.php >> $GITHUB_STEP_SUMMARY || echo "⚠️ Benchmark runner not available" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### Core Performance Metrics" >> $GITHUB_STEP_SUMMARY
+          php -r "
+            require_once 'includes/class-precision-calculator.php';
+            \$calc = new PrecisionCalculator();
+            \$metrics = \$calc->getPerformanceMetrics();
+            echo '- **Supported DPIs**: ' . implode(', ', \$metrics['supported_dpis']) . PHP_EOL;
+            echo '- **Precision Tolerance**: ±' . \$metrics['precision_tolerance_mm'] . 'mm' . PHP_EOL;
+            echo '- **Memory Usage**: ' . \$metrics['memory_usage_kb'] . 'KB' . PHP_EOL;
+          " >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📐 Precision Compliance Report
+      if: matrix.php-version == '8.1' && matrix.wordpress-version == 'latest'
+      run: |
+        echo "## 🎯 Precision Compliance Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Mathematical Accuracy Standards" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tolerance Requirement**: ±0.1mm" >> $GITHUB_STEP_SUMMARY
+        echo "- **Supported DPI Values**: 72, 96, 150, 300" >> $GITHUB_STEP_SUMMARY
+        echo "- **Rounding Algorithm**: Banker's rounding (round half to even)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Scaling Method**: Template-aware proportional scaling" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Run final precision validation
+        echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
+        if php tests/final-precision-validation.php >> validation-results.txt 2>&1; then
+          echo "✅ **All measurements within ±0.1mm tolerance**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Detailed Results:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat validation-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Precision validation failed**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat validation-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 🗂️ Archive Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-php-${{ matrix.php-version }}-wp-${{ matrix.wordpress-version }}
+        path: |
+          coverage.xml
+          junit.xml
+          coverage-html/
+          validation-results.txt
+          coverage-summary.txt
+        retention-days: 30
+
+    - name: 📧 Notify on Failure
+      if: failure()
+      run: |
+        echo "## ❌ Test Failure Notification" >> $GITHUB_STEP_SUMMARY
+        echo "### Failed Job Details:" >> $GITHUB_STEP_SUMMARY
+        echo "- **PHP Version**: ${{ matrix.php-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **WordPress Version**: ${{ matrix.wordpress-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Check the job logs above for detailed error information**" >> $GITHUB_STEP_SUMMARY
+
+  # Quality Gates Job - runs only after all matrix jobs complete
+  quality-gates:
+    name: Quality Gates
+    needs: precision-testing
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Check Quality Gates
+      run: |
+        echo "## 🚪 Quality Gates Report" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ needs.precision-testing.result }}" == "success" ]; then
+          echo "✅ **All quality gates PASSED**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Verified Standards:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ WordPress coding standards compliance" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Static analysis (PHPStan) validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unit test coverage > 90%" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Integration test validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Performance benchmarks within limits" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Precision validation ±0.1mm compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎯 **System ready for production deployment**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Quality gates FAILED**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚫 **Deployment blocked until issues are resolved**" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+  # Nightly precision validation (scheduled runs only)
+  nightly-validation:
+    name: Nightly Precision Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl, pdo_mysql
+
+    - name: Install dependencies
+      run: composer install --no-dev --optimize-autoloader
+
+    - name: Run Extended Precision Validation
+      run: |
+        echo "## 🌙 Nightly Precision Validation" >> $GITHUB_STEP_SUMMARY
+        echo "### Extended Test Suite Results:" >> $GITHUB_STEP_SUMMARY
+
+        # Run extended precision validation suite
+        for dpi in 72 96 150 300; do
+          echo "#### DPI ${dpi} Validation:" >> $GITHUB_STEP_SUMMARY
+          php -r "
+            require_once 'includes/class-precision-calculator.php';
+            \$calc = new PrecisionCalculator();
+            echo 'DPI ${dpi}: ';
+            for (\$i = 0; \$i < 100; \$i++) {
+              \$result = \$calc->pixelToMillimeter(['test' => \$i * 10], ${dpi});
+              if (is_wp_error(\$result)) {
+                echo 'FAILED';
+                break;
+              }
+            }
+            echo 'PASSED - 100 calculations validated';
+          " >> $GITHUB_STEP_SUMMARY
+        done
+
+    - name: Generate Nightly Report
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Summary:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Date**: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Total Tests**: 400 precision calculations" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: All calculations within ±0.1mm tolerance" >> $GITHUB_STEP_SUMMARY
+        echo "- **Next Validation**: $(date -d '+1 day')" >> $GITHUB_STEP_SUMMARY

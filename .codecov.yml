@@ -1,0 +1,186 @@
+# Codecov Configuration for Issue #23 Precision Testing System
+# Comprehensive coverage reporting with precision-focused metrics
+
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    after_n_builds: 1
+    wait_for_ci: yes
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+
+      # Critical precision components must have high coverage
+      precision-calculator:
+        target: 95%
+        threshold: 1%
+        paths:
+          - "includes/class-precision-calculator.php"
+
+      # Template measurement system
+      measurement-manager:
+        target: 90%
+        threshold: 2%
+        paths:
+          - "includes/class-template-measurement-manager.php"
+
+      # Core includes directory
+      core-includes:
+        target: 85%
+        threshold: 2%
+        paths:
+          - "includes/"
+
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+
+      # New precision-related code must be well tested
+      precision-features:
+        target: 90%
+        threshold: 2%
+        paths:
+          - "includes/class-precision-*.php"
+
+  ignore:
+    # WordPress plugin files that don't need coverage
+    - "octo-print-designer.php"
+    - "uninstall.php"
+
+    # Generated or external files
+    - "vendor/"
+    - "node_modules/"
+    - "languages/"
+
+    # Test files themselves
+    - "tests/"
+
+    # Legacy or deprecated files
+    - "deprecated/"
+    - "legacy/"
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+flags:
+  precision-tests:
+    paths:
+      - includes/class-precision-calculator.php
+      - includes/class-template-measurement-manager.php
+    carryforward: false
+
+  unit-tests:
+    paths:
+      - includes/
+      - admin/
+      - public/
+    carryforward: false
+
+  integration-tests:
+    paths:
+      - includes/
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+  branches:
+    - main
+    - develop
+
+github_checks:
+  annotations: true
+
+# Custom Precision Testing Reporting
+# Generate specialized reports for mathematical accuracy validation
+
+# Pull request comments configuration
+comment:
+  layout: "header,diff,flags,files"
+  behavior: default
+  require_changes: true
+  branches:
+    - main
+
+  # Custom comment template for precision testing
+  template: |
+    ## 📊 Precision Testing Coverage Report
+
+    **Overall Coverage**: {{ coverage }}% {{ coverage_trend }}
+
+    ### 🎯 Critical Components
+    | Component | Coverage | Target | Status |
+    |-----------|----------|---------|---------|
+    | PrecisionCalculator | {{ flags.precision-tests.coverage }}% | 95% | {{ "✅" if flags.precision-tests.coverage >= 95 else "⚠️" if flags.precision-tests.coverage >= 90 else "❌" }} |
+    | Core Includes | {{ project.coverage }}% | 85% | {{ "✅" if project.coverage >= 85 else "⚠️" if project.coverage >= 80 else "❌" }} |
+
+    ### 📈 Coverage Summary
+    - **Lines Covered**: {{ totals.lines }}
+    - **Files Changed**: {{ files|length }}
+    - **Precision Components**: High coverage required for mathematical accuracy
+
+    {{ diff_table }}
+
+    ---
+    *Precision testing requires 90%+ coverage for mathematical accuracy validation*
+
+# Specific thresholds for precision components
+component_management:
+  individual_components:
+    - component_id: precision_core
+      name: "Precision Calculator Core"
+      paths:
+        - "includes/class-precision-calculator.php"
+      target: 95%
+
+    - component_id: measurement_system
+      name: "Measurement Management System"
+      paths:
+        - "includes/class-template-measurement-manager.php"
+      target: 90%
+
+    - component_id: admin_interface
+      name: "Admin Interface"
+      paths:
+        - "admin/"
+      target: 80%
+
+# Profiling for performance-critical precision code
+profiling:
+  critical_files:
+    - "includes/class-precision-calculator.php"
+
+# Integration with GitHub status checks
+github_checks:
+  annotations: true
+
+# Team-specific notifications
+team_management:
+  notifications:
+    - name: precision-team
+      notification_type: "slack"
+      threshold: 90%
+      only_pulls: true

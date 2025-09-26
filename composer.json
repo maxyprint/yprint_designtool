@@ -1,0 +1,90 @@
+{
+  "name": "octonove/yprint-designtool",
+  "description": "WordPress plugin for print design tool with comprehensive testing framework",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0+",
+  "authors": [
+    {
+      "name": "Octonove",
+      "homepage": "https://octonove.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.4"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6",
+    "brain/monkey": "^2.6",
+    "mockery/mockery": "^1.6",
+    "wp-cli/wp-cli-bundle": "^2.8",
+    "10up/wp_mock": "^0.5.0",
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "wp-coding-standards/wpcs": "^3.0",
+    "phpstan/phpstan": "^1.10"
+  },
+  "autoload": {
+    "psr-4": {
+      "OctoPrintDesigner\\": "includes/",
+      "OctoPrintDesigner\\Admin\\": "admin/",
+      "OctoPrintDesigner\\Public\\": "public/"
+    },
+    "classmap": [
+      "includes/",
+      "admin/",
+      "public/"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "OctoPrintDesigner\\Tests\\": "tests/",
+      "OctoPrintDesigner\\Tests\\Unit\\": "tests/Unit/",
+      "OctoPrintDesigner\\Tests\\Integration\\": "tests/Integration/",
+      "OctoPrintDesigner\\Tests\\Performance\\": "tests/Performance/"
+    }
+  },
+  "scripts": {
+    "test": [
+      "phpunit"
+    ],
+    "test:unit": [
+      "phpunit --testsuite=unit"
+    ],
+    "test:integration": [
+      "phpunit --testsuite=integration"
+    ],
+    "test:performance": [
+      "phpunit --testsuite=performance"
+    ],
+    "test:coverage": [
+      "phpunit --coverage-html coverage/"
+    ],
+    "test:coverage-clover": [
+      "phpunit --coverage-clover coverage.xml"
+    ],
+    "cs:check": [
+      "phpcs --standard=WordPress --extensions=php --ignore=*/node_modules/*,*/vendor/*,*/tests/* ."
+    ],
+    "cs:fix": [
+      "phpcbf --standard=WordPress --extensions=php --ignore=*/node_modules/*,*/vendor/*,*/tests/* ."
+    ],
+    "stan:check": [
+      "phpstan analyse --level=5 includes/ admin/ public/"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "optimize-autoloader": true,
+    "sort-packages": true
+  },
+  "extra": {
+    "wordpress-install-dir": "./wp-test",
+    "installer-paths": {
+      "./wp-test/wp-content/plugins/{$name}/": ["type:wordpress-plugin"],
+      "./wp-test/wp-content/themes/{$name}/": ["type:wordpress-theme"]
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
