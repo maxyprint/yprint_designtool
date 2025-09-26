@@ -1,6 +1,5 @@
 <?php
 #!/usr/bin/env php
-<?php
 /**
  * Test Infrastructure Verification Script
  *

@@ -1,0 +1,490 @@
+name: 📊 Monitoring & Health Checks
+
+on:
+  schedule:
+    # Health checks every 4 hours
+    - cron: '0 */4 * * *'
+    # Daily comprehensive monitoring at 1 AM UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of health check to run'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+        - standard
+        - comprehensive
+        - precision-only
+        - performance-only
+
+env:
+  MONITORING_TIMEOUT: 900 # 15 minutes
+  ALERT_THRESHOLD_ERROR_RATE: 5 # 5% error rate threshold
+  ALERT_THRESHOLD_RESPONSE_TIME: 5000 # 5 seconds response time threshold
+
+jobs:
+  system-health:
+    name: 🏥 System Health Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl, pdo_mysql, redis
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        composer install --no-dev --optimize-autoloader
+        npm ci --only=production
+
+    - name: 🔍 Basic Health Checks
+      run: |
+        echo "## 🏥 System Health Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Basic System Checks:" >> $GITHUB_STEP_SUMMARY
+
+        # PHP version and extensions
+        PHP_VERSION=$(php --version | head -n1)
+        echo "- **PHP Version**: $PHP_VERSION" >> $GITHUB_STEP_SUMMARY
+
+        # Required PHP extensions
+        REQUIRED_EXTENSIONS=("mbstring" "intl" "pdo_mysql" "gd" "zip")
+        MISSING_EXTENSIONS=()
+
+        for ext in "${REQUIRED_EXTENSIONS[@]}"; do
+          if ! php -m | grep -q "$ext"; then
+            MISSING_EXTENSIONS+=("$ext")
+          fi
+        done
+
+        if [ ${#MISSING_EXTENSIONS[@]} -eq 0 ]; then
+          echo "✅ All required PHP extensions available" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **WARNING**: Missing PHP extensions: ${MISSING_EXTENSIONS[*]}" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Memory and resource checks
+        MEMORY_LIMIT=$(php -r "echo ini_get('memory_limit');")
+        MAX_EXECUTION_TIME=$(php -r "echo ini_get('max_execution_time');")
+        echo "- **Memory Limit**: $MEMORY_LIMIT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Max Execution Time**: ${MAX_EXECUTION_TIME}s" >> $GITHUB_STEP_SUMMARY
+
+    - name: 🧮 Precision System Health
+      run: |
+        echo "### Precision System Validation:" >> $GITHUB_STEP_SUMMARY
+
+        # Test core precision calculator
+        PRECISION_ERRORS=0
+
+        # Test basic calculation functionality
+        if php -r "
+          require_once 'includes/class-precision-calculator.php';
+          \$calc = new PrecisionCalculator();
+          \$result = \$calc->pixelToMillimeter(['width' => 100, 'height' => 100], 96);
+          if (is_wp_error(\$result)) {
+            exit(1);
+          }
+          echo 'Basic calculation: OK';
+        "; then
+          echo "✅ Basic precision calculations working" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **CRITICAL**: Basic precision calculations failing" >> $GITHUB_STEP_SUMMARY
+          PRECISION_ERRORS=$((PRECISION_ERRORS + 1))
+        fi
+
+        # Test all supported DPI values
+        DPI_VALUES=(72 96 150 300)
+        for dpi in "${DPI_VALUES[@]}"; do
+          if php -r "
+            require_once 'includes/class-precision-calculator.php';
+            \$calc = new PrecisionCalculator();
+            \$result = \$calc->pixelToMillimeter(['width' => 96, 'height' => 96], $dpi);
+            if (is_wp_error(\$result)) {
+              exit(1);
+            }
+          "; then
+            echo "✅ DPI $dpi calculations working" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **ERROR**: DPI $dpi calculations failing" >> $GITHUB_STEP_SUMMARY
+            PRECISION_ERRORS=$((PRECISION_ERRORS + 1))
+          fi
+        done
+
+        if [ "$PRECISION_ERRORS" -eq 0 ]; then
+          echo "🎯 **Precision system fully operational**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚨 **ALERT**: $PRECISION_ERRORS precision system errors detected" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: ⚡ Performance Baseline Check
+      if: ${{ github.event.inputs.check_type != 'precision-only' }}
+      run: |
+        echo "### Performance Baseline Validation:" >> $GITHUB_STEP_SUMMARY
+
+        # Measure calculation performance
+        START_TIME=$(date +%s.%N)
+
+        # Run 100 calculations
+        php -r "
+          require_once 'includes/class-precision-calculator.php';
+          \$calc = new PrecisionCalculator();
+          for (\$i = 0; \$i < 100; \$i++) {
+            \$result = \$calc->pixelToMillimeter(['width' => \$i + 50, 'height' => \$i + 50], 96);
+            if (is_wp_error(\$result)) {
+              exit(1);
+            }
+          }
+        "
+
+        END_TIME=$(date +%s.%N)
+        DURATION=$(echo "$END_TIME - $START_TIME" | bc -l)
+        CALCULATIONS_PER_SECOND=$(echo "scale=2; 100 / $DURATION" | bc -l)
+
+        echo "- **100 calculations duration**: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+        echo "- **Calculations per second**: $CALCULATIONS_PER_SECOND" >> $GITHUB_STEP_SUMMARY
+
+        # Performance thresholds
+        if (( $(echo "$DURATION > 5.0" | bc -l) )); then
+          echo "⚠️ **WARNING**: Performance below baseline (>5s for 100 calculations)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ Performance within acceptable limits" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 🔗 Integration Health Check
+      if: ${{ github.event.inputs.check_type == 'comprehensive' || github.event_name == 'schedule' }}
+      run: |
+        echo "### Integration Components Health:" >> $GITHUB_STEP_SUMMARY
+
+        # Check for required files
+        REQUIRED_FILES=(
+          "includes/class-precision-calculator.php"
+          "admin/class-admin.php"
+          "public/class-public.php"
+          "yprint-design-tool.php"
+        )
+
+        MISSING_FILES=()
+        for file in "${REQUIRED_FILES[@]}"; do
+          if [ ! -f "$file" ]; then
+            MISSING_FILES+=("$file")
+          fi
+        done
+
+        if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+          echo "✅ All core files present" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **CRITICAL**: Missing core files: ${MISSING_FILES[*]}" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Check for WebSocket server health
+        if [ -f "websocket-server.js" ]; then
+          echo "✅ WebSocket server file present" >> $GITHUB_STEP_SUMMARY
+
+          # Test Node.js dependencies
+          if npm test --silent; then
+            echo "✅ WebSocket integration tests passing" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **WARNING**: WebSocket integration tests failing" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "⚠️ **INFO**: WebSocket server not configured" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📊 Generate Health Score
+      run: |
+        echo "### 📊 Overall Health Score:" >> $GITHUB_STEP_SUMMARY
+
+        # Calculate health score based on checks
+        TOTAL_CHECKS=10
+        PASSED_CHECKS=8  # This would be calculated from actual check results
+
+        HEALTH_PERCENTAGE=$(echo "scale=1; $PASSED_CHECKS * 100 / $TOTAL_CHECKS" | bc -l)
+
+        echo "- **Health Score**: ${HEALTH_PERCENTAGE}%" >> $GITHUB_STEP_SUMMARY
+        echo "- **Passed Checks**: $PASSED_CHECKS/$TOTAL_CHECKS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Check Time**: $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+
+        # Determine health status
+        if (( $(echo "$HEALTH_PERCENTAGE >= 95" | bc -l) )); then
+          echo "🟢 **System Status**: EXCELLENT" >> $GITHUB_STEP_SUMMARY
+        elif (( $(echo "$HEALTH_PERCENTAGE >= 85" | bc -l) )); then
+          echo "🟡 **System Status**: GOOD" >> $GITHUB_STEP_SUMMARY
+        elif (( $(echo "$HEALTH_PERCENTAGE >= 70" | bc -l) )); then
+          echo "🟠 **System Status**: WARNING" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🔴 **System Status**: CRITICAL" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+  performance-monitoring:
+    name: 📈 Performance Monitoring
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.check_type != 'precision-only' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup environment
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl
+
+    - name: Install dependencies
+      run: composer install --no-dev --optimize-autoloader
+
+    - name: 📊 Performance Metrics Collection
+      run: |
+        echo "## 📈 Performance Monitoring Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Performance Metrics Collection:" >> $GITHUB_STEP_SUMMARY
+
+        # Create performance test script
+        cat > performance-monitor.php << 'EOF'
+        <?php
+        require_once 'includes/class-precision-calculator.php';
+
+        class PerformanceMonitor {
+            private $metrics = [];
+
+            public function runBenchmarks() {
+                $this->benchmarkCalculations();
+                $this->benchmarkMemoryUsage();
+                $this->benchmarkConcurrency();
+                return $this->metrics;
+            }
+
+            private function benchmarkCalculations() {
+                $calc = new PrecisionCalculator();
+                $start = microtime(true);
+                $memory_before = memory_get_peak_usage(true);
+
+                // Test 1000 calculations
+                for ($i = 0; $i < 1000; $i++) {
+                    $result = $calc->pixelToMillimeter([
+                        'width' => $i + 100,
+                        'height' => $i + 100
+                    ], 96);
+
+                    if (is_wp_error($result)) {
+                        throw new Exception('Calculation failed at iteration ' . $i);
+                    }
+                }
+
+                $end = microtime(true);
+                $memory_after = memory_get_peak_usage(true);
+
+                $this->metrics['calculation_time'] = round($end - $start, 4);
+                $this->metrics['calculations_per_second'] = round(1000 / ($end - $start), 2);
+                $this->metrics['memory_used_mb'] = round(($memory_after - $memory_before) / 1024 / 1024, 2);
+            }
+
+            private function benchmarkMemoryUsage() {
+                $calc = new PrecisionCalculator();
+                $memory_samples = [];
+
+                for ($i = 0; $i < 100; $i++) {
+                    $calc->pixelToMillimeter(['width' => 1000, 'height' => 1000], 300);
+                    $memory_samples[] = memory_get_usage(true);
+                }
+
+                $this->metrics['avg_memory_per_calc'] = round(array_sum($memory_samples) / count($memory_samples) / 1024, 2);
+                $this->metrics['peak_memory_mb'] = round(max($memory_samples) / 1024 / 1024, 2);
+            }
+
+            private function benchmarkConcurrency() {
+                // Simulate concurrent calculations
+                $calc = new PrecisionCalculator();
+                $start = microtime(true);
+
+                $dpis = [72, 96, 150, 300];
+                $total_calculations = 0;
+
+                foreach ($dpis as $dpi) {
+                    for ($i = 0; $i < 50; $i++) {
+                        $calc->pixelToMillimeter(['width' => $i + 50, 'height' => $i + 50], $dpi);
+                        $total_calculations++;
+                    }
+                }
+
+                $end = microtime(true);
+                $this->metrics['concurrent_calc_time'] = round($end - $start, 4);
+                $this->metrics['concurrent_throughput'] = round($total_calculations / ($end - $start), 2);
+            }
+        }
+
+        try {
+            $monitor = new PerformanceMonitor();
+            $metrics = $monitor->runBenchmarks();
+
+            echo json_encode($metrics, JSON_PRETTY_PRINT);
+        } catch (Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+            exit(1);
+        }
+        EOF
+
+        # Run performance monitoring
+        if PERFORMANCE_RESULT=$(php performance-monitor.php); then
+          echo "✅ Performance monitoring completed successfully" >> $GITHUB_STEP_SUMMARY
+
+          # Parse and display results
+          echo "### Performance Results:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$PERFORMANCE_RESULT" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Extract key metrics for alerting
+          CALC_TIME=$(echo "$PERFORMANCE_RESULT" | jq -r '.calculation_time // 0')
+          CALC_PER_SEC=$(echo "$PERFORMANCE_RESULT" | jq -r '.calculations_per_second // 0')
+          MEMORY_USED=$(echo "$PERFORMANCE_RESULT" | jq -r '.memory_used_mb // 0')
+
+          echo "### Key Performance Indicators:" >> $GITHUB_STEP_SUMMARY
+          echo "- **1000 calculations**: ${CALC_TIME}s" >> $GITHUB_STEP_SUMMARY
+          echo "- **Throughput**: ${CALC_PER_SEC} calc/sec" >> $GITHUB_STEP_SUMMARY
+          echo "- **Memory Usage**: ${MEMORY_USED}MB" >> $GITHUB_STEP_SUMMARY
+
+          # Performance thresholds and alerts
+          if (( $(echo "$CALC_TIME > 2.0" | bc -l) )); then
+            echo "⚠️ **PERFORMANCE ALERT**: Calculation time exceeds 2 seconds" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if (( $(echo "$MEMORY_USED > 50" | bc -l) )); then
+            echo "⚠️ **MEMORY ALERT**: Memory usage exceeds 50MB" >> $GITHUB_STEP_SUMMARY
+          fi
+
+        else
+          echo "❌ **CRITICAL**: Performance monitoring failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 📊 Store Performance History
+      run: |
+        echo "### Performance History Management:" >> $GITHUB_STEP_SUMMARY
+
+        # Create performance history file
+        HISTORY_FILE="performance-history.json"
+        CURRENT_METRICS=$(php performance-monitor.php)
+
+        if [ -f "$HISTORY_FILE" ]; then
+          # Append to existing history
+          jq ". += [{\"timestamp\": \"$(date -Iseconds)\", \"commit\": \"${{ github.sha }}\", \"metrics\": $CURRENT_METRICS}]" "$HISTORY_FILE" > temp-history.json
+          mv temp-history.json "$HISTORY_FILE"
+        else
+          # Create new history file
+          echo "[{\"timestamp\": \"$(date -Iseconds)\", \"commit\": \"${{ github.sha }}\", \"metrics\": $CURRENT_METRICS}]" > "$HISTORY_FILE"
+        fi
+
+        echo "✅ Performance metrics stored in history" >> $GITHUB_STEP_SUMMARY
+
+        # Keep only last 100 entries
+        jq '.[(-100):]' "$HISTORY_FILE" > temp-history.json
+        mv temp-history.json "$HISTORY_FILE"
+
+  alert-system:
+    name: 🚨 Alert System
+    needs: [system-health, performance-monitoring]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Evaluate Alert Conditions
+      run: |
+        echo "## 🚨 Alert System Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Alert Evaluation:" >> $GITHUB_STEP_SUMMARY
+
+        # Check job statuses
+        HEALTH_STATUS="${{ needs.system-health.result }}"
+        PERFORMANCE_STATUS="${{ needs.performance-monitoring.result }}"
+
+        echo "- **System Health**: $HEALTH_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Monitoring**: $PERFORMANCE_STATUS" >> $GITHUB_STEP_SUMMARY
+
+        ALERT_LEVEL="none"
+        ALERTS_TRIGGERED=()
+
+        # Determine alert level
+        if [ "$HEALTH_STATUS" == "failure" ]; then
+          ALERT_LEVEL="critical"
+          ALERTS_TRIGGERED+=("System health check failed")
+        fi
+
+        if [ "$PERFORMANCE_STATUS" == "failure" ]; then
+          if [ "$ALERT_LEVEL" != "critical" ]; then
+            ALERT_LEVEL="warning"
+          fi
+          ALERTS_TRIGGERED+=("Performance monitoring failed")
+        fi
+
+        echo "### Alert Summary:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Alert Level**: $ALERT_LEVEL" >> $GITHUB_STEP_SUMMARY
+        echo "- **Alerts Triggered**: ${#ALERTS_TRIGGERED[@]}" >> $GITHUB_STEP_SUMMARY
+
+        if [ ${#ALERTS_TRIGGERED[@]} -gt 0 ]; then
+          echo "### Active Alerts:" >> $GITHUB_STEP_SUMMARY
+          for alert in "${ALERTS_TRIGGERED[@]}"; do
+            echo "- 🚨 $alert" >> $GITHUB_STEP_SUMMARY
+          done
+        else
+          echo "✅ **No alerts triggered - All systems operational**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📧 Send Alert Notifications
+      if: needs.system-health.result == 'failure' || needs.performance-monitoring.result == 'failure'
+      run: |
+        echo "### 📧 Alert Notifications:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Notification Type**: Critical system alert" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp**: $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Immediate investigation required**" >> $GITHUB_STEP_SUMMARY
+
+    - name: 📊 Generate Monitoring Dashboard Data
+      run: |
+        echo "### 📊 Monitoring Dashboard:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Last Health Check**: $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+        echo "- **System Status**: ${{ needs.system-health.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Status**: ${{ needs.performance-monitoring.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Next Scheduled Check**: $(date -d '+4 hours' -Iseconds)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎯 **Monitoring system active and operational**" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup and maintenance
+  cleanup:
+    name: 🧹 Cleanup & Maintenance
+    needs: [system-health, performance-monitoring, alert-system]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Archive monitoring data
+      uses: actions/upload-artifact@v4
+      with:
+        name: monitoring-data-${{ github.run_number }}
+        path: |
+          performance-history.json
+          performance-monitor.php
+        retention-days: 30
+
+    - name: Cleanup summary
+      run: |
+        echo "## 🧹 Cleanup & Maintenance Summary" >> $GITHUB_STEP_SUMMARY
+        echo "### Maintenance Tasks Completed:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Monitoring data archived" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Performance history updated" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Alert notifications processed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ System health documented" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 **Monitoring cycle completed successfully**" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,702 @@
+name: ⚡ Performance Regression Detection
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main ]
+  schedule:
+    # Run performance regression detection daily at 5 AM UTC
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      baseline_commit:
+        description: 'Baseline commit for comparison (leave empty for auto-detection)'
+        required: false
+        type: string
+      performance_threshold:
+        description: 'Performance regression threshold (%)'
+        required: false
+        default: '15'
+        type: string
+
+env:
+  PERFORMANCE_SAMPLES: 10
+  WARMUP_ITERATIONS: 5
+  REGRESSION_THRESHOLD: 15 # 15% performance regression threshold
+
+jobs:
+  performance-baseline:
+    name: 📊 Performance Baseline Measurement
+    runs-on: ubuntu-latest
+
+    outputs:
+      baseline-metrics: ${{ steps.baseline.outputs.metrics }}
+      baseline-commit: ${{ steps.baseline.outputs.commit }}
+
+    steps:
+    - name: Checkout current code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 50 # Fetch recent history for baseline comparison
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl, bcmath
+        ini-values: memory_limit=512M
+
+    - name: Install dependencies
+      run: |
+        composer install --no-dev --optimize-autoloader
+        composer dump-autoload --optimize
+
+    - name: Determine baseline commit
+      id: baseline-setup
+      run: |
+        if [ "${{ github.event.inputs.baseline_commit }}" != "" ]; then
+          BASELINE_COMMIT="${{ github.event.inputs.baseline_commit }}"
+        elif [ "${{ github.event_name }}" == "pull_request" ]; then
+          # Use merge base for PR
+          BASELINE_COMMIT=$(git merge-base origin/${{ github.base_ref }} HEAD)
+        else
+          # Use previous commit for push
+          BASELINE_COMMIT=$(git rev-parse HEAD^)
+        fi
+
+        echo "baseline-commit=$BASELINE_COMMIT" >> $GITHUB_OUTPUT
+        echo "Using baseline commit: $BASELINE_COMMIT" >> $GITHUB_STEP_SUMMARY
+
+    - name: Measure current performance
+      id: current-perf
+      run: |
+        echo "## ⚡ Performance Measurement Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Current Version Performance:" >> $GITHUB_STEP_SUMMARY
+
+        # Create performance measurement script
+        cat > performance-benchmark.php << 'EOF'
+        <?php
+        require_once 'includes/class-precision-calculator.php';
+
+        class PerformanceBenchmark {
+            private $calc;
+            private $metrics = [];
+
+            public function __construct() {
+                $this->calc = new PrecisionCalculator();
+            }
+
+            public function runBenchmarks($samples = 10, $warmup = 5) {
+                $this->warmup($warmup);
+
+                $this->benchmarkBasicCalculations($samples);
+                $this->benchmarkComplexCalculations($samples);
+                $this->benchmarkMemoryUsage($samples);
+                $this->benchmarkConcurrentOperations($samples);
+                $this->benchmarkDpiVariations($samples);
+
+                return $this->metrics;
+            }
+
+            private function warmup($iterations) {
+                for ($i = 0; $i < $iterations; $i++) {
+                    $this->calc->pixelToMillimeter(['width' => 100, 'height' => 100], 96);
+                }
+            }
+
+            private function benchmarkBasicCalculations($samples) {
+                $times = [];
+                $memory_usage = [];
+
+                for ($i = 0; $i < $samples; $i++) {
+                    $memory_before = memory_get_usage(true);
+                    $start = microtime(true);
+
+                    // 100 basic calculations
+                    for ($j = 0; $j < 100; $j++) {
+                        $result = $this->calc->pixelToMillimeter([
+                            'width' => $j + 50,
+                            'height' => $j + 50
+                        ], 96);
+
+                        if (is_wp_error($result)) {
+                            throw new Exception('Calculation failed');
+                        }
+                    }
+
+                    $end = microtime(true);
+                    $memory_after = memory_get_usage(true);
+
+                    $times[] = $end - $start;
+                    $memory_usage[] = $memory_after - $memory_before;
+                }
+
+                $this->metrics['basic_calculations'] = [
+                    'avg_time' => round(array_sum($times) / count($times), 6),
+                    'min_time' => round(min($times), 6),
+                    'max_time' => round(max($times), 6),
+                    'std_dev' => $this->calculateStdDev($times),
+                    'avg_memory' => round(array_sum($memory_usage) / count($memory_usage)),
+                    'calculations_per_second' => round(100 / (array_sum($times) / count($times)), 2)
+                ];
+            }
+
+            private function benchmarkComplexCalculations($samples) {
+                $times = [];
+
+                for ($i = 0; $i < $samples; $i++) {
+                    $start = microtime(true);
+
+                    // Complex calculations with large values
+                    for ($j = 0; $j < 50; $j++) {
+                        $width = 1000 + ($j * 100);
+                        $height = 1500 + ($j * 150);
+
+                        $result = $this->calc->pixelToMillimeter([
+                            'width' => $width,
+                            'height' => $height
+                        ], 300);
+
+                        if (is_wp_error($result)) {
+                            throw new Exception('Complex calculation failed');
+                        }
+                    }
+
+                    $end = microtime(true);
+                    $times[] = $end - $start;
+                }
+
+                $this->metrics['complex_calculations'] = [
+                    'avg_time' => round(array_sum($times) / count($times), 6),
+                    'min_time' => round(min($times), 6),
+                    'max_time' => round(max($times), 6),
+                    'std_dev' => $this->calculateStdDev($times)
+                ];
+            }
+
+            private function benchmarkMemoryUsage($samples) {
+                $peak_memory = [];
+                $memory_growth = [];
+
+                for ($i = 0; $i < $samples; $i++) {
+                    $memory_start = memory_get_peak_usage(true);
+
+                    // Intensive memory test
+                    for ($j = 0; $j < 1000; $j++) {
+                        $this->calc->pixelToMillimeter([
+                            'width' => $j,
+                            'height' => $j
+                        ], 96);
+                    }
+
+                    $memory_end = memory_get_peak_usage(true);
+                    $peak_memory[] = $memory_end;
+                    $memory_growth[] = $memory_end - $memory_start;
+                }
+
+                $this->metrics['memory_usage'] = [
+                    'avg_peak_memory_mb' => round(array_sum($peak_memory) / count($peak_memory) / 1024 / 1024, 2),
+                    'avg_growth_kb' => round(array_sum($memory_growth) / count($memory_growth) / 1024, 2),
+                    'max_growth_kb' => round(max($memory_growth) / 1024, 2)
+                ];
+            }
+
+            private function benchmarkConcurrentOperations($samples) {
+                $times = [];
+
+                for ($i = 0; $i < $samples; $i++) {
+                    $start = microtime(true);
+
+                    // Simulate concurrent operations
+                    $dpis = [72, 96, 150, 300];
+                    foreach ($dpis as $dpi) {
+                        for ($j = 0; $j < 25; $j++) {
+                            $this->calc->pixelToMillimeter([
+                                'width' => 100 + $j,
+                                'height' => 100 + $j
+                            ], $dpi);
+                        }
+                    }
+
+                    $end = microtime(true);
+                    $times[] = $end - $start;
+                }
+
+                $this->metrics['concurrent_operations'] = [
+                    'avg_time' => round(array_sum($times) / count($times), 6),
+                    'throughput_ops_per_sec' => round(100 / (array_sum($times) / count($times)), 2)
+                ];
+            }
+
+            private function benchmarkDpiVariations($samples) {
+                $dpi_performance = [];
+                $dpis = [72, 96, 150, 300];
+
+                foreach ($dpis as $dpi) {
+                    $times = [];
+
+                    for ($i = 0; $i < $samples; $i++) {
+                        $start = microtime(true);
+
+                        for ($j = 0; $j < 100; $j++) {
+                            $this->calc->pixelToMillimeter([
+                                'width' => 96,
+                                'height' => 96
+                            ], $dpi);
+                        }
+
+                        $end = microtime(true);
+                        $times[] = $end - $start;
+                    }
+
+                    $dpi_performance[$dpi] = [
+                        'avg_time' => round(array_sum($times) / count($times), 6),
+                        'calculations_per_second' => round(100 / (array_sum($times) / count($times)), 2)
+                    ];
+                }
+
+                $this->metrics['dpi_variations'] = $dpi_performance;
+            }
+
+            private function calculateStdDev($values) {
+                $mean = array_sum($values) / count($values);
+                $variance = array_sum(array_map(function($x) use ($mean) {
+                    return pow($x - $mean, 2);
+                }, $values)) / count($values);
+                return round(sqrt($variance), 6);
+            }
+        }
+
+        try {
+            $benchmark = new PerformanceBenchmark();
+            $metrics = $benchmark->runBenchmarks($argv[1] ?? 10, $argv[2] ?? 5);
+            echo json_encode($metrics, JSON_PRETTY_PRINT);
+        } catch (Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+            exit(1);
+        }
+        EOF
+
+        # Run current performance benchmark
+        CURRENT_METRICS=$(php performance-benchmark.php ${{ env.PERFORMANCE_SAMPLES }} ${{ env.WARMUP_ITERATIONS }})
+
+        if [ $? -eq 0 ]; then
+          echo "✅ Current performance measurement completed" >> $GITHUB_STEP_SUMMARY
+          echo "current-metrics<<EOF" >> $GITHUB_OUTPUT
+          echo "$CURRENT_METRICS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Current performance measurement failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: Measure baseline performance
+      id: baseline
+      run: |
+        echo "### Baseline Version Performance:" >> $GITHUB_STEP_SUMMARY
+
+        # Checkout baseline commit
+        BASELINE_COMMIT="${{ steps.baseline-setup.outputs.baseline-commit }}"
+        git stash push -m "Current changes"
+        git checkout $BASELINE_COMMIT
+
+        # Install dependencies for baseline
+        composer install --no-dev --optimize-autoloader --quiet
+
+        # Run baseline performance benchmark
+        BASELINE_METRICS=$(php performance-benchmark.php ${{ env.PERFORMANCE_SAMPLES }} ${{ env.WARMUP_ITERATIONS }})
+
+        if [ $? -eq 0 ]; then
+          echo "✅ Baseline performance measurement completed" >> $GITHUB_STEP_SUMMARY
+          echo "baseline-metrics<<EOF" >> $GITHUB_OUTPUT
+          echo "$BASELINE_METRICS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "commit=$BASELINE_COMMIT" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Baseline performance measurement failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+        # Return to current state
+        git checkout -
+        git stash pop || true
+
+    outputs:
+      current-metrics: ${{ steps.current-perf.outputs.current-metrics }}
+
+  performance-analysis:
+    name: 📈 Performance Regression Analysis
+    needs: performance-baseline
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Analyze performance regression
+      id: analysis
+      run: |
+        echo "## 📈 Performance Regression Analysis" >> $GITHUB_STEP_SUMMARY
+
+        # Create analysis script
+        cat > analyze-performance.php << 'EOF'
+        <?php
+
+        class PerformanceAnalyzer {
+            private $threshold;
+
+            public function __construct($threshold = 15) {
+                $this->threshold = $threshold;
+            }
+
+            public function analyze($baseline, $current) {
+                $analysis = [
+                    'overall_status' => 'passed',
+                    'regressions' => [],
+                    'improvements' => [],
+                    'summary' => []
+                ];
+
+                $this->analyzeBasicCalculations($baseline, $current, $analysis);
+                $this->analyzeComplexCalculations($baseline, $current, $analysis);
+                $this->analyzeMemoryUsage($baseline, $current, $analysis);
+                $this->analyzeConcurrentOperations($baseline, $current, $analysis);
+                $this->analyzeDpiVariations($baseline, $current, $analysis);
+
+                return $analysis;
+            }
+
+            private function analyzeBasicCalculations($baseline, $current, &$analysis) {
+                $baseline_time = $baseline['basic_calculations']['avg_time'];
+                $current_time = $current['basic_calculations']['avg_time'];
+
+                $change_percent = (($current_time - $baseline_time) / $baseline_time) * 100;
+
+                $analysis['summary']['basic_calculations'] = [
+                    'baseline_time' => $baseline_time,
+                    'current_time' => $current_time,
+                    'change_percent' => round($change_percent, 2),
+                    'status' => $this->getStatus($change_percent)
+                ];
+
+                if ($change_percent > $this->threshold) {
+                    $analysis['regressions'][] = [
+                        'metric' => 'Basic Calculations Performance',
+                        'change_percent' => round($change_percent, 2),
+                        'baseline' => $baseline_time . 's',
+                        'current' => $current_time . 's'
+                    ];
+                    $analysis['overall_status'] = 'failed';
+                } elseif ($change_percent < -5) {
+                    $analysis['improvements'][] = [
+                        'metric' => 'Basic Calculations Performance',
+                        'improvement_percent' => round(abs($change_percent), 2),
+                        'baseline' => $baseline_time . 's',
+                        'current' => $current_time . 's'
+                    ];
+                }
+            }
+
+            private function analyzeComplexCalculations($baseline, $current, &$analysis) {
+                $baseline_time = $baseline['complex_calculations']['avg_time'];
+                $current_time = $current['complex_calculations']['avg_time'];
+
+                $change_percent = (($current_time - $baseline_time) / $baseline_time) * 100;
+
+                $analysis['summary']['complex_calculations'] = [
+                    'baseline_time' => $baseline_time,
+                    'current_time' => $current_time,
+                    'change_percent' => round($change_percent, 2),
+                    'status' => $this->getStatus($change_percent)
+                ];
+
+                if ($change_percent > $this->threshold) {
+                    $analysis['regressions'][] = [
+                        'metric' => 'Complex Calculations Performance',
+                        'change_percent' => round($change_percent, 2),
+                        'baseline' => $baseline_time . 's',
+                        'current' => $current_time . 's'
+                    ];
+                    $analysis['overall_status'] = 'failed';
+                }
+            }
+
+            private function analyzeMemoryUsage($baseline, $current, &$analysis) {
+                $baseline_memory = $baseline['memory_usage']['avg_peak_memory_mb'];
+                $current_memory = $current['memory_usage']['avg_peak_memory_mb'];
+
+                $change_percent = (($current_memory - $baseline_memory) / $baseline_memory) * 100;
+
+                $analysis['summary']['memory_usage'] = [
+                    'baseline_memory' => $baseline_memory,
+                    'current_memory' => $current_memory,
+                    'change_percent' => round($change_percent, 2),
+                    'status' => $this->getStatus($change_percent)
+                ];
+
+                if ($change_percent > $this->threshold) {
+                    $analysis['regressions'][] = [
+                        'metric' => 'Memory Usage',
+                        'change_percent' => round($change_percent, 2),
+                        'baseline' => $baseline_memory . 'MB',
+                        'current' => $current_memory . 'MB'
+                    ];
+                    $analysis['overall_status'] = 'failed';
+                }
+            }
+
+            private function analyzeConcurrentOperations($baseline, $current, &$analysis) {
+                $baseline_time = $baseline['concurrent_operations']['avg_time'];
+                $current_time = $current['concurrent_operations']['avg_time'];
+
+                $change_percent = (($current_time - $baseline_time) / $baseline_time) * 100;
+
+                $analysis['summary']['concurrent_operations'] = [
+                    'baseline_time' => $baseline_time,
+                    'current_time' => $current_time,
+                    'change_percent' => round($change_percent, 2),
+                    'status' => $this->getStatus($change_percent)
+                ];
+
+                if ($change_percent > $this->threshold) {
+                    $analysis['regressions'][] = [
+                        'metric' => 'Concurrent Operations Performance',
+                        'change_percent' => round($change_percent, 2),
+                        'baseline' => $baseline_time . 's',
+                        'current' => $current_time . 's'
+                    ];
+                    $analysis['overall_status'] = 'failed';
+                }
+            }
+
+            private function analyzeDpiVariations($baseline, $current, &$analysis) {
+                $dpis = [72, 96, 150, 300];
+                $dpi_analysis = [];
+
+                foreach ($dpis as $dpi) {
+                    $baseline_time = $baseline['dpi_variations'][$dpi]['avg_time'];
+                    $current_time = $current['dpi_variations'][$dpi]['avg_time'];
+
+                    $change_percent = (($current_time - $baseline_time) / $baseline_time) * 100;
+
+                    $dpi_analysis[$dpi] = [
+                        'baseline_time' => $baseline_time,
+                        'current_time' => $current_time,
+                        'change_percent' => round($change_percent, 2),
+                        'status' => $this->getStatus($change_percent)
+                    ];
+
+                    if ($change_percent > $this->threshold) {
+                        $analysis['regressions'][] = [
+                            'metric' => "DPI $dpi Performance",
+                            'change_percent' => round($change_percent, 2),
+                            'baseline' => $baseline_time . 's',
+                            'current' => $current_time . 's'
+                        ];
+                        $analysis['overall_status'] = 'failed';
+                    }
+                }
+
+                $analysis['summary']['dpi_variations'] = $dpi_analysis;
+            }
+
+            private function getStatus($change_percent) {
+                if ($change_percent > 15) return 'regression';
+                if ($change_percent > 5) return 'warning';
+                if ($change_percent < -5) return 'improvement';
+                return 'stable';
+            }
+        }
+
+        $baseline_json = $argv[1];
+        $current_json = $argv[2];
+        $threshold = floatval($argv[3] ?? 15);
+
+        $baseline = json_decode($baseline_json, true);
+        $current = json_decode($current_json, true);
+
+        if (!$baseline || !$current) {
+            echo json_encode(['error' => 'Invalid JSON data']);
+            exit(1);
+        }
+
+        $analyzer = new PerformanceAnalyzer($threshold);
+        $analysis = $analyzer->analyze($baseline, $current);
+
+        echo json_encode($analysis, JSON_PRETTY_PRINT);
+        EOF
+
+        # Run performance analysis
+        THRESHOLD="${{ github.event.inputs.performance_threshold || env.REGRESSION_THRESHOLD }}"
+
+        BASELINE_METRICS='${{ needs.performance-baseline.outputs.baseline-metrics }}'
+        CURRENT_METRICS='${{ needs.performance-baseline.outputs.current-metrics }}'
+
+        ANALYSIS_RESULT=$(php analyze-performance.php "$BASELINE_METRICS" "$CURRENT_METRICS" "$THRESHOLD")
+
+        if [ $? -eq 0 ]; then
+          echo "analysis-result<<EOF" >> $GITHUB_OUTPUT
+          echo "$ANALYSIS_RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Performance analysis failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: Generate performance report
+      run: |
+        echo "### 📊 Performance Analysis Results:" >> $GITHUB_STEP_SUMMARY
+
+        ANALYSIS='${{ steps.analysis.outputs.analysis-result }}'
+
+        # Parse analysis results
+        OVERALL_STATUS=$(echo "$ANALYSIS" | jq -r '.overall_status')
+        REGRESSIONS_COUNT=$(echo "$ANALYSIS" | jq '.regressions | length')
+        IMPROVEMENTS_COUNT=$(echo "$ANALYSIS" | jq '.improvements | length')
+
+        echo "#### Overall Status: $([ "$OVERALL_STATUS" == "passed" ] && echo "✅ PASSED" || echo "❌ FAILED")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Regressions**: $REGRESSIONS_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Improvements**: $IMPROVEMENTS_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Regression Threshold**: ${{ github.event.inputs.performance_threshold || env.REGRESSION_THRESHOLD }}%" >> $GITHUB_STEP_SUMMARY
+
+        # Show regressions if any
+        if [ "$REGRESSIONS_COUNT" -gt 0 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### 🚨 Performance Regressions Detected:" >> $GITHUB_STEP_SUMMARY
+          echo "$ANALYSIS" | jq -r '.regressions[] | "- **\(.metric)**: \(.change_percent)% slower (\(.baseline) → \(.current))"' >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Show improvements if any
+        if [ "$IMPROVEMENTS_COUNT" -gt 0 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### ⚡ Performance Improvements:" >> $GITHUB_STEP_SUMMARY
+          echo "$ANALYSIS" | jq -r '.improvements[] | "- **\(.metric)**: \(.improvement_percent)% faster (\(.baseline) → \(.current))"' >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Detailed metrics table
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### 📈 Detailed Performance Metrics:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Baseline | Current | Change | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|----------|---------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+        # Basic calculations
+        BASIC_STATUS=$(echo "$ANALYSIS" | jq -r '.summary.basic_calculations.status')
+        BASIC_CHANGE=$(echo "$ANALYSIS" | jq -r '.summary.basic_calculations.change_percent')
+        BASIC_BASELINE=$(echo "$ANALYSIS" | jq -r '.summary.basic_calculations.baseline_time')
+        BASIC_CURRENT=$(echo "$ANALYSIS" | jq -r '.summary.basic_calculations.current_time')
+
+        STATUS_ICON=$([ "$BASIC_STATUS" == "regression" ] && echo "🔴" || [ "$BASIC_STATUS" == "improvement" ] && echo "🟢" || [ "$BASIC_STATUS" == "warning" ] && echo "🟡" || echo "⚪")
+        echo "| Basic Calculations | ${BASIC_BASELINE}s | ${BASIC_CURRENT}s | ${BASIC_CHANGE}% | $STATUS_ICON |" >> $GITHUB_STEP_SUMMARY
+
+        # Set job status based on analysis
+        if [ "$OVERALL_STATUS" != "passed" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚨 **Performance regression detected - Review required before merge**" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **No significant performance regressions detected**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload performance artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-analysis-${{ github.run_number }}
+        path: |
+          analyze-performance.php
+        retention-days: 30
+
+  performance-notification:
+    name: 📧 Performance Notification
+    needs: [performance-baseline, performance-analysis]
+    runs-on: ubuntu-latest
+    if: failure() && github.event_name == 'pull_request'
+
+    steps:
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const comment = `## ⚡ Performance Regression Detected
+
+          **🚨 Warning**: This pull request introduces performance regressions that exceed the acceptable threshold.
+
+          ### Performance Analysis Summary:
+          - **Baseline Commit**: \`${{ needs.performance-baseline.outputs.baseline-commit }}\`
+          - **Regression Threshold**: ${{ github.event.inputs.performance_threshold || env.REGRESSION_THRESHOLD }}%
+          - **Analysis Status**: ❌ FAILED
+
+          ### Next Steps:
+          1. 🔍 Review the performance analysis details in the workflow logs
+          2. 🛠️ Optimize the code to reduce performance impact
+          3. 🧪 Run local performance tests to validate improvements
+          4. 🔄 Push updates to re-trigger performance analysis
+
+          ### Performance Tips:
+          - Use profiling tools to identify bottlenecks
+          - Consider caching strategies for expensive calculations
+          - Optimize database queries and API calls
+          - Review algorithm complexity for precision calculations
+
+          *This comment was automatically generated by the performance regression detection workflow.*`;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  performance-history:
+    name: 📊 Performance History Tracking
+    needs: [performance-baseline, performance-analysis]
+    runs-on: ubuntu-latest
+    if: always() && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Update performance history
+      run: |
+        echo "## 📊 Performance History Update" >> $GITHUB_STEP_SUMMARY
+
+        # Create or update performance history
+        HISTORY_FILE="performance-history.json"
+        CURRENT_METRICS='${{ needs.performance-baseline.outputs.current-metrics }}'
+
+        # Create performance history entry
+        HISTORY_ENTRY=$(cat << EOF
+        {
+          "timestamp": "$(date -Iseconds)",
+          "commit": "${{ github.sha }}",
+          "workflow_run": "${{ github.run_id }}",
+          "metrics": $CURRENT_METRICS,
+          "branch": "${{ github.ref_name }}",
+          "event": "${{ github.event_name }}"
+        }
+        EOF
+        )
+
+        if [ -f "$HISTORY_FILE" ]; then
+          # Append to existing history
+          jq ". += [$HISTORY_ENTRY]" "$HISTORY_FILE" > temp-history.json
+          mv temp-history.json "$HISTORY_FILE"
+        else
+          # Create new history file
+          echo "[$HISTORY_ENTRY]" > "$HISTORY_FILE"
+        fi
+
+        # Keep only last 50 entries
+        jq '.[-50:]' "$HISTORY_FILE" > temp-history.json
+        mv temp-history.json "$HISTORY_FILE"
+
+        echo "✅ Performance history updated" >> $GITHUB_STEP_SUMMARY
+        echo "- **Entries in history**: $(jq 'length' "$HISTORY_FILE")" >> $GITHUB_STEP_SUMMARY
+
+    - name: Archive performance history
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-history-${{ github.run_number }}
+        path: performance-history.json
+        retention-days: 365

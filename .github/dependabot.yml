@@ -1,0 +1,74 @@
+version: 2
+updates:
+  # PHP dependencies
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "octonove/security-team"
+    assignees:
+      - "octonove/dev-team"
+    commit-message:
+      prefix: "🔒 Security"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "php"
+    ignore:
+      # Ignore patch releases for development dependencies
+      - dependency-name: "*"
+        dependency-type: "development"
+        update-types: ["version-update:semver-patch"]
+
+  # Node.js dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "octonove/security-team"
+    assignees:
+      - "octonove/dev-team"
+    commit-message:
+      prefix: "🔒 Security"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "javascript"
+    ignore:
+      # Ignore patch releases for development dependencies
+      - dependency-name: "*"
+        dependency-type: "development"
+        update-types: ["version-update:semver-patch"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "1"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "octonove/devops-team"
+    assignees:
+      - "octonove/devops-team"
+    commit-message:
+      prefix: "🚀 CI/CD"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "ci-cd"
+      - "maintenance"

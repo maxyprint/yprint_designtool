@@ -1,0 +1,39 @@
+# Global code owners
+* @octonove/dev-team
+
+# Core precision system
+/includes/class-precision-calculator.php @octonove/precision-team @octonove/math-team
+/includes/precision-*.php @octonove/precision-team
+/tests/precision-*.php @octonove/precision-team @octonove/qa-team
+
+# CI/CD and deployment
+/.github/workflows/ @octonove/devops-team @octonove/security-team
+/.github/dependabot.yml @octonove/security-team
+/composer.json @octonove/dev-team @octonove/security-team
+/package.json @octonove/dev-team @octonove/security-team
+
+# Security-sensitive files
+/.github/workflows/security-scan.yml @octonove/security-team
+/.github/workflows/deployment-pipeline.yml @octonove/devops-team @octonove/security-team
+
+# Performance and monitoring
+/.github/workflows/monitoring-alerts.yml @octonove/devops-team @octonove/performance-team
+/tests/Performance/ @octonove/performance-team @octonove/qa-team
+
+# Admin interface
+/admin/ @octonove/frontend-team @octonove/ux-team
+
+# Public interface
+/public/ @octonove/frontend-team @octonove/ux-team
+
+# Database and migrations
+/database/ @octonove/database-team @octonove/dev-team
+
+# Documentation
+/docs/ @octonove/docs-team
+*.md @octonove/docs-team
+
+# Configuration files
+phpunit.xml @octonove/qa-team @octonove/dev-team
+.phpcs.xml @octonove/qa-team @octonove/dev-team
+phpstan.neon @octonove/qa-team @octonove/dev-team

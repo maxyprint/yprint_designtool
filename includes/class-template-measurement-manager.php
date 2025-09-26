@@ -12,66 +12,117 @@ class TemplateMeasurementManager {
 
     private $table_name;
     private $wpdb;
+    private $query_cache;
+    private $cache_ttl;
+    private $query_performance_log;
 
     public function __construct() {
         global $wpdb;
         $this->wpdb = $wpdb;
         $this->table_name = $wpdb->prefix . 'template_measurements';
+        $this->query_cache = [];
+        $this->cache_ttl = 1800; // 30 minutes cache TTL
+        $this->query_performance_log = [];
     }
 
     /**
-     * 🎯 DYNAMIC SIZES: Get template sizes from _template_sizes meta field
+     * 🎯 DYNAMIC SIZES: Get template sizes from _template_sizes meta field (OPTIMIZED)
      *
      * @param int $template_id Template post ID
      * @return array Array of size objects [{'id': 'L', 'name': 'Large', 'order': 3}]
      */
     public function get_template_sizes($template_id) {
+        $cache_key = "template_sizes_{$template_id}";
+
+        // Check cache first
+        if (isset($this->query_cache[$cache_key])) {
+            $cached_data = $this->query_cache[$cache_key];
+            if ((time() - $cached_data['timestamp']) < $this->cache_ttl) {
+                return $cached_data['data'];
+            }
+        }
+
+        $start_time = microtime(true);
+
         $sizes = get_post_meta($template_id, '_template_sizes', true);
 
         if (!is_array($sizes)) {
-            return [];
+            $sizes = [];
+        } else {
+            // Optimized sort with error handling
+            usort($sizes, function($a, $b) {
+                $order_a = isset($a['order']) ? (int)$a['order'] : 0;
+                $order_b = isset($b['order']) ? (int)$b['order'] : 0;
+                return $order_a - $order_b;
+            });
         }
 
-        // Sort by order field
-        usort($sizes, function($a, $b) {
-            return ($a['order'] ?? 0) - ($b['order'] ?? 0);
-        });
+        $query_time = round((microtime(true) - $start_time) * 1000, 2);
+        $this->logQueryPerformance('get_template_sizes', $query_time, count($sizes));
+
+        // Cache the result
+        $this->query_cache[$cache_key] = [
+            'data' => $sizes,
+            'timestamp' => time()
+        ];
 
         return $sizes;
     }
 
     /**
-     * 🔍 Get all measurements for a specific template
-     * Returns measurements organized by size_key and measurement_key
+     * 🔍 Get all measurements for a specific template (OPTIMIZED)
+     * Returns measurements organized by size_key and measurement_key with caching
      *
      * @param int $template_id Template post ID
      * @return array Multi-dimensional array [size_key][measurement_key] = value_cm
      */
     public function get_measurements($template_id) {
+        $cache_key = "measurements_{$template_id}";
+
+        // Check cache first
+        if (isset($this->query_cache[$cache_key])) {
+            $cached_data = $this->query_cache[$cache_key];
+            if ((time() - $cached_data['timestamp']) < $this->cache_ttl) {
+                return $cached_data['data'];
+            }
+        }
+
+        $start_time = microtime(true);
+
+        // Optimized query with specific column ordering for better performance
         $results = $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT size_key, measurement_key, measurement_label, value_cm
                 FROM {$this->table_name}
                 WHERE template_id = %d
-                ORDER BY size_key, measurement_key",
+                ORDER BY size_key ASC, measurement_key ASC",
                 $template_id
             ),
             ARRAY_A
         );
 
+        $query_time = round((microtime(true) - $start_time) * 1000, 2);
+        $this->logQueryPerformance('get_measurements', $query_time, count($results));
+
         $measurements = [];
         foreach ($results as $row) {
             $measurements[$row['size_key']][$row['measurement_key']] = [
-                'value_cm' => floatval($row['value_cm']),
+                'value_cm' => (float)$row['value_cm'], // Optimized type casting
                 'label' => $row['measurement_label']
             ];
         }
+
+        // Cache the result
+        $this->query_cache[$cache_key] = [
+            'data' => $measurements,
+            'timestamp' => time()
+        ];
 
         return $measurements;
     }
 
     /**
-     * 🎯 Get specific measurement for size/type combination
+     * 🎯 Get specific measurement for size/type combination (OPTIMIZED)
      *
      * @param int $template_id Template post ID
      * @param string $size_key Size identifier (from _template_sizes.id)
@@ -79,15 +130,40 @@ class TemplateMeasurementManager {
      * @return float|null Measurement value in cm, null if not found
      */
     public function get_specific_measurement($template_id, $size_key, $measurement_key) {
+        $cache_key = "specific_{$template_id}_{$size_key}_{$measurement_key}";
+
+        // Check cache first
+        if (isset($this->query_cache[$cache_key])) {
+            $cached_data = $this->query_cache[$cache_key];
+            if ((time() - $cached_data['timestamp']) < $this->cache_ttl) {
+                return $cached_data['data'];
+            }
+        }
+
+        $start_time = microtime(true);
+
+        // Optimized query with LIMIT 1 for faster execution
         $result = $this->wpdb->get_var(
             $this->wpdb->prepare(
                 "SELECT value_cm FROM {$this->table_name}
-                WHERE template_id = %d AND size_key = %s AND measurement_key = %s",
+                WHERE template_id = %d AND size_key = %s AND measurement_key = %s
+                LIMIT 1",
                 $template_id, $size_key, $measurement_key
             )
         );
 
-        return $result ? floatval($result) : null;
+        $query_time = round((microtime(true) - $start_time) * 1000, 2);
+        $this->logQueryPerformance('get_specific_measurement', $query_time, $result ? 1 : 0);
+
+        $value = $result ? (float)$result : null;
+
+        // Cache the result
+        $this->query_cache[$cache_key] = [
+            'data' => $value,
+            'timestamp' => time()
+        ];
+
+        return $value;
     }
 
     /**
@@ -345,5 +421,198 @@ class TemplateMeasurementManager {
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+    }
+
+    /**
+     * 📊 Log query performance for monitoring
+     *
+     * @param string $query_type Type of query executed
+     * @param float $execution_time_ms Execution time in milliseconds
+     * @param int $result_count Number of results returned
+     */
+    private function logQueryPerformance($query_type, $execution_time_ms, $result_count) {
+        $this->query_performance_log[] = [
+            'query_type' => $query_type,
+            'execution_time_ms' => $execution_time_ms,
+            'result_count' => $result_count,
+            'timestamp' => microtime(true),
+            'memory_usage_kb' => round(memory_get_usage() / 1024, 2)
+        ];
+
+        // Keep only the last 100 performance entries to prevent memory bloat
+        if (count($this->query_performance_log) > 100) {
+            $this->query_performance_log = array_slice($this->query_performance_log, -100);
+        }
+
+        // Log slow queries for debugging
+        if ($execution_time_ms > 25) { // Log queries slower than 25ms
+            error_log("TemplateMeasurementManager: Slow query detected - {$query_type}: {$execution_time_ms}ms, {$result_count} results");
+        }
+    }
+
+    /**
+     * 📈 Get database performance statistics
+     *
+     * @return array Performance analytics
+     */
+    public function getDatabasePerformanceStats() {
+        if (empty($this->query_performance_log)) {
+            return [
+                'total_queries' => 0,
+                'average_execution_time_ms' => 0,
+                'cache_hit_ratio' => 0,
+                'slow_queries_count' => 0
+            ];
+        }
+
+        $total_queries = count($this->query_performance_log);
+        $total_time = array_sum(array_column($this->query_performance_log, 'execution_time_ms'));
+        $average_time = round($total_time / $total_queries, 2);
+        $slow_queries = array_filter($this->query_performance_log, function($log) {
+            return $log['execution_time_ms'] > 25;
+        });
+
+        // Calculate cache statistics
+        $cache_entries = count($this->query_cache);
+        $valid_cache_entries = 0;
+        foreach ($this->query_cache as $cached_data) {
+            if ((time() - $cached_data['timestamp']) < $this->cache_ttl) {
+                $valid_cache_entries++;
+            }
+        }
+
+        return [
+            'total_queries' => $total_queries,
+            'average_execution_time_ms' => $average_time,
+            'fastest_query_ms' => min(array_column($this->query_performance_log, 'execution_time_ms')),
+            'slowest_query_ms' => max(array_column($this->query_performance_log, 'execution_time_ms')),
+            'slow_queries_count' => count($slow_queries),
+            'cache_entries_total' => $cache_entries,
+            'cache_entries_valid' => $valid_cache_entries,
+            'cache_efficiency' => $cache_entries > 0 ? round(($valid_cache_entries / $cache_entries) * 100, 2) : 0,
+            'memory_usage_current_kb' => round(memory_get_usage() / 1024, 2),
+            'cache_ttl_seconds' => $this->cache_ttl
+        ];
+    }
+
+    /**
+     * 🧹 Clear query cache and performance logs
+     *
+     * @param bool $clear_performance_log Also clear performance logs
+     */
+    public function clearQueryCache($clear_performance_log = false) {
+        $this->query_cache = [];
+
+        if ($clear_performance_log) {
+            $this->query_performance_log = [];
+        }
+
+        return true;
+    }
+
+    /**
+     * ⚡ Bulk get measurements for multiple templates (OPTIMIZED)
+     *
+     * @param array $template_ids Array of template IDs
+     * @return array Multi-dimensional array [template_id][size_key][measurement_key] = value_cm
+     */
+    public function get_bulk_measurements($template_ids) {
+        if (empty($template_ids) || !is_array($template_ids)) {
+            return [];
+        }
+
+        $template_ids = array_map('intval', $template_ids); // Sanitize input
+        $placeholders = implode(',', array_fill(0, count($template_ids), '%d'));
+
+        $start_time = microtime(true);
+
+        // Single optimized query instead of multiple queries
+        $results = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT template_id, size_key, measurement_key, measurement_label, value_cm
+                FROM {$this->table_name}
+                WHERE template_id IN ($placeholders)
+                ORDER BY template_id ASC, size_key ASC, measurement_key ASC",
+                ...$template_ids
+            ),
+            ARRAY_A
+        );
+
+        $query_time = round((microtime(true) - $start_time) * 1000, 2);
+        $this->logQueryPerformance('get_bulk_measurements', $query_time, count($results));
+
+        $measurements = [];
+        foreach ($results as $row) {
+            $template_id = (int)$row['template_id'];
+            $measurements[$template_id][$row['size_key']][$row['measurement_key']] = [
+                'value_cm' => (float)$row['value_cm'],
+                'label' => $row['measurement_label']
+            ];
+        }
+
+        return $measurements;
+    }
+
+    /**
+     * 🔍 Get measurements with performance analysis
+     *
+     * @param int $template_id Template post ID
+     * @param bool $include_performance_data Include performance metrics in response
+     * @return array Measurements with optional performance data
+     */
+    public function get_measurements_with_performance($template_id, $include_performance_data = false) {
+        $start_total_time = microtime(true);
+
+        $measurements = $this->get_measurements($template_id);
+
+        if (!$include_performance_data) {
+            return $measurements;
+        }
+
+        $total_time = round((microtime(true) - $start_total_time) * 1000, 2);
+
+        return [
+            'measurements' => $measurements,
+            'performance' => [
+                'execution_time_ms' => $total_time,
+                'measurement_count' => $this->countMeasurements($measurements),
+                'cache_status' => isset($this->query_cache["measurements_{$template_id}"]) ? 'hit' : 'miss',
+                'memory_usage_kb' => round(memory_get_usage() / 1024, 2)
+            ]
+        ];
+    }
+
+    /**
+     * 📏 Count total measurements in result set
+     *
+     * @param array $measurements Measurements array
+     * @return int Total count of measurements
+     */
+    private function countMeasurements($measurements) {
+        $count = 0;
+        foreach ($measurements as $size_measurements) {
+            $count += count($size_measurements);
+        }
+        return $count;
+    }
+
+    /**
+     * 🏗️ Create optimized database indexes for performance
+     */
+    public static function create_performance_indexes() {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'template_measurements';
+
+        // Create composite indexes for common query patterns
+        $indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_template_size_perf ON {$table_name} (template_id, size_key)",
+            "CREATE INDEX IF NOT EXISTS idx_template_measurement_perf ON {$table_name} (template_id, measurement_key)",
+            "CREATE INDEX IF NOT EXISTS idx_full_lookup_perf ON {$table_name} (template_id, size_key, measurement_key)"
+        ];
+
+        foreach ($indexes as $index_sql) {
+            $wpdb->query($index_sql);
+        }
     }
 }

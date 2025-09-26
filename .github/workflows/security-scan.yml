@@ -1,0 +1,325 @@
+name: 🔒 Security Scan & Compliance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scan daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_level:
+        description: 'Security scan level'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+        - standard
+        - enhanced
+        - comprehensive
+
+env:
+  SECURITY_SCAN_TIMEOUT: 1800 # 30 minutes
+
+jobs:
+  security-audit:
+    name: 🛡️ Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl
+        tools: composer:v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        composer install --no-dev --optimize-autoloader
+        npm ci --only=production
+
+    - name: 🔍 Dependency Vulnerability Scan
+      run: |
+        echo "## 🔍 Dependency Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
+        echo "### Composer Dependencies:" >> $GITHUB_STEP_SUMMARY
+
+        # PHP dependencies audit
+        if composer audit --no-dev --format=json > composer-audit.json; then
+          echo "✅ No critical vulnerabilities found in PHP dependencies" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **WARNING**: Vulnerabilities found in PHP dependencies" >> $GITHUB_STEP_SUMMARY
+          if [ -f composer-audit.json ]; then
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            cat composer-audit.json >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+        echo "### NPM Dependencies:" >> $GITHUB_STEP_SUMMARY
+
+        # Node.js dependencies audit
+        if npm audit --audit-level=moderate --json > npm-audit.json; then
+          echo "✅ No moderate+ vulnerabilities found in Node.js dependencies" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **WARNING**: Vulnerabilities found in Node.js dependencies" >> $GITHUB_STEP_SUMMARY
+          if [ -f npm-audit.json ]; then
+            VULNERABILITY_COUNT=$(jq '.metadata.vulnerabilities.total' npm-audit.json 2>/dev/null || echo "unknown")
+            echo "- **Total vulnerabilities**: $VULNERABILITY_COUNT" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+    - name: 🔒 Code Security Analysis
+      run: |
+        echo "## 🔒 Code Security Analysis" >> $GITHUB_STEP_SUMMARY
+
+        # Initialize security check counters
+        SECURITY_ISSUES=0
+
+        echo "### PHP Security Patterns:" >> $GITHUB_STEP_SUMMARY
+
+        # Check for dangerous PHP functions
+        DANGEROUS_FUNCTIONS=(
+          "eval"
+          "exec"
+          "system"
+          "shell_exec"
+          "passthru"
+          "file_get_contents.*http"
+          "fopen.*http"
+          "curl_exec"
+          "preg_replace.*\/e"
+        )
+
+        for func in "${DANGEROUS_FUNCTIONS[@]}"; do
+          if grep -r -E "$func\s*\(" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests >/dev/null 2>&1; then
+            echo "⚠️ **WARNING**: Found potentially dangerous function: \`$func\`" >> $GITHUB_STEP_SUMMARY
+            SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+          fi
+        done
+
+        # Check for SQL injection patterns
+        if grep -r -E "(mysql_query|query\s*\(.*\\\$|prepare\s*\(.*\\\$)" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Potential SQL injection vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+        fi
+
+        # Check for XSS vulnerabilities
+        if grep -r -E "(echo\s+\\\$_(GET|POST|REQUEST)|print\s+\\\$_(GET|POST|REQUEST))" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Potential XSS vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+        fi
+
+        # Check for hardcoded credentials
+        if grep -r -i -E "(password|secret|key|token)\s*=\s*['\"][^'\"]{8,}['\"]" --include="*.php" --include="*.js" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Potential hardcoded credentials detected" >> $GITHUB_STEP_SUMMARY
+          SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+        fi
+
+        echo "### JavaScript Security Patterns:" >> $GITHUB_STEP_SUMMARY
+
+        # Check for dangerous JavaScript patterns
+        if grep -r -E "(eval\s*\(|innerHTML\s*=|document\.write)" --include="*.js" . --exclude-dir=vendor --exclude-dir=node_modules >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Potential JavaScript security issues detected" >> $GITHUB_STEP_SUMMARY
+          SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+        fi
+
+        # Summary
+        if [ "$SECURITY_ISSUES" -eq 0 ]; then
+          echo "✅ **No obvious security issues detected**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚨 **$SECURITY_ISSUES potential security issues require review**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 🏗️ WordPress Security Standards
+      run: |
+        echo "## 🏗️ WordPress Security Standards" >> $GITHUB_STEP_SUMMARY
+        echo "### WordPress Security Checks:" >> $GITHUB_STEP_SUMMARY
+
+        WP_SECURITY_ISSUES=0
+
+        # Check for proper nonce usage
+        if grep -r "wp_ajax" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules | grep -v "wp_verify_nonce" >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: AJAX handlers without nonce verification detected" >> $GITHUB_STEP_SUMMARY
+          WP_SECURITY_ISSUES=$((WP_SECURITY_ISSUES + 1))
+        fi
+
+        # Check for proper capability checks
+        if grep -r "wp_ajax" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules | grep -v "current_user_can\|user_can" >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: AJAX handlers without capability checks detected" >> $GITHUB_STEP_SUMMARY
+          WP_SECURITY_ISSUES=$((WP_SECURITY_ISSUES + 1))
+        fi
+
+        # Check for direct database queries
+        if grep -r "\$wpdb->query\|\$wpdb->get_" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests | grep -v "prepare" >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Direct database queries without prepared statements detected" >> $GITHUB_STEP_SUMMARY
+          WP_SECURITY_ISSUES=$((WP_SECURITY_ISSUES + 1))
+        fi
+
+        # Check for proper data sanitization
+        if grep -r "\$_GET\|\$_POST\|\$_REQUEST" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests | grep -v "sanitize_\|wp_unslash\|esc_" >/dev/null 2>&1; then
+          echo "⚠️ **WARNING**: Unsanitized user input detected" >> $GITHUB_STEP_SUMMARY
+          WP_SECURITY_ISSUES=$((WP_SECURITY_ISSUES + 1))
+        fi
+
+        if [ "$WP_SECURITY_ISSUES" -eq 0 ]; then
+          echo "✅ **WordPress security standards followed**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚨 **$WP_SECURITY_ISSUES WordPress security issues require attention**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📋 File Permission Audit
+      run: |
+        echo "## 📋 File Permission Audit" >> $GITHUB_STEP_SUMMARY
+        echo "### File System Security:" >> $GITHUB_STEP_SUMMARY
+
+        PERMISSION_ISSUES=0
+
+        # Check for world-writable files
+        WRITABLE_FILES=$(find . -type f -perm /o+w ! -path "./vendor/*" ! -path "./node_modules/*" | head -10)
+        if [ -n "$WRITABLE_FILES" ]; then
+          echo "⚠️ **WARNING**: World-writable files detected:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$WRITABLE_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          PERMISSION_ISSUES=$((PERMISSION_ISSUES + 1))
+        fi
+
+        # Check for executable PHP files
+        EXECUTABLE_PHP=$(find . -name "*.php" -perm /u+x ! -path "./vendor/*" ! -path "./node_modules/*" | head -10)
+        if [ -n "$EXECUTABLE_PHP" ]; then
+          echo "⚠️ **WARNING**: Executable PHP files detected:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$EXECUTABLE_PHP" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          PERMISSION_ISSUES=$((PERMISSION_ISSUES + 1))
+        fi
+
+        if [ "$PERMISSION_ISSUES" -eq 0 ]; then
+          echo "✅ **File permissions are secure**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚨 **$PERMISSION_ISSUES file permission issues require attention**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 🔐 Enhanced Security Scan
+      if: ${{ github.event.inputs.scan_level == 'enhanced' || github.event.inputs.scan_level == 'comprehensive' }}
+      run: |
+        echo "## 🔐 Enhanced Security Scan" >> $GITHUB_STEP_SUMMARY
+        echo "### Advanced Security Analysis:" >> $GITHUB_STEP_SUMMARY
+
+        # Install additional security tools
+        npm install -g retire
+
+        # JavaScript security scan
+        echo "#### JavaScript Security (retire.js):" >> $GITHUB_STEP_SUMMARY
+        if retire --path . --outputformat json --outputpath retire-report.json; then
+          echo "✅ No known vulnerable JavaScript libraries detected" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **WARNING**: Vulnerable JavaScript libraries detected" >> $GITHUB_STEP_SUMMARY
+          if [ -f retire-report.json ]; then
+            VULNERABLE_COUNT=$(jq 'length' retire-report.json 2>/dev/null || echo "unknown")
+            echo "- **Vulnerable libraries**: $VULNERABLE_COUNT" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+        # Additional malware patterns
+        echo "#### Malware Pattern Detection:" >> $GITHUB_STEP_SUMMARY
+        MALWARE_PATTERNS=(
+          "base64_decode"
+          "str_rot13"
+          "gzinflate"
+          "rawurldecode"
+          "\\\\x[0-9a-fA-F]{2}"
+          "chr\s*\(\s*[0-9]"
+        )
+
+        MALWARE_DETECTED=0
+        for pattern in "${MALWARE_PATTERNS[@]}"; do
+          if grep -r -E "$pattern" --include="*.php" . --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests >/dev/null 2>&1; then
+            echo "⚠️ **WARNING**: Suspicious pattern detected: \`$pattern\`" >> $GITHUB_STEP_SUMMARY
+            MALWARE_DETECTED=$((MALWARE_DETECTED + 1))
+          fi
+        done
+
+        if [ "$MALWARE_DETECTED" -eq 0 ]; then
+          echo "✅ No malware patterns detected" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚨 **$MALWARE_DETECTED suspicious patterns require manual review**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📊 Generate Security Report
+      run: |
+        echo "## 📊 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "### Scan Configuration:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Scan Level**: ${{ github.event.inputs.scan_level || 'standard' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Scan Date**: $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Count total issues from all artifacts
+        TOTAL_ISSUES=0
+
+        # Add up issues from various scans
+        if [ -f composer-audit.json ]; then
+          COMPOSER_ISSUES=$(jq '.advisories | length' composer-audit.json 2>/dev/null || echo "0")
+          TOTAL_ISSUES=$((TOTAL_ISSUES + COMPOSER_ISSUES))
+        fi
+
+        if [ -f npm-audit.json ]; then
+          NPM_ISSUES=$(jq '.metadata.vulnerabilities.total' npm-audit.json 2>/dev/null || echo "0")
+          TOTAL_ISSUES=$((TOTAL_ISSUES + NPM_ISSUES))
+        fi
+
+        echo "### Overall Security Status:" >> $GITHUB_STEP_SUMMARY
+        if [ "$TOTAL_ISSUES" -eq 0 ]; then
+          echo "✅ **SECURITY SCAN PASSED**" >> $GITHUB_STEP_SUMMARY
+          echo "- No critical security issues detected" >> $GITHUB_STEP_SUMMARY
+          echo "- All dependencies are up to date" >> $GITHUB_STEP_SUMMARY
+          echo "- Code follows security best practices" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **SECURITY ISSUES DETECTED**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Issues**: $TOTAL_ISSUES" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action Required**: Review and address findings" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 🗂️ Archive Security Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results-${{ github.run_number }}
+        path: |
+          composer-audit.json
+          npm-audit.json
+          retire-report.json
+        retention-days: 90
+
+    - name: 📧 Security Alert Notification
+      if: failure()
+      run: |
+        echo "## 🚨 Security Alert" >> $GITHUB_STEP_SUMMARY
+        echo "### Critical Security Issues Detected!" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Scan Time**: $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Review the scan results immediately and address all findings before deployment.**" >> $GITHUB_STEP_SUMMARY
