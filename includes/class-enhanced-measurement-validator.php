@@ -43,11 +43,24 @@ class EnhancedMeasurementValidator {
 
     /**
      * Initialize validation components
+     * 🔧 CIRCULAR DEPENDENCY FIX: Lazy-load API integration to prevent constructor loops
      */
     private function init_components() {
         $this->precision_calculator = new PrecisionCalculator();
         $this->template_measurement_manager = new TemplateMeasurementManager();
-        $this->api_integration = Octo_Print_API_Integration::get_instance();
+        // API integration will be loaded lazily when needed to avoid circular dependency
+        $this->api_integration = null;
+    }
+
+    /**
+     * 🔧 CIRCULAR DEPENDENCY FIX: Get API integration instance with lazy loading
+     */
+    private function get_api_integration() {
+        if ($this->api_integration === null) {
+            // Only load API integration when actually needed
+            $this->api_integration = Octo_Print_API_Integration::get_instance();
+        }
+        return $this->api_integration;
     }
 
     /**

@@ -24,14 +24,22 @@ class Octo_Print_Designer {
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-loader.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-user-images.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-wc-integration.php';
-        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
 
-        // 🧠 Agent Implementation: Measurement Database Classes
+        // 🧠 Agent Implementation: Measurement Database Classes (Must load before API integration)
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-template-measurement-manager.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-measurement-validation-framework.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-measurement-migration-script.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-template-sizes-integration-tester.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-deployment-readiness-certification.php';
+
+        // 🎯 Issue #23: Precision Calculator Classes (Must load before API integration)
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-precision-calculator.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-enhanced-measurement-validator.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-validation-admin-interface.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-validation-performance-monitor.php';
+
+        // API Integration (requires PrecisionCalculator and TemplateMeasurementManager)
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
 
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-template.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-octo-print-designer-admin.php';

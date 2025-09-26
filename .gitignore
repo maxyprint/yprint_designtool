@@ -1,6 +1,8 @@
 # Development & Testing
 tests/
 node_modules/
+vendor/
+composer.lock
 *.log
 
 # Claude Flow System Files
