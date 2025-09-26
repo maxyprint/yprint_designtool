@@ -1,4 +1,4 @@
-name: Issue #23 Precision Testing System
+name: Issues #23 & #24 Precision Testing System
 
 on:
   push:
@@ -195,6 +195,19 @@ jobs:
           echo "✅ Standalone precision tests: PASSED" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ Standalone precision tests: FAILED" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+        # 🎯 Run Issue #24 Precision Validation Tests
+        echo "### Issue #24: Reference Calculation & Production Pipeline Tests" >> $GITHUB_STEP_SUMMARY
+        if php run-issue-24-tests.php; then
+          echo "✅ Issue #24 precision validation: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "✅ ±0.1mm tolerance requirement validated" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Production pipeline precision confirmed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Issue #24 precision validation: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Critical: ±0.1mm tolerance not achieved" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Production deployment blocked" >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
 
