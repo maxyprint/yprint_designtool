@@ -31,7 +31,7 @@
         try {
             // Access webpack require function
             if (typeof window.__webpack_require__ === 'function') {
-                // Try to require the fabric module directly from webpack
+                // Try to require the fabric module directly from webpack using the correct module ID
                 const fabricModuleId = './node_modules/fabric/dist/index.min.mjs';
 
                 try {
@@ -51,6 +51,23 @@
                     }
                 } catch (moduleError) {
                     console.log('⚠️ WEBPACK FABRIC EXTRACTOR: Direct module require failed, trying alternative methods');
+                    console.log('🔍 DEBUG: Module error details:', moduleError.message);
+                }
+
+                // Alternative method: Access webpack module cache directly
+                if (window.__webpack_require__.cache) {
+                    const fabricCacheKey = Object.keys(window.__webpack_require__.cache)
+                        .find(key => key.includes('fabric/dist/index.min.mjs'));
+
+                    if (fabricCacheKey) {
+                        const fabricModule = window.__webpack_require__.cache[fabricCacheKey];
+                        if (fabricModule && fabricModule.exports && fabricModule.exports.Canvas) {
+                            window.fabric = fabricModule.exports;
+                            console.log('✅ WEBPACK FABRIC EXTRACTOR: fabric.js found in cache');
+                            dispatchFabricReadyEvents();
+                            return true;
+                        }
+                    }
                 }
 
                 // Alternative: Search through webpack module cache

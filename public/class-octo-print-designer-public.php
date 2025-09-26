@@ -137,7 +137,7 @@ class Octo_Print_Designer_Public {
         // Phase 1: Immediate Fabric Extraction from Webpack Bundle
         wp_register_script(
             'octo-webpack-fabric-extractor',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-extractor.js',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-loader-optimized.js',
             ['octo-print-designer-vendor'], // Load immediately after vendor bundle
             $this->version . '.extractor-v2',
             true
