@@ -3284,22 +3284,107 @@ private function build_print_provider_email_content($order, $design_items, $note
         </div>
 
         <script type="text/javascript">
+        // 🔍 IMMEDIATE DEBUG: Page load validation
+        console.group('🔍 BUTTON INITIALIZATION DEBUG');
+        console.log('📋 ENVIRONMENT CHECK:', {
+            jQuery: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'NOT FOUND',
+            ajaxurl: typeof ajaxurl !== 'undefined' ? ajaxurl : 'NOT FOUND',
+            documentReady: document.readyState,
+            timestamp: new Date().toISOString()
+        });
+
+        // 🖱️ RAW CLICK DETECTION (Independent of jQuery)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 DOM READY: Checking button availability...');
+            var buttonElement = document.getElementById('design-preview-btn');
+
+            if (buttonElement) {
+                console.log('✅ BUTTON FOUND:', {
+                    id: buttonElement.id,
+                    disabled: buttonElement.disabled,
+                    classList: Array.from(buttonElement.classList),
+                    orderId: buttonElement.getAttribute('data-order-id')
+                });
+
+                // Add raw click listener that ALWAYS works
+                buttonElement.addEventListener('click', function(e) {
+                    console.log('🖱️ RAW CLICK DETECTED on preview button!');
+                    console.log('🖱️ Click Event Details:', {
+                        target: e.target.id,
+                        disabled: e.target.disabled,
+                        timestamp: new Date().toISOString()
+                    });
+                });
+            } else {
+                console.error('❌ BUTTON NOT FOUND: #design-preview-btn missing from DOM');
+            }
+        });
+
+        // Global click detection for ANY element
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'design-preview-btn' || e.target.closest('#design-preview-btn')) {
+                console.log('🖱️ GLOBAL CLICK: Preview button clicked via global listener');
+            }
+        });
+
+        console.groupEnd();
+
         jQuery(document).ready(function($) {
-            // Design Preview Button
+            console.group('🔍 JQUERY EVENT HANDLER SETUP');
+
+            // Validate jQuery environment
+            console.log('📊 JQUERY VALIDATION:', {
+                version: $.fn.jquery,
+                buttonExists: $('#design-preview-btn').length > 0,
+                buttonDisabled: $('#design-preview-btn').prop('disabled'),
+                ajaxurlAvailable: typeof ajaxurl !== 'undefined'
+            });
+
+            var button = $('#design-preview-btn');
+            if (button.length === 0) {
+                console.error('❌ JQUERY: Button #design-preview-btn not found!');
+                console.groupEnd();
+                return;
+            }
+
+            console.log('✅ JQUERY: Attaching click event handler...');
+
+            // Design Preview Button - Enhanced with multiple binding methods
+
+            // Method 1: Direct binding
             $('#design-preview-btn').on('click', function() {
-                var button = $(this);
-                var orderId = button.data('order-id');
+                console.log('🎯 METHOD 1: Direct jQuery click handler triggered');
+                handlePreviewClick($(this));
+            });
+
+            // Method 2: Event delegation (backup)
+            $(document).on('click', '#design-preview-btn', function() {
+                console.log('🎯 METHOD 2: Event delegation handler triggered');
+                handlePreviewClick($(this));
+            });
+
+            // Validate event handlers were attached
+            setTimeout(function() {
+                var events = $._data(document.getElementById('design-preview-btn'), 'events');
+                console.log('📋 EVENT HANDLERS ATTACHED:', events);
+            }, 100);
+
+            console.groupEnd();
+
+            // Main click handler function
+            function handlePreviewClick(buttonElement) {
+                var orderId = buttonElement.data('order-id');
 
                 // 🐛 DEBUG: Console logging for preview button click
                 console.group('🎨 DESIGN PREVIEW DEBUG - Order #' + orderId);
                 console.log('🔍 Button Status:', {
-                    disabled: button.prop('disabled'),
+                    disabled: buttonElement.prop('disabled'),
                     orderId: orderId,
-                    buttonElement: button[0],
+                    buttonElement: buttonElement[0],
                     timestamp: new Date().toISOString()
                 });
 
-                if (button.prop('disabled')) {
+                if (buttonElement.prop('disabled')) {
                     console.warn('❌ ABORT: Button is disabled');
                     console.groupEnd();
                     return;
@@ -3312,22 +3397,66 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $('#design-preview-loading').show();
                 $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
 
+                // 🔍 AJAX PREREQUISITES VALIDATION
+                console.group('🔍 AJAX PREREQUISITES CHECK');
+
+                var ajaxValidation = {
+                    ajaxurl_available: typeof ajaxurl !== 'undefined',
+                    ajaxurl_value: typeof ajaxurl !== 'undefined' ? ajaxurl : 'MISSING',
+                    jquery_available: typeof $ !== 'undefined',
+                    jquery_ajax: typeof $.ajax !== 'undefined',
+                    order_id_valid: orderId && orderId > 0,
+                    nonce_generated: '<?php echo wp_create_nonce('design_preview_nonce'); ?>',
+                    admin_context: window.location.href.includes('/wp-admin/')
+                };
+
+                console.log('📊 AJAX VALIDATION:', ajaxValidation);
+
+                // Critical validation checks
+                if (!ajaxValidation.ajaxurl_available) {
+                    console.error('❌ CRITICAL: ajaxurl is not defined! WordPress AJAX will fail.');
+                    console.groupEnd();
+                    console.groupEnd(); // End main debug group
+                    alert('AJAX Error: ajaxurl not available. Check WordPress admin configuration.');
+                    return;
+                }
+
+                if (!ajaxValidation.jquery_ajax) {
+                    console.error('❌ CRITICAL: jQuery.ajax is not available!');
+                    console.groupEnd();
+                    console.groupEnd(); // End main debug group
+                    alert('AJAX Error: jQuery not properly loaded.');
+                    return;
+                }
+
+                if (!ajaxValidation.order_id_valid) {
+                    console.error('❌ CRITICAL: Invalid order ID:', orderId);
+                    console.groupEnd();
+                    console.groupEnd(); // End main debug group
+                    alert('AJAX Error: Invalid order ID.');
+                    return;
+                }
+
+                console.log('✅ AJAX PREREQUISITES: All checks passed');
+                console.groupEnd();
+
                 // 🧠 AGENT FIX: AjaxCorsResolver - Enhanced AJAX with CORS support
                 var ajaxData = {
                     action: 'octo_load_design_preview',
                     order_id: orderId,
-                    nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                    nonce: ajaxValidation.nonce_generated
                 };
 
-                console.log('📡 AJAX REQUEST:', {
-                    url: ajaxurl,
+                console.log('📡 AJAX REQUEST PREPARED:', {
+                    url: ajaxValidation.ajaxurl_value,
                     data: ajaxData,
                     method: 'POST',
+                    dataSize: JSON.stringify(ajaxData).length,
                     timestamp: new Date().toISOString()
                 });
 
                 $.ajax({
-                    url: ajaxurl,
+                    url: ajaxValidation.ajaxurl_value,
                     type: 'POST',
                     data: ajaxData,
                     // CORS optimization
