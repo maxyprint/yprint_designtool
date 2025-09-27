@@ -1,0 +1,239 @@
+name: 🔍 Database Diagnostics - Order 5374 Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      query_type:
+        description: 'Type of database query to run'
+        required: true
+        default: 'order_meta'
+        type: choice
+        options:
+          - order_meta
+          - order_items
+          - design_data
+          - all_meta
+          - custom_query
+      custom_sql:
+        description: 'Custom SQL query (if custom_query selected)'
+        required: false
+        default: ''
+
+jobs:
+  database-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔄 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, pdo, pdo_mysql
+
+      - name: 📥 Install WP-CLI
+        run: |
+          curl -O https://raw.githubusercontent.com/wp-cli/wp-cli/v2.9.0/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+          wp --version
+
+      - name: 🔗 Test Database Connection
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_CHARSET: ${{ secrets.DB_CHARSET }}
+        run: |
+          echo "🔍 Testing database connection..."
+          echo "Host: $DB_HOST"
+          echo "Database: $DB_NAME"
+          echo "User: $DB_USER"
+          echo "Charset: $DB_CHARSET"
+
+          # Test basic connection
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 'Database connection successful!' AS status;" "$DB_NAME"
+
+      - name: 📊 Order 5374 Meta Analysis
+        if: ${{ github.event.inputs.query_type == 'order_meta' || github.event.inputs.query_type == 'all_meta' }}
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "🎯 Analyzing Order 5374 Meta Fields..."
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" << 'EOF'
+          SELECT
+            meta_key,
+            LENGTH(meta_value) as value_length,
+            LEFT(meta_value, 100) as value_preview
+          FROM wp_postmeta
+          WHERE post_id = 5374
+          AND (
+            meta_key LIKE '%design%' OR
+            meta_key LIKE '%view%' OR
+            meta_key LIKE '%canvas%' OR
+            meta_key LIKE '%print%' OR
+            meta_key = '_design_data' OR
+            meta_key = '_db_processed_views'
+          )
+          ORDER BY meta_key;
+          EOF
+
+      - name: 🛒 Order 5374 Items Analysis
+        if: ${{ github.event.inputs.query_type == 'order_items' || github.event.inputs.query_type == 'all_meta' }}
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "🛒 Analyzing Order 5374 Items..."
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" << 'EOF'
+          SELECT
+            oi.order_item_id,
+            oi.order_item_name,
+            oi.order_item_type,
+            oim.meta_key,
+            LENGTH(oim.meta_value) as meta_length,
+            LEFT(oim.meta_value, 100) as meta_preview
+          FROM wp_woocommerce_order_items oi
+          LEFT JOIN wp_woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id
+          WHERE oi.order_id = 5374
+          AND (
+            oim.meta_key LIKE '%design%' OR
+            oim.meta_key LIKE '%view%' OR
+            oim.meta_key LIKE '%template%' OR
+            oim.meta_key = '_db_processed_views' OR
+            oim.meta_key IS NULL
+          )
+          ORDER BY oi.order_item_id, oim.meta_key;
+          EOF
+
+      - name: 🎨 Design Data Deep Dive
+        if: ${{ github.event.inputs.query_type == 'design_data' }}
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "🎨 Deep Dive: Design Data Analysis..."
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" << 'EOF'
+          -- Check for _design_data
+          SELECT
+            'ORDER META _design_data' as source,
+            post_id,
+            meta_key,
+            LENGTH(meta_value) as data_size,
+            CASE
+              WHEN meta_value LIKE '{%' THEN 'JSON'
+              WHEN meta_value LIKE 'a:%' THEN 'SERIALIZED'
+              ELSE 'OTHER'
+            END as format
+          FROM wp_postmeta
+          WHERE post_id = 5374 AND meta_key = '_design_data'
+
+          UNION ALL
+
+          -- Check for _db_processed_views in order items
+          SELECT
+            'ORDER ITEM _db_processed_views' as source,
+            oi.order_id as post_id,
+            oim.meta_key,
+            LENGTH(oim.meta_value) as data_size,
+            CASE
+              WHEN oim.meta_value LIKE '{%' THEN 'JSON'
+              WHEN oim.meta_value LIKE 'a:%' THEN 'SERIALIZED'
+              ELSE 'OTHER'
+            END as format
+          FROM wp_woocommerce_order_items oi
+          JOIN wp_woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id
+          WHERE oi.order_id = 5374 AND oim.meta_key = '_db_processed_views'
+
+          ORDER BY source, data_size DESC;
+          EOF
+
+      - name: 🔧 Custom Query Execution
+        if: ${{ github.event.inputs.query_type == 'custom_query' && github.event.inputs.custom_sql != '' }}
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "🔧 Executing Custom Query..."
+          echo "Query: ${{ github.event.inputs.custom_sql }}"
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "${{ github.event.inputs.custom_sql }}"
+
+      - name: 📋 WordPress Configuration Check
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "📋 WordPress Environment Check..."
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" << 'EOF'
+          -- Check WordPress version and plugins
+          SELECT option_name, option_value
+          FROM wp_options
+          WHERE option_name IN (
+            'db_version',
+            'wp_version',
+            'active_plugins'
+          );
+
+          -- Check if WooCommerce is active
+          SELECT option_value
+          FROM wp_options
+          WHERE option_name = 'active_plugins'
+          AND option_value LIKE '%woocommerce%';
+          EOF
+
+      - name: 🎯 Order 5374 Summary Report
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "🎯 FINAL SUMMARY: Order 5374 Analysis"
+          echo "=================================="
+
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" << 'EOF'
+          SELECT
+            '🛒 ORDER BASIC INFO' as section,
+            CONCAT('Order Status: ', post_status) as info
+          FROM wp_posts
+          WHERE ID = 5374 AND post_type = 'shop_order'
+
+          UNION ALL
+
+          SELECT
+            '📊 META FIELDS COUNT' as section,
+            CONCAT('Total Meta Fields: ', COUNT(*)) as info
+          FROM wp_postmeta
+          WHERE post_id = 5374
+
+          UNION ALL
+
+          SELECT
+            '🎨 DESIGN META COUNT' as section,
+            CONCAT('Design-Related Meta: ', COUNT(*)) as info
+          FROM wp_postmeta
+          WHERE post_id = 5374
+          AND (meta_key LIKE '%design%' OR meta_key LIKE '%view%' OR meta_key LIKE '%canvas%')
+
+          UNION ALL
+
+          SELECT
+            '🛍️ ORDER ITEMS COUNT' as section,
+            CONCAT('Order Items: ', COUNT(*)) as info
+          FROM wp_woocommerce_order_items
+          WHERE order_id = 5374;
+          EOF
