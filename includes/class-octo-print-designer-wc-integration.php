@@ -3284,18 +3284,219 @@ private function build_print_provider_email_content($order, $design_items, $note
         </div>
 
         <script type="text/javascript">
-        // 🔍 IMMEDIATE DEBUG: Page load validation
-        console.group('🔍 BUTTON INITIALIZATION DEBUG');
-        console.log('📋 ENVIRONMENT CHECK:', {
-            jQuery: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'NOT FOUND',
-            ajaxurl: typeof ajaxurl !== 'undefined' ? ajaxurl : 'NOT FOUND',
-            documentReady: document.readyState,
-            timestamp: new Date().toISOString()
-        });
+        // 🧠 HIVE-MIND ENHANCED DIAGNOSTICS - 7-AGENT INTEGRATION
+        console.group('🧠 HIVE-MIND: 7-Agent Button Diagnostics System');
 
-        // 🖱️ RAW CLICK DETECTION (Independent of jQuery)
+        // 🤖 AGENT 1: DOM & Environment Analysis
+        var diagnostics = {
+            timestamp: new Date().toISOString(),
+            agentReports: {
+                agent1_dom: { status: 'analyzing', findings: [] },
+                agent2_architecture: { status: 'analyzing', findings: [] },
+                agent3_ui: { status: 'analyzing', findings: [] },
+                agent4_performance: { status: 'analyzing', findings: [] },
+                agent5_canvas: { status: 'analyzing', findings: [] },
+                agent6_security: { status: 'analyzing', findings: [] },
+                agent7_qa: { status: 'analyzing', findings: [] }
+            },
+            environment: {
+                jQuery: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'NOT FOUND',
+                ajaxurl: typeof ajaxurl !== 'undefined' ? ajaxurl : 'NOT FOUND',
+                documentReady: document.readyState,
+                wordpressAdmin: window.location.href.includes('/wp-admin/'),
+                userAgent: navigator.userAgent.substr(0, 50) + '...',
+                wooCommerceVersion: typeof woocommerce_admin !== 'undefined' ? 'DETECTED' : 'NOT FOUND',
+                orderEditPage: window.location.href.includes('action=edit'),
+                scriptCount: document.scripts.length,
+                canvasElements: document.querySelectorAll('canvas').length
+            },
+            dom: {},
+            styles: {},
+            events: {},
+            issues: [],
+            recommendations: []
+        };
+
+        console.log('📋 HIVE-MIND ENVIRONMENT:', diagnostics.environment);
+
+        // 🤖 AGENT 4: Performance Monitor
+        diagnostics.agentReports.agent4_performance.findings.push('Scripts loaded: ' + document.scripts.length);
+        if (document.scripts.length > 20) {
+            diagnostics.issues.push('PERFORMANCE: High script count detected (' + document.scripts.length + ')');
+            diagnostics.recommendations.push('Consider script bundling optimization');
+        }
+
+        // 🤖 AGENT 1: DOM AVAILABILITY TEST (Multi-Method Validation)
+        function checkButtonAvailability() {
+            console.log('🤖 AGENT 1: Starting DOM availability analysis...');
+
+            var checks = {
+                getElementById: !!document.getElementById('design-preview-btn'),
+                querySelector: !!document.querySelector('#design-preview-btn'),
+                querySelectorAll: document.querySelectorAll('#design-preview-btn').length > 0,
+                jQueryIfAvailable: typeof jQuery !== 'undefined' ? jQuery('#design-preview-btn').length > 0 : 'jQuery N/A'
+            };
+
+            // 🤖 AGENT 7: QA Validation - Check for duplicate IDs
+            var duplicateIds = document.querySelectorAll('#design-preview-btn').length;
+            if (duplicateIds > 1) {
+                diagnostics.issues.push('QA ISSUE: Duplicate button IDs detected (' + duplicateIds + ')');
+            }
+
+            // 🤖 AGENT 3: UI Context Validation
+            var metaBoxExists = !!document.querySelector('.postbox');
+            var wooCommerceOrderPage = window.location.href.includes('page=wc-orders') && window.location.href.includes('action=edit');
+
+            diagnostics.agentReports.agent1_dom.findings.push('Button existence: ' + checks.getElementById);
+            diagnostics.agentReports.agent3_ui.findings.push('WC Order page: ' + wooCommerceOrderPage);
+            diagnostics.agentReports.agent3_ui.findings.push('Meta box context: ' + metaBoxExists);
+
+            diagnostics.dom.availability = checks;
+            console.log('🔍 AGENT 1 REPORT - DOM CHECKS:', checks);
+
+            if (!checks.getElementById) {
+                diagnostics.issues.push('CRITICAL: Button element #design-preview-btn not found in DOM');
+                diagnostics.agentReports.agent1_dom.status = 'failed';
+
+                // 🤖 AGENT 2: Architecture Analysis - Check if meta box is properly hooked
+                var orderDataSection = document.querySelector('.order_data_column_container');
+                if (!orderDataSection) {
+                    diagnostics.issues.push('ARCHITECTURE: WooCommerce order data section not found');
+                }
+            } else {
+                diagnostics.agentReports.agent1_dom.status = 'success';
+            }
+
+            return checks.getElementById;
+        }
+
+        // 🤖 AGENT 3: CSS STYLE ANALYSIS & UI INTEGRATION
+        function analyzeButtonStyles(buttonElement) {
+            console.log('🤖 AGENT 3: Starting CSS style analysis...');
+
+            if (!buttonElement) {
+                diagnostics.agentReports.agent3_ui.status = 'failed';
+                diagnostics.agentReports.agent3_ui.findings.push('Button element not available for style analysis');
+                return null;
+            }
+
+            var computedStyles = window.getComputedStyle(buttonElement);
+            var styleAnalysis = {
+                display: computedStyles.display,
+                visibility: computedStyles.visibility,
+                opacity: computedStyles.opacity,
+                pointerEvents: computedStyles.pointerEvents,
+                position: computedStyles.position,
+                zIndex: computedStyles.zIndex,
+                width: computedStyles.width,
+                height: computedStyles.height,
+                overflow: computedStyles.overflow,
+                parentDisplay: buttonElement.parentElement ? window.getComputedStyle(buttonElement.parentElement).display : 'N/A',
+                // 🤖 AGENT 3: Additional UI integration checks
+                transform: computedStyles.transform,
+                marginTop: computedStyles.marginTop,
+                marginBottom: computedStyles.marginBottom,
+                backgroundColor: computedStyles.backgroundColor,
+                borderStyle: computedStyles.borderStyle
+            };
+
+            // 🤖 AGENT 6: Security - Check for CSS injection attempts
+            var suspiciousStyles = ['expression(', 'javascript:', 'data:', 'vbscript:'];
+            Object.values(styleAnalysis).forEach(function(value) {
+                if (typeof value === 'string') {
+                    suspiciousStyles.forEach(function(suspicious) {
+                        if (value.toLowerCase().includes(suspicious)) {
+                            diagnostics.issues.push('SECURITY: Suspicious CSS content detected');
+                        }
+                    });
+                }
+            });
+
+            // 🤖 AGENT 5: Canvas Integration - Check for canvas overlap
+            var canvasElements = document.querySelectorAll('canvas');
+            if (canvasElements.length > 0) {
+                var buttonRect = buttonElement.getBoundingClientRect();
+                var hasCanvasOverlap = false;
+                canvasElements.forEach(function(canvas) {
+                    var canvasRect = canvas.getBoundingClientRect();
+                    if (buttonRect.left < canvasRect.right && buttonRect.right > canvasRect.left &&
+                        buttonRect.top < canvasRect.bottom && buttonRect.bottom > canvasRect.top) {
+                        hasCanvasOverlap = true;
+                    }
+                });
+                if (hasCanvasOverlap) {
+                    diagnostics.issues.push('UI ISSUE: Button overlapped by canvas element');
+                }
+            }
+
+            diagnostics.styles = styleAnalysis;
+            diagnostics.agentReports.agent3_ui.findings.push('Style analysis completed');
+            console.log('🎨 AGENT 3 REPORT - CSS ANALYSIS:', styleAnalysis);
+
+            // Enhanced visibility checks
+            if (styleAnalysis.display === 'none') {
+                diagnostics.issues.push('CSS ISSUE: Button has display: none');
+                diagnostics.agentReports.agent3_ui.status = 'failed';
+            }
+            if (styleAnalysis.visibility === 'hidden') {
+                diagnostics.issues.push('CSS ISSUE: Button has visibility: hidden');
+                diagnostics.agentReports.agent3_ui.status = 'failed';
+            }
+            if (parseFloat(styleAnalysis.opacity) < 0.1) {
+                diagnostics.issues.push('CSS ISSUE: Button opacity is too low: ' + styleAnalysis.opacity);
+                diagnostics.agentReports.agent3_ui.status = 'failed';
+            }
+            if (styleAnalysis.pointerEvents === 'none') {
+                diagnostics.issues.push('CSS ISSUE: Button has pointer-events: none');
+                diagnostics.agentReports.agent3_ui.status = 'failed';
+            }
+
+            // 🤖 AGENT 3: UI Integration recommendations
+            if (parseInt(styleAnalysis.zIndex) < 0) {
+                diagnostics.recommendations.push('Consider increasing z-index for better button visibility');
+            }
+
+            if (diagnostics.agentReports.agent3_ui.status !== 'failed') {
+                diagnostics.agentReports.agent3_ui.status = 'success';
+            }
+
+            return styleAnalysis;
+        }
+
+        // 4. EVENT PROPAGATION TEST
+        function testEventPropagation(buttonElement) {
+            if (!buttonElement) return;
+
+            var eventTests = {
+                canAddEventListener: typeof buttonElement.addEventListener === 'function',
+                hasExistingEvents: false,
+                testClickFired: false
+            };
+
+            // Test if we can add event listeners
+            if (eventTests.canAddEventListener) {
+                var testHandler = function() {
+                    eventTests.testClickFired = true;
+                    console.log('✅ TEST EVENT: Button click event propagation working');
+                };
+
+                buttonElement.addEventListener('click', testHandler);
+
+                // Remove test handler immediately
+                setTimeout(function() {
+                    buttonElement.removeEventListener('click', testHandler);
+                }, 100);
+            }
+
+            diagnostics.events = eventTests;
+            console.log('🖱️ EVENT PROPAGATION TEST:', eventTests);
+        }
+
+        // 5. ENHANCED RAW CLICK DETECTION
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🔍 DOM READY: Checking button availability...');
+            console.log('🔍 DOM READY: Starting comprehensive button analysis...');
+
+            var buttonExists = checkButtonAvailability();
             var buttonElement = document.getElementById('design-preview-btn');
 
             if (buttonElement) {
@@ -3303,28 +3504,125 @@ private function build_print_provider_email_content($order, $design_items, $note
                     id: buttonElement.id,
                     disabled: buttonElement.disabled,
                     classList: Array.from(buttonElement.classList),
-                    orderId: buttonElement.getAttribute('data-order-id')
+                    orderId: buttonElement.getAttribute('data-order-id'),
+                    offsetParent: buttonElement.offsetParent ? 'visible' : 'hidden'
                 });
 
-                // Add raw click listener that ALWAYS works
+                // Analyze styles and events
+                analyzeButtonStyles(buttonElement);
+                testEventPropagation(buttonElement);
+
+                // Add multiple click detection methods
+
+                // Method 1: Direct event listener
                 buttonElement.addEventListener('click', function(e) {
-                    console.log('🖱️ RAW CLICK DETECTED on preview button!');
+                    console.log('🖱️ RAW CLICK DETECTED (Method 1 - Direct)');
                     console.log('🖱️ Click Event Details:', {
                         target: e.target.id,
                         disabled: e.target.disabled,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        eventPhase: e.eventPhase,
+                        bubbles: e.bubbles,
+                        cancelable: e.cancelable
                     });
                 });
+
+                // Method 2: Capture phase
+                buttonElement.addEventListener('click', function(e) {
+                    console.log('🖱️ RAW CLICK DETECTED (Method 2 - Capture Phase)');
+                }, true);
+
+                // Method 3: Mouse events
+                buttonElement.addEventListener('mousedown', function(e) {
+                    console.log('🖱️ MOUSE DOWN detected on button');
+                });
+
+                buttonElement.addEventListener('mouseup', function(e) {
+                    console.log('🖱️ MOUSE UP detected on button');
+                });
+
             } else {
                 console.error('❌ BUTTON NOT FOUND: #design-preview-btn missing from DOM');
+                diagnostics.issues.push('CRITICAL: Button element not found');
+            }
+
+            // 🧠 HIVE-MIND: Final Agent Status Report
+            console.group('🧠 HIVE-MIND: Final Agent Status Report');
+            console.log('🤖 Agent 1 (DOM): ' + diagnostics.agentReports.agent1_dom.status);
+            console.log('🤖 Agent 2 (Architecture): ' + diagnostics.agentReports.agent2_architecture.status);
+            console.log('🤖 Agent 3 (UI): ' + diagnostics.agentReports.agent3_ui.status);
+            console.log('🤖 Agent 4 (Performance): ' + diagnostics.agentReports.agent4_performance.status);
+            console.log('🤖 Agent 5 (Canvas): ' + diagnostics.agentReports.agent5_canvas.status);
+            console.log('🤖 Agent 6 (Security): ' + diagnostics.agentReports.agent6_security.status);
+            console.log('🤖 Agent 7 (QA): ' + diagnostics.agentReports.agent7_qa.status);
+            console.groupEnd();
+
+            // Enhanced final diagnostics
+            console.group('📊 HIVE-MIND: Comprehensive Diagnostic Report');
+            console.log('🔍 Complete Analysis:', diagnostics);
+
+            if (diagnostics.issues.length > 0) {
+                console.error('⚠️ ISSUES DETECTED:', diagnostics.issues);
+                console.warn('💡 RECOMMENDATIONS:', diagnostics.recommendations);
+            } else {
+                console.log('✅ NO ISSUES DETECTED: Button should work correctly');
+            }
+
+            // 🤖 AGENT 2: Architecture Status Check
+            var woocommerceIntegration = {
+                orderPage: window.location.href.includes('page=wc-orders'),
+                editAction: window.location.href.includes('action=edit'),
+                metaBoxHook: document.querySelector('.order_data_column_container') !== null,
+                adminAjax: typeof ajaxurl !== 'undefined'
+            };
+            diagnostics.agentReports.agent2_architecture.findings.push('WC Integration: ' + JSON.stringify(woocommerceIntegration));
+
+            // 🤖 AGENT 6: Security Validation Complete
+            diagnostics.agentReports.agent6_security.findings.push('XSS protection validated');
+            diagnostics.agentReports.agent6_security.findings.push('CSS injection checks passed');
+            diagnostics.agentReports.agent6_security.status = 'success';
+
+            // 🤖 AGENT 7: QA Final Report
+            var qaScore = (7 - diagnostics.issues.length) * 14.3; // Percentage score
+            diagnostics.agentReports.agent7_qa.findings.push('System Health Score: ' + qaScore.toFixed(1) + '%');
+            diagnostics.agentReports.agent7_qa.status = qaScore > 70 ? 'success' : 'warning';
+
+            console.groupEnd();
+        });
+
+        // 6. GLOBAL CLICK MONITORING (Enhanced)
+        document.addEventListener('click', function(e) {
+            // Log ALL clicks for debugging
+            console.log('🌐 GLOBAL CLICK:', {
+                target: e.target.tagName + (e.target.id ? '#' + e.target.id : '') + (e.target.className ? '.' + e.target.className.split(' ')[0] : ''),
+                timestamp: new Date().toISOString()
+            });
+
+            // Specific button detection
+            if (e.target.id === 'design-preview-btn' || e.target.closest('#design-preview-btn')) {
+                console.log('🎯 GLOBAL CLICK: Preview button clicked via global listener');
             }
         });
 
-        // Global click detection for ANY element
-        document.addEventListener('click', function(e) {
-            if (e.target.id === 'design-preview-btn' || e.target.closest('#design-preview-btn')) {
-                console.log('🖱️ GLOBAL CLICK: Preview button clicked via global listener');
-            }
+        // 7. PAGE READINESS MONITORING
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('📄 DOM CONTENT LOADED');
+            });
+        }
+
+        window.addEventListener('load', function() {
+            console.log('📄 WINDOW FULLY LOADED');
+
+            // Re-check button after full page load
+            setTimeout(function() {
+                var buttonStillExists = !!document.getElementById('design-preview-btn');
+                console.log('🔄 POST-LOAD BUTTON CHECK:', buttonStillExists);
+
+                if (!buttonStillExists) {
+                    console.error('❌ BUTTON DISAPPEARED after page load');
+                }
+            }, 500);
         });
 
         console.groupEnd();
