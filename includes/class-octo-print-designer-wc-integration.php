@@ -3122,9 +3122,55 @@ private function build_print_provider_email_content($order, $design_items, $note
             return; // No design items, no preview needed
         }
 
-        // Check if stored design data exists
+        // Check if stored design data exists (check both _design_data and _db_processed_views)
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $db_processed_views = null;
+
+        // If no _design_data, check for _db_processed_views
+        if (empty($stored_design_data)) {
+            foreach ($order->get_items() as $item) {
+                $processed_views_meta = $item->get_meta('_db_processed_views');
+                if (!empty($processed_views_meta)) {
+                    $db_processed_views = $processed_views_meta;
+                    break;
+                }
+            }
+        }
+
+        // 🐛 DEBUG: Output data analysis to browser console
+        $debug_data = [
+            'order_id' => $order_id,
+            'has_design_items' => $has_design_items,
+            'stored_design_data_exists' => !empty($stored_design_data),
+            'stored_design_data_size' => $stored_design_data ? strlen($stored_design_data) : 0,
+            'db_processed_views_exists' => !empty($db_processed_views),
+            'db_processed_views_size' => $db_processed_views ? strlen($db_processed_views) : 0,
+            'data_source' => $stored_design_data ? 'canvas_data' : ($db_processed_views ? 'print_db' : 'none'),
+            'timestamp' => current_time('mysql')
+        ];
+
+        // Analyze order items for debug info
+        $items_debug = [];
+        foreach ($order->get_items() as $item_id => $item) {
+            $items_debug[] = [
+                'item_id' => $item_id,
+                'product_name' => $item->get_name(),
+                'has_design_id' => !empty($this->get_design_meta($item, 'design_id')),
+                'has_template_id' => !empty($item->get_meta('_yprint_template_id')),
+                'has_db_processed_views' => !empty($item->get_meta('_db_processed_views')),
+                'db_views_size' => strlen($item->get_meta('_db_processed_views') ?: '')
+            ];
+        }
+        $debug_data['order_items'] = $items_debug;
         ?>
+
+        <script type="text/javascript">
+            // 🐛 PHP → JavaScript Debug Bridge
+            console.group('🐛 PHP DEBUG: WooCommerce Order Data Analysis');
+            console.log('📊 ORDER ANALYSIS:', <?php echo wp_json_encode($debug_data, JSON_PRETTY_PRINT); ?>);
+            console.groupEnd();
+        </script>
+
         <div id="design-preview-section">
             <div class="design-preview-header">
                 <h3>
@@ -3137,10 +3183,14 @@ private function build_print_provider_email_content($order, $design_items, $note
                 <div style="margin-bottom: 16px;">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                         <strong style="font-size: 13px; color: #1d2327;">Status:</strong>
-                        <?php if ($stored_design_data): ?>
+                        <?php if ($stored_design_data || $db_processed_views): ?>
                             <span class="design-status-indicator status-available">
                                 <span class="dashicons dashicons-yes-alt" style="font-size: 14px;"></span>
-                                Design data available
+                                <?php if ($stored_design_data): ?>
+                                    Design data available (Canvas)
+                                <?php else: ?>
+                                    Design data available (Print DB)
+                                <?php endif; ?>
                             </span>
                         <?php else: ?>
                             <span class="design-status-indicator status-unavailable">
@@ -3153,6 +3203,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                     <p style="margin: 0; font-size: 12px; color: #646970; line-height: 1.4;">
                         <?php if ($stored_design_data): ?>
                             Design data is available for interactive canvas preview with full editing capabilities.
+                        <?php elseif ($db_processed_views): ?>
+                            Design data found in print database. Canvas preview will be reconstructed from stored print data.
                         <?php else: ?>
                             No design canvas data found. Preview may not be available for orders placed before the preview system was implemented.
                         <?php endif; ?>
@@ -3165,21 +3217,25 @@ private function build_print_provider_email_content($order, $design_items, $note
                         id="design-preview-btn"
                         class="button button-primary design-preview-btn"
                         data-order-id="<?php echo esc_attr($order_id); ?>"
-                        <?php echo $stored_design_data ? '' : 'disabled'; ?>
-                        aria-label="<?php echo $stored_design_data ? 'Open design preview modal' : 'Design preview not available'; ?>">
+                        <?php echo ($stored_design_data || $db_processed_views) ? '' : 'disabled'; ?>
+                        aria-label="<?php echo ($stored_design_data || $db_processed_views) ? 'Open design preview modal' : 'Design preview not available'; ?>">
                         <span class="dashicons dashicons-visibility" style="font-size: 16px; margin-right: -2px;"></span>
                         View Design Preview
                     </button>
 
-                    <?php if ($stored_design_data): ?>
+                    <?php if ($stored_design_data || $db_processed_views): ?>
                         <span style="font-size: 11px; color: #646970; display: flex; align-items: center; gap: 4px;">
                             <span class="dashicons dashicons-info" style="font-size: 14px;"></span>
-                            Interactive preview with zoom and export options
+                            <?php if ($stored_design_data): ?>
+                                Interactive preview with zoom and export options
+                            <?php else: ?>
+                                Preview reconstructed from print database
+                            <?php endif; ?>
                         </span>
                     <?php endif; ?>
                 </div>
 
-                <?php if (!$stored_design_data): ?>
+                <?php if (!$stored_design_data && !$db_processed_views): ?>
                     <div style="margin-top: 16px; padding: 12px; background: #fff3cd; border-left: 4px solid #dba617; border-radius: 0 4px 4px 0;">
                         <div style="display: flex; align-items: flex-start; gap: 8px;">
                             <span class="dashicons dashicons-lightbulb" style="color: #b58900; margin-top: 2px;"></span>
@@ -3234,9 +3290,22 @@ private function build_print_provider_email_content($order, $design_items, $note
                 var button = $(this);
                 var orderId = button.data('order-id');
 
+                // 🐛 DEBUG: Console logging for preview button click
+                console.group('🎨 DESIGN PREVIEW DEBUG - Order #' + orderId);
+                console.log('🔍 Button Status:', {
+                    disabled: button.prop('disabled'),
+                    orderId: orderId,
+                    buttonElement: button[0],
+                    timestamp: new Date().toISOString()
+                });
+
                 if (button.prop('disabled')) {
+                    console.warn('❌ ABORT: Button is disabled');
+                    console.groupEnd();
                     return;
                 }
+
+                console.log('✅ STARTING: Preview modal initialization');
 
                 // Show modal
                 $('#design-preview-modal').show();
@@ -3244,14 +3313,23 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
 
                 // 🧠 AGENT FIX: AjaxCorsResolver - Enhanced AJAX with CORS support
+                var ajaxData = {
+                    action: 'octo_load_design_preview',
+                    order_id: orderId,
+                    nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                };
+
+                console.log('📡 AJAX REQUEST:', {
+                    url: ajaxurl,
+                    data: ajaxData,
+                    method: 'POST',
+                    timestamp: new Date().toISOString()
+                });
+
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
-                    data: {
-                        action: 'octo_load_design_preview',
-                        order_id: orderId,
-                        nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
-                    },
+                    data: ajaxData,
                     // CORS optimization
                     crossDomain: false,
                     xhrFields: {
@@ -3261,15 +3339,51 @@ private function build_print_provider_email_content($order, $design_items, $note
                         'X-Requested-With': 'XMLHttpRequest',
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
                     },
+                    beforeSend: function(xhr) {
+                        console.log('🚀 AJAX SEND: Request initiated', {
+                            readyState: xhr.readyState,
+                            status: xhr.status,
+                            url: ajaxurl
+                        });
+                    },
                     success: function(response) {
+                        console.log('✅ AJAX SUCCESS: Response received', {
+                            success: response.success,
+                            dataKeys: Object.keys(response.data || {}),
+                            responseSize: JSON.stringify(response).length,
+                            timestamp: new Date().toISOString()
+                        });
+
                         if (response.success) {
+                            console.log('🎉 SUCCESS: Design preview data loaded', {
+                                hasHtml: !!response.data.html,
+                                hasDesignData: !!response.data.design_data,
+                                hasTemplateData: !!response.data.template_data,
+                                htmlLength: response.data.html ? response.data.html.length : 0
+                            });
+
                             $('#design-preview-content').html(response.data.html);
 
                             // Initialize canvas if design data is available
                             if (response.data.design_data) {
+                                console.log('🎨 CANVAS INIT: Starting canvas initialization', {
+                                    designDataType: typeof response.data.design_data,
+                                    hasObjects: !!(response.data.design_data.objects),
+                                    objectCount: response.data.design_data.objects ? response.data.design_data.objects.length : 0,
+                                    canvasSize: response.data.design_data.canvas || 'unknown'
+                                });
                                 initializeDesignCanvas(response.data.design_data, response.data.template_data);
+                            } else {
+                                console.warn('⚠️ NO CANVAS DATA: Design data not available for canvas initialization');
                             }
                         } else {
+                            console.error('❌ AJAX ERROR: Request failed', {
+                                success: response.success,
+                                message: response.data && response.data.message ? response.data.message : 'Unknown error',
+                                fullResponse: response,
+                                timestamp: new Date().toISOString()
+                            });
+
                             $('#design-preview-content').html(`
                                 <div class="design-error">
                                     <h3>
@@ -3284,8 +3398,19 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 </div>
                             `);
                         }
+
+                        console.groupEnd(); // End debug group
                     },
                     error: function(xhr, status, error) {
+                        console.error('🚨 AJAX NETWORK ERROR: Request failed', {
+                            status: status,
+                            error: error,
+                            readyState: xhr.readyState,
+                            responseText: xhr.responseText,
+                            statusCode: xhr.status,
+                            statusText: xhr.statusText,
+                            timestamp: new Date().toISOString()
+                        });
                         $('#design-preview-content').html(`
                             <div class="design-error">
                                 <h3>
@@ -3309,6 +3434,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 </details>
                             </div>
                         `);
+
+                        console.groupEnd(); // End debug group
                     }
                 });
             });
@@ -3585,6 +3712,10 @@ private function build_print_provider_email_content($order, $design_items, $note
      * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load design preview data
      */
     public function ajax_load_design_preview() {
+        // 🐛 DEBUG: Start AJAX debug logging
+        $debug_start_time = microtime(true);
+        error_log("🎨 [AJAX DEBUG] Design preview request started");
+
         // 🧠 AGENT FIX: AjaxCorsResolver - CORS headers for admin-ajax.php
         header('Access-Control-Allow-Origin: ' . get_site_url());
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
@@ -3617,9 +3748,35 @@ private function build_print_provider_email_content($order, $design_items, $note
             wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
         }
 
+        // 🐛 DEBUG: Order validation and initial data check
+        error_log("✅ [AJAX DEBUG] Order #{$order_id} found successfully");
+
         // Get stored design data
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
         $design_data = null;
+
+        // 🐛 DEBUG: Analyze available data sources
+        $debug_sources = [
+            'order_id' => $order_id,
+            'stored_design_data_exists' => !empty($stored_design_data),
+            'stored_design_data_size' => $stored_design_data ? strlen($stored_design_data) : 0
+        ];
+
+        // Check for _db_processed_views in all order items
+        $db_processed_views_found = [];
+        foreach ($order->get_items() as $item_id => $item) {
+            $processed_views = $item->get_meta('_db_processed_views');
+            if (!empty($processed_views)) {
+                $db_processed_views_found[$item_id] = [
+                    'item_name' => $item->get_name(),
+                    'data_size' => strlen($processed_views),
+                    'data_preview' => substr($processed_views, 0, 100) . '...'
+                ];
+            }
+        }
+        $debug_sources['db_processed_views_items'] = $db_processed_views_found;
+
+        error_log("🔍 [AJAX DEBUG] Data sources analysis: " . wp_json_encode($debug_sources));
 
         if ($stored_design_data) {
             // 🧠 DATABASE OPTIMIZER: Efficient JSON processing with caching
@@ -3642,6 +3799,19 @@ private function build_print_provider_email_content($order, $design_items, $note
 
             $processing_time = (microtime(true) - $processing_start) * 1000;
             error_log(sprintf("📊 [DB OPTIMIZER] JSON processing: %.2fms", $processing_time));
+        } else {
+            // 🔄 FALLBACK: Try to extract from _db_processed_views
+            foreach ($order->get_items() as $item) {
+                $processed_views_meta = $item->get_meta('_db_processed_views');
+                if (!empty($processed_views_meta)) {
+                    error_log("🔄 [DATA CONVERTER] Converting _db_processed_views to canvas format");
+                    $design_data = $this->convert_processed_views_to_canvas_data($processed_views_meta, $order_id, $item);
+                    if ($design_data) {
+                        error_log("✅ [DATA CONVERTER] Successfully converted print data to canvas format");
+                        break;
+                    }
+                }
+            }
         }
 
         // Build preview HTML with professional design controls
@@ -3857,6 +4027,37 @@ private function build_print_provider_email_content($order, $design_items, $note
             $html .= $this->generateAgent3CanvasScript($design_data, $order_id);
         }
 
+        // 🐛 DEBUG: Calculate processing time and prepare comprehensive debug data
+        $total_processing_time = (microtime(true) - $debug_start_time) * 1000;
+
+        $final_debug_data = [
+            'processing_time_ms' => round($total_processing_time, 2),
+            'data_source_used' => $stored_design_data ? 'canvas_data' : ($design_data ? 'converted_db_views' : 'none'),
+            'design_data_available' => !empty($design_data),
+            'design_objects_count' => $design_data && isset($design_data['objects']) ? count($design_data['objects']) : 0,
+            'canvas_dimensions' => $design_data && isset($design_data['canvas']) ? $design_data['canvas'] : null,
+            'agent3_integration' => !empty($design_data),
+            'html_size_bytes' => strlen($html),
+            'conversion_applied' => !$stored_design_data && !empty($design_data),
+            'db_processed_views_found' => !empty($db_processed_views_found),
+            'order_items_checked' => count($order->get_items()),
+            'timestamp' => current_time('mysql')
+        ];
+
+        error_log("🎉 [AJAX DEBUG] Preview generation completed: " . wp_json_encode($final_debug_data));
+
+        // Add debug data as JavaScript console output
+        $debug_script = "
+        <script type='text/javascript'>
+            console.group('🐛 AJAX RESPONSE DEBUG - Order #{$order_id}');
+            console.log('⏱️ PERFORMANCE:', " . wp_json_encode($final_debug_data, JSON_PRETTY_PRINT) . ");
+            console.log('💾 DATA SOURCE:', '" . ($stored_design_data ? 'Canvas Data (_design_data)' : ($design_data ? 'Print DB (_db_processed_views)' : 'No Data Found')) . "');
+            console.log('🎨 DESIGN DATA:', " . ($design_data ? wp_json_encode($design_data, JSON_PRETTY_PRINT) : 'null') . ");
+            console.groupEnd();
+        </script>";
+
+        $html .= $debug_script;
+
         wp_send_json_success(array(
             'html' => $html,
             'design_data' => $design_data,
@@ -3867,6 +4068,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'number' => $order->get_order_number(),
                 'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
             ),
+            'debug' => $final_debug_data, // Include debug data in response
             'message' => __('Design preview loaded successfully', 'octo-print-designer')
         ));
     }
@@ -4073,5 +4275,96 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'images' => $images
             ]
         ];
+    }
+
+    /**
+     * 🔄 DATA CONVERTER: Convert _db_processed_views to canvas-compatible format
+     * This function bridges the gap between print database format and canvas preview
+     */
+    private function convert_processed_views_to_canvas_data($processed_views_meta, $order_id, $item) {
+        error_log("🔄 [DATA CONVERTER] Starting conversion for order {$order_id}");
+
+        // Parse the processed views data
+        if (is_string($processed_views_meta)) {
+            $processed_views = json_decode($processed_views_meta, true);
+        } else {
+            $processed_views = $processed_views_meta;
+        }
+
+        if (!is_array($processed_views) || empty($processed_views)) {
+            error_log("❌ [DATA CONVERTER] Invalid processed views data");
+            return null;
+        }
+
+        // Extract first view (usually the main design view)
+        $first_view = reset($processed_views);
+        if (!isset($first_view['images']) || !is_array($first_view['images'])) {
+            error_log("❌ [DATA CONVERTER] No images found in processed views");
+            return null;
+        }
+
+        // Build canvas-compatible format
+        $canvas_objects = [];
+        $object_counter = 0;
+
+        foreach ($first_view['images'] as $image_data) {
+            if (!isset($image_data['url']) || !isset($image_data['transform'])) {
+                continue;
+            }
+
+            $transform = $image_data['transform'];
+            $canvas_objects[] = [
+                'type' => 'image',
+                'version' => '5.3.0',
+                'originX' => 'left',
+                'originY' => 'top',
+                'left' => floatval($transform['left'] ?? 0),
+                'top' => floatval($transform['top'] ?? 0),
+                'width' => intval($transform['width'] ?? 100),
+                'height' => intval($transform['height'] ?? 100),
+                'scaleX' => floatval($transform['scaleX'] ?? 1),
+                'scaleY' => floatval($transform['scaleY'] ?? 1),
+                'angle' => floatval($transform['angle'] ?? 0),
+                'src' => $image_data['url'],
+                'visible' => $image_data['visible'] ?? true,
+                'crossOrigin' => 'anonymous',
+                // Add unique ID for canvas rendering
+                'id' => $image_data['id'] ?? 'img_' . time() . '_' . $object_counter++
+            ];
+        }
+
+        if (empty($canvas_objects)) {
+            error_log("❌ [DATA CONVERTER] No valid canvas objects created");
+            return null;
+        }
+
+        // Get template dimensions (fallback to standard dimensions)
+        $template_id = $item->get_meta('_yprint_template_id');
+        $canvas_width = 780;  // Standard canvas width
+        $canvas_height = 580; // Standard canvas height
+
+        // Create Fabric.js compatible canvas data
+        $canvas_data = [
+            'version' => '5.3.0',
+            'objects' => $canvas_objects,
+            'background' => '#ffffff',
+            'canvas' => [
+                'width' => $canvas_width,
+                'height' => $canvas_height,
+                'zoom' => 1
+            ],
+            // Add metadata to indicate this was converted from print DB
+            'metadata' => [
+                'source' => 'db_processed_views',
+                'converted_at' => current_time('mysql'),
+                'order_id' => $order_id,
+                'template_id' => $template_id,
+                'original_view_name' => $first_view['view_name'] ?? 'Design View'
+            ]
+        ];
+
+        error_log("✅ [DATA CONVERTER] Successfully created canvas data with " . count($canvas_objects) . " objects");
+
+        return $canvas_data;
     }
 }
