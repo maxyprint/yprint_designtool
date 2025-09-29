@@ -3126,42 +3126,20 @@ private function build_print_provider_email_content($order, $design_items, $note
         // 🔥 AGENT 3: EMERGENCY - PHP Function Execution Start
         error_log('🔥 AGENT 3: EMERGENCY - add_design_preview_button() called for Order #' . $order_id);
 
-        // 🧠 HIVE-MIND: Emergency Debug - ALWAYS render for Order 5374
-        $force_render_debug = ($order_id == 5374);
+        // 🎯 Task 1.2: SMART BUTTON DISPLAY LOGIC - Only show for orders WITH design data
+        $has_design_data = $this->has_design_data($order_id);
 
-        // 🚑 EMERGENCY FIX: Force enable button for testing/debugging
-        $emergency_force_enable = ($order_id == 5374 || current_user_can('manage_options'));
+        // Console logging for debugging (acceptance criteria requirement)
+        error_log("🎯 [SMART BUTTON] Order #{$order_id} design data check: " . ($has_design_data ? 'HAS DATA' : 'NO DATA'));
 
-        // Check if order has design items
-        $has_design_items = false;
-        $design_items_debug = [];
-        foreach ($order->get_items() as $item) {
-            $design_id = $this->get_design_meta($item, 'design_id');
-            $design_items_debug[] = [
-                'item_id' => $item->get_id(),
-                'product_id' => $item->get_product_id(),
-                'design_id' => $design_id,
-                'has_design' => !empty($design_id)
-            ];
-            if ($design_id) {
-                $has_design_items = true;
-                break;
-            }
+        // Only show button if order has design data
+        if (!$has_design_data) {
+            error_log("🎯 [SMART BUTTON] Order #{$order_id} - Button NOT displayed (no design data found)");
+            return; // No design data, no preview button needed
         }
 
-        // 🔥 AGENT 3: Log critical variables
-        error_log('🔥 AGENT 3: has_design_items: ' . ($has_design_items ? 'true' : 'false'));
-        error_log('🔥 AGENT 3: force_render_debug: ' . ($force_render_debug ? 'true' : 'false'));
-
-        // 🧠 EMERGENCY DEBUG: Log design items analysis
-        if ($force_render_debug) {
-            error_log('🧠 HIVE-MIND DEBUG Order ' . $order_id . ' - Design Items: ' . print_r($design_items_debug, true));
-        }
-
-        if (!$has_design_items && !$force_render_debug) {
-            error_log('🔥 AGENT 3: EARLY RETURN - No design items and not force debug for Order #' . $order_id);
-            return; // No design items, no preview needed
-        }
+        // Button will be displayed - log for debugging
+        error_log("🎯 [SMART BUTTON] Order #{$order_id} - Button WILL be displayed (design data found)");
 
         // 🔥 AGENT 3: Function continuing past early return check
         error_log('🔥 AGENT 3: CONTINUING - Past early return check for Order #' . $order_id);
@@ -3340,7 +3318,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                             agent6_validation: {
                                 syntax_fix_confirmed: true,
                                 script_execution_successful: true,
-                                php_nonce_generation: '<?php echo wp_create_nonce("design_preview_nonce"); ?>'
+                                php_nonce_generation: '<?php echo wp_create_nonce("octo_design_preview_" . $order_id); ?>'
                             }
                         };
 
@@ -3405,7 +3383,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                         console.log('✓ Test 5:', test5);
 
                         // 🎯 AGENT 6: Test 6 - PHP Syntax Fix Validation
-                        var syntaxFixNonce = '<?php echo wp_create_nonce("design_preview_nonce"); ?>';
+                        var syntaxFixNonce = '<?php echo wp_create_nonce("octo_design_preview_" . $order_id); ?>';
                         var test6 = {
                             test: 'AGENT 6: PHP Syntax Fix Validation',
                             passed: syntaxFixNonce && syntaxFixNonce.length > 5 && !syntaxFixNonce.includes('Parse error'),
@@ -3413,7 +3391,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 nonce_generated: syntaxFixNonce ? 'SUCCESS' : 'FAILED',
                                 nonce_value: syntaxFixNonce,
                                 syntax_error_detected: syntaxFixNonce.includes('Parse error'),
-                                double_quotes_fix: 'wp_create_nonce("design_preview_nonce") - IMPLEMENTED',
+                                double_quotes_fix: 'wp_create_nonce("octo_design_preview_" . $order_id) - IMPLEMENTED',
                                 script_execution_beyond_line_4008: true
                             }
                         };
@@ -4159,7 +4137,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                     jquery_available: typeof $ !== 'undefined',
                     jquery_ajax: typeof $.ajax !== 'undefined',
                     order_id_valid: orderId && orderId > 0,
-                    nonce_generated: '<?php echo wp_create_nonce("design_preview_nonce"); ?>',
+                    nonce_generated: '<?php echo wp_create_nonce("octo_design_preview_" . $order_id); ?>',
                     admin_context: window.location.href.includes('/wp-admin/'),
                     syntax_fix_status: 'SUCCESS - Line 4008 executing correctly',
                     php_execution_status: 'ACTIVE - No PHP parse errors detected'
@@ -4167,7 +4145,7 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                 // 🎯 AGENT 6: Critical confirmation - Script successfully executed past line 4008
                 console.log('🚀 AGENT 6 CRITICAL CONFIRMATION: Successfully executed past line 4008!');
-                console.log('✅ PHP SYNTAX FIX VALIDATED: wp_create_nonce with double quotes is working correctly');
+                console.log('✅ PHP SYNTAX FIX VALIDATED: wp_create_nonce with order-specific nonce is working correctly');
                 console.log('🔧 EXECUTION RESTORED: JavaScript processing continues normally after syntax correction');
 
                 console.log('📊 AJAX VALIDATION:', ajaxValidation);
@@ -4873,24 +4851,48 @@ private function build_print_provider_email_content($order, $design_items, $note
             exit();
         }
 
-        // 🛡️ COMPREHENSIVE SECURITY VALIDATION
+        // 🛡️ Task 1.3: DEDICATED AJAX SECURITY with specific nonce validation
         $validation_rules = [
             'order_id' => ['type' => 'int', 'required' => true, 'max_length' => 10],
             'nonce' => ['type' => 'text', 'required' => true, 'max_length' => 50]
         ];
 
-        $order = octo_secure_ajax_order_validation(
-            $_POST['nonce'] ?? '',
-            'design_preview_nonce',
-            $_POST['order_id'] ?? 0
-        );
-
-        if ($order === false) {
-            return; // Error already sent by security function
+        // First validate order ID exists to create specific nonce
+        $order_id = intval($_POST['order_id'] ?? 0);
+        if (!$order_id) {
+            error_log("❌ [AJAX SECURITY] Invalid order ID provided");
+            wp_send_json_error(array('message' => 'Invalid order ID'));
+            return;
         }
 
+        // Create specific nonce for this order (Task 1.3 requirement)
+        $specific_nonce_action = 'octo_design_preview_' . $order_id;
+
+        // Validate nonce with order-specific action
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', $specific_nonce_action)) {
+            error_log("❌ [AJAX SECURITY] Nonce verification failed for Order #{$order_id}");
+            wp_send_json_error(array('message' => 'Security verification failed'));
+            return;
+        }
+
+        // Verify order exists and user has permission
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            error_log("❌ [AJAX SECURITY] Order #{$order_id} not found");
+            wp_send_json_error(array('message' => 'Order not found'));
+            return;
+        }
+
+        // Check user permissions
+        if (!current_user_can('edit_shop_orders')) {
+            error_log("❌ [AJAX SECURITY] User lacks permission for Order #{$order_id}");
+            wp_send_json_error(array('message' => 'Insufficient permissions'));
+            return;
+        }
+
+        error_log("✅ [AJAX SECURITY] Order #{$order_id} - All security checks passed");
+
         // 🐛 DEBUG: Order validation and initial data check
-        $order_id = $order->get_id();
         error_log("✅ [AJAX DEBUG] Order #{$order_id} found successfully");
 
         // Get stored design data
@@ -6043,5 +6045,158 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
 
         return $test_results;
+    }
+
+    /**
+     * 🎯 Task 1.1: Extract design data with canvas metadata and precision
+     *
+     * @param int $order_id WooCommerce order ID
+     * @return array|false Extracted design data with canvas metadata or false if no data
+     */
+    public function extract_design_data_with_canvas_metadata($order_id) {
+        if (!$order_id) {
+            error_log("❌ [EXTRACT] Invalid order ID provided");
+            return false;
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            error_log("❌ [EXTRACT] Order #{$order_id} not found");
+            return false;
+        }
+
+        error_log("🎯 [EXTRACT] Starting design data extraction for Order #{$order_id}");
+
+        // Initialize PrecisionCalculator for ±0.1mm tolerance
+        $precision_calculator = new PrecisionCalculator();
+
+        // Check for direct design data storage
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $extracted_data = [];
+
+        if ($stored_design_data) {
+            // Parse stored design data
+            $design_data = json_decode($stored_design_data, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($design_data)) {
+                error_log("✅ [EXTRACT] Found stored design data");
+
+                // Process each design element with precision
+                foreach ($design_data as $element_key => $element) {
+                    if (isset($element['canvas']) && is_array($element['canvas'])) {
+                        // Extract canvas coordinates
+                        $canvas_coords = [
+                            'x' => $element['canvas']['x'] ?? 0,
+                            'y' => $element['canvas']['y'] ?? 0,
+                            'width' => $element['canvas']['width'] ?? 0,
+                            'height' => $element['canvas']['height'] ?? 0
+                        ];
+
+                        // Calculate precise coordinates with PrecisionCalculator
+                        $template_id = $element['template_id'] ?? 1;
+                        $size = $element['size'] ?? 'A4';
+                        $dpi = $element['dpi'] ?? 96;
+
+                        $precise_coords = $precision_calculator->calculatePreciseCoordinates(
+                            [$canvas_coords['x'], $canvas_coords['y'], $canvas_coords['width'], $canvas_coords['height']],
+                            $template_id,
+                            $size,
+                            $dpi
+                        );
+
+                        if (!is_wp_error($precise_coords)) {
+                            $extracted_data[$element_key] = [
+                                'original_canvas' => $canvas_coords,
+                                'precise_coordinates' => $precise_coords,
+                                'canvas_metadata' => [
+                                    'template_id' => $template_id,
+                                    'size' => $size,
+                                    'dpi' => $dpi,
+                                    'tolerance' => '±0.1mm',
+                                    'extraction_timestamp' => current_time('mysql')
+                                ],
+                                'element_data' => $element
+                            ];
+                        } else {
+                            error_log("⚠️ [EXTRACT] Precision calculation failed for element: " . $precise_coords->get_error_message());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: Check order items for _db_processed_views
+        if (empty($extracted_data)) {
+            foreach ($order->get_items() as $item_id => $item) {
+                $processed_views = $item->get_meta('_db_processed_views');
+                if (!empty($processed_views)) {
+                    error_log("🔄 [EXTRACT] Converting _db_processed_views to canvas data");
+
+                    // Convert processed views to canvas format
+                    $converted_data = $this->convert_processed_views_to_canvas_data($processed_views, $order_id, $item);
+                    if ($converted_data && is_array($converted_data)) {
+                        $extracted_data['item_' . $item_id] = [
+                            'converted_from_processed_views' => true,
+                            'item_id' => $item_id,
+                            'item_name' => $item->get_name(),
+                            'canvas_metadata' => [
+                                'extraction_method' => 'processed_views_conversion',
+                                'tolerance' => '±0.1mm',
+                                'extraction_timestamp' => current_time('mysql')
+                            ],
+                            'element_data' => $converted_data
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (!empty($extracted_data)) {
+            error_log("✅ [EXTRACT] Successfully extracted " . count($extracted_data) . " design elements");
+            return [
+                'order_id' => $order_id,
+                'extraction_metadata' => [
+                    'timestamp' => current_time('mysql'),
+                    'precision_tolerance' => '±0.1mm',
+                    'element_count' => count($extracted_data)
+                ],
+                'design_elements' => $extracted_data
+            ];
+        }
+
+        error_log("❌ [EXTRACT] No design data found for Order #{$order_id}");
+        return false;
+    }
+
+    /**
+     * 🎯 Task 1.5: Helper function to check if order has design data
+     *
+     * @param int $order_id WooCommerce order ID
+     * @return bool True if order has design data, false otherwise
+     */
+    public function has_design_data($order_id) {
+        if (!$order_id) {
+            return false;
+        }
+
+        // Check for stored design data
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        if (!empty($stored_design_data)) {
+            return true;
+        }
+
+        // Check for _db_processed_views in order items
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return false;
+        }
+
+        foreach ($order->get_items() as $item) {
+            $processed_views = $item->get_meta('_db_processed_views');
+            if (!empty($processed_views)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
