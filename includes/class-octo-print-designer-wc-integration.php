@@ -3213,7 +3213,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                     nonce: '<?php echo wp_create_nonce("octo_design_preview_" . $order_id); ?>'
                 },
                 success: function(response) {
-                    console.log('✅ Design data loaded successfully');
+                    console.log('✅ Design data loaded successfully', response);
 
                     // Reset button
                     if (button) {
@@ -3221,11 +3221,38 @@ private function build_print_provider_email_content($order, $design_items, $note
                         button.disabled = false;
                     }
 
-                    // Show modal with actual content
-                    var modal = document.getElementById('design-preview-modal');
-                    if (modal) {
-                        document.getElementById('design-preview-content').innerHTML = response;
-                        modal.style.display = 'block';
+                    // Handle new JSON response format
+                    if (response.success && response.data) {
+                        var modal = document.getElementById('design-preview-modal');
+                        if (modal) {
+                            // Set HTML content
+                            var contentContainer = document.getElementById('design-preview-content');
+                            if (contentContainer) {
+                                contentContainer.innerHTML = response.data.html;
+
+                                // Execute JavaScript parts if available
+                                if (response.data.javascript) {
+                                    console.log('🔧 Executing JavaScript parts:', Object.keys(response.data.javascript));
+                                    Object.keys(response.data.javascript).forEach(function(scriptName) {
+                                        try {
+                                            console.log('🔧 Executing script:', scriptName);
+                                            eval(response.data.javascript[scriptName]);
+                                        } catch (e) {
+                                            console.error('❌ Script execution error for', scriptName, ':', e);
+                                        }
+                                    });
+                                }
+
+                                modal.style.display = 'block';
+                            }
+                        }
+                    } else {
+                        // Fallback for old response format
+                        var modal = document.getElementById('design-preview-modal');
+                        if (modal) {
+                            document.getElementById('design-preview-content').innerHTML = response;
+                            modal.style.display = 'block';
+                        }
                     }
                 },
                 error: function(xhr, status, error) {
