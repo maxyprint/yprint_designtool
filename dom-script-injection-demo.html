@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM Script Injection System - Demo & Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .demo-section {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .demo-section h2 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background: #5a6fd8;
+        }
+
+        .button.success {
+            background: #28a745;
+        }
+
+        .button.danger {
+            background: #dc3545;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-area {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 10px 0;
+            min-height: 50px;
+        }
+
+        .success-message {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .log-area {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 DOM Script Injection System</h1>
+        <p>Agent 3: Comprehensive script injection solution for AJAX responses</p>
+        <p><strong>Mission:</strong> Execute JavaScript from AJAX responses when jQuery .html() strips &lt;script&gt; tags</p>
+    </div>
+
+    <!-- System Status -->
+    <div class="demo-section">
+        <h2>📊 System Status</h2>
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="status-indicator">🔄</div>
+                <div class="metric-label">System Status</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="scripts-executed">0</div>
+                <div class="metric-label">Scripts Executed</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="cache-hits">0</div>
+                <div class="metric-label">Cache Hits</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="error-count">0</div>
+                <div class="metric-label">Errors</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Demo -->
+    <div class="demo-section">
+        <h2>🚀 Quick Demo</h2>
+        <p>Test the basic functionality with a simple script injection:</p>
+        <button class="button" onclick="runQuickDemo()">Run Quick Demo</button>
+        <button class="button" onclick="clearDemoResults()">Clear Results</button>
+        <div id="quick-demo-result" class="result-area"></div>
+    </div>
+
+    <!-- jQuery Integration Demo -->
+    <div class="demo-section">
+        <h2>🔧 jQuery Integration</h2>
+        <p>Demonstrate the jQuery .htmlWithScripts() method:</p>
+        <button class="button" onclick="testJQueryIntegration()">Test jQuery Integration</button>
+        <div id="jquery-demo-container" class="result-area"></div>
+    </div>
+
+    <!-- Execution Methods Demo -->
+    <div class="demo-section">
+        <h2>⚡ Execution Methods</h2>
+        <p>Test different script execution methods:</p>
+        <button class="button" onclick="testExecutionMethod('createElement')">createElement Method</button>
+        <button class="button" onclick="testExecutionMethod('function')">Function Constructor</button>
+        <button class="button" onclick="testExecutionMethod('isolated')">Isolated Context</button>
+        <div id="execution-methods-result" class="result-area"></div>
+    </div>
+
+    <!-- Security Tests -->
+    <div class="demo-section">
+        <h2>🔒 Security Features</h2>
+        <p>Test security measures and suspicious script detection:</p>
+        <button class="button" onclick="testSecurityFeatures()">Test Security Features</button>
+        <div id="security-test-result" class="result-area"></div>
+    </div>
+
+    <!-- Performance Tests -->
+    <div class="demo-section">
+        <h2>📈 Performance Tests</h2>
+        <p>Test performance optimization features:</p>
+        <button class="button" onclick="testPerformance()">Run Performance Test</button>
+        <button class="button" onclick="testCaching()">Test Caching System</button>
+        <div id="performance-test-result" class="result-area"></div>
+    </div>
+
+    <!-- AJAX Simulation -->
+    <div class="demo-section">
+        <h2>🌐 AJAX Response Simulation</h2>
+        <p>Simulate real-world AJAX responses with embedded scripts:</p>
+        <button class="button" onclick="simulateAjaxResponse()">Simulate AJAX Response</button>
+        <button class="button" onclick="simulateWordPressResponse()">WordPress Admin Response</button>
+        <div id="ajax-simulation-result" class="result-area"></div>
+    </div>
+
+    <!-- Comprehensive Test Suite -->
+    <div class="demo-section">
+        <h2>🧪 Comprehensive Test Suite</h2>
+        <p>Run the complete test suite to validate all functionality:</p>
+        <button class="button success" onclick="runTestSuite()">
+            <span id="test-suite-button-text">Run All Tests</span>
+            <span id="test-suite-loading" class="loading hidden"></span>
+        </button>
+        <div id="test-suite-result" class="result-area"></div>
+        <div id="test-report" class="hidden"></div>
+    </div>
+
+    <!-- Live Console -->
+    <div class="demo-section">
+        <h2>📺 Live Console</h2>
+        <p>Real-time system logs and debug information:</p>
+        <button class="button" onclick="clearLiveConsole()">Clear Console</button>
+        <div id="live-console" class="log-area"></div>
+    </div>
+
+    <!-- Load Required Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="public/js/dom-script-injection-system.js"></script>
+    <script src="public/js/script-injection-examples.js"></script>
+    <script src="test-script-injection-system.js"></script>
+
+    <script>
+        // Demo Application Logic
+        let liveConsoleBuffer = [];
+        let originalConsoleLog = console.log;
+        let originalConsoleError = console.error;
+        let originalConsoleWarn = console.warn;
+
+        // Intercept console logs for live display
+        function interceptConsole() {
+            console.log = function(...args) {
+                originalConsoleLog.apply(console, args);
+                addToLiveConsole('LOG', args.join(' '));
+            };
+
+            console.error = function(...args) {
+                originalConsoleError.apply(console, args);
+                addToLiveConsole('ERROR', args.join(' '));
+            };
+
+            console.warn = function(...args) {
+                originalConsoleWarn.apply(console, args);
+                addToLiveConsole('WARN', args.join(' '));
+            };
+        }
+
+        function addToLiveConsole(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] [${level}] ${message}`;
+
+            liveConsoleBuffer.push(logEntry);
+
+            // Keep only last 50 entries
+            if (liveConsoleBuffer.length > 50) {
+                liveConsoleBuffer.shift();
+            }
+
+            updateLiveConsole();
+        }
+
+        function updateLiveConsole() {
+            const consoleElement = document.getElementById('live-console');
+            if (consoleElement) {
+                consoleElement.textContent = liveConsoleBuffer.join('\n');
+                consoleElement.scrollTop = consoleElement.scrollHeight;
+            }
+        }
+
+        function clearLiveConsole() {
+            liveConsoleBuffer = [];
+            updateLiveConsole();
+        }
+
+        // Update system metrics
+        function updateMetrics() {
+            if (window.domScriptInjector) {
+                const metrics = window.domScriptInjector.getMetrics();
+
+                document.getElementById('status-indicator').textContent = '✅';
+                document.getElementById('scripts-executed').textContent = metrics.executionCount;
+                document.getElementById('cache-hits').textContent = metrics.cacheHits;
+                document.getElementById('error-count').textContent = metrics.errorCount;
+            }
+        }
+
+        // Demo Functions
+        function runQuickDemo() {
+            const demoHtml = `
+                <div class="demo-result">
+                    <h4>✨ Quick Demo Result</h4>
+                    <p>This content was injected with embedded scripts!</p>
+                    <script>
+                        console.log('🎉 Quick demo script executed successfully!');
+                        window.quickDemoExecuted = true;
+                        document.getElementById('quick-demo-result').style.borderLeft = '4px solid #28a745';
+                    </script>
+                </div>
+            `;
+
+            $('#quick-demo-result').htmlWithScripts(demoHtml)
+                .then(result => {
+                    console.log('✅ Quick demo completed:', result);
+                    updateMetrics();
+                })
+                .catch(error => {
+                    console.error('❌ Quick demo failed:', error);
+                });
+        }
+
+        function clearDemoResults() {
+            document.getElementById('quick-demo-result').innerHTML = '';
+            document.getElementById('quick-demo-result').style.borderLeft = '4px solid #667eea';
+        }
+
+        function testJQueryIntegration() {
+            const jqueryHtml = `
+                <div class="jquery-demo-result">
+                    <h4>🔧 jQuery Integration Test</h4>
+                    <p>Testing jQuery .htmlWithScripts() method...</p>
+                    <script>
+                        jQuery(document).ready(function($) {
+                            console.log('📦 jQuery script executed in DOM ready!');
+                            $('.jquery-demo-result').append('<p style="color: green;">✅ jQuery integration working!</p>');
+                            window.jqueryIntegrationWorking = true;
+                        });
+                    </script>
+                </div>
+            `;
+
+            $('#jquery-demo-container').htmlWithScripts(jqueryHtml, {
+                enableLogging: true
+            }).then(result => {
+                console.log('✅ jQuery integration test completed:', result);
+                updateMetrics();
+            });
+        }
+
+        function testExecutionMethod(method) {
+            const script = {
+                content: `
+                    console.log('⚡ Testing ${method} execution method');
+                    window.executionMethodTest = '${method}';
+
+                    // Update result display
+                    const resultDiv = document.getElementById('execution-methods-result');
+                    const methodResult = document.createElement('div');
+                    methodResult.className = 'success-message';
+                    methodResult.innerHTML = '✅ ${method} method executed successfully!';
+                    resultDiv.appendChild(methodResult);
+                `,
+                attributes: {}
+            };
+
+            window.domScriptInjector.executeScript(script, {
+                preferredMethod: method,
+                enableLogging: true
+            }).then(result => {
+                console.log(`✅ ${method} execution test completed:`, result);
+                updateMetrics();
+            }).catch(error => {
+                console.error(`❌ ${method} execution failed:`, error);
+
+                const resultDiv = document.getElementById('execution-methods-result');
+                const errorResult = document.createElement('div');
+                errorResult.className = 'error-message';
+                errorResult.innerHTML = `❌ ${method} method failed: ${error.message}`;
+                resultDiv.appendChild(errorResult);
+            });
+        }
+
+        function testSecurityFeatures() {
+            const resultDiv = document.getElementById('security-test-result');
+            resultDiv.innerHTML = '<h4>🔒 Security Test Results</h4>';
+
+            const testCases = [
+                {
+                    name: 'Large Script Detection',
+                    content: 'console.log("test");'.repeat(100000),
+                    shouldBlock: true
+                },
+                {
+                    name: 'Eval Detection',
+                    content: 'eval("malicious code");',
+                    shouldBlock: true
+                },
+                {
+                    name: 'Document.write Detection',
+                    content: 'document.write("<script>alert(1)</script>");',
+                    shouldBlock: true
+                },
+                {
+                    name: 'Safe Script',
+                    content: 'console.log("This is a safe script");',
+                    shouldBlock: false
+                }
+            ];
+
+            testCases.forEach(testCase => {
+                const isSafe = window.domScriptInjector.isScriptSafe(testCase.content, {});
+                const blocked = !isSafe;
+                const testPassed = blocked === testCase.shouldBlock;
+
+                const testResult = document.createElement('div');
+                testResult.className = testPassed ? 'success-message' : 'error-message';
+                testResult.innerHTML = `
+                    ${testPassed ? '✅' : '❌'} ${testCase.name}:
+                    ${blocked ? 'Blocked' : 'Allowed'}
+                    ${testPassed ? '(Correct)' : '(Incorrect)'}
+                `;
+                resultDiv.appendChild(testResult);
+            });
+
+            console.log('🔒 Security features tested');
+            updateMetrics();
+        }
+
+        async function testPerformance() {
+            const resultDiv = document.getElementById('performance-test-result');
+            resultDiv.innerHTML = '<h4>📈 Performance Test Running...</h4>';
+
+            const startTime = performance.now();
+            const scripts = [];
+
+            // Create 20 test scripts
+            for (let i = 0; i < 20; i++) {
+                scripts.push({
+                    content: `
+                        console.log('Performance test script ${i}');
+                        window.perfTestScript${i} = true;
+                    `,
+                    attributes: {}
+                });
+            }
+
+            try {
+                const results = await window.domScriptInjector.executeScripts(scripts, {
+                    batchExecution: true,
+                    enableCaching: true,
+                    enableLogging: false
+                });
+
+                const endTime = performance.now();
+                const executionTime = endTime - startTime;
+
+                resultDiv.innerHTML = `
+                    <h4>📈 Performance Test Results</h4>
+                    <div class="success-message">
+                        ✅ Executed ${results.length} scripts in ${executionTime.toFixed(2)}ms<br>
+                        Average: ${(executionTime / results.length).toFixed(2)}ms per script
+                    </div>
+                `;
+
+                console.log(`📈 Performance test: ${results.length} scripts in ${executionTime.toFixed(2)}ms`);
+                updateMetrics();
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h4>📈 Performance Test Results</h4>
+                    <div class="error-message">❌ Performance test failed: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function testCaching() {
+            const resultDiv = document.getElementById('performance-test-result');
+            resultDiv.innerHTML = '<h4>📦 Caching Test Running...</h4>';
+
+            const script = {
+                content: 'window.cachingTestExecuted = (window.cachingTestExecuted || 0) + 1;',
+                attributes: {}
+            };
+
+            try {
+                // First execution
+                const start1 = performance.now();
+                const result1 = await window.domScriptInjector.executeScript(script, {
+                    enableCaching: true
+                });
+                const time1 = performance.now() - start1;
+
+                // Second execution (should use cache)
+                const start2 = performance.now();
+                const result2 = await window.domScriptInjector.executeScript(script, {
+                    enableCaching: true
+                });
+                const time2 = performance.now() - start2;
+
+                const improvementRatio = time1 / time2;
+
+                resultDiv.innerHTML = `
+                    <h4>📦 Caching Test Results</h4>
+                    <div class="success-message">
+                        ✅ First execution: ${time1.toFixed(2)}ms<br>
+                        ✅ Second execution: ${time2.toFixed(2)}ms<br>
+                        📈 Performance improvement: ${improvementRatio.toFixed(2)}x
+                    </div>
+                `;
+
+                console.log(`📦 Caching test: ${improvementRatio.toFixed(2)}x improvement`);
+                updateMetrics();
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h4>📦 Caching Test Results</h4>
+                    <div class="error-message">❌ Caching test failed: ${error.message}</div>
+                `;
+            }
+        }
+
+        function simulateAjaxResponse() {
+            const ajaxHtml = `
+                <div class="ajax-simulation">
+                    <h4>🌐 Simulated AJAX Response</h4>
+                    <p>This content simulates a typical AJAX response with embedded scripts.</p>
+
+                    <script>
+                        console.log('📡 AJAX Response Script 1 executed');
+                        window.ajaxResponseScript1 = true;
+                    </script>
+
+                    <div class="content-section">
+                        <p>Some content between scripts...</p>
+
+                        <script>
+                            console.log('📡 AJAX Response Script 2 executed');
+                            window.ajaxResponseScript2 = true;
+
+                            // Simulate dynamic content manipulation
+                            setTimeout(() => {
+                                const contentSection = document.querySelector('.ajax-simulation .content-section');
+                                if (contentSection) {
+                                    contentSection.style.backgroundColor = '#e8f5e8';
+                                    contentSection.innerHTML += '<p style="color: green;">✅ Dynamic content updated by script!</p>';
+                                }
+                            }, 100);
+                        </script>
+                    </div>
+
+                    <script>
+                        console.log('📡 AJAX Response Script 3 executed');
+                        window.ajaxResponseScript3 = true;
+                    </script>
+                </div>
+            `;
+
+            $('#ajax-simulation-result').htmlWithScripts(ajaxHtml, {
+                enableLogging: true,
+                enableMetrics: true
+            }).then(result => {
+                console.log('🌐 AJAX simulation completed:', result);
+                updateMetrics();
+            });
+        }
+
+        function simulateWordPressResponse() {
+            const wpHtml = `
+                <div class="wp-admin-simulation">
+                    <h4>🔧 WordPress Admin Response</h4>
+                    <p>Simulating WordPress admin AJAX response with jQuery dependencies.</p>
+
+                    <script>
+                        jQuery(document).ready(function($) {
+                            console.log('🔧 WordPress jQuery script executed');
+                            window.wpJQueryExecuted = true;
+
+                            // Simulate WordPress admin behavior
+                            $('.wp-admin-simulation').addClass('wp-initialized');
+
+                            // Add WordPress-style notice
+                            $('.wp-admin-simulation').append(
+                                '<div class="success-message">✅ WordPress admin functionality initialized!</div>'
+                            );
+                        });
+                    </script>
+
+                    <div class="meta-box">
+                        <h5>Meta Box Example</h5>
+                        <script>
+                            // Simulate meta box initialization
+                            console.log('🔧 WordPress meta box script executed');
+                            window.wpMetaBoxExecuted = true;
+
+                            // Simulate ajaxurl usage (WordPress global)
+                            if (typeof ajaxurl === 'undefined') {
+                                window.ajaxurl = '/wp-admin/admin-ajax.php';
+                            }
+                            console.log('🔧 ajaxurl available:', ajaxurl);
+                        </script>
+                    </div>
+                </div>
+            `;
+
+            $('#ajax-simulation-result').htmlWithScripts(wpHtml, {
+                enableLogging: true,
+                preferredMethod: 'function'
+            }).then(result => {
+                console.log('🔧 WordPress simulation completed:', result);
+                updateMetrics();
+            });
+        }
+
+        async function runTestSuite() {
+            const button = document.getElementById('test-suite-button-text');
+            const loading = document.getElementById('test-suite-loading');
+            const resultDiv = document.getElementById('test-suite-result');
+            const reportDiv = document.getElementById('test-report');
+
+            // Show loading state
+            button.textContent = 'Running Tests...';
+            loading.classList.remove('hidden');
+            resultDiv.innerHTML = '<p>🧪 Running comprehensive test suite...</p>';
+
+            try {
+                // Wait for test suite to complete
+                setTimeout(async () => {
+                    if (window.scriptInjectionTestReport) {
+                        const report = window.scriptInjectionTestReport;
+
+                        // Show results
+                        resultDiv.innerHTML = `
+                            <h4>🧪 Test Suite Results</h4>
+                            <div class="metrics">
+                                <div class="metric-card">
+                                    <div class="metric-value">${report.passed}</div>
+                                    <div class="metric-label">Passed</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-value">${report.failed}</div>
+                                    <div class="metric-label">Failed</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-value">${report.successRate.toFixed(1)}%</div>
+                                    <div class="metric-label">Success Rate</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-value">${report.totalTime.toFixed(0)}ms</div>
+                                    <div class="metric-label">Total Time</div>
+                                </div>
+                            </div>
+                            ${report.failed > 0 ?
+                                `<div class="error-message">❌ ${report.failed} tests failed. Check console for details.</div>` :
+                                `<div class="success-message">✅ All tests passed!</div>`
+                            }
+                        `;
+
+                        // Show detailed report
+                        reportDiv.innerHTML = `
+                            <h4>📋 Detailed Test Report</h4>
+                            <div class="code-block">${JSON.stringify(report, null, 2)}</div>
+                        `;
+                        reportDiv.classList.remove('hidden');
+
+                        updateMetrics();
+                    } else {
+                        resultDiv.innerHTML = '<div class="error-message">❌ Test suite not available</div>';
+                    }
+
+                    // Reset button
+                    button.textContent = 'Run All Tests';
+                    loading.classList.add('hidden');
+                }, 2000);
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error-message">❌ Test suite failed: ${error.message}</div>`;
+                button.textContent = 'Run All Tests';
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Initialize demo when DOM is ready
+        $(document).ready(function() {
+            console.log('🚀 DOM Script Injection Demo initialized');
+
+            // Setup console interception
+            interceptConsole();
+
+            // Update metrics periodically
+            setInterval(updateMetrics, 1000);
+
+            // Initial metrics update
+            setTimeout(updateMetrics, 500);
+
+            console.log('💡 Demo ready! Try the various test buttons to see the system in action.');
+        });
+    </script>
+</body>
+</html>

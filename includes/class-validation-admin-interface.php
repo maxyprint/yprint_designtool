@@ -490,6 +490,146 @@ class ValidationAdminInterface {
 
         <script type="text/javascript">
         jQuery(document).ready(function($) {
+            // 🧠 AGENT FIX: Enhanced Script-Aware HTML Insertion Function
+            // Solves jQuery .html() security limitation that prevents JavaScript execution
+            function insertHtmlWithScripts(containerSelector, htmlContent) {
+                console.log('🔧 SCRIPT INSERTION: Starting enhanced HTML insertion with script execution');
+
+                var $container = $(containerSelector);
+                if (!$container.length) {
+                    console.error('❌ SCRIPT INSERTION ERROR: Container not found:', containerSelector);
+                    return false;
+                }
+
+                try {
+                    // Create temporary container to parse HTML
+                    var $temp = $('<div>').html(htmlContent);
+
+                    // Extract all script elements
+                    var $scripts = $temp.find('script');
+                    var scriptContents = [];
+
+                    console.log('📊 SCRIPT EXTRACTION:', {
+                        totalScripts: $scripts.length,
+                        htmlLength: htmlContent.length,
+                        containerTarget: containerSelector
+                    });
+
+                    // Collect script contents and sources
+                    $scripts.each(function(index) {
+                        var $script = $(this);
+                        var scriptInfo = {
+                            index: index,
+                            hasContent: !!$script.html().trim(),
+                            hasSrc: !!$script.attr('src'),
+                            src: $script.attr('src') || null,
+                            content: $script.html(),
+                            type: $script.attr('type') || 'text/javascript'
+                        };
+
+                        console.log('📜 SCRIPT #' + index + ':', scriptInfo);
+
+                        if (scriptInfo.hasContent) {
+                            scriptContents.push({
+                                type: 'inline',
+                                content: scriptInfo.content,
+                                scriptType: scriptInfo.type
+                            });
+                        }
+
+                        if (scriptInfo.hasSrc) {
+                            scriptContents.push({
+                                type: 'external',
+                                src: scriptInfo.src,
+                                scriptType: scriptInfo.type
+                            });
+                        }
+                    });
+
+                    // Remove scripts from HTML to prevent double execution
+                    $scripts.remove();
+
+                    // Insert cleaned HTML first
+                    var cleanHtml = $temp.html();
+                    console.log('🧹 CLEAN HTML: Inserting HTML without scripts', {
+                        cleanHtmlLength: cleanHtml.length,
+                        scriptsRemoved: $scripts.length
+                    });
+
+                    $container.html(cleanHtml);
+
+                    // Execute scripts in order
+                    if (scriptContents.length > 0) {
+                        console.log('⚡ SCRIPT EXECUTION: Starting script execution phase');
+
+                        scriptContents.forEach(function(script, index) {
+                            try {
+                                if (script.type === 'inline') {
+                                    console.log('🔥 EXECUTING INLINE SCRIPT #' + index + ':', {
+                                        contentLength: script.content.length,
+                                        scriptType: script.scriptType
+                                    });
+
+                                    // Create and execute script element for proper scope
+                                    var scriptElement = document.createElement('script');
+                                    scriptElement.type = script.scriptType;
+                                    scriptElement.text = script.content;
+
+                                    // Append to head for execution, then remove
+                                    document.head.appendChild(scriptElement);
+                                    document.head.removeChild(scriptElement);
+
+                                    console.log('✅ INLINE SCRIPT #' + index + ': Executed successfully');
+
+                                } else if (script.type === 'external') {
+                                    console.log('📥 LOADING EXTERNAL SCRIPT #' + index + ':', script.src);
+
+                                    // Load external script dynamically
+                                    var scriptElement = document.createElement('script');
+                                    scriptElement.type = script.scriptType;
+                                    scriptElement.src = script.src;
+                                    scriptElement.onload = function() {
+                                        console.log('✅ EXTERNAL SCRIPT #' + index + ': Loaded successfully');
+                                    };
+                                    scriptElement.onerror = function() {
+                                        console.error('❌ EXTERNAL SCRIPT #' + index + ': Failed to load');
+                                    };
+
+                                    document.head.appendChild(scriptElement);
+                                }
+
+                            } catch (scriptError) {
+                                console.error('❌ SCRIPT EXECUTION ERROR #' + index + ':', {
+                                    error: scriptError.message,
+                                    stack: scriptError.stack,
+                                    scriptType: script.type,
+                                    scriptContent: script.type === 'inline' ? script.content.substring(0, 100) + '...' : script.src
+                                });
+                            }
+                        });
+
+                        console.log('🎉 SCRIPT EXECUTION COMPLETE: All scripts processed');
+                    } else {
+                        console.log('ℹ️ NO SCRIPTS: No JavaScript found in HTML content');
+                    }
+
+                    return true;
+
+                } catch (error) {
+                    console.error('❌ HTML INSERTION FATAL ERROR:', {
+                        error: error.message,
+                        stack: error.stack,
+                        htmlLength: htmlContent.length,
+                        container: containerSelector
+                    });
+
+                    // Fallback to standard insertion if our method fails
+                    console.log('🔄 FALLBACK: Using standard jQuery .html() method');
+                    $container.html(htmlContent);
+                    return false;
+                }
+            }
+
             $('#report_type').on('change', function() {
                 if ($(this).val() === 'template_specific') {
                     $('#template-selection').show();
@@ -513,7 +653,8 @@ class ValidationAdminInterface {
                     nonce: validationAdmin.nonce
                 }, function(response) {
                     if (response.success) {
-                        $('#report-results').html(response.data.html);
+                        // 🧠 AGENT FIX: Use enhanced script-aware HTML insertion instead of .html()
+                        insertHtmlWithScripts('#report-results', response.data.html);
                     } else {
                         $('#report-results').html('<div class="notice notice-error"><p>Report generation failed</p></div>');
                     }
