@@ -3978,8 +3978,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }
             }
 
-            // 🔧 FIX: Wrap jQuery handlers in DOM ready to ensure button exists
-            $(document).ready(function() {
+            // 🔧 FIX: Wrap jQuery handlers in DOM ready to ensure button exists with proper jQuery alias
+            jQuery(document).ready(function($) {
                 console.group('🔍 JQUERY EVENT HANDLER SETUP');
 
                 // 🎯 AGENT 6: Enhanced validation - Verify PHP syntax fix enabled jQuery execution
