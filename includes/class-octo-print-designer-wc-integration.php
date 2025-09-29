@@ -3268,6 +3268,114 @@ private function build_print_provider_email_content($order, $design_items, $note
                         View Design Preview
                     </button>
 
+                    <!-- 🔧 DIAGNOSTIC TEST BUTTON -->
+                    <button
+                        type="button"
+                        id="diagnostic-test-btn"
+                        class="button button-secondary"
+                        style="margin-left: 8px; background-color: #0073aa; border-color: #0073aa; color: white;"
+                        onclick="runDiagnosticTest()"
+                        title="Test warum Design Preview nicht funktioniert">
+                        <span class="dashicons dashicons-admin-tools" style="font-size: 14px; margin-right: 2px;"></span>
+                        🔧 Test Functions
+                    </button>
+
+                    <script type="text/javascript">
+                    function runDiagnosticTest() {
+                        console.group('🔧 DIAGNOSTIC TEST BUTTON - Design Preview Analysis');
+
+                        var diagnosticResults = {
+                            timestamp: new Date().toISOString(),
+                            testResults: []
+                        };
+
+                        // Test 1: Check if Design Preview Button exists
+                        var previewBtn = document.getElementById('design-preview-btn');
+                        var test1 = {
+                            test: 'Design Preview Button DOM Existence',
+                            passed: !!previewBtn,
+                            details: previewBtn ? 'Button found in DOM' : 'Button NOT found in DOM'
+                        };
+                        diagnosticResults.testResults.push(test1);
+                        console.log('✓ Test 1:', test1);
+
+                        if (previewBtn) {
+                            // Test 2: Button Properties
+                            var test2 = {
+                                test: 'Button Properties Check',
+                                passed: !previewBtn.disabled,
+                                details: {
+                                    disabled: previewBtn.disabled,
+                                    visible: previewBtn.offsetParent !== null,
+                                    clickable: window.getComputedStyle(previewBtn).pointerEvents !== 'none'
+                                }
+                            };
+                            diagnosticResults.testResults.push(test2);
+                            console.log('✓ Test 2:', test2);
+
+                            // Test 3: Event Listeners
+                            var test3 = {
+                                test: 'Event Listener Check',
+                                passed: previewBtn.onclick !== null || previewBtn.getAttribute('onclick') !== null,
+                                details: {
+                                    hasOnclick: previewBtn.onclick !== null,
+                                    hasOnclickAttr: previewBtn.getAttribute('onclick') !== null
+                                }
+                            };
+                            diagnosticResults.testResults.push(test3);
+                            console.log('✓ Test 3:', test3);
+                        }
+
+                        // Test 4: Required Dependencies
+                        var test4 = {
+                            test: 'WordPress & WooCommerce Dependencies',
+                            passed: typeof jQuery !== 'undefined' && typeof ajaxurl !== 'undefined',
+                            details: {
+                                jQuery: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'MISSING',
+                                ajaxurl: typeof ajaxurl !== 'undefined' ? 'Available' : 'MISSING',
+                                wooCommerce: window.location.href.includes('/wp-admin/') && window.location.href.includes('page=wc-orders')
+                            }
+                        };
+                        diagnosticResults.testResults.push(test4);
+                        console.log('✓ Test 4:', test4);
+
+                        // Test 5: Design Data Availability
+                        var designDataExists = <?php echo json_encode(!!$stored_design_data); ?>;
+                        var test5 = {
+                            test: 'Design Data Availability',
+                            passed: designDataExists,
+                            details: designDataExists ? 'Design data found in order' : 'No design data found - button may be disabled'
+                        };
+                        diagnosticResults.testResults.push(test5);
+                        console.log('✓ Test 5:', test5);
+
+                        // Generate Summary
+                        var passedTests = diagnosticResults.testResults.filter(t => t.passed).length;
+                        var totalTests = diagnosticResults.testResults.length;
+                        var summary = `Diagnostic Complete: ${passedTests}/${totalTests} tests passed`;
+
+                        console.log('📊 SUMMARY:', summary);
+                        console.groupEnd();
+
+                        // Show user-friendly alert
+                        var issues = diagnosticResults.testResults
+                            .filter(t => !t.passed)
+                            .map(t => `❌ ${t.test}: ${typeof t.details === 'string' ? t.details : JSON.stringify(t.details)}`)
+                            .join('\n');
+
+                        var successes = diagnosticResults.testResults
+                            .filter(t => t.passed)
+                            .map(t => `✅ ${t.test}`)
+                            .join('\n');
+
+                        var alertMessage = `🔧 DIAGNOSTIC TEST RESULTS\n\n${summary}\n\n${successes ? 'WORKING:\n' + successes + '\n\n' : ''}${issues ? 'ISSUES FOUND:\n' + issues : 'All tests passed!'}`;
+
+                        alert(alertMessage);
+
+                        return diagnosticResults;
+                    }
+                    </script>
+
                     <?php if ($stored_design_data || $db_processed_views): ?>
                         <span style="font-size: 11px; color: #646970; display: flex; align-items: center; gap: 4px;">
                             <span class="dashicons dashicons-info" style="font-size: 14px;"></span>
