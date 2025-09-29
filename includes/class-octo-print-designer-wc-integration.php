@@ -4000,14 +4000,14 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                 var button = $('#design-preview-btn');
                 if (button.length === 0) {
-                    console.error('❌ JQUERY: Button #design-preview-btn not found!');
-                    console.error('🔍 AGENT 6: Event handler attachment failed - button element missing');
-                    console.groupEnd();
-                    return;
+                    console.warn('⚠️ JQUERY: Button #design-preview-btn not found, using event delegation fallback');
+                    console.log('🔍 AGENT 7: Proceeding with event handler setup anyway - event delegation will handle it');
+                } else {
+                    console.log('✅ JQUERY: Button found, setting up direct handlers');
                 }
 
-                console.log('✅ JQUERY: Attaching click event handler...');
-                console.log('🎯 AGENT 6: Button element found, proceeding with event handler setup');
+                console.log('✅ JQUERY: Attaching click event handlers...');
+                console.log('🎯 AGENT 7: Proceeding with event handler setup (direct + event delegation)');
 
                 // Design Preview Button - Enhanced with multiple binding methods
 
