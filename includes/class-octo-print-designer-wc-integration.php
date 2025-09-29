@@ -4944,31 +4944,324 @@ private function build_print_provider_email_content($order, $design_items, $note
             </div>
 
             <?php if ($design_data): ?>
-                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: #28a745;">✅ Design Data Available</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 13px;">
-                        <div>
-                            <strong>Template View ID:</strong><br>
-                            <?php echo esc_html($design_data['template_view_id'] ?? 'N/A'); ?>
+                <!-- 🧠 HIVE-MIND 7-AGENT DESIGN DATA ANALYSIS SYSTEM -->
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #28a745;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                        <span style="font-size: 24px;">🧠</span>
+                        <h4 style="margin: 0; color: #28a745; font-size: 16px;">HIVE-MIND Design Data Analysis System</h4>
+                        <span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">7 AGENTS ACTIVE</span>
+                    </div>
+
+                    <!-- 🔍 AGENT 1: DESIGN DATA STRUCTURE ANALYZER -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #007cba;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">🔍</span>
+                            <h5 style="margin: 0; color: #007cba; font-size: 14px;">AGENT 1: Design Data Structure Analysis</h5>
                         </div>
-                        <div>
-                            <strong>Elements Count:</strong><br>
-                            <?php echo esc_html(isset($design_data['elements']) ? count($design_data['elements']) : 0); ?>
-                        </div>
-                        <div>
-                            <strong>Timestamp:</strong><br>
-                            <?php
-                            if (isset($design_data['timestamp'])) {
-                                echo esc_html(date('d.m.Y H:i:s', $design_data['timestamp']));
-                            } else {
-                                echo 'N/A';
+                        <?php
+                        // AGENT 1 Analysis
+                        $data_completeness = 0;
+                        $available_fields = [];
+                        $total_possible_fields = ['template_view_id', 'elements', 'timestamp', 'objects', 'canvas', 'version', 'background'];
+
+                        foreach ($total_possible_fields as $field) {
+                            if (isset($design_data[$field]) && !empty($design_data[$field])) {
+                                $available_fields[] = $field;
+                                $data_completeness++;
                             }
-                            ?>
+                        }
+                        $completeness_percentage = round(($data_completeness / count($total_possible_fields)) * 100);
+                        ?>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 12px;">
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Data Structure:</strong><br>
+                                <span style="color: #007cba;"><?php echo esc_html($design_data['version'] ?? 'Unknown Version'); ?></span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Fields Available:</strong><br>
+                                <span style="color: #28a745;"><?php echo count($available_fields); ?>/<?php echo count($total_possible_fields); ?> fields</span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Completeness:</strong><br>
+                                <span style="color: <?php echo $completeness_percentage >= 70 ? '#28a745' : ($completeness_percentage >= 40 ? '#ffc107' : '#dc3545'); ?>;">
+                                    <?php echo $completeness_percentage; ?>%
+                                </span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Data Size:</strong><br>
+                                <span style="color: #6c757d;"><?php echo esc_html(strlen($stored_design_data) . ' chars'); ?></span>
+                            </div>
                         </div>
-                        <div>
-                            <strong>Data Size:</strong><br>
-                            <?php echo esc_html(strlen($stored_design_data) . ' chars'); ?>
+                    </div>
+
+                    <!-- 🕵️ AGENT 2: MISSING DATA DETECTIVE -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #dc3545;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">🕵️</span>
+                            <h5 style="margin: 0; color: #dc3545; font-size: 14px;">AGENT 2: Missing Data Detection</h5>
                         </div>
+                        <?php
+                        // AGENT 2 Analysis
+                        $missing_fields = array_diff($total_possible_fields, $available_fields);
+                        $missing_object_properties = [];
+                        $incomplete_objects = 0;
+
+                        if (isset($design_data['objects']) && is_array($design_data['objects'])) {
+                            $required_object_props = ['type', 'left', 'top', 'width', 'height'];
+                            foreach ($design_data['objects'] as $obj) {
+                                $missing_props = [];
+                                foreach ($required_object_props as $prop) {
+                                    if (!isset($obj[$prop])) {
+                                        $missing_props[] = $prop;
+                                    }
+                                }
+                                if (!empty($missing_props)) {
+                                    $incomplete_objects++;
+                                    $missing_object_properties = array_merge($missing_object_properties, $missing_props);
+                                }
+                            }
+                        }
+                        ?>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
+                            <div style="background: #fff3cd; padding: 10px; border-radius: 4px; border: 1px solid #ffeaa7;">
+                                <strong style="color: #856404;">Missing Core Fields:</strong><br>
+                                <?php if (empty($missing_fields)): ?>
+                                    <span style="color: #28a745;">✅ All core fields present</span>
+                                <?php else: ?>
+                                    <span style="color: #dc3545;">❌ <?php echo implode(', ', $missing_fields); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div style="background: #f8d7da; padding: 10px; border-radius: 4px; border: 1px solid #f5c6cb;">
+                                <strong style="color: #721c24;">Incomplete Objects:</strong><br>
+                                <?php if ($incomplete_objects === 0): ?>
+                                    <span style="color: #28a745;">✅ All objects complete</span>
+                                <?php else: ?>
+                                    <span style="color: #dc3545;">⚠️ <?php echo $incomplete_objects; ?> objects missing properties</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php if (!empty($missing_object_properties)): ?>
+                            <div style="margin-top: 10px; padding: 8px; background: #ffe6e6; border-radius: 4px; font-size: 11px;">
+                                <strong>Missing object properties:</strong> <?php echo implode(', ', array_unique($missing_object_properties)); ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- 📊 AGENT 3: DATA COMPLETENESS VISUALIZER -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">📊</span>
+                            <h5 style="margin: 0; color: #28a745; font-size: 14px;">AGENT 3: Data Completeness Visualization</h5>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;">
+                                <span><strong>Overall Data Quality:</strong></span>
+                                <span><?php echo $completeness_percentage; ?>%</span>
+                            </div>
+                            <div style="background: #e9ecef; height: 20px; border-radius: 10px; overflow: hidden;">
+                                <div style="background: <?php echo $completeness_percentage >= 70 ? '#28a745' : ($completeness_percentage >= 40 ? '#ffc107' : '#dc3545'); ?>; height: 100%; width: <?php echo $completeness_percentage; ?>%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 11px;">
+                            <?php foreach ($total_possible_fields as $field): ?>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: <?php echo in_array($field, $available_fields) ? '#28a745' : '#dc3545'; ?>;">
+                                        <?php echo in_array($field, $available_fields) ? '✅' : '❌'; ?>
+                                    </span>
+                                    <span style="color: #495057;"><?php echo ucfirst(str_replace('_', ' ', $field)); ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- 📦 AGENT 4: DESIGN OBJECT INVENTORY -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #6f42c1;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">📦</span>
+                            <h5 style="margin: 0; color: #6f42c1; font-size: 14px;">AGENT 4: Design Object Inventory</h5>
+                        </div>
+                        <?php
+                        // AGENT 4 Analysis
+                        $object_types = [];
+                        $total_objects = 0;
+                        $objects_by_type = [];
+
+                        if (isset($design_data['objects']) && is_array($design_data['objects'])) {
+                            $total_objects = count($design_data['objects']);
+                            foreach ($design_data['objects'] as $obj) {
+                                $type = $obj['type'] ?? 'unknown';
+                                $objects_by_type[$type] = ($objects_by_type[$type] ?? 0) + 1;
+                            }
+                        } elseif (isset($design_data['elements']) && is_array($design_data['elements'])) {
+                            $total_objects = count($design_data['elements']);
+                            foreach ($design_data['elements'] as $obj) {
+                                $type = $obj['type'] ?? 'unknown';
+                                $objects_by_type[$type] = ($objects_by_type[$type] ?? 0) + 1;
+                            }
+                        }
+                        ?>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; text-align: center;">
+                                <div style="font-size: 18px; font-weight: bold; color: #6f42c1;"><?php echo $total_objects; ?></div>
+                                <div style="font-size: 11px; color: #6c757d;">Total Objects</div>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; text-align: center;">
+                                <div style="font-size: 18px; font-weight: bold; color: #6f42c1;"><?php echo count($objects_by_type); ?></div>
+                                <div style="font-size: 11px; color: #6c757d;">Object Types</div>
+                            </div>
+                        </div>
+                        <?php if (!empty($objects_by_type)): ?>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px;">
+                                <?php foreach ($objects_by_type as $type => $count): ?>
+                                    <span style="background: #e9ecef; padding: 4px 8px; border-radius: 12px; color: #495057;">
+                                        <strong><?php echo ucfirst($type); ?>:</strong> <?php echo $count; ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- ⚙️ AGENT 5: CANVAS METADATA -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #fd7e14;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">⚙️</span>
+                            <h5 style="margin: 0; color: #fd7e14; font-size: 14px;">AGENT 5: Canvas Metadata Engineering</h5>
+                        </div>
+                        <?php
+                        // AGENT 5 Analysis
+                        $canvas_info = $design_data['canvas'] ?? [];
+                        $template_id = $design_data['template_view_id'] ?? 'N/A';
+                        $background = $design_data['background'] ?? 'Not specified';
+                        ?>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; font-size: 12px;">
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Canvas Size:</strong><br>
+                                <span style="color: #fd7e14;">
+                                    <?php echo isset($canvas_info['width']) && isset($canvas_info['height'])
+                                        ? $canvas_info['width'] . ' × ' . $canvas_info['height'] . ' px'
+                                        : 'Not specified'; ?>
+                                </span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Template ID:</strong><br>
+                                <span style="color: #fd7e14;"><?php echo esc_html($template_id); ?></span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Zoom Level:</strong><br>
+                                <span style="color: #fd7e14;"><?php echo esc_html($canvas_info['zoom'] ?? 1); ?>x</span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Background:</strong><br>
+                                <span style="color: #fd7e14;"><?php echo esc_html($background); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🔍 AGENT 6: DATA SOURCE TRANSPARENCY -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #20c997;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">🔍</span>
+                            <h5 style="margin: 0; color: #20c997; font-size: 14px;">AGENT 6: Data Source Transparency</h5>
+                        </div>
+                        <?php
+                        // AGENT 6 Analysis
+                        $data_source = $stored_design_data ? 'canvas_data' : ($design_data ? 'converted_db_views' : 'none');
+                        $conversion_timestamp = isset($design_data['timestamp']) ? $design_data['timestamp'] : time();
+                        ?>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 12px;">
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Data Source:</strong><br>
+                                <span style="color: #20c997;">
+                                    <?php if ($data_source === 'canvas_data'): ?>
+                                        📊 Direct Canvas Data
+                                    <?php elseif ($data_source === 'converted_db_views'): ?>
+                                        🔄 Converted from Print DB
+                                    <?php else: ?>
+                                        ❌ No data source
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Data Pipeline:</strong><br>
+                                <span style="color: #20c997;">
+                                    <?php echo $stored_design_data ? 'Direct Storage' : 'Runtime Conversion'; ?>
+                                </span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Last Updated:</strong><br>
+                                <span style="color: #20c997;">
+                                    <?php echo date('M j, Y H:i', $conversion_timestamp); ?>
+                                </span>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #495057;">Data Quality:</strong><br>
+                                <span style="color: <?php echo $stored_design_data ? '#28a745' : '#ffc107'; ?>;">
+                                    <?php echo $stored_design_data ? 'High (Original)' : 'Medium (Converted)'; ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🚀 AGENT 7: ENHANCED UI INTEGRATION SUMMARY -->
+                    <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #17a2b8;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 18px;">🚀</span>
+                            <h5 style="margin: 0; color: #17a2b8; font-size: 14px;">AGENT 7: Enhanced UI Integration Summary</h5>
+                        </div>
+                        <?php
+                        // AGENT 7 Summary Analysis
+                        $readiness_score = 0;
+                        $readiness_factors = [
+                            'has_objects' => (isset($design_data['objects']) && count($design_data['objects']) > 0) || (isset($design_data['elements']) && count($design_data['elements']) > 0),
+                            'has_canvas' => isset($design_data['canvas']) && !empty($design_data['canvas']),
+                            'has_template' => isset($design_data['template_view_id']) && !empty($design_data['template_view_id']),
+                            'data_complete' => $completeness_percentage >= 70,
+                            'no_missing_critical' => $incomplete_objects === 0
+                        ];
+
+                        foreach ($readiness_factors as $factor => $value) {
+                            if ($value) $readiness_score++;
+                        }
+                        $readiness_percentage = round(($readiness_score / count($readiness_factors)) * 100);
+                        ?>
+                        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <strong style="color: #495057;">Canvas Rendering Readiness:</strong>
+                                <span style="background: <?php echo $readiness_percentage >= 80 ? '#28a745' : ($readiness_percentage >= 60 ? '#ffc107' : '#dc3545'); ?>; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">
+                                    <?php echo $readiness_percentage; ?>%
+                                </span>
+                            </div>
+                            <div style="background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: <?php echo $readiness_percentage >= 80 ? '#28a745' : ($readiness_percentage >= 60 ? '#ffc107' : '#dc3545'); ?>; height: 100%; width: <?php echo $readiness_percentage; ?>%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: 11px;">
+                            <?php foreach ($readiness_factors as $factor => $status): ?>
+                                <div style="display: flex; align-items: center; gap: 6px; padding: 6px; background: <?php echo $status ? '#d4edda' : '#f8d7da'; ?>; border-radius: 4px;">
+                                    <span style="color: <?php echo $status ? '#28a745' : '#dc3545'; ?>;">
+                                        <?php echo $status ? '✅' : '❌'; ?>
+                                    </span>
+                                    <span style="color: #495057; font-weight: 500;">
+                                        <?php echo ucwords(str_replace('_', ' ', $factor)); ?>
+                                    </span>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <?php if ($readiness_percentage >= 80): ?>
+                            <div style="margin-top: 12px; padding: 10px; background: #d4edda; border-radius: 4px; color: #155724; font-size: 12px;">
+                                <strong>🎉 Excellent!</strong> Design data is complete and ready for high-quality canvas rendering with full functionality.
+                            </div>
+                        <?php elseif ($readiness_percentage >= 60): ?>
+                            <div style="margin-top: 12px; padding: 10px; background: #fff3cd; border-radius: 4px; color: #856404; font-size: 12px;">
+                                <strong>⚠️ Good</strong> Design data is mostly complete. Canvas rendering available with minor limitations.
+                            </div>
+                        <?php else: ?>
+                            <div style="margin-top: 12px; padding: 10px; background: #f8d7da; border-radius: 4px; color: #721c24; font-size: 12px;">
+                                <strong>🔧 Limited</strong> Design data has significant gaps. Canvas rendering may have reduced functionality.
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- 🎨 AGENT 3: NEW CANVAS PREVIEW CONTAINER -->
@@ -5009,26 +5302,98 @@ private function build_print_provider_email_content($order, $design_items, $note
                         </div>
                     </div>
 
-                    <?php if (isset($design_data['elements']) && is_array($design_data['elements'])): ?>
-                        <details style="margin-top: 15px;">
-                            <summary style="cursor: pointer; font-weight: bold; color: #007cba;">📝 Design Elements Details</summary>
-                            <div style="margin-top: 10px; max-height: 300px; overflow-y: auto; background: white; padding: 10px; border-radius: 4px;">
-                                <?php foreach ($design_data['elements'] as $index => $element): ?>
-                                    <div style="padding: 8px; margin-bottom: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px;">
-                                        <strong>Element <?php echo ($index + 1); ?>:</strong>
-                                        <?php echo esc_html($element['type'] ?? 'unknown'); ?>
+                    <?php
+                    // Check for both elements and objects arrays for detailed display
+                    $detailed_objects = [];
+                    if (isset($design_data['elements']) && is_array($design_data['elements'])) {
+                        $detailed_objects = $design_data['elements'];
+                    } elseif (isset($design_data['objects']) && is_array($design_data['objects'])) {
+                        $detailed_objects = $design_data['objects'];
+                    }
+                    ?>
+                    <?php if (!empty($detailed_objects)): ?>
+                        <details style="margin-top: 15px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
+                            <summary style="cursor: pointer; font-weight: bold; color: #007cba; background: #f8f9fa; padding: 12px; margin: 0;">
+                                <span style="font-size: 16px;">📝</span> Detailed Object Analysis (<?php echo count($detailed_objects); ?> items)
+                            </summary>
+                            <div style="margin: 0; max-height: 350px; overflow-y: auto; background: white;">
+                                <?php foreach ($detailed_objects as $index => $element): ?>
+                                    <?php
+                                    $type = $element['type'] ?? 'unknown';
+                                    $type_icon = [
+                                        'image' => '🖼️',
+                                        'text' => '📝',
+                                        'textbox' => '📝',
+                                        'rect' => '⬜',
+                                        'circle' => '⭕',
+                                        'polygon' => '🔷',
+                                        'path' => '🎨',
+                                        'group' => '📁'
+                                    ][$type] ?? '❓';
+
+                                    $completeness = 0;
+                                    $required_props = ['type', 'left', 'top', 'width', 'height'];
+                                    foreach ($required_props as $prop) {
+                                        if (isset($element[$prop])) $completeness++;
+                                    }
+                                    $completeness_pct = round(($completeness / count($required_props)) * 100);
+                                    ?>
+                                    <div style="padding: 12px; margin: 0; background: <?php echo $index % 2 == 0 ? '#ffffff' : '#f8f9fa'; ?>; border-bottom: 1px solid #eee; font-size: 12px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="font-size: 16px;"><?php echo $type_icon; ?></span>
+                                                <strong style="color: #495057;">Object <?php echo ($index + 1); ?>: <?php echo ucfirst($type); ?></strong>
+                                            </div>
+                                            <span style="background: <?php echo $completeness_pct >= 80 ? '#28a745' : ($completeness_pct >= 60 ? '#ffc107' : '#dc3545'); ?>; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold;">
+                                                <?php echo $completeness_pct; ?>%
+                                            </span>
+                                        </div>
+
                                         <?php if (isset($element['text'])): ?>
-                                            - "<?php echo esc_html($element['text']); ?>"
+                                            <div style="margin-bottom: 6px; color: #6c757d;">
+                                                <strong>Content:</strong> "<?php echo esc_html(substr($element['text'], 0, 50) . (strlen($element['text']) > 50 ? '...' : '')); ?>"
+                                            </div>
                                         <?php elseif (isset($element['src'])): ?>
-                                            - Image: <?php echo esc_html(basename($element['src'])); ?>
+                                            <div style="margin-bottom: 6px; color: #6c757d;">
+                                                <strong>Source:</strong> <?php echo esc_html(basename($element['src'])); ?>
+                                            </div>
                                         <?php endif; ?>
-                                        <br>
-                                        <small style="color: #666;">
-                                            Position: (<?php echo esc_html($element['left'] ?? '0'); ?>, <?php echo esc_html($element['top'] ?? '0'); ?>)
+
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 6px;">
+                                            <div style="background: #e9ecef; padding: 4px 6px; border-radius: 3px; font-size: 11px;">
+                                                <strong>Position:</strong> (<?php echo esc_html($element['left'] ?? 'N/A'); ?>, <?php echo esc_html($element['top'] ?? 'N/A'); ?>)
+                                            </div>
                                             <?php if (isset($element['width']) && isset($element['height'])): ?>
-                                                | Size: <?php echo esc_html($element['width'] . 'x' . $element['height']); ?>
+                                                <div style="background: #e9ecef; padding: 4px 6px; border-radius: 3px; font-size: 11px;">
+                                                    <strong>Size:</strong> <?php echo esc_html($element['width'] . ' × ' . $element['height']); ?>
+                                                </div>
                                             <?php endif; ?>
-                                        </small>
+                                            <?php if (isset($element['angle']) || isset($element['rotation'])): ?>
+                                                <div style="background: #e9ecef; padding: 4px 6px; border-radius: 3px; font-size: 11px;">
+                                                    <strong>Rotation:</strong> <?php echo esc_html(($element['angle'] ?? $element['rotation'] ?? 0) . '°'); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <?php if (isset($element['opacity'])): ?>
+                                                <div style="background: #e9ecef; padding: 4px 6px; border-radius: 3px; font-size: 11px;">
+                                                    <strong>Opacity:</strong> <?php echo esc_html(round(($element['opacity'] ?? 1) * 100) . '%'); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <?php
+                                        // Show missing properties if any
+                                        $missing_props = [];
+                                        foreach ($required_props as $prop) {
+                                            if (!isset($element[$prop])) {
+                                                $missing_props[] = $prop;
+                                            }
+                                        }
+                                        ?>
+                                        <?php if (!empty($missing_props)): ?>
+                                            <div style="margin-top: 6px; padding: 4px 6px; background: #fff3cd; border-radius: 3px; font-size: 10px; color: #856404;">
+                                                <strong>Missing:</strong> <?php echo implode(', ', $missing_props); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
