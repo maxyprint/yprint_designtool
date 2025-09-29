@@ -594,6 +594,13 @@ class AdminCanvasRenderer {
                 ? { x: left, y: top }
                 : this.preserveCoordinates(left, top);
 
+            // 🎯 AGENT 4: SAFETY VALIDATION - Ensure position object is valid
+            if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+                console.error('❌ AGENT 4: Invalid position object:', position, 'imageData:', imageData);
+                // Fallback to direct coordinates
+                position = { x: left, y: top };
+            }
+
             // 🎯 AGENT 4: Calculate exact image dimensions with preserved scaling
             const displayWidth = (imageData.width || img.naturalWidth) * scaleX;
             const displayHeight = (imageData.height || img.naturalHeight) * scaleY;

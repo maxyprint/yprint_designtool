@@ -706,10 +706,20 @@ class DesignPreviewGenerator {
 
         designData.objects.forEach((obj, index) => {
             if (obj.type === 'image' && obj.src) {
-                // 🎯 AGENT 2: EXACT COORDINATE PRESERVATION
+                // 🎯 AGENT 2: EXACT COORDINATE PRESERVATION - Flatten properties for AdminCanvasRenderer compatibility
                 images.push({
                     id: obj.id || `hive_img_${index}`,
                     url: obj.src,
+                    type: 'image',
+                    // Flatten coordinate properties for direct access by AdminCanvasRenderer
+                    left: parseFloat(obj.left || 0),
+                    top: parseFloat(obj.top || 0),
+                    width: parseFloat(obj.width || 0),
+                    height: parseFloat(obj.height || 0),
+                    scaleX: parseFloat(obj.scaleX || 1),
+                    scaleY: parseFloat(obj.scaleY || 1),
+                    angle: parseFloat(obj.angle || 0),
+                    // Keep transform object for backward compatibility
                     transform: {
                         left: parseFloat(obj.left || 0),
                         top: parseFloat(obj.top || 0),
