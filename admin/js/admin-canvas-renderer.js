@@ -571,6 +571,112 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 AGENT 5: DIMENSION VALIDATION UTILITY
+     * Comprehensive validation for image rendering parameters to prevent invisible rendering
+     * @param {Object} params - Validation parameters
+     * @returns {Object} Validation result with detailed diagnostics
+     */
+    validateRenderingParameters(params) {
+        const {
+            imageData,
+            img,
+            position,
+            dimensions,
+            scaleX,
+            scaleY,
+            angle,
+            context = 'image'
+        } = params;
+
+        const validation = {
+            isValid: true,
+            errors: [],
+            warnings: [],
+            diagnostics: {}
+        };
+
+        // Validate image object
+        if (context === 'image') {
+            if (!img || !img.complete) {
+                validation.isValid = false;
+                validation.errors.push('Image not loaded or not complete');
+            }
+            if (img && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                validation.isValid = false;
+                validation.errors.push('Image has zero natural dimensions');
+            }
+        }
+
+        // Validate position coordinates
+        if (position) {
+            if (!isFinite(position.x) || !isFinite(position.y) ||
+                isNaN(position.x) || isNaN(position.y)) {
+                validation.isValid = false;
+                validation.errors.push('Invalid position coordinates (NaN or Infinity)');
+            }
+        }
+
+        // Validate dimensions
+        if (dimensions) {
+            const { width, height } = dimensions;
+            if (!width || !height || width <= 0 || height <= 0 ||
+                !isFinite(width) || !isFinite(height) ||
+                isNaN(width) || isNaN(height)) {
+                validation.isValid = false;
+                validation.errors.push('Invalid dimensions (zero, negative, NaN, or Infinity)');
+            }
+            if (width < 1 || height < 1) {
+                validation.warnings.push('Sub-pixel dimensions detected - may result in invisible rendering');
+            }
+        }
+
+        // Validate scaling factors
+        if (scaleX !== undefined && scaleY !== undefined) {
+            if (!scaleX || !scaleY || scaleX <= 0 || scaleY <= 0 ||
+                !isFinite(scaleX) || !isFinite(scaleY) ||
+                isNaN(scaleX) || isNaN(scaleY)) {
+                validation.isValid = false;
+                validation.errors.push('Invalid scale factors (zero, negative, NaN, or Infinity)');
+            }
+        }
+
+        // Validate rotation angle
+        if (angle !== undefined) {
+            if (!isFinite(angle) || isNaN(angle)) {
+                validation.isValid = false;
+                validation.errors.push('Invalid rotation angle (NaN or Infinity)');
+            }
+        }
+
+        // Check canvas bounds visibility
+        if (position && dimensions && this.canvasWidth && this.canvasHeight) {
+            const isVisible = !(position.x > this.canvasWidth || position.y > this.canvasHeight ||
+                position.x + dimensions.width < 0 || position.y + dimensions.height < 0);
+            if (!isVisible) {
+                validation.warnings.push('Element positioned outside canvas bounds - will not be visible');
+            }
+            validation.diagnostics.visibleOnCanvas = isVisible;
+        }
+
+        // Validate canvas context state
+        if (this.ctx) {
+            if (!this.ctx || typeof this.ctx.drawImage !== 'function') {
+                validation.isValid = false;
+                validation.errors.push('Invalid canvas context state');
+            }
+        }
+
+        validation.diagnostics = {
+            ...validation.diagnostics,
+            totalErrors: validation.errors.length,
+            totalWarnings: validation.warnings.length,
+            renderingSafe: validation.isValid && validation.errors.length === 0
+        };
+
+        return validation;
+    }
+
+    /**
      * 🎯 AGENT 4: SPECIALIZED IMAGE ELEMENT RENDERER
      * Renders image objects with exact positioning and no coordinate transformation
      * @param {Object} imageData - Image data with url and transform properties
@@ -601,12 +707,90 @@ class AdminCanvasRenderer {
                 position = { x: left, y: top };
             }
 
+            // 🎯 AGENT 5: DIMENSION VALIDATION - Validate image and scaling values
+            const baseWidth = imageData.width || img.naturalWidth;
+            const baseHeight = imageData.height || img.naturalHeight;
+
+            // 🎯 AGENT 5: Validate base image dimensions
+            if (!baseWidth || !baseHeight || baseWidth <= 0 || baseHeight <= 0) {
+                console.error('❌ AGENT 5 DIMENSION VALIDATION: Invalid base dimensions:', {
+                    baseWidth, baseHeight,
+                    imageDataWidth: imageData.width,
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight
+                });
+                return; // Exit early to prevent invisible rendering
+            }
+
+            // 🎯 AGENT 5: Validate scaling factors
+            if (!scaleX || !scaleY || scaleX <= 0 || scaleY <= 0 ||
+                !isFinite(scaleX) || !isFinite(scaleY) ||
+                isNaN(scaleX) || isNaN(scaleY)) {
+                console.error('❌ AGENT 5 DIMENSION VALIDATION: Invalid scale factors:', {
+                    scaleX, scaleY, originalScaleX: imageData.scaleX, originalScaleY: imageData.scaleY
+                });
+                return; // Exit early to prevent invisible rendering
+            }
+
             // 🎯 AGENT 4: Calculate exact image dimensions with preserved scaling
-            const displayWidth = (imageData.width || img.naturalWidth) * scaleX;
-            const displayHeight = (imageData.height || img.naturalHeight) * scaleY;
+            const displayWidth = baseWidth * scaleX;
+            const displayHeight = baseHeight * scaleY;
+
+            // 🎯 AGENT 5: BOUNDS CHECKING - Validate final display dimensions
+            if (!displayWidth || !displayHeight || displayWidth <= 0 || displayHeight <= 0 ||
+                !isFinite(displayWidth) || !isFinite(displayHeight) ||
+                isNaN(displayWidth) || isNaN(displayHeight)) {
+                console.error('❌ AGENT 5 DIMENSION VALIDATION: Invalid display dimensions:', {
+                    displayWidth, displayHeight, baseWidth, baseHeight, scaleX, scaleY
+                });
+                return; // Exit early to prevent invisible rendering
+            }
+
+            // 🎯 AGENT 5: COMPREHENSIVE VALIDATION - Use centralized validation system
+            const validationResult = this.validateRenderingParameters({
+                imageData,
+                img,
+                position,
+                dimensions: { width: displayWidth, height: displayHeight },
+                scaleX,
+                scaleY,
+                angle,
+                context: 'image'
+            });
+
+            // 🎯 AGENT 5: Handle validation errors and warnings
+            if (!validationResult.isValid) {
+                console.error('❌ AGENT 5 VALIDATION FAILED - Aborting render to prevent invisible rendering:', {
+                    errors: validationResult.errors,
+                    warnings: validationResult.warnings,
+                    diagnostics: validationResult.diagnostics,
+                    imageData: {
+                        src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                        type: imageData.type,
+                        left, top, scaleX, scaleY
+                    }
+                });
+                return; // Exit early to prevent invisible rendering
+            }
+
+            // 🎯 AGENT 5: Log validation warnings for debugging
+            if (validationResult.warnings.length > 0) {
+                console.warn('⚠️ AGENT 5 VALIDATION WARNINGS:', {
+                    warnings: validationResult.warnings,
+                    diagnostics: validationResult.diagnostics,
+                    position: { x: position.x, y: position.y },
+                    dimensions: { width: displayWidth, height: displayHeight },
+                    canvasBounds: { width: this.canvasWidth, height: this.canvasHeight }
+                });
+                // Continue rendering but log the warnings
+            }
+
+            // 🎯 AGENT 5: Validation complete - all parameters verified by centralized validation system
 
             // Save context state
             this.ctx.save();
+
+            // 🎯 AGENT 5: Context validation complete - verified by centralized validation system
 
             // 🎯 AGENT 4: Apply transformations in correct order
             this.ctx.translate(position.x, position.y);
@@ -618,6 +802,8 @@ class AdminCanvasRenderer {
             // 🎯 AGENT 4: High-quality image rendering
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
+
+            // 🎯 AGENT 5: Image validation complete - verified by centralized validation system
 
             // 🎯 AGENT 4: Draw image with exact dimensions (top-left origin)
             this.ctx.drawImage(
@@ -632,11 +818,47 @@ class AdminCanvasRenderer {
             const renderTime = performance.now() - startTime;
             this.updatePerformanceMetrics(renderTime);
 
-            // 🎯 AGENT 4: DETAILED IMAGE RENDERING LOG
+            // 🎯 AGENT 5: INVISIBLE RENDERING DETECTION - Comprehensive diagnostics
+            const isVisibleOnCanvas = !(position.x > this.canvasWidth || position.y > this.canvasHeight ||
+                position.x + displayWidth < 0 || position.y + displayHeight < 0);
+            const hasValidDimensions = displayWidth > 0 && displayHeight > 0;
+            const isEffectivelyVisible = isVisibleOnCanvas && hasValidDimensions && displayWidth >= 1 && displayHeight >= 1;
+
+            // 🎯 AGENT 5: DETAILED DEBUG LOGGING for invisible rendering scenarios
+            if (!isEffectivelyVisible) {
+                console.warn('⚠️ AGENT 5 INVISIBLE RENDERING DETECTED:', {
+                    reason: !isVisibleOnCanvas ? 'outside_canvas_bounds' : 'invalid_dimensions',
+                    visibility: {
+                        isVisibleOnCanvas,
+                        hasValidDimensions,
+                        isEffectivelyVisible,
+                        subPixelSize: displayWidth < 1 || displayHeight < 1
+                    },
+                    position: { x: position.x, y: position.y },
+                    dimensions: { width: displayWidth, height: displayHeight },
+                    canvasBounds: { width: this.canvasWidth, height: this.canvasHeight },
+                    imageData: {
+                        src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                        originalDimensions: { width: imageData.width, height: imageData.height },
+                        scaling: { scaleX, scaleY }
+                    }
+                });
+            }
+
+            // 🎯 AGENT 4+5: ENHANCED IMAGE RENDERING LOG with validation results
             if (this.imageRenderer.logImageRender) {
-                console.log('🎯 AGENT 4 IMAGE RENDERER:', {
+                console.log('🎯 AGENT 4+5 IMAGE RENDERER:', {
                     type: imageData.type || 'image',
                     src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                    validation: {
+                        dimensionsValid: hasValidDimensions,
+                        positionValid: isFinite(position.x) && isFinite(position.y),
+                        scaleValid: scaleX > 0 && scaleY > 0 && isFinite(scaleX) && isFinite(scaleY),
+                        angleValid: isFinite(angle),
+                        imageReady: img.complete && img.naturalWidth > 0 && img.naturalHeight > 0,
+                        visibleOnCanvas: isVisibleOnCanvas,
+                        effectivelyVisible: isEffectivelyVisible
+                    },
                     positioning: {
                         originalLeft: left,
                         originalTop: top,
@@ -645,13 +867,19 @@ class AdminCanvasRenderer {
                         coordinatePreservation: this.coordinatePreservation.noTransformMode
                     },
                     dimensions: {
+                        baseSize: `${baseWidth}×${baseHeight}`,
                         naturalSize: `${img.naturalWidth}×${img.naturalHeight}`,
-                        scaledSize: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
-                        scaleFactors: `${(scaleX * 100).toFixed(1)}%×${(scaleY * 100).toFixed(1)}%`
+                        scaledSize: `${displayWidth.toFixed(3)}×${displayHeight.toFixed(3)}`,
+                        scaleFactors: `${(scaleX * 100).toFixed(3)}%×${(scaleY * 100).toFixed(3)}%`,
+                        subPixelRendering: displayWidth < 1 || displayHeight < 1
                     },
-                    rotation: angle !== 0 ? `${(angle * 180 / Math.PI).toFixed(1)}°` : 'none',
+                    transform: {
+                        rotation: angle !== 0 ? `${(angle * 180 / Math.PI).toFixed(3)}°` : 'none',
+                        transformMatrix: this.ctx.getTransform ? this.ctx.getTransform() : 'unavailable'
+                    },
                     performance: `${renderTime.toFixed(2)}ms`,
-                    exactPositioning: position.x === left && position.y === top
+                    exactPositioning: position.x === left && position.y === top,
+                    renderingStatus: isEffectivelyVisible ? 'SUCCESS' : 'INVISIBLE'
                 });
             }
 
