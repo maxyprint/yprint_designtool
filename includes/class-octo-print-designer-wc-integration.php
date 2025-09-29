@@ -13,8 +13,7 @@ class Octo_Print_Designer_WC_Integration {
     }
 
     private function __construct() {
-        // 🔥 AGENT 4: EMERGENCY - Class instantiated
-        error_log('🔥 AGENT 4: EMERGENCY - Octo_Print_Designer_WC_Integration class instantiated');
+        // Class instantiated
 
         // Cart item customization
         add_filter('woocommerce_get_item_data', array($this, 'display_cart_item_custom_data'), 10, 2);
@@ -53,8 +52,7 @@ class Octo_Print_Designer_WC_Integration {
 
         // 🎨 DESIGN PREVIEW SYSTEM: WooCommerce Admin Integration
         add_action('woocommerce_admin_order_data_after_order_details', array($this, 'add_design_preview_button'));
-        // 🔥 AGENT 4: EMERGENCY - Hook registered
-        error_log('🔥 AGENT 4: EMERGENCY - woocommerce_admin_order_data_after_order_details hook registered');
+        // Hook registered
         add_action('wp_ajax_octo_load_design_preview', array($this, 'ajax_load_design_preview'));
 
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_cart_item_data'), 10, 3);
@@ -3120,17 +3118,12 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         $order_id = $order->get_id();
 
-        // 🔥 AGENT 4: EMERGENCY - Hook fired
-        error_log('🔥 AGENT 4: EMERGENCY - woocommerce_admin_order_data_after_order_details hook FIRED for Order #' . $order_id);
-
-        // 🔥 AGENT 3: EMERGENCY - PHP Function Execution Start
-        error_log('🔥 AGENT 3: EMERGENCY - add_design_preview_button() called for Order #' . $order_id);
+        // Hook fired for order #$order_id
 
         // 🎯 Task 1.2: SMART BUTTON DISPLAY LOGIC - Only show for orders WITH design data
         $has_design_data = $this->has_design_data($order_id);
 
-        // Console logging for debugging (acceptance criteria requirement)
-        error_log("🎯 [SMART BUTTON] Order #{$order_id} design data check: " . ($has_design_data ? 'HAS DATA' : 'NO DATA'));
+        // Smart button logic: only show for orders with design data
 
         // Only show button if order has design data
         if (!$has_design_data) {
@@ -3141,8 +3134,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Button will be displayed - log for debugging
         error_log("🎯 [SMART BUTTON] Order #{$order_id} - Button WILL be displayed (design data found)");
 
-        // 🔥 AGENT 3: Function continuing past early return check
-        error_log('🔥 AGENT 3: CONTINUING - Past early return check for Order #' . $order_id);
+        // Continuing with button render
 
         // Check if stored design data exists (check both _design_data and _db_processed_views)
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
@@ -3200,30 +3192,65 @@ private function build_print_provider_email_content($order, $design_items, $note
         ?>
 
         <script type="text/javascript">
-        // 🔥 AGENT 5: EMERGENCY - Immediate button functionality
+        // ✅ FIXED: Actual Design Preview with AJAX call
         function emergencyDesignPreview(orderId) {
-            console.log('🔥 AGENT 5: EMERGENCY - Button clicked via inline onclick');
-            console.log('🔥 AGENT 5: Order ID:', orderId);
+            console.log('🎯 Loading design preview for Order #' + orderId);
 
-            // Show modal immediately
-            var modal = document.getElementById('design-preview-modal');
-            if (modal) {
-                modal.style.display = 'block';
-                console.log('🔥 AGENT 5: Modal shown successfully');
-            } else {
-                alert('🔥 AGENT 5: Design Preview functionality activated for Order #' + orderId);
+            // Show loading state
+            var button = document.getElementById('design-preview-btn');
+            if (button) {
+                button.textContent = 'Loading...';
+                button.disabled = true;
             }
+
+            // Make AJAX call to load actual design data
+            jQuery.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'octo_load_design_preview',
+                    order_id: orderId,
+                    nonce: '<?php echo wp_create_nonce("octo_design_preview_" . $order_id); ?>'
+                },
+                success: function(response) {
+                    console.log('✅ Design data loaded successfully');
+
+                    // Reset button
+                    if (button) {
+                        button.textContent = 'View Design Preview';
+                        button.disabled = false;
+                    }
+
+                    // Show modal with actual content
+                    var modal = document.getElementById('design-preview-modal');
+                    if (modal) {
+                        document.getElementById('design-preview-content').innerHTML = response;
+                        modal.style.display = 'block';
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Failed to load design preview:', error);
+
+                    // Reset button
+                    if (button) {
+                        button.textContent = 'View Design Preview';
+                        button.disabled = false;
+                    }
+
+                    alert('Failed to load design preview: ' + error);
+                }
+            });
         }
 
-        // Backup window.onload event binding
-        window.addEventListener('load', function() {
-            console.log('🔥 AGENT 5: EMERGENCY - Window load event fired');
-            var button = document.getElementById('design-preview-btn');
-            if (button && !button.onclick) {
-                button.addEventListener('click', function() {
-                    console.log('🔥 AGENT 5: EMERGENCY - Window load event handler fired');
-                    emergencyDesignPreview(button.getAttribute('data-order-id'));
+        // Clean single event binding
+        jQuery(document).ready(function($) {
+            var button = $('#design-preview-btn');
+            if (button.length && !button.data('events-bound')) {
+                button.on('click', function(e) {
+                    e.preventDefault();
+                    emergencyDesignPreview($(this).data('order-id'));
                 });
+                button.data('events-bound', true);
             }
         });
         </script>
@@ -3521,13 +3548,10 @@ private function build_print_provider_email_content($order, $design_items, $note
         </div>
 
         <?php
-        // 🔥 AGENT 3: EMERGENCY - About to output script block
-        error_log('🔥 AGENT 3: EMERGENCY - About to output JavaScript script block');
+        // Rendering JavaScript
         ?>
         <script type="text/javascript">
-        // 🔥 AGENT 1: EMERGENCY - Script block execution START
-        console.log('🔥 AGENT 1: EMERGENCY - Script block execution START');
-        console.log('🔥 AGENT 1: JavaScript is executing at line 3496');
+        // Script execution started
 
         // 🧠 HIVE-MIND ENHANCED DIAGNOSTICS - 7-AGENT INTEGRATION
         console.group('🧠 HIVE-MIND: 7-Agent Button Diagnostics System');
@@ -4662,174 +4686,10 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         </script>
 
-        <!-- 🔥 AGENT 6: EMERGENCY - Alternative Script Placement -->
-        <script type="text/javascript">
-        (function() {
-            'use strict';
-            console.log('🔥 AGENT 6: EMERGENCY - Alternative script block executing');
+        <!-- Alternative script system removed for performance -->
+        <!-- Agent 6 system fully removed -->
 
-            // Method 1: DOMContentLoaded
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('🔥 AGENT 6: DOMContentLoaded fired');
-                bindDesignPreviewEvents();
-            });
-
-            // Method 2: Window load
-            window.addEventListener('load', function() {
-                console.log('🔥 AGENT 6: Window load fired');
-                bindDesignPreviewEvents();
-            });
-
-            // Method 3: Immediate execution with delay
-            setTimeout(function() {
-                console.log('🔥 AGENT 6: Delayed execution fired');
-                bindDesignPreviewEvents();
-            }, 100);
-
-            // Method 4: Multiple timeout intervals for maximum reliability
-            setTimeout(function() {
-                console.log('🔥 AGENT 6: Secondary delayed execution fired');
-                bindDesignPreviewEvents();
-            }, 500);
-
-            setTimeout(function() {
-                console.log('🔥 AGENT 6: Tertiary delayed execution fired');
-                bindDesignPreviewEvents();
-            }, 1000);
-
-            function bindDesignPreviewEvents() {
-                var button = document.getElementById('design-preview-btn');
-                if (!button) {
-                    console.log('🔥 AGENT 6: Button not found');
-                    return;
-                }
-
-                console.log('🔥 AGENT 6: Button found:', button);
-
-                // Add event listener if not already added
-                if (!button.hasAttribute('data-agent6-bound')) {
-                    button.setAttribute('data-agent6-bound', 'true');
-
-                    // Method A: addEventListener
-                    button.addEventListener('click', function(e) {
-                        console.log('🔥 AGENT 6: Alternative addEventListener handler fired');
-                        emergencyDesignPreview(this.getAttribute('data-order-id'));
-                    });
-
-                    // Method B: onclick property (additional fallback)
-                    var originalOnclick = button.onclick;
-                    button.onclick = function(e) {
-                        console.log('🔥 AGENT 6: Alternative onclick property handler fired');
-                        if (originalOnclick) {
-                            originalOnclick.call(this, e);
-                        }
-                        emergencyDesignPreview(this.getAttribute('data-order-id'));
-                    };
-
-                    console.log('🔥 AGENT 6: Event handlers successfully bound');
-                } else {
-                    console.log('🔥 AGENT 6: Events already bound, skipping');
-                }
-            }
-
-            // Method 5: Polling fallback - check every 2 seconds for button
-            var pollAttempts = 0;
-            var maxPollAttempts = 10;
-            function pollForButton() {
-                pollAttempts++;
-                console.log('🔥 AGENT 6: Polling attempt #' + pollAttempts);
-
-                if (pollAttempts > maxPollAttempts) {
-                    console.log('🔥 AGENT 6: Max polling attempts reached');
-                    return;
-                }
-
-                var button = document.getElementById('design-preview-btn');
-                if (button && !button.hasAttribute('data-agent6-bound')) {
-                    console.log('🔥 AGENT 6: Button found via polling');
-                    bindDesignPreviewEvents();
-                } else if (!button) {
-                    setTimeout(pollForButton, 2000);
-                }
-            }
-
-            // Start polling
-            setTimeout(pollForButton, 2000);
-
-            // Method 6: Global function fallback
-            window.agent6EmergencyDesignPreview = function(orderId) {
-                console.log('🔥 AGENT 6: Global function fallback called for Order #' + orderId);
-                emergencyDesignPreview(orderId);
-            };
-
-            console.log('🔥 AGENT 6: Alternative script initialization complete');
-        })();
-        </script>
-
-        <!-- 🔥 AGENT 7: EMERGENCY - Comprehensive Debug System -->
-        <script type="text/javascript">
-        window.AGENT7_DEBUG_SYSTEM = {
-            status: 'active',
-            version: '1.0.0',
-            timestamp: new Date().toISOString(),
-
-            // Comprehensive button test
-            testButton: function() {
-                console.group('🔥 AGENT 7: COMPREHENSIVE BUTTON TEST');
-
-                var button = document.getElementById('design-preview-btn');
-                var results = {
-                    buttonExists: !!button,
-                    hasOnclick: button ? !!button.onclick : false,
-                    hasOnclickAttr: button ? !!button.getAttribute('onclick') : false,
-                    hasEventListeners: false,
-                    isVisible: false,
-                    isEnabled: false
-                };
-
-                if (button) {
-                    results.isVisible = button.offsetParent !== null;
-                    results.isEnabled = !button.disabled;
-                    results.hasEventListeners = button.hasAttribute('data-agent6-bound');
-                }
-
-                console.log('🔥 AGENT 7: Test Results:', results);
-                console.groupEnd();
-
-                return results;
-            },
-
-            // Emergency button activation
-            activateButton: function() {
-                console.log('🔥 AGENT 7: EMERGENCY ACTIVATION');
-                var button = document.getElementById('design-preview-btn');
-                if (button) {
-                    button.click();
-                    console.log('🔥 AGENT 7: Button click triggered');
-                } else {
-                    console.error('🔥 AGENT 7: Button not found for activation');
-                }
-            },
-
-            // Status monitoring
-            monitor: function() {
-                console.log('🔥 AGENT 7: MONITORING ACTIVE');
-                setInterval(function() {
-                    var button = document.getElementById('design-preview-btn');
-                    console.log('🔥 AGENT 7: Monitor - Button exists:', !!button);
-                }, 5000);
-            }
-        };
-
-        // Auto-initialize debug system
-        console.log('🔥 AGENT 7: EMERGENCY - Debug system initialized');
-        console.log('🔥 AGENT 7: Available commands: AGENT7_DEBUG_SYSTEM.testButton(), .activateButton(), .monitor()');
-
-        // Auto-test after short delay
-        setTimeout(function() {
-            window.AGENT7_DEBUG_SYSTEM.testButton();
-        }, 2000);
-        </script>
+        <!-- Debug system removed for performance -->
         <?php
     }
 
