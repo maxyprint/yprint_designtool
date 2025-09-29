@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 HIVE-MIND 7-Agent Canvas System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .canvas-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: #fff;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .agent-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .agent {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .agent.active { border-left-color: #28a745; background: #d4edda; }
+        .agent-title { font-weight: bold; color: #495057; margin-bottom: 5px; }
+        .agent-desc { font-size: 12px; color: #6c757d; }
+        .results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .quality-indicator {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .quality-perfect { background: #d4edda; color: #155724; }
+        .quality-good { background: #fff3cd; color: #856404; }
+        .quality-poor { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 HIVE-MIND 7-Agent Canvas Reconstruction System</h1>
+        <p>Complete Canvas Reconstruction & Visual Rendering Engine for 1:1 Design Replicas</p>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Agent Status Dashboard</h2>
+        <div class="agent-status">
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 1 - Dimension Controller</div>
+                <div class="agent-desc">Canvas: 780×580px - Exact dimensions preserved</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 2 - Coordinate Preservation</div>
+                <div class="agent-desc">Zero transformations - 1:1 positioning</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 3 - Background Renderer</div>
+                <div class="agent-desc">Template/mockup background support</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 4 - Image Renderer</div>
+                <div class="agent-desc">CrossOrigin images with exact positioning</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 5 - Text Renderer</div>
+                <div class="agent-desc">Font loading and text with exact positioning</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 6 - Shape Renderer</div>
+                <div class="agent-desc">Rectangles, circles, shapes with exact dimensions</div>
+            </div>
+            <div class="agent active">
+                <div class="agent-title">🎯 AGENT 7 - Integration System</div>
+                <div class="agent-desc">Validation pipeline & quality assurance</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎨 Canvas Rendering Test</h2>
+        <div class="controls">
+            <button class="btn btn-primary" onclick="testOriginalData()">
+                🎯 Test Original Design Data
+            </button>
+            <button class="btn btn-success" onclick="testWithBackground()">
+                🖼️ Test with Background
+            </button>
+            <button class="btn btn-info" onclick="testTextShapes()">
+                📝 Test Text & Shapes
+            </button>
+            <button class="btn btn-warning" onclick="validateQuality()">
+                ✅ Validate 1:1 Replica
+            </button>
+        </div>
+
+        <div class="canvas-container">
+            <div id="canvas-container" style="min-height: 400px; background: #fafafa;">
+                <p style="color: #666; margin-top: 180px;">Canvas will appear here</p>
+            </div>
+        </div>
+
+        <div id="quality-status" style="text-align: center; margin: 20px 0;">
+            <span class="quality-indicator quality-poor">Quality Check: Not Started</span>
+        </div>
+
+        <div class="results" id="results">
+            System ready. Click a test button to begin...<br>
+            All 7 agents are loaded and waiting for coordination commands.
+        </div>
+    </div>
+
+    <!-- Include the enhanced canvas system -->
+    <script src="/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js"></script>
+    <script src="/workspaces/yprint_designtool/admin/js/design-preview-generator.js"></script>
+
+    <script>
+        // 🧠 HIVE-MIND COORDINATION SYSTEM
+        let previewGenerator = null;
+        let lastResults = null;
+
+        // Initialize the system
+        function initializeHiveMind() {
+            log('🧠 INITIALIZING HIVE-MIND 7-AGENT SYSTEM...');
+
+            previewGenerator = new DesignPreviewGenerator();
+            const success = previewGenerator.init('canvas-container');
+
+            if (success) {
+                log('✅ ALL 7 AGENTS INITIALIZED SUCCESSFULLY');
+                log(`🎯 Canvas Dimensions: ${previewGenerator.renderer.canvasWidth}×${previewGenerator.renderer.canvasHeight}`);
+                log(`🎯 Coordinate Preservation: ${previewGenerator.renderer.coordinatePreservation.noTransformMode}`);
+                log(`🎯 Exact Dimensions: ${previewGenerator.renderer.dimensionPreservation.enforceExactDimensions}`);
+            } else {
+                log('❌ HIVE-MIND INITIALIZATION FAILED');
+            }
+        }
+
+        // Test with original design data
+        async function testOriginalData() {
+            log('🎯 EXECUTING TEST: Original Design Data (2 Images)');
+
+            const testData = {
+                "objects": [
+                    {
+                        "type": "image",
+                        "left": 328.1701693971554,
+                        "top": 156,
+                        "width": 1924,
+                        "height": 1075,
+                        "scaleX": 0.10507805062222215,
+                        "scaleY": 0.10507805062222215,
+                        "src": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/11092025ylifelogowhite-1.png"
+                    },
+                    {
+                        "type": "image",
+                        "left": 405.3813852813853,
+                        "top": 123.28369110662797,
+                        "width": 824,
+                        "height": 331,
+                        "scaleX": 0.045190812423822155,
+                        "scaleY": 0.045190812423822155,
+                        "src": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/yprint-logo.png"
+                    }
+                ],
+                "canvas": {
+                    "width": 780,
+                    "height": 580,
+                    "zoom": 1
+                }
+            };
+
+            try {
+                lastResults = await previewGenerator.generatePreview(testData);
+                updateQualityStatus(lastResults);
+                log('🎯 TEST COMPLETE: Original design data rendered successfully');
+            } catch (error) {
+                log('❌ TEST FAILED: ' + error.message);
+            }
+        }
+
+        // Test with background template
+        async function testWithBackground() {
+            log('🎯 EXECUTING TEST: With Background Template');
+
+            const testData = {
+                "objects": [
+                    {
+                        "type": "image",
+                        "left": 328,
+                        "top": 156,
+                        "width": 200,
+                        "height": 113,
+                        "scaleX": 1,
+                        "scaleY": 1,
+                        "src": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/11092025ylifelogowhite-1.png"
+                    }
+                ],
+                "background": "https://via.placeholder.com/780x580/e0e0e0/999999?text=Background+Template",
+                "canvas": { "width": 780, "height": 580 }
+            };
+
+            try {
+                lastResults = await previewGenerator.generatePreview(testData, {
+                    backgroundUrl: testData.background
+                });
+                updateQualityStatus(lastResults);
+                log('🎯 TEST COMPLETE: Background template rendered successfully');
+            } catch (error) {
+                log('❌ TEST FAILED: ' + error.message);
+            }
+        }
+
+        // Test text and shapes
+        async function testTextShapes() {
+            log('🎯 EXECUTING TEST: Text & Shape Elements');
+
+            const testData = {
+                "objects": [
+                    {
+                        "type": "text",
+                        "left": 100,
+                        "top": 100,
+                        "text": "HIVE-MIND CANVAS",
+                        "fontFamily": "Arial, sans-serif",
+                        "fontSize": 24,
+                        "fill": "#333333",
+                        "scaleX": 1,
+                        "scaleY": 1
+                    },
+                    {
+                        "type": "rect",
+                        "left": 100,
+                        "top": 150,
+                        "width": 200,
+                        "height": 50,
+                        "fill": "#007bff",
+                        "scaleX": 1,
+                        "scaleY": 1
+                    },
+                    {
+                        "type": "circle",
+                        "left": 400,
+                        "top": 100,
+                        "width": 100,
+                        "height": 100,
+                        "fill": "#28a745",
+                        "scaleX": 1,
+                        "scaleY": 1
+                    }
+                ],
+                "canvas": { "width": 780, "height": 580 }
+            };
+
+            try {
+                lastResults = await previewGenerator.generatePreview(testData);
+                updateQualityStatus(lastResults);
+                log('🎯 TEST COMPLETE: Text and shapes rendered successfully');
+            } catch (error) {
+                log('❌ TEST FAILED: ' + error.message);
+            }
+        }
+
+        // Validate quality
+        function validateQuality() {
+            if (!lastResults) {
+                log('⚠️ No render results available. Run a test first.');
+                return;
+            }
+
+            log('🎯 QUALITY VALIDATION REPORT:');
+            log(`• 1:1 Replica Achievement: ${lastResults.qualityAssurance.is1to1Replica}`);
+            log(`• Quality Score: ${lastResults.qualityAssurance.qualityScore}/100`);
+            log(`• Coordinate Preservation: ${lastResults.qualityAssurance.coordinatePreservation}`);
+            log(`• Exact Dimensions: ${lastResults.qualityAssurance.exactDimensions}`);
+
+            if (lastResults.qualityAssurance.issues.length > 0) {
+                log('⚠️ Quality Issues:');
+                lastResults.qualityAssurance.issues.forEach(issue => log(`  - ${issue}`));
+            } else {
+                log('✅ Perfect 1:1 replica - No quality issues detected');
+            }
+        }
+
+        // Update quality status indicator
+        function updateQualityStatus(results) {
+            const statusEl = document.getElementById('quality-status');
+            const qa = results.qualityAssurance;
+
+            let statusClass, statusText;
+            if (qa.qualityScore === 100) {
+                statusClass = 'quality-perfect';
+                statusText = `🎯 PERFECT 1:1 REPLICA (${qa.qualityScore}/100)`;
+            } else if (qa.qualityScore >= 70) {
+                statusClass = 'quality-good';
+                statusText = `✅ Good Quality (${qa.qualityScore}/100)`;
+            } else {
+                statusClass = 'quality-poor';
+                statusText = `⚠️ Quality Issues (${qa.qualityScore}/100)`;
+            }
+
+            statusEl.innerHTML = `<span class="quality-indicator ${statusClass}">${statusText}</span>`;
+        }
+
+        // Logging function
+        function log(message) {
+            const resultsEl = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsEl.innerHTML += `[${timestamp}] ${message}<br>`;
+            resultsEl.scrollTop = resultsEl.scrollHeight;
+            console.log(message);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeHiveMind);
+    </script>
+</body>
+</html>

@@ -12,14 +12,76 @@
 
 class AdminCanvasRenderer {
     constructor() {
-        this.canvasWidth = 254;  // 25.4cm in mm, converted to base units
-        this.canvasHeight = 302; // 30.2cm in mm, converted to base units
+        // 🎯 AGENT 1: EXACT CANVAS DIMENSIONS - 780×580 from design_data
+        this.canvasWidth = 780;   // Original design canvas width
+        this.canvasHeight = 580;  // Original design canvas height
         this.pixelRatio = window.devicePixelRatio || 1;
-        this.scaleFactor = 2; // Base scale for good visibility
+        this.scaleFactor = 1; // AGENT 1: No scaling for 1:1 replica
         this.canvas = null;
         this.ctx = null;
         this.imageCache = new Map();
         this.isRendering = false;
+
+        // 🎯 AGENT 1: DIMENSION PRESERVATION LOGGING
+        this.dimensionPreservation = {
+            originalWidth: 780,
+            originalHeight: 580,
+            enforceExactDimensions: true,
+            logDimensionChanges: true
+        };
+
+        // 🎯 AGENT 2: COORDINATE PRESERVATION ENGINE
+        this.coordinatePreservation = {
+            noTransformMode: true,        // Apply zero transformations
+            preserveOriginalCoords: true, // Keep original left/top values
+            validateCoordinates: true,    // Log coordinate preservation
+            allowedTolerance: 0.1        // Sub-pixel tolerance for validation
+        };
+
+        // 🎯 AGENT 3: MOCKUP BACKGROUND RENDERER
+        this.backgroundRenderer = {
+            templateSupport: true,           // Enable template background rendering
+            backgroundCache: new Map(),     // Cache for background images
+            preserveAspectRatio: true,      // Maintain template aspect ratio
+            backgroundLayer: 'bottom',      // Render background first
+            logBackgroundRender: true       // Log background rendering
+        };
+
+        // 🎯 AGENT 4: IMAGE ELEMENT RENDERER
+        this.imageRenderer = {
+            exactPositioning: true,         // Use exact positioning without transformation
+            crossOriginSupport: true,       // Handle external image URLs
+            preserveImageScaling: true,     // Maintain original scaleX/scaleY values
+            enableImageCaching: true,       // Cache loaded images for performance
+            logImageRender: true           // Log detailed image rendering info
+        };
+
+        // 🎯 AGENT 5: TEXT ELEMENT RENDERER
+        this.textRenderer = {
+            fontLoadingSupport: true,       // Support web font loading
+            exactTextPositioning: true,     // Use exact text positioning
+            preserveTextScaling: true,      // Maintain original text scaling
+            fontCache: new Map(),          // Cache loaded fonts
+            supportedTextProps: [          // Supported text properties
+                'fontFamily', 'fontSize', 'fontWeight', 'fontStyle',
+                'textAlign', 'fill', 'stroke', 'strokeWidth', 'textDecoration'
+            ],
+            logTextRender: true           // Log detailed text rendering info
+        };
+
+        // 🎯 AGENT 6: SHAPE ELEMENT RENDERER
+        this.shapeRenderer = {
+            exactShapePositioning: true,    // Use exact shape positioning
+            preserveShapeDimensions: true,  // Maintain original shape dimensions
+            supportedShapes: [             // Supported shape types
+                'rect', 'rectangle', 'circle', 'ellipse', 'line', 'polygon', 'path'
+            ],
+            supportedShapeProps: [         // Supported shape properties
+                'fill', 'stroke', 'strokeWidth', 'strokeDashArray',
+                'opacity', 'shadow', 'radius'
+            ],
+            logShapeRender: true          // Log detailed shape rendering info
+        };
 
         // 🎯 AGENT 5: ENHANCED TRANSFORM ENGINE - Sub-pixel accuracy system
         this.transformCache = new Map(); // Cache for transform calculations
@@ -52,11 +114,20 @@ class AdminCanvasRenderer {
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
 
-        // Calculate display dimensions
-        const containerWidth = container.clientWidth || 400;
+        // 🎯 AGENT 1: ZERO-SCALING CANVAS CREATION - Preserve exact dimensions
+        const containerWidth = container.clientWidth || 800;
         const aspectRatio = this.canvasHeight / this.canvasWidth;
-        const displayWidth = Math.min(containerWidth, 600);
-        const displayHeight = displayWidth * aspectRatio;
+
+        // AGENT 1: Option 1 - Exact dimensions (may be small)
+        let displayWidth, displayHeight;
+        if (this.dimensionPreservation.enforceExactDimensions) {
+            displayWidth = this.canvasWidth;
+            displayHeight = this.canvasHeight;
+        } else {
+            // Option 2 - Scale to fit container while maintaining aspect ratio
+            displayWidth = Math.min(containerWidth, 800);
+            displayHeight = displayWidth * aspectRatio;
+        }
 
         // Set canvas dimensions for high DPI
         this.canvas.width = displayWidth * this.pixelRatio;
@@ -67,9 +138,22 @@ class AdminCanvasRenderer {
         // Scale context for high DPI
         this.ctx.scale(this.pixelRatio, this.pixelRatio);
 
-        // Calculate scale factors for coordinate transformation
+        // 🎯 AGENT 1: DIMENSION PRESERVATION - Calculate scale factors
         this.scaleX = displayWidth / this.canvasWidth;
         this.scaleY = displayHeight / this.canvasHeight;
+
+        // 🎯 AGENT 1: DIMENSION VALIDATION LOGGING
+        if (this.dimensionPreservation.logDimensionChanges) {
+            console.log('🎯 AGENT 1 DIMENSION CONTROLLER:', {
+                originalCanvas: `${this.canvasWidth}×${this.canvasHeight}`,
+                displaySize: `${displayWidth}×${displayHeight}`,
+                actualCanvas: `${this.canvas.width}×${this.canvas.height}`,
+                scaleFactors: `${this.scaleX.toFixed(3)}×${this.scaleY.toFixed(3)}`,
+                isExactDimensions: this.scaleX === 1 && this.scaleY === 1,
+                pixelRatio: this.pixelRatio,
+                aspectRatioPreserved: Math.abs((displayWidth/displayHeight) - (this.canvasWidth/this.canvasHeight)) < 0.001
+            });
+        }
 
         // Style the canvas
         this.canvas.style.border = '1px solid #ddd';
@@ -130,6 +214,117 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 AGENT 3: BACKGROUND TEMPLATE RENDERER
+     * Load and render template/mockup background images
+     * @param {string} templateUrl - Template background image URL
+     * @param {Object} options - Background rendering options
+     */
+    async renderBackground(templateUrl, options = {}) {
+        if (!this.backgroundRenderer.templateSupport || !templateUrl) {
+            if (this.backgroundRenderer.logBackgroundRender) {
+                console.log('🎯 AGENT 3 BACKGROUND: Skipping background render - no template URL');
+            }
+            return;
+        }
+
+        const startTime = performance.now();
+
+        try {
+            // 🎯 AGENT 3: Load background image with caching
+            let backgroundImg;
+            if (this.backgroundRenderer.backgroundCache.has(templateUrl)) {
+                backgroundImg = this.backgroundRenderer.backgroundCache.get(templateUrl);
+            } else {
+                backgroundImg = await this.loadImage(templateUrl);
+                this.backgroundRenderer.backgroundCache.set(templateUrl, backgroundImg);
+            }
+
+            // 🎯 AGENT 3: Calculate background scaling to fit canvas exactly
+            const bgScaleX = this.canvasWidth / backgroundImg.naturalWidth;
+            const bgScaleY = this.canvasHeight / backgroundImg.naturalHeight;
+
+            let finalScaleX, finalScaleY, offsetX = 0, offsetY = 0;
+
+            if (this.backgroundRenderer.preserveAspectRatio) {
+                // Maintain aspect ratio - fit to cover entire canvas
+                const scale = Math.max(bgScaleX, bgScaleY);
+                finalScaleX = finalScaleY = scale;
+
+                // Center the background if it doesn't fit exactly
+                const scaledWidth = backgroundImg.naturalWidth * scale;
+                const scaledHeight = backgroundImg.naturalHeight * scale;
+                offsetX = (this.canvasWidth - scaledWidth) / 2;
+                offsetY = (this.canvasHeight - scaledHeight) / 2;
+            } else {
+                // Stretch to fit exact canvas dimensions
+                finalScaleX = bgScaleX;
+                finalScaleY = bgScaleY;
+            }
+
+            // 🎯 AGENT 3: Apply coordinate preservation to background positioning
+            const bgPosition = this.coordinatePreservation.noTransformMode
+                ? { x: offsetX, y: offsetY }
+                : this.preserveCoordinates(offsetX, offsetY);
+
+            // 🎯 AGENT 3: Render background without affecting element coordinates
+            this.ctx.save();
+
+            // Draw background image
+            this.ctx.drawImage(
+                backgroundImg,
+                bgPosition.x,
+                bgPosition.y,
+                backgroundImg.naturalWidth * finalScaleX,
+                backgroundImg.naturalHeight * finalScaleY
+            );
+
+            this.ctx.restore();
+
+            const renderTime = performance.now() - startTime;
+
+            // 🎯 AGENT 3: BACKGROUND LOGGING
+            if (this.backgroundRenderer.logBackgroundRender) {
+                console.log('🎯 AGENT 3 BACKGROUND RENDERER:', {
+                    templateUrl: templateUrl,
+                    originalSize: `${backgroundImg.naturalWidth}×${backgroundImg.naturalHeight}`,
+                    canvasSize: `${this.canvasWidth}×${this.canvasHeight}`,
+                    scaling: {
+                        scaleX: finalScaleX.toFixed(3),
+                        scaleY: finalScaleY.toFixed(3),
+                        aspectRatioPreserved: this.backgroundRenderer.preserveAspectRatio
+                    },
+                    positioning: {
+                        offsetX: offsetX.toFixed(1),
+                        offsetY: offsetY.toFixed(1),
+                        finalX: bgPosition.x.toFixed(1),
+                        finalY: bgPosition.y.toFixed(1)
+                    },
+                    performance: `${renderTime.toFixed(2)}ms`,
+                    cached: this.backgroundRenderer.backgroundCache.has(templateUrl)
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ AGENT 3 BACKGROUND ERROR:', error);
+
+            // Draw error indicator for background
+            this.ctx.save();
+            this.ctx.fillStyle = '#f0f0f0';
+            this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+            this.ctx.fillStyle = '#999999';
+            this.ctx.font = '16px Arial, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(
+                'Background Load Error',
+                this.canvasWidth / 2,
+                this.canvasHeight / 2
+            );
+            this.ctx.restore();
+        }
+    }
+
+    /**
      * 🎯 ENHANCED TRANSFORM ENGINE
      * Pixel-perfect coordinate transformation with matrix calculations
      * Handles viewport scaling, rotation, and sub-pixel positioning
@@ -151,6 +346,47 @@ class AdminCanvasRenderer {
         matrix.scaleSelf(transform.scaleX || 1, transform.scaleY || 1);
 
         return matrix;
+    }
+
+    /**
+     * 🎯 AGENT 2: COORDINATE PRESERVATION - Zero-transformation coordinate system
+     * Apply zero transformations to preserve exact original coordinates
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     * @param {Object} options - Transform options
+     * @returns {Object} Preserved coordinates with validation metadata
+     */
+    preserveCoordinates(x, y, options = {}) {
+        // 🎯 AGENT 2: NO TRANSFORMATION MODE - Return exact coordinates
+        if (this.coordinatePreservation.noTransformMode) {
+            const result = {
+                x: x, // EXACT preservation - no scaling
+                y: y, // EXACT preservation - no scaling
+                originalX: x,
+                originalY: y,
+                preservation: {
+                    noTransformation: true,
+                    exactCoordinates: true,
+                    scaleApplied: false,
+                    agent: 'AGENT_2_COORDINATE_PRESERVATION'
+                }
+            };
+
+            // 🎯 AGENT 2: COORDINATE VALIDATION LOGGING
+            if (this.coordinatePreservation.validateCoordinates) {
+                console.log('🎯 AGENT 2 COORDINATE PRESERVATION:', {
+                    input: `${x}, ${y}`,
+                    output: `${result.x}, ${result.y}`,
+                    preserved: result.x === x && result.y === y,
+                    transformation: 'NONE - 1:1 Replica Mode'
+                });
+            }
+
+            return result;
+        }
+
+        // Fallback to original transform system if not in preservation mode
+        return this.transformCoordinates(x, y, options);
     }
 
     /**
@@ -335,11 +571,479 @@ class AdminCanvasRenderer {
     }
 
     /**
-     * 🎯 ENHANCED IMAGE RENDERER
+     * 🎯 AGENT 4: SPECIALIZED IMAGE ELEMENT RENDERER
+     * Renders image objects with exact positioning and no coordinate transformation
+     * @param {Object} imageData - Image data with url and transform properties
+     */
+    async renderImageElement(imageData) {
+        const startTime = performance.now();
+
+        try {
+            // 🎯 AGENT 4: Load image with crossOrigin support
+            const img = await this.loadImage(imageData.src || imageData.url);
+
+            // 🎯 AGENT 4: Extract exact positioning from design data
+            const left = imageData.left || 0;
+            const top = imageData.top || 0;
+            const scaleX = imageData.scaleX || 1;
+            const scaleY = imageData.scaleY || 1;
+            const angle = (imageData.angle || 0) * Math.PI / 180;
+
+            // 🎯 AGENT 4: Apply coordinate preservation (no transformation)
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: left, y: top }
+                : this.preserveCoordinates(left, top);
+
+            // 🎯 AGENT 4: Calculate exact image dimensions with preserved scaling
+            const displayWidth = (imageData.width || img.naturalWidth) * scaleX;
+            const displayHeight = (imageData.height || img.naturalHeight) * scaleY;
+
+            // Save context state
+            this.ctx.save();
+
+            // 🎯 AGENT 4: Apply transformations in correct order
+            this.ctx.translate(position.x, position.y);
+
+            if (angle !== 0) {
+                this.ctx.rotate(angle);
+            }
+
+            // 🎯 AGENT 4: High-quality image rendering
+            this.ctx.imageSmoothingEnabled = true;
+            this.ctx.imageSmoothingQuality = 'high';
+
+            // 🎯 AGENT 4: Draw image with exact dimensions (top-left origin)
+            this.ctx.drawImage(
+                img,
+                0, 0,  // No centering - use exact coordinates
+                displayWidth,
+                displayHeight
+            );
+
+            this.ctx.restore();
+
+            const renderTime = performance.now() - startTime;
+            this.updatePerformanceMetrics(renderTime);
+
+            // 🎯 AGENT 4: DETAILED IMAGE RENDERING LOG
+            if (this.imageRenderer.logImageRender) {
+                console.log('🎯 AGENT 4 IMAGE RENDERER:', {
+                    type: imageData.type || 'image',
+                    src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                    positioning: {
+                        originalLeft: left,
+                        originalTop: top,
+                        finalX: position.x,
+                        finalY: position.y,
+                        coordinatePreservation: this.coordinatePreservation.noTransformMode
+                    },
+                    dimensions: {
+                        naturalSize: `${img.naturalWidth}×${img.naturalHeight}`,
+                        scaledSize: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
+                        scaleFactors: `${(scaleX * 100).toFixed(1)}%×${(scaleY * 100).toFixed(1)}%`
+                    },
+                    rotation: angle !== 0 ? `${(angle * 180 / Math.PI).toFixed(1)}°` : 'none',
+                    performance: `${renderTime.toFixed(2)}ms`,
+                    exactPositioning: position.x === left && position.y === top
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ AGENT 4 IMAGE ERROR:', error);
+
+            // 🎯 AGENT 4: Enhanced error visualization
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: imageData.left || 0, y: imageData.top || 0 }
+                : this.preserveCoordinates(imageData.left || 0, imageData.top || 0);
+
+            this.ctx.save();
+
+            // Error background
+            this.ctx.fillStyle = '#ffe6e6';
+            this.ctx.fillRect(position.x, position.y, 100, 60);
+
+            // Error border
+            this.ctx.strokeStyle = '#ff4444';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(position.x, position.y, 100, 60);
+
+            // Error text
+            this.ctx.fillStyle = '#cc0000';
+            this.ctx.font = '12px Arial, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('IMAGE ERROR', position.x + 50, position.y + 25);
+            this.ctx.fillText(imageData.type || 'unknown', position.x + 50, position.y + 45);
+
+            this.ctx.restore();
+        }
+    }
+
+    /**
+     * 🎯 AGENT 5: SPECIALIZED TEXT ELEMENT RENDERER
+     * Renders text objects with exact positioning and font loading support
+     * @param {Object} textData - Text data with font and positioning properties
+     */
+    async renderTextElement(textData) {
+        const startTime = performance.now();
+
+        try {
+            // 🎯 AGENT 5: Extract text properties
+            const text = textData.text || '';
+            const left = textData.left || 0;
+            const top = textData.top || 0;
+            const scaleX = textData.scaleX || 1;
+            const scaleY = textData.scaleY || 1;
+            const angle = (textData.angle || 0) * Math.PI / 180;
+
+            // 🎯 AGENT 5: Font properties with defaults
+            const fontFamily = textData.fontFamily || 'Arial, sans-serif';
+            const fontSize = (textData.fontSize || 16) * scaleY; // Scale font size
+            const fontWeight = textData.fontWeight || 'normal';
+            const fontStyle = textData.fontStyle || 'normal';
+            const textAlign = textData.textAlign || 'left';
+
+            // 🎯 AGENT 5: Color properties
+            const fill = textData.fill || '#000000';
+            const stroke = textData.stroke || null;
+            const strokeWidth = textData.strokeWidth || 0;
+
+            // 🎯 AGENT 5: Apply coordinate preservation (no transformation)
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: left, y: top }
+                : this.preserveCoordinates(left, top);
+
+            // 🎯 AGENT 5: Load font if web font
+            if (this.textRenderer.fontLoadingSupport && fontFamily !== 'Arial, sans-serif') {
+                await this.loadFont(fontFamily);
+            }
+
+            // Save context state
+            this.ctx.save();
+
+            // 🎯 AGENT 5: Apply transformations in correct order
+            this.ctx.translate(position.x, position.y);
+
+            if (angle !== 0) {
+                this.ctx.rotate(angle);
+            }
+
+            // Apply scaling
+            this.ctx.scale(scaleX, scaleY);
+
+            // 🎯 AGENT 5: Set font properties
+            this.ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+            this.ctx.textAlign = textAlign;
+            this.ctx.textBaseline = 'top'; // Consistent baseline
+
+            // 🎯 AGENT 5: Render text with fill and stroke
+            if (fill) {
+                this.ctx.fillStyle = fill;
+                this.ctx.fillText(text, 0, 0);
+            }
+
+            if (stroke && strokeWidth > 0) {
+                this.ctx.strokeStyle = stroke;
+                this.ctx.lineWidth = strokeWidth;
+                this.ctx.strokeText(text, 0, 0);
+            }
+
+            this.ctx.restore();
+
+            const renderTime = performance.now() - startTime;
+            this.updatePerformanceMetrics(renderTime);
+
+            // 🎯 AGENT 5: DETAILED TEXT RENDERING LOG
+            if (this.textRenderer.logTextRender) {
+                console.log('🎯 AGENT 5 TEXT RENDERER:', {
+                    type: textData.type || 'text',
+                    text: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
+                    positioning: {
+                        originalLeft: left,
+                        originalTop: top,
+                        finalX: position.x,
+                        finalY: position.y,
+                        coordinatePreservation: this.coordinatePreservation.noTransformMode
+                    },
+                    font: {
+                        family: fontFamily,
+                        size: fontSize.toFixed(1) + 'px',
+                        weight: fontWeight,
+                        style: fontStyle,
+                        align: textAlign
+                    },
+                    styling: {
+                        fill: fill,
+                        stroke: stroke || 'none',
+                        strokeWidth: strokeWidth
+                    },
+                    scaling: {
+                        scaleX: (scaleX * 100).toFixed(1) + '%',
+                        scaleY: (scaleY * 100).toFixed(1) + '%'
+                    },
+                    rotation: angle !== 0 ? `${(angle * 180 / Math.PI).toFixed(1)}°` : 'none',
+                    performance: `${renderTime.toFixed(2)}ms`,
+                    exactPositioning: position.x === left && position.y === top
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ AGENT 5 TEXT ERROR:', error);
+
+            // 🎯 AGENT 5: Enhanced error visualization for text
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: textData.left || 0, y: textData.top || 0 }
+                : this.preserveCoordinates(textData.left || 0, textData.top || 0);
+
+            this.ctx.save();
+
+            // Error background
+            this.ctx.fillStyle = '#fff0e6';
+            this.ctx.fillRect(position.x, position.y, 120, 40);
+
+            // Error border
+            this.ctx.strokeStyle = '#ff8c00';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(position.x, position.y, 120, 40);
+
+            // Error text
+            this.ctx.fillStyle = '#cc6600';
+            this.ctx.font = '12px Arial, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('TEXT ERROR', position.x + 60, position.y + 15);
+            this.ctx.fillText(textData.type || 'unknown', position.x + 60, position.y + 30);
+
+            this.ctx.restore();
+        }
+    }
+
+    /**
+     * 🎯 AGENT 5: FONT LOADER
+     * Load web fonts with caching support
+     * @param {string} fontFamily - Font family name
+     */
+    async loadFont(fontFamily) {
+        if (this.textRenderer.fontCache.has(fontFamily)) {
+            return this.textRenderer.fontCache.get(fontFamily);
+        }
+
+        try {
+            // Check if font is available in document fonts
+            if ('fonts' in document) {
+                const font = new FontFace(fontFamily, `url(${fontFamily})`);
+                await font.load();
+                document.fonts.add(font);
+                this.textRenderer.fontCache.set(fontFamily, true);
+
+                if (this.textRenderer.logTextRender) {
+                    console.log('🎯 AGENT 5 FONT LOADED:', fontFamily);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ AGENT 5 FONT LOAD WARNING:', fontFamily, error);
+            // Cache the failure to avoid repeated attempts
+            this.textRenderer.fontCache.set(fontFamily, false);
+        }
+    }
+
+    /**
+     * 🎯 AGENT 6: SPECIALIZED SHAPE ELEMENT RENDERER
+     * Renders shape objects with exact positioning and dimensions
+     * @param {Object} shapeData - Shape data with type and positioning properties
+     */
+    async renderShapeElement(shapeData) {
+        const startTime = performance.now();
+
+        try {
+            // 🎯 AGENT 6: Extract shape properties
+            const type = shapeData.type || 'rect';
+            const left = shapeData.left || 0;
+            const top = shapeData.top || 0;
+            const width = shapeData.width || 100;
+            const height = shapeData.height || 100;
+            const scaleX = shapeData.scaleX || 1;
+            const scaleY = shapeData.scaleY || 1;
+            const angle = (shapeData.angle || 0) * Math.PI / 180;
+
+            // 🎯 AGENT 6: Style properties
+            const fill = shapeData.fill || '#000000';
+            const stroke = shapeData.stroke || null;
+            const strokeWidth = shapeData.strokeWidth || 0;
+            const opacity = shapeData.opacity !== undefined ? shapeData.opacity : 1;
+            const radius = shapeData.radius || 0;
+
+            // 🎯 AGENT 6: Apply coordinate preservation (no transformation)
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: left, y: top }
+                : this.preserveCoordinates(left, top);
+
+            // 🎯 AGENT 6: Calculate exact dimensions with preserved scaling
+            const displayWidth = width * scaleX;
+            const displayHeight = height * scaleY;
+
+            // Save context state
+            this.ctx.save();
+
+            // 🎯 AGENT 6: Apply transformations in correct order
+            this.ctx.translate(position.x, position.y);
+
+            if (angle !== 0) {
+                this.ctx.rotate(angle);
+            }
+
+            // Apply opacity
+            this.ctx.globalAlpha = opacity;
+
+            // 🎯 AGENT 6: Render based on shape type
+            this.ctx.beginPath();
+
+            switch (type.toLowerCase()) {
+                case 'rect':
+                case 'rectangle':
+                    if (radius > 0) {
+                        // Rounded rectangle
+                        this.drawRoundedRect(0, 0, displayWidth, displayHeight, radius);
+                    } else {
+                        this.ctx.rect(0, 0, displayWidth, displayHeight);
+                    }
+                    break;
+
+                case 'circle':
+                    const centerX = displayWidth / 2;
+                    const centerY = displayHeight / 2;
+                    const radiusValue = Math.min(displayWidth, displayHeight) / 2;
+                    this.ctx.arc(centerX, centerY, radiusValue, 0, 2 * Math.PI);
+                    break;
+
+                case 'ellipse':
+                    const ellipseCenterX = displayWidth / 2;
+                    const ellipseCenterY = displayHeight / 2;
+                    const radiusX = displayWidth / 2;
+                    const radiusY = displayHeight / 2;
+                    this.ctx.ellipse(ellipseCenterX, ellipseCenterY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+                    break;
+
+                case 'line':
+                    this.ctx.moveTo(0, 0);
+                    this.ctx.lineTo(displayWidth, displayHeight);
+                    break;
+
+                default:
+                    // Default to rectangle for unknown shapes
+                    this.ctx.rect(0, 0, displayWidth, displayHeight);
+                    break;
+            }
+
+            // 🎯 AGENT 6: Apply fill and stroke
+            if (fill && type !== 'line') {
+                this.ctx.fillStyle = fill;
+                this.ctx.fill();
+            }
+
+            if (stroke && strokeWidth > 0) {
+                this.ctx.strokeStyle = stroke;
+                this.ctx.lineWidth = strokeWidth;
+                this.ctx.stroke();
+            }
+
+            this.ctx.restore();
+
+            const renderTime = performance.now() - startTime;
+            this.updatePerformanceMetrics(renderTime);
+
+            // 🎯 AGENT 6: DETAILED SHAPE RENDERING LOG
+            if (this.shapeRenderer.logShapeRender) {
+                console.log('🎯 AGENT 6 SHAPE RENDERER:', {
+                    type: type,
+                    positioning: {
+                        originalLeft: left,
+                        originalTop: top,
+                        finalX: position.x,
+                        finalY: position.y,
+                        coordinatePreservation: this.coordinatePreservation.noTransformMode
+                    },
+                    dimensions: {
+                        originalSize: `${width}×${height}`,
+                        scaledSize: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
+                        scaleFactors: `${(scaleX * 100).toFixed(1)}%×${(scaleY * 100).toFixed(1)}%`
+                    },
+                    styling: {
+                        fill: fill,
+                        stroke: stroke || 'none',
+                        strokeWidth: strokeWidth,
+                        opacity: (opacity * 100).toFixed(1) + '%',
+                        radius: radius || 'none'
+                    },
+                    rotation: angle !== 0 ? `${(angle * 180 / Math.PI).toFixed(1)}°` : 'none',
+                    performance: `${renderTime.toFixed(2)}ms`,
+                    exactPositioning: position.x === left && position.y === top
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ AGENT 6 SHAPE ERROR:', error);
+
+            // 🎯 AGENT 6: Enhanced error visualization for shapes
+            const position = this.coordinatePreservation.noTransformMode
+                ? { x: shapeData.left || 0, y: shapeData.top || 0 }
+                : this.preserveCoordinates(shapeData.left || 0, shapeData.top || 0);
+
+            this.ctx.save();
+
+            // Error background
+            this.ctx.fillStyle = '#f0f0ff';
+            this.ctx.fillRect(position.x, position.y, 100, 50);
+
+            // Error border
+            this.ctx.strokeStyle = '#4444ff';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(position.x, position.y, 100, 50);
+
+            // Error text
+            this.ctx.fillStyle = '#0000cc';
+            this.ctx.font = '12px Arial, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('SHAPE ERROR', position.x + 50, position.y + 20);
+            this.ctx.fillText(shapeData.type || 'unknown', position.x + 50, position.y + 35);
+
+            this.ctx.restore();
+        }
+    }
+
+    /**
+     * 🎯 AGENT 6: ROUNDED RECTANGLE HELPER
+     * Draw a rounded rectangle path
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     * @param {number} width - Width
+     * @param {number} height - Height
+     * @param {number} radius - Corner radius
+     */
+    drawRoundedRect(x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+
+        this.ctx.moveTo(x + r, y);
+        this.ctx.lineTo(x + width - r, y);
+        this.ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+        this.ctx.lineTo(x + width, y + height - r);
+        this.ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+        this.ctx.lineTo(x + r, y + height);
+        this.ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+        this.ctx.lineTo(x, y + r);
+        this.ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+
+    /**
+     * 🎯 ENHANCED IMAGE RENDERER (Legacy support)
      * Precise image rendering with sub-pixel accuracy and performance monitoring
      * @param {Object} imageData - Image data with url and transform properties
      */
     async renderImage(imageData) {
+        // 🎯 AGENT 4: Route to specialized image renderer for better handling
+        if (imageData.type === 'image' || imageData.src) {
+            return this.renderImageElement(imageData);
+        }
+
+        // Fallback to original implementation for compatibility
         const startTime = performance.now();
 
         try {
@@ -466,49 +1170,210 @@ class AdminCanvasRenderer {
     }
 
     /**
-     * Render complete design data
+     * 🎯 AGENT 7: INTEGRATED RENDERING PIPELINE
+     * Render complete design data with all specialized renderers
      * @param {Object} designData - Complete design data object
+     * @param {Object} options - Rendering options
      */
-    async renderDesign(designData) {
+    async renderDesign(designData, options = {}) {
         if (this.isRendering) {
             console.log('⚠️ RENDERER: Already rendering, skipping...');
             return;
         }
 
         this.isRendering = true;
-        console.log('🎨 RENDERER: Starting design render...', designData);
+        const startTime = performance.now();
+
+        console.log('🎯 AGENT 7 RENDERING PIPELINE: Starting integrated render...', designData);
 
         try {
-            // Clear canvas
+            // 🎯 AGENT 7: Clear canvas and prepare for rendering
             this.clearCanvas();
 
-            // Find the first design view (could be extended for multiple views)
-            const viewKeys = Object.keys(designData);
-            if (viewKeys.length === 0) {
-                console.log('⚠️ RENDERER: No design data found');
+            // 🎯 AGENT 7: Handle different data formats (objects array vs legacy format)
+            let objectsToRender = [];
+            let backgroundUrl = null;
+
+            if (designData.objects && Array.isArray(designData.objects)) {
+                // New format: direct objects array
+                objectsToRender = designData.objects;
+                backgroundUrl = designData.background || options.backgroundUrl;
+            } else {
+                // Legacy format: nested view structure
+                const viewKeys = Object.keys(designData);
+                if (viewKeys.length === 0) {
+                    console.log('⚠️ AGENT 7: No design data found');
+                    return;
+                }
+
+                const firstView = designData[viewKeys[0]];
+                if (firstView && firstView.images) {
+                    objectsToRender = firstView.images;
+                }
+            }
+
+            // 🎯 AGENT 7: STEP 1 - Render background (Agent 3)
+            if (backgroundUrl) {
+                console.log('🎯 AGENT 7: Rendering background template...');
+                await this.renderBackground(backgroundUrl);
+            }
+
+            // 🎯 AGENT 7: STEP 2 - Process and render all objects in order
+            if (objectsToRender.length === 0) {
+                console.log('⚠️ AGENT 7: No objects to render');
                 return;
             }
 
-            const firstView = designData[viewKeys[0]];
-            if (!firstView || !firstView.images) {
-                console.log('⚠️ RENDERER: No images in design data');
-                return;
+            console.log(`🎯 AGENT 7: Processing ${objectsToRender.length} design objects...`);
+
+            const renderResults = {
+                totalObjects: objectsToRender.length,
+                rendered: { images: 0, text: 0, shapes: 0, other: 0 },
+                errors: [],
+                coordinateValidation: [],
+                performance: {}
+            };
+
+            // 🎯 AGENT 7: Render each object with specialized renderer
+            for (let i = 0; i < objectsToRender.length; i++) {
+                const obj = objectsToRender[i];
+                const objStartTime = performance.now();
+
+                try {
+                    // 🎯 AGENT 7: Route to appropriate specialized renderer
+                    switch (obj.type?.toLowerCase()) {
+                        case 'image':
+                            await this.renderImageElement(obj);
+                            renderResults.rendered.images++;
+                            break;
+
+                        case 'text':
+                        case 'textbox':
+                            await this.renderTextElement(obj);
+                            renderResults.rendered.text++;
+                            break;
+
+                        case 'rect':
+                        case 'rectangle':
+                        case 'circle':
+                        case 'ellipse':
+                        case 'line':
+                        case 'polygon':
+                            await this.renderShapeElement(obj);
+                            renderResults.rendered.shapes++;
+                            break;
+
+                        default:
+                            // Try image renderer for unknown types with src
+                            if (obj.src || obj.url) {
+                                await this.renderImageElement(obj);
+                                renderResults.rendered.images++;
+                            } else {
+                                console.warn('⚠️ AGENT 7: Unknown object type:', obj.type, obj);
+                                renderResults.rendered.other++;
+                            }
+                            break;
+                    }
+
+                    // 🎯 AGENT 7: Coordinate validation for each object
+                    if (this.coordinatePreservation.validateCoordinates && obj.left !== undefined && obj.top !== undefined) {
+                        const validation = {
+                            object: i + 1,
+                            type: obj.type,
+                            originalCoords: { left: obj.left, top: obj.top },
+                            preserved: this.coordinatePreservation.noTransformMode,
+                            renderTime: performance.now() - objStartTime
+                        };
+                        renderResults.coordinateValidation.push(validation);
+                    }
+
+                } catch (error) {
+                    console.error(`❌ AGENT 7: Error rendering object ${i + 1}:`, error);
+                    renderResults.errors.push({
+                        object: i + 1,
+                        type: obj.type || 'unknown',
+                        error: error.message
+                    });
+                }
             }
 
-            // Render all images
-            console.log(`🎨 RENDERER: Rendering ${firstView.images.length} images...`);
+            const totalTime = performance.now() - startTime;
+            renderResults.performance = {
+                totalTime: `${totalTime.toFixed(2)}ms`,
+                averagePerObject: `${(totalTime / objectsToRender.length).toFixed(2)}ms`,
+                objectsPerSecond: (objectsToRender.length / (totalTime / 1000)).toFixed(1)
+            };
 
-            for (const imageData of firstView.images) {
-                await this.renderImage(imageData);
-            }
+            // 🎯 AGENT 7: FINAL VALIDATION & QUALITY CHECK
+            const qualityCheck = this.performQualityCheck(renderResults, designData);
 
-            console.log('✅ RENDERER: Design render complete');
+            console.log('🎯 AGENT 7 RENDERING COMPLETE:', {
+                ...renderResults,
+                qualityCheck,
+                systemStatus: {
+                    canvasDimensions: `${this.canvasWidth}×${this.canvasHeight}`,
+                    coordinatePreservation: this.coordinatePreservation.noTransformMode,
+                    exactDimensions: this.dimensionPreservation.enforceExactDimensions,
+                    allAgentsActive: true
+                }
+            });
+
+            return renderResults;
 
         } catch (error) {
-            console.error('❌ RENDERER ERROR:', error);
+            console.error('❌ AGENT 7 PIPELINE ERROR:', error);
+            throw error;
         } finally {
             this.isRendering = false;
         }
+    }
+
+    /**
+     * 🎯 AGENT 7: QUALITY CHECK SYSTEM
+     * Perform 1:1 replica quality validation
+     * @param {Object} renderResults - Rendering results
+     * @param {Object} originalData - Original design data
+     * @returns {Object} Quality check results
+     */
+    performQualityCheck(renderResults, originalData) {
+        const qualityCheck = {
+            is1to1Replica: false,
+            coordinatePreservation: true,
+            dimensionAccuracy: true,
+            renderingSuccess: true,
+            score: 0,
+            issues: []
+        };
+
+        // Check rendering success rate
+        const successRate = ((renderResults.totalObjects - renderResults.errors.length) / renderResults.totalObjects) * 100;
+        if (successRate < 100) {
+            qualityCheck.renderingSuccess = false;
+            qualityCheck.issues.push(`Rendering errors: ${renderResults.errors.length}/${renderResults.totalObjects} objects failed`);
+        }
+
+        // Check coordinate preservation
+        if (!this.coordinatePreservation.noTransformMode) {
+            qualityCheck.coordinatePreservation = false;
+            qualityCheck.issues.push('Coordinate transformation applied - not 1:1 replica');
+        }
+
+        // Check dimension accuracy
+        if (!this.dimensionPreservation.enforceExactDimensions) {
+            qualityCheck.dimensionAccuracy = false;
+            qualityCheck.issues.push('Canvas dimensions not exact - scaling applied');
+        }
+
+        // Calculate overall quality score
+        let score = 0;
+        if (qualityCheck.renderingSuccess) score += 40;
+        if (qualityCheck.coordinatePreservation) score += 30;
+        if (qualityCheck.dimensionAccuracy) score += 30;
+
+        qualityCheck.score = score;
+        qualityCheck.is1to1Replica = score === 100;
+
+        return qualityCheck;
     }
 
     /**

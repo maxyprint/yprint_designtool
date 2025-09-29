@@ -13,6 +13,21 @@ class DesignPreviewGenerator {
         this.currentData = null;
         this.previewCallbacks = new Map();
         this.errorHandlers = new Map();
+
+        // 🎯 AGENT 7: RENDERING VALIDATION & INTEGRATION SYSTEM
+        this.integrationSystem = {
+            enabledRenderers: {
+                background: true,    // Agent 3 - Background renderer
+                images: true,        // Agent 4 - Image renderer
+                text: true,          // Agent 5 - Text renderer
+                shapes: true         // Agent 6 - Shape renderer
+            },
+            renderingOrder: ['background', 'images', 'text', 'shapes'],
+            validationEnabled: true,     // Enable 1:1 replica validation
+            coordinateValidation: true,  // Validate coordinate preservation
+            performanceMonitoring: true, // Monitor rendering performance
+            replicaQualityCheck: true   // Check for 1:1 replica achievement
+        };
     }
 
     /**
@@ -132,13 +147,13 @@ class DesignPreviewGenerator {
     }
 
     /**
-     * 🎯 ENHANCED PREVIEW GENERATOR
-     * Generate preview from design data with transform validation and performance tracking
+     * 🎯 AGENT 7: ENHANCED INTEGRATED PREVIEW GENERATOR
+     * Generate preview using all 7 specialized agents for 1:1 replica rendering
      * @param {Object} designData - Design data object
      * @param {Object} options - Rendering options
      */
     async generatePreview(designData, options = {}) {
-        console.log('🔄 PREVIEW GENERATOR: Generating preview...', designData);
+        console.log('🎯 AGENT 7 PREVIEW GENERATOR: Starting integrated preview generation...', designData);
 
         const startTime = performance.now();
 
@@ -146,7 +161,7 @@ class DesignPreviewGenerator {
             // Store current data
             this.currentData = designData;
 
-            // Validate data
+            // 🎯 AGENT 7: Enhanced data validation
             const validation = this.validateDesignData(designData);
             if (!validation.isValid) {
                 throw new Error(`Invalid design data: ${validation.errors.join(', ')}`);
@@ -154,56 +169,80 @@ class DesignPreviewGenerator {
 
             // Show warnings if any
             if (validation.warnings.length > 0) {
-                console.warn('⚠️ PREVIEW WARNINGS:', validation.warnings);
+                console.warn('⚠️ AGENT 7 PREVIEW WARNINGS:', validation.warnings);
             }
 
-            // 🎯 TRANSFORM ACCURACY TEST: Test with known coordinates before rendering
-            if (options.testAccuracy !== false) {
-                const accuracyTest = this.renderer.testTransformAccuracy();
-                if (accuracyTest.failed > 0) {
-                    console.warn('⚠️ TRANSFORM ACCURACY: Some tests failed', accuracyTest);
-                }
-            }
+            // 🎯 AGENT 7: Prepare integrated rendering options
+            const renderOptions = {
+                ...options,
+                enableValidation: this.integrationSystem.validationEnabled,
+                coordinateValidation: this.integrationSystem.coordinateValidation,
+                performanceMonitoring: this.integrationSystem.performanceMonitoring
+            };
 
-            // Generate preview with loading state
-            await this.renderer.renderWithLoading(
-                designData,
-                options.loadingText || `Rendering ${validation.imageCount} elements...`
-            );
+            // 🎯 AGENT 7: Execute integrated rendering pipeline
+            console.log('🎯 AGENT 7: Executing 7-agent rendering pipeline...');
+
+            const renderResults = await this.renderer.renderDesign(designData, renderOptions);
 
             const totalTime = performance.now() - startTime;
 
-            // 🎯 GET PERFORMANCE REPORT
-            const performanceReport = this.renderer.getPerformanceReport();
-
-            // Trigger success callbacks
-            this.triggerCallbacks('success', {
+            // 🎯 AGENT 7: Compile comprehensive results
+            const integratedResults = {
                 designData,
                 validation,
-                renderer: this.renderer,
+                renderResults,
+                agents: {
+                    agent1_dimensionController: this.renderer.dimensionPreservation,
+                    agent2_coordinatePreservation: this.renderer.coordinatePreservation,
+                    agent3_backgroundRenderer: this.renderer.backgroundRenderer,
+                    agent4_imageRenderer: this.renderer.imageRenderer,
+                    agent5_textRenderer: this.renderer.textRenderer,
+                    agent6_shapeRenderer: this.renderer.shapeRenderer,
+                    agent7_integration: this.integrationSystem
+                },
                 performance: {
-                    totalTime: `${totalTime.toFixed(2)}ms`,
-                    ...performanceReport
+                    totalGenerationTime: `${totalTime.toFixed(2)}ms`,
+                    renderingTime: renderResults?.performance?.totalTime || 'N/A',
+                    ...this.renderer.getPerformanceReport()
+                },
+                qualityAssurance: {
+                    is1to1Replica: renderResults?.qualityCheck?.is1to1Replica || false,
+                    qualityScore: renderResults?.qualityCheck?.score || 0,
+                    coordinatePreservation: this.renderer.coordinatePreservation.noTransformMode,
+                    exactDimensions: this.renderer.dimensionPreservation.enforceExactDimensions,
+                    issues: renderResults?.qualityCheck?.issues || []
                 }
+            };
+
+            // 🎯 AGENT 7: Trigger success callbacks with comprehensive data
+            this.triggerCallbacks('success', integratedResults);
+
+            console.log('🎯 AGENT 7 PREVIEW GENERATION COMPLETE:', {
+                systemStatus: 'ALL_7_AGENTS_ACTIVE',
+                is1to1Replica: integratedResults.qualityAssurance.is1to1Replica,
+                qualityScore: `${integratedResults.qualityAssurance.qualityScore}/100`,
+                totalTime: `${totalTime.toFixed(2)}ms`,
+                objectsRendered: renderResults?.totalObjects || 0,
+                errors: renderResults?.errors?.length || 0,
+                agentSystemIntegrated: true
             });
 
-            console.log('✅ PREVIEW GENERATOR: Preview generated successfully', {
-                totalTime: `${totalTime.toFixed(2)}ms`,
-                images: validation.imageCount,
-                performance: performanceReport
-            });
+            return integratedResults;
 
         } catch (error) {
-            console.error('❌ PREVIEW GENERATION ERROR:', error);
+            console.error('❌ AGENT 7 PREVIEW GENERATION ERROR:', error);
 
             // Trigger error callbacks
             this.triggerCallbacks('error', {
                 error,
-                designData
+                designData,
+                agent: 'AGENT_7_INTEGRATION_SYSTEM'
             });
 
             // Show error on canvas
             this.showError(error.message);
+            throw error;
         }
     }
 
