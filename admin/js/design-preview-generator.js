@@ -92,9 +92,16 @@ class DesignPreviewGenerator {
                 result.warnings.push('System ID is missing');
             }
 
-            // Validate images array
+            // 🎯 AGENT 5: ENHANCED VALIDATION with Data Structure Guidance
             if (!firstView.images || !Array.isArray(firstView.images)) {
-                result.errors.push('Images array is missing or invalid');
+                // Check if data might be in Hive Mind format
+                if (designData.objects && Array.isArray(designData.objects)) {
+                    result.errors.push('Data structure incompatibility: Found Hive Mind "objects" array but Canvas Reconstruction Engine expects "images" array. Use transformDataStructure() method to convert.');
+                } else if (designData.elements && Array.isArray(designData.elements)) {
+                    result.errors.push('Data structure incompatibility: Found legacy "elements" array but Canvas Reconstruction Engine expects "images" array. Use transformDataStructure() method to convert.');
+                } else {
+                    result.errors.push('Images array is missing or invalid - no compatible data structure found');
+                }
                 return result;
             }
 
@@ -118,7 +125,7 @@ class DesignPreviewGenerator {
                     result.errors.push(`Image ${index}: Invalid URL format`);
                 }
 
-                // Check transform data
+                // 🎯 AGENT 5: ENHANCED COORDINATE VALIDATION
                 if (img.transform) {
                     const transform = img.transform;
                     const requiredProps = ['left', 'top', 'scaleX', 'scaleY'];
@@ -126,8 +133,25 @@ class DesignPreviewGenerator {
                     requiredProps.forEach(prop => {
                         if (typeof transform[prop] !== 'number') {
                             result.warnings.push(`Image ${index}: Transform ${prop} is not a number`);
+                        } else if (isNaN(transform[prop])) {
+                            result.errors.push(`Image ${index}: Transform ${prop} is NaN`);
                         }
                     });
+
+                    // 🎯 AGENT 2: COORDINATE PRESERVATION VALIDATION
+                    // Validate coordinate ranges for 780x580 canvas
+                    if (transform.left < -1000 || transform.left > 2000) {
+                        result.warnings.push(`Image ${index}: Left coordinate (${transform.left}) may be outside expected range`);
+                    }
+                    if (transform.top < -1000 || transform.top > 2000) {
+                        result.warnings.push(`Image ${index}: Top coordinate (${transform.top}) may be outside expected range`);
+                    }
+                    if (transform.scaleX <= 0 || transform.scaleX > 10) {
+                        result.warnings.push(`Image ${index}: ScaleX (${transform.scaleX}) may be outside expected range`);
+                    }
+                    if (transform.scaleY <= 0 || transform.scaleY > 10) {
+                        result.warnings.push(`Image ${index}: ScaleY (${transform.scaleY}) may be outside expected range`);
+                    }
                 } else {
                     result.warnings.push(`Image ${index}: No transform data`);
                 }
@@ -147,6 +171,145 @@ class DesignPreviewGenerator {
     }
 
     /**
+     * 🎯 AGENT 5: COMPREHENSIVE DATA STRUCTURE VALIDATION
+     * Validates data structure compatibility and provides guidance
+     * @param {Object} designData - Design data to validate
+     * @returns {Object} Detailed validation result with compatibility information
+     */
+    validateDataStructureCompatibility(designData) {
+        const result = {
+            isCompatible: false,
+            format: 'unknown',
+            needsTransformation: false,
+            compatibilityErrors: [],
+            compatibilityWarnings: [],
+            detectedStructures: []
+        };
+
+        if (!designData || typeof designData !== 'object') {
+            result.compatibilityErrors.push('Invalid design data: not an object');
+            return result;
+        }
+
+        // Check for Hive Mind objects format
+        if (designData.objects && Array.isArray(designData.objects)) {
+            result.detectedStructures.push('hive_mind_objects');
+            result.format = 'hive_mind_objects';
+            result.needsTransformation = true;
+            result.compatibilityWarnings.push('Hive Mind objects format detected - requires transformation to Canvas Reconstruction format');
+
+            // Validate objects structure
+            const imageObjects = designData.objects.filter(obj => obj.type === 'image');
+            if (imageObjects.length === 0) {
+                result.compatibilityErrors.push('No image objects found in Hive Mind data');
+            } else {
+                result.compatibilityWarnings.push(`${imageObjects.length} image objects found - will be converted to images array`);
+            }
+        }
+
+        // Check for elements format
+        if (designData.elements && Array.isArray(designData.elements)) {
+            result.detectedStructures.push('elements');
+            result.format = 'elements';
+            result.needsTransformation = true;
+            result.compatibilityWarnings.push('Legacy elements format detected - requires transformation to Canvas Reconstruction format');
+        }
+
+        // Check for Canvas Reconstruction format
+        const firstViewKey = Object.keys(designData)[0];
+        if (firstViewKey && designData[firstViewKey] && designData[firstViewKey].images) {
+            result.detectedStructures.push('canvas_reconstruction');
+            result.format = 'canvas_reconstruction';
+            result.isCompatible = true;
+            result.needsTransformation = false;
+        }
+
+        // Set compatibility based on transformation capability
+        if (result.needsTransformation && result.compatibilityErrors.length === 0) {
+            result.isCompatible = true;
+        }
+
+        return result;
+    }
+
+    /**
+     * 🎯 AGENT 6: DIAGNOSE PREVIOUS TRANSFORMATION ERRORS
+     * Analyzes why data transformation failed and provides guidance
+     * @param {Object} originalData - Original design data that failed transformation
+     * @returns {string} Diagnostic message with guidance
+     */
+    diagnosePreviousError(originalData) {
+        let diagnosis = 'Transformation failed: ';
+
+        if (!originalData || typeof originalData !== 'object') {
+            return diagnosis + 'Original data is null or not an object.';
+        }
+
+        const hasObjects = originalData.objects && Array.isArray(originalData.objects);
+        const hasElements = originalData.elements && Array.isArray(originalData.elements);
+        const hasViewStructure = Object.keys(originalData).some(key =>
+            originalData[key] && originalData[key].images && Array.isArray(originalData[key].images)
+        );
+
+        if (!hasObjects && !hasElements && !hasViewStructure) {
+            return diagnosis + 'No compatible data structure found (missing objects, elements, or view-based images arrays).';
+        }
+
+        if (hasObjects) {
+            const imageObjects = originalData.objects.filter(obj => obj.type === 'image');
+            if (imageObjects.length === 0) {
+                return diagnosis + 'Objects array found but contains no image objects.';
+            }
+            return diagnosis + `Objects array found with ${imageObjects.length} image objects but transformation logic failed.`;
+        }
+
+        if (hasElements) {
+            const imageElements = originalData.elements.filter(el => el.type === 'image');
+            if (imageElements.length === 0) {
+                return diagnosis + 'Elements array found but contains no image elements.';
+            }
+            return diagnosis + `Elements array found with ${imageElements.length} image elements but transformation logic failed.`;
+        }
+
+        return diagnosis + 'Unknown transformation failure.';
+    }
+
+    /**
+     * 🎯 AGENT 6: GENERATE ERROR CONTEXT
+     * Provides detailed context for validation errors
+     * @param {Object} originalData - Original design data
+     * @param {Object} transformedData - Transformed design data
+     * @param {Object} validation - Validation result
+     * @returns {string} Error context message
+     */
+    generateErrorContext(originalData, transformedData, validation) {
+        let context = '';
+
+        // Analysis original vs transformed
+        const originalFormat = originalData.objects ? 'objects' :
+                              originalData.elements ? 'elements' : 'view-based';
+
+        const transformedFormat = Object.keys(transformedData)[0];
+        const firstView = transformedData[transformedFormat];
+
+        context += `Original format: ${originalFormat}, Transformed to: view-based. `;
+
+        if (firstView && firstView.images) {
+            context += `Transformation produced ${firstView.images.length} images. `;
+        } else {
+            context += 'Transformation failed to produce images array. ';
+        }
+
+        // Analysis specific validation errors
+        const hasImagesError = validation.errors.some(err => err.includes('Images array'));
+        if (hasImagesError && originalData.objects) {
+            context += 'Issue: Hive Mind objects → images transformation may have failed. ';
+        }
+
+        return context;
+    }
+
+    /**
      * 🎯 AGENT 7: ENHANCED INTEGRATED PREVIEW GENERATOR
      * Generate preview using all 7 specialized agents for 1:1 replica rendering
      * @param {Object} designData - Design data object
@@ -158,13 +321,34 @@ class DesignPreviewGenerator {
         const startTime = performance.now();
 
         try {
-            // Store current data
-            this.currentData = designData;
+            // 🎯 AGENT 6: PRE-TRANSFORMATION COMPATIBILITY CHECK
+            const compatibilityCheck = this.validateDataStructureCompatibility(designData);
+            console.log('🎯 AGENT 6: Data structure compatibility analysis:', compatibilityCheck);
+
+            if (!compatibilityCheck.isCompatible) {
+                const errorMessage = `Data structure incompatibility: ${compatibilityCheck.compatibilityErrors.join(', ')}. Detected format: ${compatibilityCheck.format}`;
+                console.error('❌ AGENT 6: Compatibility check failed:', errorMessage);
+                throw new Error(errorMessage);
+            }
+
+            // 🎯 AGENT 3: DATA STRUCTURE TRANSFORMATION
+            // Transform data structure before validation and rendering
+            const transformedData = this.transformDataStructure(designData);
+            if (!transformedData) {
+                // 🎯 AGENT 6: ENHANCED ERROR REPORTING
+                const diagnosisResult = this.diagnosePreviousError(designData);
+                throw new Error(`Failed to transform design data structure. ${diagnosisResult}`);
+            }
+
+            // Store transformed data
+            this.currentData = transformedData;
 
             // 🎯 AGENT 7: Enhanced data validation
-            const validation = this.validateDesignData(designData);
+            const validation = this.validateDesignData(transformedData);
             if (!validation.isValid) {
-                throw new Error(`Invalid design data: ${validation.errors.join(', ')}`);
+                // 🎯 AGENT 6: ENHANCED ERROR CONTEXT
+                const errorContext = this.generateErrorContext(designData, transformedData, validation);
+                throw new Error(`Invalid design data: ${validation.errors.join(', ')}. ${errorContext}`);
             }
 
             // Show warnings if any
@@ -183,13 +367,13 @@ class DesignPreviewGenerator {
             // 🎯 AGENT 7: Execute integrated rendering pipeline
             console.log('🎯 AGENT 7: Executing 7-agent rendering pipeline...');
 
-            const renderResults = await this.renderer.renderDesign(designData, renderOptions);
+            const renderResults = await this.renderer.renderDesign(transformedData, renderOptions);
 
             const totalTime = performance.now() - startTime;
 
             // 🎯 AGENT 7: Compile comprehensive results
             const integratedResults = {
-                designData,
+                designData: transformedData,
                 validation,
                 renderResults,
                 agents: {
@@ -247,7 +431,8 @@ class DesignPreviewGenerator {
     }
 
     /**
-     * Show error message on canvas
+     * 🎯 AGENT 6: ENHANCED ERROR DISPLAY WITH GUIDANCE
+     * Show error message on canvas with diagnostic information
      * @param {string} message - Error message
      */
     showError(message) {
@@ -270,25 +455,68 @@ class DesignPreviewGenerator {
         ctx.lineWidth = 2;
         ctx.strokeRect(10, 10, (canvas.width / pixelRatio) - 20, (canvas.height / pixelRatio) - 20);
 
-        // Error text
+        // 🎯 AGENT 6: ENHANCED ERROR MESSAGING
         ctx.fillStyle = '#dc2626';
-        ctx.font = '14px Arial, sans-serif';
+        ctx.font = 'bold 14px Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(
-            'Preview Error',
+            'Canvas Reconstruction Error',
+            canvas.width / (2 * pixelRatio),
+            canvas.height / (2 * pixelRatio) - 40
+        );
+
+        // Main error message
+        ctx.font = '11px Arial, sans-serif';
+        ctx.fillStyle = '#666666';
+        const maxLength = 60;
+        const shortMessage = message.length > maxLength ? message.substring(0, maxLength) + '...' : message;
+        ctx.fillText(
+            shortMessage,
             canvas.width / (2 * pixelRatio),
             canvas.height / (2 * pixelRatio) - 10
         );
 
-        ctx.font = '12px Arial, sans-serif';
-        ctx.fillStyle = '#666666';
-        ctx.fillText(
-            message.substring(0, 50) + (message.length > 50 ? '...' : ''),
-            canvas.width / (2 * pixelRatio),
-            canvas.height / (2 * pixelRatio) + 15
-        );
+        // 🎯 AGENT 6: PROVIDE GUIDANCE
+        ctx.font = '10px Arial, sans-serif';
+        ctx.fillStyle = '#0066cc';
+
+        if (message.includes('Data structure incompatibility')) {
+            ctx.fillText(
+                'Hive Mind → Canvas format mismatch detected',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+            ctx.fillText(
+                'Check console for transformation details',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 30
+            );
+        } else if (message.includes('Images array is missing')) {
+            ctx.fillText(
+                'Try using transformDataStructure() method',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+        } else {
+            ctx.fillText(
+                'See browser console for detailed error information',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+        }
 
         ctx.restore();
+
+        // 🎯 AGENT 6: LOG DETAILED ERROR INFORMATION
+        console.group('🎯 AGENT 6: Canvas Reconstruction Error Details');
+        console.error('Error Message:', message);
+        console.log('Current Data:', this.currentData);
+        console.log('Renderer State:', {
+            hasRenderer: !!this.renderer,
+            canvasElement: this.renderer?.canvas,
+            context: this.renderer?.ctx
+        });
+        console.groupEnd();
     }
 
     /**
@@ -423,6 +651,129 @@ class DesignPreviewGenerator {
         }
         this.currentData = null;
         console.log('🔄 PREVIEW CLEARED');
+    }
+
+    /**
+     * 🎯 AGENT 3: DATA STRUCTURE TRANSFORMATION ENGINE
+     * Transform data structure from Hive Mind Analysis format to Canvas Reconstruction format
+     * @param {Object} designData - Design data from various sources
+     * @returns {Object} Transformed data compatible with Canvas Reconstruction Engine
+     */
+    transformDataStructure(designData) {
+        console.log('🎯 AGENT 3: Starting data structure transformation...', designData);
+
+        if (!designData || typeof designData !== 'object') {
+            console.error('❌ AGENT 3: Invalid design data for transformation');
+            return null;
+        }
+
+        // If data already has view-based structure with images, return as-is
+        const firstViewKey = Object.keys(designData)[0];
+        if (firstViewKey && designData[firstViewKey] && designData[firstViewKey].images) {
+            console.log('✅ AGENT 3: Data already in Canvas Reconstruction format');
+            return designData;
+        }
+
+        // Check if data has 'objects' array (Hive Mind Analysis format)
+        if (designData.objects && Array.isArray(designData.objects)) {
+            console.log('🎯 AGENT 3: Converting from Hive Mind objects format...');
+
+            const transformedData = this.convertObjectsToImages(designData);
+            console.log('✅ AGENT 3: Successfully transformed objects to images format', transformedData);
+            return transformedData;
+        }
+
+        // Check if data has 'elements' array (legacy format)
+        if (designData.elements && Array.isArray(designData.elements)) {
+            console.log('🎯 AGENT 3: Converting from elements format...');
+
+            const transformedData = this.convertElementsToImages(designData);
+            console.log('✅ AGENT 3: Successfully transformed elements to images format', transformedData);
+            return transformedData;
+        }
+
+        console.warn('⚠️ AGENT 3: Unknown data structure format, returning as-is');
+        return designData;
+    }
+
+    /**
+     * 🎯 AGENT 3: Convert objects array to Canvas Reconstruction images format
+     * @param {Object} designData - Data with objects array
+     * @returns {Object} Canvas Reconstruction compatible format
+     */
+    convertObjectsToImages(designData) {
+        const images = [];
+
+        designData.objects.forEach((obj, index) => {
+            if (obj.type === 'image' && obj.src) {
+                // 🎯 AGENT 2: EXACT COORDINATE PRESERVATION
+                images.push({
+                    id: obj.id || `hive_img_${index}`,
+                    url: obj.src,
+                    transform: {
+                        left: parseFloat(obj.left || 0),
+                        top: parseFloat(obj.top || 0),
+                        width: parseFloat(obj.width || 0),
+                        height: parseFloat(obj.height || 0),
+                        scaleX: parseFloat(obj.scaleX || 1),
+                        scaleY: parseFloat(obj.scaleY || 1),
+                        angle: parseFloat(obj.angle || 0)
+                    }
+                });
+            }
+        });
+
+        // Create view-based structure for Canvas Reconstruction Engine
+        const viewId = 'hive_mind_view';
+        return {
+            [viewId]: {
+                view_name: 'Hive Mind Design View',
+                system_id: designData.system_id || Date.now().toString(),
+                variation_id: designData.variation_id || viewId,
+                images: images,
+                canvas: {
+                    width: designData.canvas?.width || 780,
+                    height: designData.canvas?.height || 580
+                }
+            }
+        };
+    }
+
+    /**
+     * 🎯 AGENT 3: Convert elements array to Canvas Reconstruction images format
+     * @param {Object} designData - Data with elements array
+     * @returns {Object} Canvas Reconstruction compatible format
+     */
+    convertElementsToImages(designData) {
+        const images = [];
+
+        designData.elements.forEach((element, index) => {
+            if (element.type === 'image' && element.src) {
+                images.push({
+                    id: element.id || `element_img_${index}`,
+                    url: element.src,
+                    transform: {
+                        left: parseFloat(element.left || 0),
+                        top: parseFloat(element.top || 0),
+                        width: parseFloat(element.width || 0),
+                        height: parseFloat(element.height || 0),
+                        scaleX: parseFloat(element.scaleX || 1),
+                        scaleY: parseFloat(element.scaleY || 1),
+                        angle: parseFloat(element.angle || 0)
+                    }
+                });
+            }
+        });
+
+        const viewId = designData.template_view_id || 'elements_view';
+        return {
+            [viewId]: {
+                view_name: 'Elements Design View',
+                system_id: designData.system_id || Date.now().toString(),
+                variation_id: designData.variation_id || viewId,
+                images: images
+            }
+        };
     }
 
     /**

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 AGENT 7: Hive Mind ↔ Canvas Compatibility Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .test-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .test-section {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .test-section:last-child {
+            border-bottom: none;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .data-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .data-panel h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        .canvas-container {
+            border: 2px solid #28a745;
+            border-radius: 6px;
+            margin: 10px 0;
+            position: relative;
+            background: white;
+        }
+        .canvas-container canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        .test-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status-display {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .status-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .status-info {
+            background: #cce7ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+        }
+        .coordinates-display {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .test-results {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎯 AGENT 7: HIVE-MIND ↔ CANVAS COMPATIBILITY TEST</h1>
+            <p>Testing Data Structure Transformation: Objects Array → Images Array</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Test Scenario: Canvas Reconstruction Engine Compatibility</h2>
+            <p><strong>Problem:</strong> Hive Mind Data Analysis provides <code>objects</code> array but Canvas Reconstruction Engine expects <code>images</code> array.</p>
+            <p><strong>Solution:</strong> Implement transformation pipeline to convert data structures while preserving exact coordinates.</p>
+
+            <div class="test-grid">
+                <div class="data-panel">
+                    <h4>🧠 Hive Mind Format (Input)</h4>
+                    <pre id="hive-mind-data">Loading...</pre>
+                </div>
+                <div class="data-panel">
+                    <h4>🖼️ Canvas Reconstruction Format (Expected Output)</h4>
+                    <pre id="canvas-data">Loading...</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Transformation Tests</h2>
+            <div id="test-status" class="status-display status-info">Ready to run tests...</div>
+
+            <button id="test-compatibility" class="test-button">
+                🔬 Test Data Structure Compatibility
+            </button>
+            <button id="test-transformation" class="test-button">
+                🔄 Test Hive Mind → Canvas Transformation
+            </button>
+            <button id="test-coordinate-preservation" class="test-button">
+                📐 Test Coordinate Preservation
+            </button>
+            <button id="test-canvas-rendering" class="test-button">
+                🎨 Test Canvas Rendering
+            </button>
+
+            <div class="test-results" id="test-results" style="display: none;">
+                <h4>Test Results:</h4>
+                <div id="results-content"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🖼️ Live Canvas Rendering Test</h2>
+            <div class="test-grid">
+                <div>
+                    <h4>Before Transformation (Should Fail)</h4>
+                    <div class="canvas-container">
+                        <canvas id="canvas-before" width="390" height="290"></canvas>
+                    </div>
+                    <button id="render-before" class="test-button">
+                        Render with Hive Mind Data (Should Fail)
+                    </button>
+                    <div id="status-before" class="status-display status-info">Ready to test...</div>
+                </div>
+                <div>
+                    <h4>After Transformation (Should Work)</h4>
+                    <div class="canvas-container">
+                        <canvas id="canvas-after" width="390" height="290"></canvas>
+                    </div>
+                    <button id="render-after" class="test-button">
+                        Render with Transformed Data (Should Work)
+                    </button>
+                    <div id="status-after" class="status-display status-info">Ready to test...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Coordinate Verification</h2>
+            <div id="coordinate-analysis" class="coordinates-display">
+                Click "Test Coordinate Preservation" to see detailed coordinate analysis...
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the required Canvas system -->
+    <script src="admin/js/admin-canvas-renderer.js"></script>
+    <script src="admin/js/design-preview-generator.js"></script>
+
+    <script>
+        // 🎯 AGENT 7: COMPREHENSIVE TEST SUITE
+
+        // Test data: Exact format from Hive Mind Analysis System
+        const hiveMindData = {
+            "objects": [
+                {
+                    "type": "image",
+                    "left": 328.1701693971554,
+                    "top": 156,
+                    "width": 1924,
+                    "height": 1075,
+                    "scaleX": 0.10507805062222215,
+                    "scaleY": 0.10507805062222215,
+                    "src": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/11092025ylifelogowhite-1.png"
+                },
+                {
+                    "type": "image",
+                    "left": 405.3813852813853,
+                    "top": 123.28369110662797,
+                    "width": 1000,
+                    "height": 400,
+                    "scaleX": 0.050,
+                    "scaleY": 0.050,
+                    "src": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/yprint-logo.png"
+                }
+            ],
+            "canvas": {
+                "width": 780,
+                "height": 580
+            }
+        };
+
+        // Expected Canvas Reconstruction format
+        const expectedCanvasFormat = {
+            "hive_mind_view": {
+                "view_name": "Hive Mind Design View",
+                "system_id": "test_system",
+                "variation_id": "hive_mind_view",
+                "images": [
+                    {
+                        "id": "hive_img_0",
+                        "url": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/11092025ylifelogowhite-1.png",
+                        "transform": {
+                            "left": 328.1701693971554,
+                            "top": 156,
+                            "width": 1924,
+                            "height": 1075,
+                            "scaleX": 0.10507805062222215,
+                            "scaleY": 0.10507805062222215,
+                            "angle": 0
+                        }
+                    },
+                    {
+                        "id": "hive_img_1",
+                        "url": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/yprint-logo.png",
+                        "transform": {
+                            "left": 405.3813852813853,
+                            "top": 123.28369110662797,
+                            "width": 1000,
+                            "height": 400,
+                            "scaleX": 0.050,
+                            "scaleY": 0.050,
+                            "angle": 0
+                        }
+                    }
+                ],
+                "canvas": {
+                    "width": 780,
+                    "height": 580
+                }
+            }
+        };
+
+        // Initialize test data display
+        document.getElementById('hive-mind-data').textContent = JSON.stringify(hiveMindData, null, 2);
+        document.getElementById('canvas-data').textContent = JSON.stringify(expectedCanvasFormat, null, 2);
+
+        // Test results tracking
+        let testResults = {
+            compatibility: false,
+            transformation: false,
+            coordinatePreservation: false,
+            canvasRendering: false
+        };
+
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status-display status-${type}`;
+        }
+
+        function showTestResults(results) {
+            const resultsDiv = document.getElementById('test-results');
+            const contentDiv = document.getElementById('results-content');
+
+            resultsDiv.style.display = 'block';
+            contentDiv.innerHTML = `
+                <div class="status-${results.compatibility ? 'success' : 'error'}">
+                    ✓ Compatibility Check: ${results.compatibility ? 'PASSED' : 'FAILED'}
+                </div>
+                <div class="status-${results.transformation ? 'success' : 'error'}">
+                    ✓ Transformation Test: ${results.transformation ? 'PASSED' : 'FAILED'}
+                </div>
+                <div class="status-${results.coordinatePreservation ? 'success' : 'error'}">
+                    ✓ Coordinate Preservation: ${results.coordinatePreservation ? 'PASSED' : 'FAILED'}
+                </div>
+                <div class="status-${results.canvasRendering ? 'success' : 'error'}">
+                    ✓ Canvas Rendering: ${results.canvasRendering ? 'PASSED' : 'FAILED'}
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: ${Object.values(results).every(r => r) ? '#d4edda' : '#f8d7da'}; border-radius: 4px;">
+                    <strong>Overall Result: ${Object.values(results).every(r => r) ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}</strong>
+                </div>
+            `;
+        }
+
+        // Test 1: Data Structure Compatibility
+        document.getElementById('test-compatibility').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Test 1 - Data Structure Compatibility');
+            updateStatus('test-status', 'Testing data structure compatibility...', 'info');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+                const compatibilityResult = generator.validateDataStructureCompatibility(hiveMindData);
+
+                console.log('Compatibility Result:', compatibilityResult);
+
+                if (compatibilityResult.isCompatible && compatibilityResult.format === 'hive_mind_objects') {
+                    testResults.compatibility = true;
+                    updateStatus('test-status', '✅ Compatibility Test PASSED: Hive Mind format detected and compatible', 'success');
+                } else {
+                    testResults.compatibility = false;
+                    updateStatus('test-status', '❌ Compatibility Test FAILED: ' + compatibilityResult.compatibilityErrors.join(', '), 'error');
+                }
+
+                showTestResults(testResults);
+            } catch (error) {
+                console.error('Compatibility test error:', error);
+                testResults.compatibility = false;
+                updateStatus('test-status', '❌ Compatibility Test ERROR: ' + error.message, 'error');
+                showTestResults(testResults);
+            }
+
+            console.groupEnd();
+        });
+
+        // Test 2: Data Transformation
+        document.getElementById('test-transformation').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Test 2 - Data Transformation');
+            updateStatus('test-status', 'Testing Hive Mind → Canvas transformation...', 'info');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+                const transformedData = generator.transformDataStructure(hiveMindData);
+
+                console.log('Transformed Data:', transformedData);
+
+                // Verify transformation structure
+                const firstViewKey = Object.keys(transformedData)[0];
+                const firstView = transformedData[firstViewKey];
+
+                if (firstView && firstView.images && Array.isArray(firstView.images) && firstView.images.length === 2) {
+                    testResults.transformation = true;
+                    updateStatus('test-status', '✅ Transformation Test PASSED: Objects array converted to images array successfully', 'success');
+                } else {
+                    testResults.transformation = false;
+                    updateStatus('test-status', '❌ Transformation Test FAILED: Invalid output structure', 'error');
+                }
+
+                showTestResults(testResults);
+            } catch (error) {
+                console.error('Transformation test error:', error);
+                testResults.transformation = false;
+                updateStatus('test-status', '❌ Transformation Test ERROR: ' + error.message, 'error');
+                showTestResults(testResults);
+            }
+
+            console.groupEnd();
+        });
+
+        // Test 3: Coordinate Preservation
+        document.getElementById('test-coordinate-preservation').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Test 3 - Coordinate Preservation');
+            updateStatus('test-status', 'Testing coordinate preservation during transformation...', 'info');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+                const transformedData = generator.transformDataStructure(hiveMindData);
+
+                const firstViewKey = Object.keys(transformedData)[0];
+                const transformedImages = transformedData[firstViewKey].images;
+
+                // Verify coordinates are preserved exactly
+                let coordinateAnalysis = "🎯 AGENT 2: COORDINATE PRESERVATION ANALYSIS\\n\\n";
+                let allCoordinatesPreserved = true;
+
+                transformedImages.forEach((img, index) => {
+                    const originalObj = hiveMindData.objects[index];
+                    const transform = img.transform;
+
+                    coordinateAnalysis += `Image ${index + 1}:\\n`;
+                    coordinateAnalysis += `  Original: left=${originalObj.left}, top=${originalObj.top}, scaleX=${originalObj.scaleX}, scaleY=${originalObj.scaleY}\\n`;
+                    coordinateAnalysis += `  Transformed: left=${transform.left}, top=${transform.top}, scaleX=${transform.scaleX}, scaleY=${transform.scaleY}\\n`;
+
+                    // Check for exact coordinate preservation
+                    const leftMatch = Math.abs(originalObj.left - transform.left) < 0.0001;
+                    const topMatch = Math.abs(originalObj.top - transform.top) < 0.0001;
+                    const scaleXMatch = Math.abs(originalObj.scaleX - transform.scaleX) < 0.0001;
+                    const scaleYMatch = Math.abs(originalObj.scaleY - transform.scaleY) < 0.0001;
+
+                    const allMatch = leftMatch && topMatch && scaleXMatch && scaleYMatch;
+
+                    coordinateAnalysis += `  ✓ Preservation: ${allMatch ? 'EXACT MATCH' : 'COORDINATES CHANGED'}\\n\\n`;
+
+                    if (!allMatch) {
+                        allCoordinatesPreserved = false;
+                    }
+                });
+
+                document.getElementById('coordinate-analysis').textContent = coordinateAnalysis;
+
+                if (allCoordinatesPreserved) {
+                    testResults.coordinatePreservation = true;
+                    updateStatus('test-status', '✅ Coordinate Preservation Test PASSED: All coordinates preserved exactly', 'success');
+                } else {
+                    testResults.coordinatePreservation = false;
+                    updateStatus('test-status', '❌ Coordinate Preservation Test FAILED: Some coordinates changed during transformation', 'error');
+                }
+
+                showTestResults(testResults);
+            } catch (error) {
+                console.error('Coordinate preservation test error:', error);
+                testResults.coordinatePreservation = false;
+                updateStatus('test-status', '❌ Coordinate Preservation Test ERROR: ' + error.message, 'error');
+                showTestResults(testResults);
+            }
+
+            console.groupEnd();
+        });
+
+        // Test 4: Canvas Rendering
+        document.getElementById('test-canvas-rendering').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Test 4 - Canvas Rendering');
+            updateStatus('test-status', 'Testing complete canvas rendering pipeline...', 'info');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+
+                // Initialize with after canvas
+                const success = generator.init('canvas-after', {
+                    enableExport: true,
+                    showDebugInfo: true
+                });
+
+                if (!success) {
+                    throw new Error('Failed to initialize canvas renderer');
+                }
+
+                // Generate preview with Hive Mind data (should automatically transform)
+                await generator.generatePreview(hiveMindData, {
+                    loadingText: 'Testing Canvas Reconstruction...',
+                    enableDebugInfo: true
+                });
+
+                testResults.canvasRendering = true;
+                updateStatus('test-status', '✅ Canvas Rendering Test PASSED: Preview generated successfully', 'success');
+                showTestResults(testResults);
+
+            } catch (error) {
+                console.error('Canvas rendering test error:', error);
+                testResults.canvasRendering = false;
+                updateStatus('test-status', '❌ Canvas Rendering Test FAILED: ' + error.message, 'error');
+                showTestResults(testResults);
+            }
+
+            console.groupEnd();
+        });
+
+        // Before transformation test (should fail)
+        document.getElementById('render-before').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Render Before Transformation (Expected to Fail)');
+            updateStatus('status-before', 'Attempting to render Hive Mind data without transformation...', 'warning');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+                const success = generator.init('canvas-before');
+
+                if (!success) {
+                    throw new Error('Failed to initialize canvas renderer');
+                }
+
+                // Try to validate without transformation
+                const validation = generator.validateDesignData(hiveMindData);
+
+                if (!validation.isValid) {
+                    updateStatus('status-before', '✅ Expected Failure: ' + validation.errors[0], 'warning');
+                } else {
+                    updateStatus('status-before', '❌ Unexpected Success: Should have failed validation', 'error');
+                }
+
+            } catch (error) {
+                updateStatus('status-before', '✅ Expected Error: ' + error.message, 'warning');
+            }
+
+            console.groupEnd();
+        });
+
+        // After transformation test (should work)
+        document.getElementById('render-after').addEventListener('click', async function() {
+            console.group('🎯 AGENT 7: Render After Transformation (Expected to Work)');
+            updateStatus('status-after', 'Rendering with automatic transformation...', 'info');
+
+            try {
+                const generator = new DesignPreviewGenerator();
+                const success = generator.init('canvas-after');
+
+                if (!success) {
+                    throw new Error('Failed to initialize canvas renderer');
+                }
+
+                await generator.generatePreview(hiveMindData, {
+                    loadingText: 'Testing transformed data...'
+                });
+
+                updateStatus('status-after', '✅ Success: Canvas rendered with transformed data!', 'success');
+
+            } catch (error) {
+                updateStatus('status-after', '❌ Error: ' + error.message, 'error');
+            }
+
+            console.groupEnd();
+        });
+
+        // Auto-run basic tests on page load
+        window.addEventListener('load', function() {
+            console.log('🎯 AGENT 7: Hive Mind ↔ Canvas Compatibility Test Suite Loaded');
+            console.log('Test Data Available:', { hiveMindData, expectedCanvasFormat });
+        });
+    </script>
+</body>
+</html>

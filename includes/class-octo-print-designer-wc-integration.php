@@ -5889,12 +5889,34 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                 console.log('✅ AGENT 3: Classes loaded, setting up canvas system...');
 
-                // Design data from PHP
+                // 🎯 AGENT 4: Enhanced data flow for Canvas Integration
                 const designData = <?php echo json_encode($agent3_design_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
                 const orderInfo = {
                     id: <?php echo intval($order_id); ?>,
                     number: '<?php echo esc_js(wc_get_order($order_id)->get_order_number()); ?>'
                 };
+
+                // 🎯 AGENT 4: Data structure compatibility validation
+                console.group('🎯 AGENT 4: Canvas Integration Data Analysis');
+                console.log('Original design data:', designData);
+
+                if (designData && typeof designData === 'object') {
+                    if (designData.objects && Array.isArray(designData.objects)) {
+                        console.log('✅ AGENT 4: Detected Hive Mind objects format', designData.objects.length, 'objects');
+                    } else if (designData.elements && Array.isArray(designData.elements)) {
+                        console.log('✅ AGENT 4: Detected elements format', designData.elements.length, 'elements');
+                    } else {
+                        const firstKey = Object.keys(designData)[0];
+                        if (firstKey && designData[firstKey] && designData[firstKey].images) {
+                            console.log('✅ AGENT 4: Detected view-based format with images array');
+                        } else {
+                            console.warn('⚠️ AGENT 4: Unknown data structure format');
+                        }
+                    }
+                } else {
+                    console.error('❌ AGENT 4: Invalid design data structure');
+                }
+                console.groupEnd();
 
                 let previewGenerator = null;
                 const statusElement = document.getElementById('agent3-status');
@@ -6017,7 +6039,14 @@ private function build_print_provider_email_content($order, $design_items, $note
             return null;
         }
 
-        // Check if data is already in Agent 3 format (view-based structure)
+        // 🎯 AGENT 3: ENHANCED DATA STRUCTURE COMPATIBILITY
+        // Check if data is in objects format (Hive Mind Analysis System output)
+        if (isset($design_data['objects']) && is_array($design_data['objects'])) {
+            // Convert objects-based data to view-based Agent 3 format
+            return $this->convertObjectsToViewFormat($design_data);
+        }
+
+        // Check if data is in elements format (legacy)
         if (isset($design_data['elements']) && is_array($design_data['elements'])) {
             // Convert element-based data to view-based Agent 3 format
             return $this->convertElementsToViewFormat($design_data);
@@ -6025,6 +6054,57 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         // If it's already view-based, return as-is
         return $design_data;
+    }
+
+    /**
+     * 🎯 AGENT 3: Convert objects array to Agent 3 view-based format
+     * Handles Hive Mind Analysis System output with 'objects' array
+     */
+    private function convertObjectsToViewFormat($design_data) {
+        $view_id = $design_data['template_view_id'] ?? 'hive_mind_view';
+        $system_id = $design_data['system_id'] ?? uniqid();
+
+        $images = [];
+
+        if (isset($design_data['objects']) && is_array($design_data['objects'])) {
+            foreach ($design_data['objects'] as $index => $object) {
+                if ($object['type'] === 'image' && !empty($object['src'])) {
+                    // 🎯 AGENT 2: COORDINATE PRESERVATION
+                    // Map Hive Mind object format to Canvas Reconstruction format
+                    $images[] = [
+                        'id' => $object['id'] ?? 'hive_img_' . $index,
+                        'url' => $object['src'],
+                        'transform' => [
+                            // Preserve exact coordinates from Hive Mind Analysis
+                            'left' => floatval($object['left'] ?? 0),
+                            'top' => floatval($object['top'] ?? 0),
+                            'width' => floatval($object['width'] ?? 0),
+                            'height' => floatval($object['height'] ?? 0),
+                            'scaleX' => floatval($object['scaleX'] ?? 1),
+                            'scaleY' => floatval($object['scaleY'] ?? 1),
+                            'angle' => floatval($object['angle'] ?? 0)
+                        ]
+                    ];
+                }
+            }
+        }
+
+        // Extract canvas dimensions from Hive Mind data
+        $canvas_width = $design_data['canvas']['width'] ?? 780;
+        $canvas_height = $design_data['canvas']['height'] ?? 580;
+
+        return [
+            $view_id => [
+                'view_name' => 'Hive Mind Design View',
+                'system_id' => $system_id,
+                'variation_id' => $design_data['variation_id'] ?? $view_id,
+                'images' => $images,
+                'canvas' => [
+                    'width' => $canvas_width,
+                    'height' => $canvas_height
+                ]
+            ]
+        ];
     }
 
     /**
