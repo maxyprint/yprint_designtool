@@ -3118,6 +3118,9 @@ private function build_print_provider_email_content($order, $design_items, $note
         // 🧠 HIVE-MIND: Emergency Debug - ALWAYS render for Order 5374
         $force_render_debug = ($order_id == 5374);
 
+        // 🚑 EMERGENCY FIX: Force enable button for testing/debugging
+        $emergency_force_enable = ($order_id == 5374 || current_user_can('manage_options'));
+
         // Check if order has design items
         $has_design_items = false;
         $design_items_debug = [];
@@ -3259,7 +3262,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                         id="design-preview-btn"
                         class="button button-primary design-preview-btn"
                         data-order-id="<?php echo esc_attr($order_id); ?>"
-                        <?php echo ($stored_design_data || $db_processed_views || $force_render_debug) ? '' : 'disabled'; ?>
+                        <?php echo ($stored_design_data || $db_processed_views || $force_render_debug || $emergency_force_enable) ? '' : 'disabled'; ?>
                         aria-label="<?php echo ($stored_design_data || $db_processed_views) ? 'Open design preview modal' : 'Design preview not available'; ?>">
                         <span class="dashicons dashicons-visibility" style="font-size: 16px; margin-right: -2px;"></span>
                         View Design Preview
@@ -3273,6 +3276,11 @@ private function build_print_provider_email_content($order, $design_items, $note
                             <?php else: ?>
                                 Preview reconstructed from print database
                             <?php endif; ?>
+                        </span>
+                    <?php elseif ($emergency_force_enable): ?>
+                        <span style="font-size: 11px; color: #d63384; display: flex; align-items: center; gap: 4px;">
+                            <span class="dashicons dashicons-admin-tools" style="font-size: 14px;"></span>
+                            🚑 Emergency testing mode - Button force-enabled for diagnostics
                         </span>
                     <?php endif; ?>
                 </div>

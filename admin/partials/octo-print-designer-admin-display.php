@@ -276,6 +276,24 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎨 ADMIN UI: Initializing professional interface...');
     initializeAdminInterface();
+
+    // 🚨 EMERGENCY FIX: Expose functions to global scope for onclick handlers
+    window.loadOrderDesign = loadOrderDesign;
+    window.saveOrderPreview = saveOrderPreview;
+    window.loadDesignPreview = loadDesignPreview;
+    window.refreshPreview = refreshPreview;
+    window.exportPreview = exportPreview;
+    window.validateDesign = validateDesign;
+    window.refreshTemplateList = refreshTemplateList;
+    window.loadTemplateMeasurements = loadTemplateMeasurements;
+    window.syncTemplateSizes = syncTemplateSizes;
+    window.saveAllMeasurements = saveAllMeasurements;
+    window.validateMeasurements = validateMeasurements;
+    window.exportMeasurements = exportMeasurements;
+    window.resetSizeMeasurements = resetSizeMeasurements;
+    window.updateMeasurementValue = updateMeasurementValue;
+
+    console.log('🚨 EMERGENCY: All functions exposed to global scope for onclick access');
 });
 
 function initializeAdminInterface() {
