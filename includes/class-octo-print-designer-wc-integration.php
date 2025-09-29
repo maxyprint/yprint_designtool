@@ -3926,46 +3926,49 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }
             }
 
-            console.group('🔍 JQUERY EVENT HANDLER SETUP');
+            // 🔧 FIX: Wrap jQuery handlers in DOM ready to ensure button exists
+            $(document).ready(function() {
+                console.group('🔍 JQUERY EVENT HANDLER SETUP');
 
-            // Validate jQuery environment
-            console.log('📊 JQUERY VALIDATION:', {
-                version: $.fn.jquery,
-                buttonExists: $('#design-preview-btn').length > 0,
-                buttonDisabled: $('#design-preview-btn').prop('disabled'),
-                ajaxurlAvailable: typeof ajaxurl !== 'undefined'
-            });
+                // Validate jQuery environment
+                console.log('📊 JQUERY VALIDATION:', {
+                    version: $.fn.jquery,
+                    buttonExists: $('#design-preview-btn').length > 0,
+                    buttonDisabled: $('#design-preview-btn').prop('disabled'),
+                    ajaxurlAvailable: typeof ajaxurl !== 'undefined'
+                });
 
-            var button = $('#design-preview-btn');
-            if (button.length === 0) {
-                console.error('❌ JQUERY: Button #design-preview-btn not found!');
+                var button = $('#design-preview-btn');
+                if (button.length === 0) {
+                    console.error('❌ JQUERY: Button #design-preview-btn not found!');
+                    console.groupEnd();
+                    return;
+                }
+
+                console.log('✅ JQUERY: Attaching click event handler...');
+
+                // Design Preview Button - Enhanced with multiple binding methods
+
+                // Method 1: Direct binding
+                $('#design-preview-btn').on('click', function() {
+                    console.log('🎯 METHOD 1: Direct jQuery click handler triggered');
+                    handlePreviewClick($(this));
+                });
+
+                // Method 2: Event delegation (backup)
+                $(document).on('click', '#design-preview-btn', function() {
+                    console.log('🎯 METHOD 2: Event delegation handler triggered');
+                    handlePreviewClick($(this));
+                });
+
+                // Validate event handlers were attached
+                setTimeout(function() {
+                    var events = $._data(document.getElementById('design-preview-btn'), 'events');
+                    console.log('📋 EVENT HANDLERS ATTACHED:', events);
+                }, 100);
+
                 console.groupEnd();
-                return;
-            }
-
-            console.log('✅ JQUERY: Attaching click event handler...');
-
-            // Design Preview Button - Enhanced with multiple binding methods
-
-            // Method 1: Direct binding
-            $('#design-preview-btn').on('click', function() {
-                console.log('🎯 METHOD 1: Direct jQuery click handler triggered');
-                handlePreviewClick($(this));
             });
-
-            // Method 2: Event delegation (backup)
-            $(document).on('click', '#design-preview-btn', function() {
-                console.log('🎯 METHOD 2: Event delegation handler triggered');
-                handlePreviewClick($(this));
-            });
-
-            // Validate event handlers were attached
-            setTimeout(function() {
-                var events = $._data(document.getElementById('design-preview-btn'), 'events');
-                console.log('📋 EVENT HANDLERS ATTACHED:', events);
-            }, 100);
-
-            console.groupEnd();
 
             // Main click handler function
             function handlePreviewClick(buttonElement) {
