@@ -3978,9 +3978,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }
             }
 
-            // 🔧 FIX: Wrap jQuery handlers in DOM ready to ensure button exists with proper jQuery alias
-            jQuery(document).ready(function($) {
-                console.group('🔍 JQUERY EVENT HANDLER SETUP');
+            // 🔧 FIX: Execute jQuery handlers directly (already inside DOM ready function from line 3840)
+            console.group('🔍 JQUERY EVENT HANDLER SETUP');
 
                 // 🎯 AGENT 6: Enhanced validation - Verify PHP syntax fix enabled jQuery execution
                 console.log('🚀 AGENT 6 CONFIRMATION: jQuery document.ready executing - PHP syntax fix is successful!');
@@ -4049,7 +4048,6 @@ private function build_print_provider_email_content($order, $design_items, $note
                 }, 100);
 
                 console.groupEnd();
-            });
 
             // Main click handler function
             function handlePreviewClick(buttonElement) {
