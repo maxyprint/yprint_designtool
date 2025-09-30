@@ -688,6 +688,26 @@ class AdminCanvasRenderer {
             // 🎯 AGENT 4: Load image with crossOrigin support
             const img = await this.loadImage(imageData.src || imageData.url);
 
+            // 🎯 AGENT 6 FIX: Ensure image is fully decoded before rendering
+            try {
+                await img.decode();
+                console.log('🎯 AGENT 6 IMAGE DECODE: Image fully decoded and ready', {
+                    src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    complete: img.complete
+                });
+            } catch (decodeError) {
+                console.error('❌ AGENT 6 DECODE ERROR:', {
+                    error: decodeError,
+                    message: decodeError.message || 'Unknown decode error',
+                    name: decodeError.name || 'Unknown',
+                    code: decodeError.code || 'N/A',
+                    src: (imageData.src || imageData.url).substring(0, 50) + '...'
+                });
+                // Continue anyway - image may still be usable
+            }
+
             // 🎯 AGENT 4: Extract exact positioning from design data
             const left = imageData.left || 0;
             const top = imageData.top || 0;
@@ -803,7 +823,35 @@ class AdminCanvasRenderer {
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
 
-            // 🎯 AGENT 5: Image validation complete - verified by centralized validation system
+            // 🎯 AGENT 6: PRE-RENDER DIAGNOSTICS - Verify all parameters before drawImage()
+            const preRenderDiagnostics = {
+                imageState: {
+                    complete: img.complete,
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    hasValidDimensions: img.naturalWidth > 0 && img.naturalHeight > 0,
+                    src: (imageData.src || imageData.url).substring(0, 50) + '...'
+                },
+                canvasContext: {
+                    isValid: !!this.ctx,
+                    hasDrawImage: typeof this.ctx.drawImage === 'function',
+                    currentTransform: this.ctx.getTransform ? this.ctx.getTransform() : 'unavailable'
+                },
+                renderParameters: {
+                    position: { x: 0, y: 0 },
+                    dimensions: { width: displayWidth, height: displayHeight },
+                    allFinite: isFinite(displayWidth) && isFinite(displayHeight),
+                    allPositive: displayWidth > 0 && displayHeight > 0
+                }
+            };
+
+            console.log('🎯 AGENT 6 PRE-RENDER DIAGNOSTICS:', preRenderDiagnostics);
+
+            // 🎯 AGENT 6: Verify critical conditions before drawing
+            if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+                console.error('❌ AGENT 6 PRE-RENDER VALIDATION FAILED: Image not ready for rendering', preRenderDiagnostics);
+                throw new Error('Image not ready: complete=' + img.complete + ', naturalWidth=' + img.naturalWidth);
+            }
 
             // 🎯 AGENT 4: Draw image with exact dimensions (top-left origin)
             this.ctx.drawImage(
@@ -884,7 +932,54 @@ class AdminCanvasRenderer {
             }
 
         } catch (error) {
-            console.error('❌ AGENT 4 IMAGE ERROR:', error);
+            // 🎯 AGENT 6 FIX: ENHANCED ERROR LOGGING - Extract all DOMException details
+            console.error('❌ AGENT 6 IMAGE RENDER ERROR - ENHANCED DIAGNOSTICS:', {
+                // Error object details
+                errorObject: error,
+                errorType: error.constructor.name,
+                errorName: error.name || 'Unknown',
+                errorMessage: error.message || 'No message available',
+                errorCode: error.code || 'No code',
+                errorStack: error.stack || 'No stack trace',
+
+                // DOMException specific properties
+                isDOMException: error instanceof DOMException,
+                DOMSTRING: error.DOMSTRING || 'N/A',
+
+                // Image data context
+                imageContext: {
+                    src: (imageData.src || imageData.url) ? (imageData.src || imageData.url).substring(0, 100) : 'No src',
+                    type: imageData.type || 'unknown',
+                    left: imageData.left,
+                    top: imageData.top,
+                    scaleX: imageData.scaleX,
+                    scaleY: imageData.scaleY,
+                    angle: imageData.angle
+                },
+
+                // Additional error serialization attempts
+                errorKeys: Object.keys(error),
+                errorValues: Object.getOwnPropertyNames(error).reduce((acc, key) => {
+                    try {
+                        acc[key] = error[key];
+                    } catch (e) {
+                        acc[key] = 'Unable to access';
+                    }
+                    return acc;
+                }, {}),
+
+                // Error toString
+                errorString: error.toString(),
+
+                // JSON serialization attempt
+                errorJSON: (() => {
+                    try {
+                        return JSON.stringify(error);
+                    } catch (e) {
+                        return 'Cannot JSON stringify: ' + e.message;
+                    }
+                })()
+            });
 
             // 🎯 AGENT 4: Enhanced error visualization
             const position = this.coordinatePreservation.noTransformMode
