@@ -6069,11 +6069,20 @@ private function build_print_provider_email_content($order, $design_items, $note
         if (isset($design_data['objects']) && is_array($design_data['objects'])) {
             foreach ($design_data['objects'] as $index => $object) {
                 if ($object['type'] === 'image' && !empty($object['src'])) {
-                    // 🎯 AGENT 2: COORDINATE PRESERVATION
+                    // 🎯 AGENT 2: DUAL FORMAT - FLAT + NESTED FOR BACKWARD COMPATIBILITY
                     // Map Hive Mind object format to Canvas Reconstruction format
                     $images[] = [
                         'id' => $object['id'] ?? 'hive_img_' . $index,
                         'url' => $object['src'],
+                        // FLAT PROPERTIES (for Agent 3 direct access):
+                        'left' => floatval($object['left'] ?? 0),
+                        'top' => floatval($object['top'] ?? 0),
+                        'width' => floatval($object['width'] ?? 0),
+                        'height' => floatval($object['height'] ?? 0),
+                        'scaleX' => floatval($object['scaleX'] ?? 1),
+                        'scaleY' => floatval($object['scaleY'] ?? 1),
+                        'angle' => floatval($object['angle'] ?? 0),
+                        // NESTED (backward compatibility):
                         'transform' => [
                             // Preserve exact coordinates from Hive Mind Analysis
                             'left' => floatval($object['left'] ?? 0),
@@ -6122,9 +6131,20 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $images[] = [
                         'id' => $element['id'] ?? 'img_' . $index,
                         'url' => $element['src'],
+                        // FLAT PROPERTIES (for Agent 3 direct access):
+                        'left' => floatval($element['left'] ?? 0),
+                        'top' => floatval($element['top'] ?? 0),
+                        'width' => floatval($element['width'] ?? 0),
+                        'height' => floatval($element['height'] ?? 0),
+                        'scaleX' => floatval($element['scaleX'] ?? 1),
+                        'scaleY' => floatval($element['scaleY'] ?? 1),
+                        'angle' => floatval($element['angle'] ?? 0),
+                        // NESTED (backward compatibility):
                         'transform' => [
                             'left' => floatval($element['left'] ?? 0),
                             'top' => floatval($element['top'] ?? 0),
+                            'width' => floatval($element['width'] ?? 0),
+                            'height' => floatval($element['height'] ?? 0),
                             'scaleX' => floatval($element['scaleX'] ?? 1),
                             'scaleY' => floatval($element['scaleY'] ?? 1),
                             'angle' => floatval($element['angle'] ?? 0)

@@ -1282,43 +1282,186 @@ class AdminCanvasRenderer {
         const startTime = performance.now();
 
         try {
-            // 🎯 COMPATIBILITY FIX: Handle both flat and nested property formats
-            // Try url first (nested format), then src (flat format)
+            // 🎯 AGENT 3: ENHANCED COMPATIBILITY FIX - Robust nested transform extraction
+            // Handle multiple data structure formats with detailed logging
+
+            // STEP 1: Extract image URL from multiple possible locations
             const imageUrl = imageData.url || imageData.src;
             if (!imageUrl) {
-                console.error('❌ RENDER ERROR: No image URL found', imageData);
+                console.error('❌ AGENT 3 RENDER ERROR: No image URL found', {
+                    imageData: imageData,
+                    hasUrl: !!imageData.url,
+                    hasSrc: !!imageData.src,
+                    keys: Object.keys(imageData)
+                });
                 throw new Error('Image URL missing - neither url nor src property found');
             }
 
-            const img = await this.loadImage(imageUrl);
-
-            // 🎯 COMPATIBILITY FIX: Check both flat properties and transform object
-            // Try flat properties first (new format), then fall back to transform object
-            const transform = imageData.transform || {};
-
-            const left = imageData.left ?? transform.left ?? 0;
-            const top = imageData.top ?? transform.top ?? 0;
-            const scaleX = imageData.scaleX ?? transform.scaleX ?? 1;
-            const scaleY = imageData.scaleY ?? transform.scaleY ?? 1;
-            const angle = ((imageData.angle ?? transform.angle ?? 0) * Math.PI / 180); // Convert to radians
-
-            console.log('🎯 RENDER IMAGE COMPATIBILITY:', {
+            console.log('🎯 AGENT 3 COORDINATE EXTRACTION: Starting deep extraction...', {
                 id: imageData.id,
-                hasUrl: !!imageData.url,
-                hasSrc: !!imageData.src,
-                hasFlatProps: imageData.left !== undefined,
-                hasTransformObj: !!imageData.transform,
-                resolvedUrl: imageUrl,
-                resolvedCoords: { left, top, scaleX, scaleY, angle: angle * 180 / Math.PI }
+                dataStructure: {
+                    hasUrl: !!imageData.url,
+                    hasSrc: !!imageData.src,
+                    hasLeft: imageData.left !== undefined,
+                    hasTop: imageData.top !== undefined,
+                    hasTransformObj: !!imageData.transform,
+                    transformKeys: imageData.transform ? Object.keys(imageData.transform) : []
+                }
             });
 
-            // 🎯 PRECISION TRANSFORM: Use cached coordinates for performance
-            const cacheKey = `${imageData.id}_${left}_${top}`;
-            const pos = this.getCachedTransform(cacheKey, { left, top });
+            const img = await this.loadImage(imageUrl);
 
-            // Build resolved transform object for dimension calculation
-            const resolvedTransform = { left, top, scaleX, scaleY, angle: angle * 180 / Math.PI };
-            const dimensions = this.calculateImageDimensions(img, resolvedTransform);
+            // 🎯 AGENT 3: STEP 2 - Deep extraction from nested transform object
+            // Extract transform object if it exists
+            const transform = imageData.transform || {};
+
+            // ENHANCED: Try multiple extraction strategies in priority order
+            // Strategy 1: Direct flat properties (highest priority)
+            // Strategy 2: Nested transform object properties
+            // Strategy 3: Default values (fallback)
+
+            let left, top, scaleX, scaleY, angle;
+
+            // Extract LEFT coordinate with detailed logging
+            if (imageData.left !== undefined) {
+                left = imageData.left;
+                console.log('🎯 AGENT 3: LEFT from flat property:', left);
+            } else if (transform.left !== undefined) {
+                left = transform.left;
+                console.log('🎯 AGENT 3: LEFT from transform.left:', left);
+            } else {
+                left = 0;
+                console.warn('⚠️ AGENT 3: LEFT defaulted to 0 - no source found');
+            }
+
+            // Extract TOP coordinate with detailed logging
+            if (imageData.top !== undefined) {
+                top = imageData.top;
+                console.log('🎯 AGENT 3: TOP from flat property:', top);
+            } else if (transform.top !== undefined) {
+                top = transform.top;
+                console.log('🎯 AGENT 3: TOP from transform.top:', top);
+            } else {
+                top = 0;
+                console.warn('⚠️ AGENT 3: TOP defaulted to 0 - no source found');
+            }
+
+            // Extract SCALEX with detailed logging
+            if (imageData.scaleX !== undefined) {
+                scaleX = imageData.scaleX;
+                console.log('🎯 AGENT 3: SCALEX from flat property:', scaleX);
+            } else if (transform.scaleX !== undefined) {
+                scaleX = transform.scaleX;
+                console.log('🎯 AGENT 3: SCALEX from transform.scaleX:', scaleX);
+            } else {
+                scaleX = 1;
+                console.warn('⚠️ AGENT 3: SCALEX defaulted to 1 - no source found');
+            }
+
+            // Extract SCALEY with detailed logging
+            if (imageData.scaleY !== undefined) {
+                scaleY = imageData.scaleY;
+                console.log('🎯 AGENT 3: SCALEY from flat property:', scaleY);
+            } else if (transform.scaleY !== undefined) {
+                scaleY = transform.scaleY;
+                console.log('🎯 AGENT 3: SCALEY from transform.scaleY:', scaleY);
+            } else {
+                scaleY = 1;
+                console.warn('⚠️ AGENT 3: SCALEY defaulted to 1 - no source found');
+            }
+
+            // Extract ANGLE with detailed logging
+            let angleSource;
+            if (imageData.angle !== undefined) {
+                angleSource = imageData.angle;
+                console.log('🎯 AGENT 3: ANGLE from flat property:', angleSource);
+            } else if (transform.angle !== undefined) {
+                angleSource = transform.angle;
+                console.log('🎯 AGENT 3: ANGLE from transform.angle:', angleSource);
+            } else {
+                angleSource = 0;
+                console.log('🎯 AGENT 3: ANGLE defaulted to 0');
+            }
+            angle = angleSource * Math.PI / 180; // Convert to radians
+
+            // 🎯 AGENT 3: COMPREHENSIVE EXTRACTION LOG
+            console.log('🎯 AGENT 3 EXTRACTION COMPLETE:', {
+                id: imageData.id,
+                url: imageUrl.substring(0, 50) + '...',
+                extractionSources: {
+                    left: imageData.left !== undefined ? 'flat' : (transform.left !== undefined ? 'nested' : 'default'),
+                    top: imageData.top !== undefined ? 'flat' : (transform.top !== undefined ? 'nested' : 'default'),
+                    scaleX: imageData.scaleX !== undefined ? 'flat' : (transform.scaleX !== undefined ? 'nested' : 'default'),
+                    scaleY: imageData.scaleY !== undefined ? 'flat' : (transform.scaleY !== undefined ? 'nested' : 'default'),
+                    angle: imageData.angle !== undefined ? 'flat' : (transform.angle !== undefined ? 'nested' : 'default')
+                },
+                extractedValues: {
+                    left: left,
+                    top: top,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    angleDegrees: angleSource,
+                    angleRadians: angle
+                },
+                validationFlags: {
+                    hasValidCoords: left !== undefined && top !== undefined,
+                    hasValidScale: scaleX > 0 && scaleY > 0,
+                    allExtracted: left !== 0 || top !== 0 || scaleX !== 1 || scaleY !== 1
+                }
+            });
+
+            // 🎯 AGENT 3: STEP 3 - Validate extracted coordinates before rendering
+            if (!isFinite(left) || !isFinite(top) || isNaN(left) || isNaN(top)) {
+                console.error('❌ AGENT 3 VALIDATION FAILED: Invalid coordinates extracted', {
+                    left: left,
+                    top: top,
+                    scaleX: scaleX,
+                    scaleY: scaleY
+                });
+                throw new Error('Invalid coordinates - cannot render with NaN or Infinity values');
+            }
+
+            // 🎯 AGENT 3: STEP 4 - Apply coordinate preservation mode
+            // Use exact extracted coordinates without transformation
+            let renderX, renderY;
+
+            if (this.coordinatePreservation.noTransformMode) {
+                // NO TRANSFORM MODE: Use exact extracted coordinates
+                renderX = left;
+                renderY = top;
+                console.log('🎯 AGENT 3: Using NO-TRANSFORM mode - exact coordinates:', { renderX, renderY });
+            } else {
+                // LEGACY TRANSFORM MODE: Apply coordinate transformation
+                const cacheKey = `${imageData.id}_${left}_${top}`;
+                const pos = this.getCachedTransform(cacheKey, { left, top });
+                renderX = pos.x;
+                renderY = pos.y;
+                console.log('🎯 AGENT 3: Using TRANSFORM mode - scaled coordinates:', { renderX, renderY });
+            }
+
+            // 🎯 AGENT 3: STEP 5 - Calculate image dimensions with extracted scaling
+            const baseWidth = img.naturalWidth || img.width;
+            const baseHeight = img.naturalHeight || img.height;
+
+            // Apply extracted scale factors to get final display size
+            const displayWidth = baseWidth * scaleX;
+            const displayHeight = baseHeight * scaleY;
+
+            console.log('🎯 AGENT 3 DIMENSION CALCULATION:', {
+                baseSize: `${baseWidth}×${baseHeight}`,
+                extractedScale: `${scaleX}×${scaleY}`,
+                finalDisplay: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
+                renderPosition: `${renderX.toFixed(1)}, ${renderY.toFixed(1)}`
+            });
+
+            // 🎯 AGENT 3: STEP 6 - Validate dimensions before rendering
+            if (!displayWidth || !displayHeight || displayWidth <= 0 || displayHeight <= 0 ||
+                !isFinite(displayWidth) || !isFinite(displayHeight)) {
+                console.error('❌ AGENT 3 DIMENSION VALIDATION FAILED:', {
+                    displayWidth, displayHeight, baseWidth, baseHeight, scaleX, scaleY
+                });
+                throw new Error('Invalid dimensions calculated - cannot render');
+            }
 
             // Performance check: Start transform timing
             const transformStart = performance.now();
@@ -1326,27 +1469,32 @@ class AdminCanvasRenderer {
             // Save context state
             this.ctx.save();
 
-            // 🎯 MATRIX TRANSFORMATION: Apply precise transformations
-            this.ctx.translate(pos.x, pos.y);
+            // 🎯 AGENT 3: STEP 7 - Apply transformations using extracted coordinates
+            // Translate to the EXACT extracted position
+            this.ctx.translate(renderX, renderY);
 
             if (angle !== 0) {
                 this.ctx.rotate(angle);
+                console.log('🎯 AGENT 3: Rotation applied:', (angle * 180 / Math.PI).toFixed(1) + '°');
             }
-
-            // 🎯 PRECISION RENDERING: Use calculated dimensions
-            const { display } = dimensions;
 
             // Apply image smoothing for better quality
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
 
-            // Draw image (centered on transform origin)
+            // 🎯 AGENT 3: CRITICAL FIX - Use TOP-LEFT origin rendering (not centered)
+            // The extracted coordinates are already top-left position
+            // DO NOT use center-based rendering like fabric.js
+            console.log('🎯 AGENT 3 RENDERING: Drawing image at TOP-LEFT origin (0,0) with dimensions:', {
+                width: displayWidth.toFixed(1),
+                height: displayHeight.toFixed(1)
+            });
+
             this.ctx.drawImage(
                 img,
-                -display.center.x,
-                -display.center.y,
-                display.width,
-                display.height
+                0, 0,  // TOP-LEFT origin - matches extracted coordinates
+                displayWidth,
+                displayHeight
             );
 
             // Restore context state
@@ -1358,70 +1506,104 @@ class AdminCanvasRenderer {
             // 🎯 PERFORMANCE TRACKING: Update metrics
             this.updatePerformanceMetrics(totalTime);
 
-            // 🎯 ACCURACY VALIDATION: Validate against target coordinates
-            const accuracy = this.validateTransformAccuracy(
-                { left, top },
-                { x: left * this.scaleX, y: top * this.scaleY },
-                this.accuracyTolerance
-            );
-
-            console.log('✅ PRECISION IMAGE RENDERED:', {
+            // 🎯 AGENT 3: STEP 8 - Success logging with extraction details
+            console.log('✅ AGENT 3 IMAGE RENDER SUCCESS:', {
                 id: imageData.id,
-                position: `${left.toFixed(2)}, ${top.toFixed(2)}`,
-                scale: `${(scaleX * 100).toFixed(1)}%, ${(scaleY * 100).toFixed(1)}%`,
-                angle: (angle * 180 / Math.PI).toFixed(1) + '°',
-                timing: {
-                    total: `${totalTime.toFixed(2)}ms`,
-                    transform: `${transformTime.toFixed(2)}ms`
+                url: imageUrl.substring(0, 50) + '...',
+                extraction: {
+                    leftSource: imageData.left !== undefined ? 'flat' : 'nested',
+                    topSource: imageData.top !== undefined ? 'flat' : 'nested',
+                    coordinatesExtracted: { left, top },
+                    scalesExtracted: { scaleX, scaleY },
+                    angleExtracted: angleSource + '°'
                 },
-                accuracy: {
-                    isPixelPerfect: accuracy.isAccurate,
-                    error: `${accuracy.error.toFixed(3)}px`,
-                    delta: `${accuracy.delta.x.toFixed(3)}, ${accuracy.delta.y.toFixed(3)}`
+                rendering: {
+                    position: `${renderX.toFixed(2)}, ${renderY.toFixed(2)}`,
+                    dimensions: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
+                    coordinateMode: this.coordinatePreservation.noTransformMode ? 'NO-TRANSFORM' : 'TRANSFORM',
+                    renderOrigin: 'TOP-LEFT'
                 },
-                dimensions: {
-                    original: `${dimensions.base.width}x${dimensions.base.height}`,
-                    display: `${display.width.toFixed(1)}x${display.height.toFixed(1)}`
+                validation: {
+                    coordsValid: isFinite(left) && isFinite(top),
+                    dimsValid: displayWidth > 0 && displayHeight > 0,
+                    scaleValid: scaleX > 0 && scaleY > 0,
+                    canvasVisible: renderX < this.canvasWidth && renderY < this.canvasHeight
+                },
+                performance: {
+                    totalTime: `${totalTime.toFixed(2)}ms`,
+                    transformTime: `${transformTime.toFixed(2)}ms`,
+                    status: totalTime < 5 ? 'FAST' : 'SLOW'
                 }
             });
 
             // Performance warning if too slow
             if (totalTime > 5) {
-                console.warn('⚠️ PERFORMANCE WARNING: Slow render detected', {
+                console.warn('⚠️ AGENT 3 PERFORMANCE WARNING: Slow render detected', {
                     time: `${totalTime.toFixed(2)}ms`,
-                    id: imageData.id
+                    id: imageData.id,
+                    threshold: '5ms'
                 });
             }
 
-            // Accuracy warning if not pixel-perfect
-            if (!accuracy.isAccurate) {
-                console.warn('⚠️ ACCURACY WARNING: Transform not pixel-perfect', {
-                    error: `${accuracy.error.toFixed(3)}px`,
+            // Canvas bounds warning
+            if (renderX > this.canvasWidth || renderY > this.canvasHeight) {
+                console.warn('⚠️ AGENT 3 POSITION WARNING: Image may be outside canvas bounds', {
+                    renderPosition: `${renderX.toFixed(1)}, ${renderY.toFixed(1)}`,
+                    canvasSize: `${this.canvasWidth}×${this.canvasHeight}`,
+                    imageSize: `${displayWidth.toFixed(1)}×${displayHeight.toFixed(1)}`,
                     id: imageData.id
                 });
             }
 
         } catch (error) {
-            console.error('❌ RENDER ERROR:', imageData.id, error);
+            console.error('❌ AGENT 3 RENDER ERROR:', {
+                id: imageData.id,
+                error: error.message,
+                stack: error.stack,
+                imageData: {
+                    hasUrl: !!imageData.url,
+                    hasSrc: !!imageData.src,
+                    hasLeft: imageData.left !== undefined,
+                    hasTop: imageData.top !== undefined,
+                    hasTransform: !!imageData.transform,
+                    transformKeys: imageData.transform ? Object.keys(imageData.transform) : []
+                }
+            });
 
-            // Draw enhanced error placeholder
-            const pos = this.transformCoordinates(imageData.transform?.left || 0, imageData.transform?.top || 0);
+            // Draw enhanced error placeholder with nested property support
+            let errorX = 0, errorY = 0;
+
+            // Try to extract position for error indicator from nested transform
+            if (imageData.left !== undefined) {
+                errorX = imageData.left;
+            } else if (imageData.transform?.left !== undefined) {
+                errorX = imageData.transform.left;
+            }
+
+            if (imageData.top !== undefined) {
+                errorY = imageData.top;
+            } else if (imageData.transform?.top !== undefined) {
+                errorY = imageData.transform.top;
+            }
+
+            console.log('🎯 AGENT 3 ERROR INDICATOR: Positioning at:', { errorX, errorY });
+
             this.ctx.save();
 
             // Error indicator with better visibility
             this.ctx.fillStyle = '#ff4444';
-            this.ctx.fillRect(pos.x - 15, pos.y - 15, 30, 30);
+            this.ctx.fillRect(errorX - 15, errorY - 15, 30, 30);
 
             // Error border
             this.ctx.strokeStyle = '#cc0000';
             this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(pos.x - 15, pos.y - 15, 30, 30);
+            this.ctx.strokeRect(errorX - 15, errorY - 15, 30, 30);
 
             // Error text
             this.ctx.fillStyle = '#ffffff';
             this.ctx.font = '12px Arial, sans-serif';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText('ERR', pos.x, pos.y + 4);
+            this.ctx.fillText('ERR', errorX, errorY + 4);
 
             this.ctx.restore();
         }
