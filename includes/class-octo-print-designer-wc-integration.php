@@ -4845,11 +4845,14 @@ private function build_print_provider_email_content($order, $design_items, $note
             }
         }
 
-        // 🎯 DUAL-FORMAT FIX: Transform data for canvas compatibility
-        // Apply Agent 3 format transformation to ensure JavaScript renderer gets correct structure
+        // 🎯 DUAL-DATA FIX: Keep both original and transformed versions
+        // Problem: transformToAgent3Format() was overwriting $design_data, breaking HTML generation
+        // Solution: Create separate variable for Agent 3 canvas system
+        $agent3_design_data = null;
         if ($design_data) {
-            $design_data = $this->transformToAgent3Format($design_data);
-            error_log("🔧 [AJAX HANDLER] Applied transformToAgent3Format() to design data before sending to browser");
+            $agent3_design_data = $this->transformToAgent3Format($design_data);
+            // $design_data remains untouched for HTML-Anzeige (Hive-Mind Analysis Box)
+            error_log("🔧 [DUAL-DATA] Original data preserved for HTML, transformed data created for Agent 3");
         }
 
         // Build preview HTML with professional design controls
@@ -5473,9 +5476,10 @@ private function build_print_provider_email_content($order, $design_items, $note
         wp_send_json_success(array(
             'html' => $html,
             'javascript' => $javascript_parts,
-            'design_data' => $design_data,
+            'design_data' => $design_data,                      // Original for HTML-Anzeige (Hive-Mind Analysis Box)
+            'agent3_design_data' => $agent3_design_data,        // Transformed for Canvas Rendering (Agent 3 System)
             'template_data' => null, // Could be expanded later
-            'agent3_ready' => !empty($design_data),
+            'agent3_ready' => !empty($agent3_design_data),
             'order_info' => array(
                 'id' => $order_id,
                 'number' => $order->get_order_number(),
