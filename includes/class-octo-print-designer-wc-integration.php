@@ -5322,16 +5322,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                         <!-- Canvas Container for Agent 3 System -->
                         <div id="agent3-canvas-container" style="
                             width: 100%;
-                            max-width: 800px;
+                            max-width: 1000px;
                             aspect-ratio: 780 / 580;
                             min-height: 580px;
-                            border: 1px solid #ddd;
+                            border: 2px solid #007cba;
                             border-radius: 4px;
-                            background: #f9f9f9;
-                            overflow: auto;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            overflow: visible;
                             position: relative;
                             font-size: 14px;
                             color: #666;
+                            padding: 10px;
                         ">
                             <div style="text-align: center;">
                                 <div style="font-size: 32px; margin-bottom: 10px;">🎨</div>
