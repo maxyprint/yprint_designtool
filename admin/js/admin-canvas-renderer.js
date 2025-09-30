@@ -242,12 +242,26 @@ class AdminCanvasRenderer {
             const isColor = /^(#[0-9A-Fa-f]{3,8}|rgb|rgba|hsl|hsla)/i.test(templateUrl);
 
             if (isColor) {
+                // 🎯 AGENT 9 FIX: Admin preview background override for white/light backgrounds
+                let previewColor = templateUrl;
+                const isWhiteOrLight = /^(#[fF]{3,6}|#[fF]{3,6}[fF]{2}|rgb\(255,\s*255,\s*255\)|rgba\(255,\s*255,\s*255,\s*[01]?\.?\d*\))$/i.test(templateUrl);
+
+                if (isWhiteOrLight) {
+                    // Replace white with preview-friendly light gray for visibility
+                    previewColor = '#f0f0f0';
+                    console.log('🎯 AGENT 9 BACKGROUND: Replaced white background with preview-friendly color', {
+                        original: templateUrl,
+                        preview: previewColor,
+                        reason: 'White background makes white images invisible in admin preview'
+                    });
+                }
+
                 // Render solid color background
                 if (this.backgroundRenderer.logBackgroundRender) {
-                    console.log('🎯 AGENT 3 BACKGROUND: Rendering solid color:', templateUrl);
+                    console.log('🎯 AGENT 3 BACKGROUND: Rendering solid color:', previewColor);
                 }
                 this.ctx.save();
-                this.ctx.fillStyle = templateUrl;
+                this.ctx.fillStyle = previewColor;
                 this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
                 this.ctx.restore();
 
@@ -745,6 +759,43 @@ class AdminCanvasRenderer {
             const position = this.coordinatePreservation.noTransformMode
                 ? { x: left, y: top }
                 : this.preserveCoordinates(left, top);
+
+            // 🎯 AGENT 9 COORDINATE VERIFICATION: Comprehensive coordinate tracking
+            const coordinateVerification = {
+                originalData: {
+                    left: imageData.left,
+                    top: imageData.top,
+                    width: imageData.width,
+                    height: imageData.height
+                },
+                extractedCoordinates: {
+                    left: left,
+                    top: top,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    angle: angle
+                },
+                canvasRelativePosition: {
+                    x: position.x,
+                    y: position.y,
+                    description: 'Position on 780×580 canvas'
+                },
+                physicalCanvasPosition: {
+                    x: position.x * this.pixelRatio,
+                    y: position.y * this.pixelRatio,
+                    description: `Position on ${this.canvas.width}×${this.canvas.height} physical canvas (devicePixelRatio: ${this.pixelRatio})`
+                },
+                imageInfo: {
+                    src: (imageData.src || imageData.url).substring(0, 80) + '...',
+                    naturalSize: `${img.naturalWidth}×${img.naturalHeight}`
+                },
+                coordinatePreservationMode: {
+                    noTransformMode: this.coordinatePreservation.noTransformMode,
+                    preserveOriginalCoords: this.coordinatePreservation.preserveOriginalCoords
+                }
+            };
+
+            console.log('🎯 AGENT 9 COORDINATE VERIFICATION:', coordinateVerification);
 
             // 🎯 AGENT 4: SAFETY VALIDATION - Ensure position object is valid
             if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
