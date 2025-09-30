@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 6 Final Test - Enhanced Error Logging & Image Decode</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .test-section h2 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+        #canvas-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            min-height: 600px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button.secondary {
+            background-color: #008CBA;
+        }
+        .button.secondary:hover {
+            background-color: #007399;
+        }
+        .button.danger {
+            background-color: #f44336;
+        }
+        .button.danger:hover {
+            background-color: #da190b;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .log-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #4CAF50;
+            padding-left: 10px;
+        }
+        .log-entry.error {
+            border-left-color: #f44336;
+            color: #ff6b6b;
+        }
+        .log-entry.warning {
+            border-left-color: #ff9800;
+            color: #ffa726;
+        }
+        .log-entry.success {
+            border-left-color: #4CAF50;
+            color: #66bb6a;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #ddd;
+        }
+        .checklist li.checked {
+            border-left-color: #4CAF50;
+        }
+        .checklist li.checked::before {
+            content: '✓ ';
+            color: #4CAF50;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .checklist li:not(.checked)::before {
+            content: '⏳ ';
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Agent 6: Final Implementation Test</h1>
+
+        <div class="test-section">
+            <h2>Mission Objectives</h2>
+            <p>Testing the three critical fixes implemented:</p>
+            <ul class="checklist" id="objectives">
+                <li>Enhanced DOMException error logging with .message, .name, .code</li>
+                <li>Image decode await to prevent incomplete image rendering</li>
+                <li>Pre-render diagnostics before ctx.drawImage() call</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Controls</h2>
+            <button class="button" onclick="testValidImage()">Test 1: Valid Image (Should Render)</button>
+            <button class="button secondary" onclick="testInvalidImage()">Test 2: Invalid URL (Should Show Enhanced Error)</button>
+            <button class="button secondary" onclick="testCORSImage()">Test 3: CORS Image (Should Show DOMException)</button>
+            <button class="button secondary" onclick="testRealDesignData()">Test 4: Real Design Data</button>
+            <button class="button danger" onclick="clearLogs()">Clear Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Canvas Output</h2>
+            <div id="canvas-container"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Console Logs (Real-time)</h2>
+            <div class="log-output" id="console-logs"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+    </div>
+
+    <script src="admin-canvas-renderer.js"></script>
+    <script>
+        // Intercept console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const logContainer = document.getElementById('console-logs');
+        const resultsContainer = document.getElementById('test-results');
+
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+
+            // Check for specific Agent 6 logs
+            if (message.includes('AGENT 6')) {
+                addLogEntry(message, 'success');
+
+                if (message.includes('IMAGE DECODE')) {
+                    updateObjective(1, true);
+                } else if (message.includes('PRE-RENDER DIAGNOSTICS')) {
+                    updateObjective(2, true);
+                }
+            } else {
+                addLogEntry(message, 'info');
+            }
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+            addLogEntry(message, 'error');
+
+            // Check for enhanced error logging
+            if (message.includes('AGENT 6') && message.includes('ENHANCED DIAGNOSTICS')) {
+                updateObjective(0, true);
+            }
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+            addLogEntry(message, 'warning');
+        };
+
+        function clearLogs() {
+            logContainer.innerHTML = '';
+            resultsContainer.innerHTML = '';
+        }
+
+        function updateObjective(index, checked) {
+            const objectives = document.querySelectorAll('#objectives li');
+            if (objectives[index]) {
+                if (checked) {
+                    objectives[index].classList.add('checked');
+                } else {
+                    objectives[index].classList.remove('checked');
+                }
+            }
+        }
+
+        function addTestResult(title, status, details) {
+            const result = document.createElement('div');
+            result.className = `status ${status}`;
+            result.innerHTML = `<strong>${title}</strong><br>${details}`;
+            resultsContainer.appendChild(result);
+        }
+
+        // Initialize renderer
+        let renderer;
+
+        function initRenderer() {
+            if (!renderer) {
+                renderer = new AdminCanvasRenderer();
+                const success = renderer.init('canvas-container');
+                if (success) {
+                    console.log('✅ Renderer initialized successfully');
+                    addTestResult('Initialization', 'success', 'Canvas renderer initialized successfully');
+                } else {
+                    console.error('❌ Failed to initialize renderer');
+                    addTestResult('Initialization', 'error', 'Failed to initialize canvas renderer');
+                }
+            }
+            return renderer;
+        }
+
+        // Test 1: Valid image rendering
+        async function testValidImage() {
+            console.log('🔬 TEST 1: Valid Image Rendering');
+            const r = initRenderer();
+
+            try {
+                const testImage = {
+                    type: 'image',
+                    src: 'https://via.placeholder.com/200x200/4CAF50/ffffff?text=Valid+Image',
+                    left: 100,
+                    top: 100,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0
+                };
+
+                await r.renderImageElement(testImage);
+                addTestResult('Test 1: Valid Image', 'success', 'Image should render with AGENT 6 decode and pre-render logs');
+            } catch (error) {
+                console.error('Test 1 failed:', error);
+                addTestResult('Test 1: Valid Image', 'error', error.message);
+            }
+        }
+
+        // Test 2: Invalid image URL
+        async function testInvalidImage() {
+            console.log('🔬 TEST 2: Invalid Image URL (Enhanced Error Logging)');
+            const r = initRenderer();
+
+            try {
+                const testImage = {
+                    type: 'image',
+                    src: 'https://invalid-domain-that-does-not-exist-12345.com/image.jpg',
+                    left: 150,
+                    top: 150,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0
+                };
+
+                await r.renderImageElement(testImage);
+            } catch (error) {
+                console.log('Expected error caught:', error.message);
+                addTestResult('Test 2: Invalid URL', 'info', 'Check console for AGENT 6 ENHANCED DIAGNOSTICS with error details');
+            }
+        }
+
+        // Test 3: CORS error simulation
+        async function testCORSImage() {
+            console.log('🔬 TEST 3: CORS Image (DOMException Detection)');
+            const r = initRenderer();
+
+            try {
+                // This may trigger a CORS error depending on the server
+                const testImage = {
+                    type: 'image',
+                    src: 'https://example.com/test-image.jpg',
+                    left: 200,
+                    top: 200,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0
+                };
+
+                await r.renderImageElement(testImage);
+            } catch (error) {
+                console.log('CORS error expected:', error);
+                addTestResult('Test 3: CORS Error', 'info', 'Check console for DOMException details with name, message, code');
+            }
+        }
+
+        // Test 4: Real design data
+        async function testRealDesignData() {
+            console.log('🔬 TEST 4: Real Design Data');
+            const r = initRenderer();
+
+            try {
+                const designData = {
+                    objects: [
+                        {
+                            type: 'image',
+                            src: 'https://via.placeholder.com/150x150/2196F3/ffffff?text=Image+1',
+                            left: 50,
+                            top: 50,
+                            scaleX: 1.2,
+                            scaleY: 1.2,
+                            angle: 0
+                        },
+                        {
+                            type: 'image',
+                            src: 'https://via.placeholder.com/100x100/FF5722/ffffff?text=Image+2',
+                            left: 250,
+                            top: 50,
+                            scaleX: 0.8,
+                            scaleY: 0.8,
+                            angle: 15
+                        },
+                        {
+                            type: 'image',
+                            src: 'https://via.placeholder.com/120x120/9C27B0/ffffff?text=Image+3',
+                            left: 150,
+                            top: 250,
+                            scaleX: 1,
+                            scaleY: 1,
+                            angle: -10
+                        }
+                    ]
+                };
+
+                await r.renderDesign(designData);
+                addTestResult('Test 4: Real Design Data', 'success', 'Multiple images rendered. Check logs for AGENT 6 diagnostics for each image.');
+            } catch (error) {
+                console.error('Test 4 failed:', error);
+                addTestResult('Test 4: Real Design Data', 'error', error.message);
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🎯 AGENT 6 TEST PAGE LOADED');
+            addTestResult('Page Loaded', 'info', 'Ready to run tests. Click buttons above to test each scenario.');
+        });
+    </script>
+</body>
+</html>

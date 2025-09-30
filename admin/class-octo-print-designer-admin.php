@@ -43,7 +43,12 @@ class Octo_Print_Designer_Admin {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_template_measurements_from_admin', $this, 'save_template_measurements_from_admin');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_validate_template_measurements', $this, 'validate_template_measurements');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_template_sizes_measurements', $this, 'sync_template_sizes_measurements');
-    
+
+        // 🎨 AGENT 2 DELIVERABLE: WooCommerce Order Design Preview Meta Box
+        Octo_Print_Designer_Loader::$instance->add_action('add_meta_boxes_shop_order', $this, 'add_order_design_preview_meta_box');
+        Octo_Print_Designer_Loader::$instance->add_action('add_meta_boxes_woocommerce_page_wc-orders', $this, 'add_order_design_preview_meta_box');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_order_design_preview', $this, 'get_order_design_preview');
+
     }
 
     public function enqueue_scripts($hook) {
@@ -254,6 +259,16 @@ class Octo_Print_Designer_Admin {
                 $this->version . '.agent3-v1',
                 true
             );
+
+            // 🎯 AGENT 3: WooCommerce Order Preview Integration
+            // Phase 4: Order-specific preview event listener (connects meta box with rendering system)
+            wp_enqueue_script(
+                'octo-woocommerce-order-preview',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/woocommerce-order-preview.js',
+                ['octo-admin-preview-integration'], // Depends on preview integration
+                $this->version . '.agent3-order-v1',
+                true
+            );
         }
 
         // 🧪 Load test suite in development mode (WP_DEBUG enabled)
@@ -305,30 +320,42 @@ class Octo_Print_Designer_Admin {
     }
 
     public function enqueue_styles($hook) {
-        if (!$this->is_template_edit_page($hook)) return;
+        // Template edit page styles
+        if ($this->is_template_edit_page($hook)) {
+            wp_enqueue_style(
+                'octo-print-designer-admin',
+                plugin_dir_url(__FILE__) . 'css/octo-print-designer-admin.css',
+                [],
+                $this->version
+            );
 
-        wp_enqueue_style(
-            'octo-print-designer-admin',
-            plugin_dir_url(__FILE__) . 'css/octo-print-designer-admin.css',
-            [],
-            $this->version
-        );
+            // 🎨 AGENT 6: PROFESSIONAL UI ENHANCEMENT STYLES
+            wp_enqueue_style(
+                'octo-print-designer-admin-ui-enhancement',
+                plugin_dir_url(__FILE__) . 'css/admin-ui-enhancement.css',
+                ['octo-print-designer-admin'], // Load after base admin styles
+                $this->version . '.ui-enhanced'
+            );
 
-        // 🎨 AGENT 6: PROFESSIONAL UI ENHANCEMENT STYLES
-        wp_enqueue_style(
-            'octo-print-designer-admin-ui-enhancement',
-            plugin_dir_url(__FILE__) . 'css/admin-ui-enhancement.css',
-            ['octo-print-designer-admin'], // Load after base admin styles
-            $this->version . '.ui-enhanced'
-        );
+            // 🧠 AGENT 5 DELIVERABLE: Measurement Table Styling
+            wp_enqueue_style(
+                'octo-measurement-table-styling',
+                plugin_dir_url(__FILE__) . 'css/measurement-table-styling.css',
+                ['octo-print-designer-admin-ui-enhancement'],
+                $this->version . '.measurement'
+            );
+        }
 
-        // 🧠 AGENT 5 DELIVERABLE: Measurement Table Styling
-        wp_enqueue_style(
-            'octo-measurement-table-styling',
-            plugin_dir_url(__FILE__) . 'css/measurement-table-styling.css',
-            ['octo-print-designer-admin-ui-enhancement'],
-            $this->version . '.measurement'
-        );
+        // 🎨 AGENT 5 DELIVERABLE: WooCommerce Order Design Preview Styles
+        // Only load on WooCommerce order pages
+        if ($this->is_woocommerce_order_edit_page($hook)) {
+            wp_enqueue_style(
+                'octo-order-design-preview',
+                plugin_dir_url(__FILE__) . 'css/order-design-preview.css',
+                [], // No dependencies - standalone styles
+                $this->version . '.order-preview'
+            );
+        }
     }
 
     private function is_template_edit_page($hook) {
@@ -1204,5 +1231,339 @@ class Octo_Print_Designer_Admin {
         } else {
             wp_send_json_error('TemplateMeasurementManager not available');
         }
+    }
+
+    /**
+     * 🎨 WOOCOMMERCE ORDER DESIGN PREVIEW
+     * AJAX Handler: Get design data from order for preview generation
+     *
+     * Security: Nonce validation + capability checks
+     * Data Flow: Order Meta -> Design Data -> Canvas Dimensions -> JSON Response
+     * Error Handling: Comprehensive validation at each step
+     */
+    public function get_order_design_preview() {
+        // 🔒 SECURITY: Nonce validation
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'design_preview_nonce')) {
+            error_log('❌ DESIGN PREVIEW: Security check failed - invalid nonce');
+            wp_send_json_error([
+                'message' => 'Security check failed',
+                'code' => 'SECURITY_FAILED'
+            ]);
+            return;
+        }
+
+        // 🔒 SECURITY: Permission validation
+        if (!current_user_can('edit_shop_orders') && !current_user_can('manage_woocommerce')) {
+            error_log('❌ DESIGN PREVIEW: Insufficient permissions');
+            wp_send_json_error([
+                'message' => 'Insufficient permissions',
+                'code' => 'PERMISSION_DENIED'
+            ]);
+            return;
+        }
+
+        // 📦 VALIDATION: Order ID
+        $order_id = intval($_POST['order_id'] ?? 0);
+        if (!$order_id) {
+            error_log('❌ DESIGN PREVIEW: Missing order ID');
+            wp_send_json_error([
+                'message' => 'Missing order ID',
+                'code' => 'MISSING_ORDER_ID'
+            ]);
+            return;
+        }
+
+        // 📦 VALIDATION: Order existence
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            error_log('❌ DESIGN PREVIEW: Order not found - ID: ' . $order_id);
+            wp_send_json_error([
+                'message' => 'Order not found',
+                'code' => 'ORDER_NOT_FOUND',
+                'order_id' => $order_id
+            ]);
+            return;
+        }
+
+        // 🎨 DATA EXTRACTION: Design data from order meta
+        $design_data_raw = $order->get_meta('_design_data', true);
+
+        if (empty($design_data_raw)) {
+            error_log('⚠️ DESIGN PREVIEW: No design data found for order ' . $order_id);
+            wp_send_json_error([
+                'message' => 'No design data found for this order',
+                'code' => 'NO_DESIGN_DATA',
+                'order_id' => $order_id
+            ]);
+            return;
+        }
+
+        // 🔍 DEBUG: Log raw design data structure
+        error_log('🔍 DESIGN PREVIEW: Raw design data type: ' . gettype($design_data_raw));
+
+        // Parse design data (may be stored as JSON string)
+        $design_data = is_string($design_data_raw) ? json_decode($design_data_raw, true) : $design_data_raw;
+
+        if (json_last_error() !== JSON_ERROR_NONE && is_string($design_data_raw)) {
+            error_log('❌ DESIGN PREVIEW: Invalid JSON in design data - Error: ' . json_last_error_msg());
+            wp_send_json_error([
+                'message' => 'Invalid design data format',
+                'code' => 'INVALID_JSON',
+                'json_error' => json_last_error_msg()
+            ]);
+            return;
+        }
+
+        // 🖼️ DATA EXTRACTION: Mockup image URL
+        $mockup_url = $order->get_meta('_mockup_image_url', true);
+
+        // 🔍 DEBUG: Log mockup URL
+        error_log('🔍 DESIGN PREVIEW: Mockup URL: ' . ($mockup_url ?: 'NOT FOUND'));
+
+        // 📐 DATA EXTRACTION: Canvas dimensions from design data
+        $canvas_dimensions = null;
+        if (isset($design_data['canvas']) && is_array($design_data['canvas'])) {
+            $canvas_dimensions = [
+                'width' => floatval($design_data['canvas']['width'] ?? 0),
+                'height' => floatval($design_data['canvas']['height'] ?? 0)
+            ];
+        }
+
+        // 🔍 DEBUG: Log canvas dimensions
+        if ($canvas_dimensions) {
+            error_log('🔍 DESIGN PREVIEW: Canvas dimensions - Width: ' . $canvas_dimensions['width'] . ', Height: ' . $canvas_dimensions['height']);
+        } else {
+            error_log('⚠️ DESIGN PREVIEW: No canvas dimensions found in design data');
+        }
+
+        // ✅ SUCCESS RESPONSE: Complete data structure
+        $response_data = [
+            'order_id' => $order_id,
+            'design_data' => $design_data,
+            'mockup_url' => $mockup_url ?: null,
+            'canvas_dimensions' => $canvas_dimensions,
+            'has_design_data' => !empty($design_data),
+            'has_mockup_url' => !empty($mockup_url),
+            'has_canvas_dimensions' => !empty($canvas_dimensions),
+            'timestamp' => current_time('c')
+        ];
+
+        error_log('✅ DESIGN PREVIEW: Successfully retrieved design data for order ' . $order_id);
+        error_log('🔍 DESIGN PREVIEW: Response data keys: ' . implode(', ', array_keys($response_data)));
+
+        wp_send_json_success($response_data);
+    }
+
+    /**
+     * 🎨 AGENT 2 DELIVERABLE: Add Design Preview Meta Box to WooCommerce Orders
+     * Only displayed when order contains design data
+     */
+    public function add_order_design_preview_meta_box($post_or_order) {
+        // Get order ID from post or order object
+        $order_id = is_a($post_or_order, 'WP_Post') ? $post_or_order->ID : $post_or_order->get_id();
+
+        // Check if WC Integration class is available
+        if (!class_exists('Octo_Print_Designer_WC_Integration')) {
+            return;
+        }
+
+        // Get WC Integration instance to check for design data
+        $wc_integration = new Octo_Print_Designer_WC_Integration();
+
+        // Only add meta box if order has design data
+        if (!$wc_integration->has_design_data($order_id)) {
+            return;
+        }
+
+        // Add meta box for old-style shop_order post type
+        add_meta_box(
+            'octo_order_design_preview',
+            __('Design Vorschau', 'octo-print-designer'),
+            array($this, 'render_order_design_preview_meta_box'),
+            'shop_order',
+            'normal',
+            'high'
+        );
+
+        // Add meta box for new WooCommerce HPOS orders screen
+        add_meta_box(
+            'octo_order_design_preview',
+            __('Design Vorschau', 'octo-print-designer'),
+            array($this, 'render_order_design_preview_meta_box'),
+            'woocommerce_page_wc-orders',
+            'normal',
+            'high'
+        );
+    }
+
+    /**
+     * 🎨 AGENT 2 DELIVERABLE: Render Design Preview Meta Box Content
+     * Professional UI with preview button and container
+     */
+    public function render_order_design_preview_meta_box($post_or_order) {
+        // Get order ID from post or order object
+        $order_id = is_a($post_or_order, 'WP_Post') ? $post_or_order->ID : $post_or_order->get_id();
+
+        // Security nonce
+        wp_nonce_field('octo_order_design_preview', 'octo_order_design_preview_nonce');
+
+        ?>
+        <div class="wc-order-design-preview-wrapper" style="padding: 12px;">
+            <div style="margin-bottom: 15px;">
+                <p style="margin: 0 0 8px 0;">
+                    <strong style="font-size: 14px;">🎨 Design Vorschau</strong>
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #555;">
+                    Klicken Sie auf den Button um eine 1:1 Vorschau des Kundendesigns zu generieren.
+                </p>
+            </div>
+
+            <p style="margin-bottom: 15px;">
+                <button type="button"
+                        id="wc-order-preview-button"
+                        class="button button-primary button-large"
+                        data-order-id="<?php echo esc_attr($order_id); ?>"
+                        style="padding: 8px 16px;">
+                    <span class="dashicons dashicons-visibility" style="margin-top: 3px;"></span>
+                    Design Vorschau anzeigen
+                </button>
+            </p>
+
+            <div id="wc-order-design-preview-container"
+                 style="display:none; margin-top:20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;">
+                <div class="design-preview-loading" style="text-align: center; padding: 40px;">
+                    <span class="spinner is-active" style="float: none; margin: 0 auto;"></span>
+                    <p style="margin-top: 15px; color: #555;">Design wird geladen...</p>
+                </div>
+                <div class="design-preview-content" style="display: none;">
+                    <!-- Preview will be rendered here by JavaScript -->
+                </div>
+                <div class="design-preview-error" style="display: none; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 3px;">
+                    <strong style="color: #856404;">⚠️ Fehler beim Laden der Vorschau</strong>
+                    <p class="error-message" style="margin: 8px 0 0 0; color: #856404;"></p>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#wc-order-preview-button').on('click', function(e) {
+                e.preventDefault();
+
+                var button = $(this);
+                var orderId = button.data('order-id');
+                var container = $('#wc-order-design-preview-container');
+                var loadingDiv = container.find('.design-preview-loading');
+                var contentDiv = container.find('.design-preview-content');
+                var errorDiv = container.find('.design-preview-error');
+
+                // Show container and loading state
+                container.slideDown();
+                loadingDiv.show();
+                contentDiv.hide();
+                errorDiv.hide();
+
+                // Disable button
+                button.prop('disabled', true).text('Lädt...');
+
+                console.log('🎨 [META BOX] Requesting design preview for order:', orderId);
+
+                // AJAX request to load design preview
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'get_order_design_preview',
+                        order_id: orderId,
+                        nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        console.log('🎨 [META BOX] AJAX response:', response);
+                        loadingDiv.hide();
+
+                        if (response.success) {
+                            console.log('✅ [META BOX] Design data loaded successfully');
+                            console.log('🎨 [META BOX] Design data:', response.data);
+
+                            // Create preview container HTML
+                            var previewHtml = '<div class="design-preview-renderer" data-order-id="' + orderId + '">';
+                            previewHtml += '<div style="margin-bottom: 15px; padding: 12px; background: #e7f5fe; border-left: 4px solid #0073aa; border-radius: 3px;">';
+                            previewHtml += '<strong style="color: #0073aa;">✓ Design Daten erfolgreich geladen</strong>';
+                            previewHtml += '<p style="margin: 8px 0 0 0; font-size: 12px; color: #555;">Die Design-Vorschau wird automatisch gerendert.</p>';
+                            previewHtml += '</div>';
+
+                            previewHtml += '<div id="design-canvas-container-' + orderId + '" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 20px; text-align: center;">';
+                            previewHtml += '<canvas id="design-preview-canvas-' + orderId + '" style="max-width: 100%; height: auto; border: 1px solid #e1e1e1;"></canvas>';
+                            previewHtml += '<p style="margin-top: 15px; font-size: 12px; color: #666;">Canvas wird initialisiert...</p>';
+                            previewHtml += '</div>';
+                            previewHtml += '</div>';
+
+                            contentDiv.html(previewHtml).show();
+
+                            // Store design data globally for canvas renderer
+                            window.orderDesignData = window.orderDesignData || {};
+                            window.orderDesignData[orderId] = response.data;
+
+                            console.log('🎨 [META BOX] Design data stored globally');
+
+                            // Trigger rendering event for admin-preview-integration.js
+                            $(document).trigger('octo-design-preview-ready', {
+                                orderId: orderId,
+                                canvasId: 'design-preview-canvas-' + orderId,
+                                designData: response.data
+                            });
+
+                            console.log('🎨 [META BOX] Triggered octo-design-preview-ready event');
+                        } else {
+                            console.error('❌ [META BOX] AJAX error:', response.data);
+                            errorDiv.find('.error-message').text(response.data.message || 'Unbekannter Fehler');
+                            errorDiv.show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('❌ [META BOX] AJAX request failed:', error);
+                        loadingDiv.hide();
+                        errorDiv.find('.error-message').text('AJAX Fehler: ' + error);
+                        errorDiv.show();
+                    },
+                    complete: function() {
+                        // Re-enable button
+                        button.prop('disabled', false).html('<span class="dashicons dashicons-visibility" style="margin-top: 3px;"></span> Design Vorschau anzeigen');
+                    }
+                });
+            });
+        });
+        </script>
+
+        <style>
+        .wc-order-design-preview-wrapper .button-large {
+            font-size: 14px;
+            height: auto;
+            line-height: 1.5;
+        }
+        .wc-order-design-preview-wrapper .dashicons {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+        }
+        #wc-order-design-preview-container {
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .design-preview-content canvas {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        </style>
+        <?php
     }
 }

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGENT 4: Validation Enhancements Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .test-result {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+
+        .test-result.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .test-result.warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .test-result.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .test-result.info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            color: #0c5460;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        #canvas-container {
+            margin-top: 20px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #7f8c8d;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .console-output .log { color: #4ec9b0; }
+        .console-output .warn { color: #dcdcaa; }
+        .console-output .error { color: #f48771; }
+        .console-output .success { color: #b5cea8; }
+    </style>
+</head>
+<body>
+    <h1>🎯 AGENT 4: Data Flow Validator - Enhancement Test Suite</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="testOrderResponseDetection()">Test 1: Order Response Detection</button>
+        <button onclick="testCanvasDimensionFallback()">Test 2: Canvas Dimension Fallback</button>
+        <button onclick="testCoordinatePrecision()">Test 3: Coordinate Precision</button>
+        <button onclick="testMissingData()">Test 4: Missing Data Handling</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <h3>Tests Run</h3>
+            <div class="value" id="tests-run">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Passed</h3>
+            <div class="value" id="tests-passed" style="color: #27ae60;">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Failed</h3>
+            <div class="value" id="tests-failed" style="color: #e74c3c;">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Warnings</h3>
+            <div class="value" id="tests-warnings" style="color: #f39c12;">0</div>
+        </div>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="test-section">
+        <h2>Canvas Preview</h2>
+        <div id="canvas-container"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <div class="console-output" id="console"></div>
+    </div>
+
+    <!-- Load Dependencies -->
+    <script src="admin-canvas-renderer.js"></script>
+    <script src="design-preview-generator.js"></script>
+
+    <script>
+        // Test Statistics
+        let stats = {
+            run: 0,
+            passed: 0,
+            failed: 0,
+            warnings: 0
+        };
+
+        // Console capture
+        const originalConsole = {
+            log: console.log,
+            warn: console.warn,
+            error: console.error
+        };
+
+        function captureConsole() {
+            const output = document.getElementById('console');
+
+            console.log = function(...args) {
+                originalConsole.log.apply(console, args);
+                const msg = args.join(' ');
+                output.innerHTML += `<div class="log">${escapeHtml(msg)}</div>`;
+                output.scrollTop = output.scrollHeight;
+            };
+
+            console.warn = function(...args) {
+                originalConsole.warn.apply(console, args);
+                const msg = args.join(' ');
+                output.innerHTML += `<div class="warn">⚠️ ${escapeHtml(msg)}</div>`;
+                output.scrollTop = output.scrollHeight;
+            };
+
+            console.error = function(...args) {
+                originalConsole.error.apply(console, args);
+                const msg = args.join(' ');
+                output.innerHTML += `<div class="error">❌ ${escapeHtml(msg)}</div>`;
+                output.scrollTop = output.scrollHeight;
+            };
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Initialize
+        const generator = new DesignPreviewGenerator();
+        generator.init('canvas-container');
+        captureConsole();
+
+        // Test 1: Order Response Detection
+        function testOrderResponseDetection() {
+            console.log('\n🎯 TEST 1: Order Response Detection\n');
+
+            const orderResponse = {
+                order_id: 5374,
+                design_data: {
+                    "167359_189542": {
+                        view_name: "Test View",
+                        system_id: "189542",
+                        variation_id: "167359",
+                        images: [
+                            {
+                                id: "img_1",
+                                url: "https://via.placeholder.com/150",
+                                left: 100,
+                                top: 100,
+                                scaleX: 1,
+                                scaleY: 1,
+                                angle: 0
+                            }
+                        ]
+                    }
+                },
+                canvas_dimensions: { width: 780, height: 580 },
+                mockup_url: "https://via.placeholder.com/780x580",
+                has_design_data: true,
+                has_mockup_url: true,
+                has_canvas_dimensions: true,
+                timestamp: new Date().toISOString()
+            };
+
+            const validation = generator.validateDesignData(orderResponse);
+
+            updateStats();
+            displayResult('Test 1: Order Response Detection', {
+                passed: validation.hasOrderWrapper && validation.dataSource === 'woocommerce_order',
+                details: {
+                    'Has Order Wrapper': validation.hasOrderWrapper,
+                    'Data Source': validation.dataSource,
+                    'Is Valid': validation.isValid,
+                    'Errors': validation.errors.length,
+                    'Warnings': validation.warnings.length,
+                    'Image Count': validation.imageCount
+                }
+            });
+        }
+
+        // Test 2: Canvas Dimension Fallback
+        function testCanvasDimensionFallback() {
+            console.log('\n🎯 TEST 2: Canvas Dimension Fallback\n');
+
+            // Test with order response dimensions
+            const orderWithDimensions = {
+                order_id: 5375,
+                design_data: {
+                    "view_1": {
+                        images: [{ id: "img_1", url: "https://via.placeholder.com/150", left: 100, top: 100, scaleX: 1, scaleY: 1 }]
+                    }
+                },
+                canvas_dimensions: { width: 1000, height: 800 },
+                has_design_data: true
+            };
+
+            const compatibility = generator.validateDataStructureCompatibility(orderWithDimensions);
+            const transformed = generator.transformDataStructure(orderWithDimensions);
+            const firstView = Object.values(transformed)[0];
+
+            updateStats();
+            displayResult('Test 2: Canvas Dimension Fallback', {
+                passed: compatibility.canvasDimensions?.source === 'order_response' &&
+                        firstView.canvas.width === 1000,
+                details: {
+                    'Dimensions Source': compatibility.canvasDimensions?.source,
+                    'Width': firstView.canvas.width,
+                    'Height': firstView.canvas.height,
+                    'Expected Width': 1000,
+                    'Expected Height': 800
+                }
+            });
+        }
+
+        // Test 3: Coordinate Precision Validation
+        function testCoordinatePrecision() {
+            console.log('\n🎯 TEST 3: Coordinate Precision Validation\n');
+
+            const designWithPrecision = {
+                "view_1": {
+                    images: [
+                        {
+                            id: "img_1",
+                            url: "https://via.placeholder.com/150",
+                            left: 326.123456789,  // Excessive precision
+                            top: 150.123456789,   // Excessive precision
+                            scaleX: 0.113,
+                            scaleY: 0.113
+                        }
+                    ]
+                }
+            };
+
+            const validation = generator.validateDesignData(designWithPrecision);
+            const precisionWarnings = validation.warnings.filter(w => w.includes('excessive decimal precision'));
+
+            updateStats();
+            displayResult('Test 3: Coordinate Precision Validation', {
+                passed: precisionWarnings.length > 0,
+                details: {
+                    'Precision Warnings Found': precisionWarnings.length,
+                    'Expected Warnings': 2,
+                    'Warnings': precisionWarnings
+                }
+            });
+
+            if (precisionWarnings.length > 0) {
+                stats.warnings++;
+                updateStatsDisplay();
+            }
+        }
+
+        // Test 4: Missing Data Handling
+        function testMissingData() {
+            console.log('\n🎯 TEST 4: Missing Data Handling\n');
+
+            const orderWithoutData = {
+                order_id: 5376,
+                design_data: null,
+                has_design_data: false,
+                canvas_dimensions: null
+            };
+
+            const compatibility = generator.validateDataStructureCompatibility(orderWithoutData);
+            const hasError = compatibility.compatibilityErrors.some(e =>
+                e.includes('no design data available')
+            );
+
+            updateStats();
+            displayResult('Test 4: Missing Data Handling', {
+                passed: hasError && !compatibility.isCompatible,
+                details: {
+                    'Error Detected': hasError,
+                    'Is Compatible': compatibility.isCompatible,
+                    'Errors': compatibility.compatibilityErrors,
+                    'Format': compatibility.format
+                }
+            });
+        }
+
+        // Run all tests
+        async function runAllTests() {
+            clearResults();
+            console.log('🚀 Running all AGENT 4 validation tests...\n');
+
+            testOrderResponseDetection();
+            await sleep(500);
+            testCanvasDimensionFallback();
+            await sleep(500);
+            testCoordinatePrecision();
+            await sleep(500);
+            testMissingData();
+
+            console.log('\n✅ All tests completed!\n');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function updateStats() {
+            stats.run++;
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('tests-run').textContent = stats.run;
+            document.getElementById('tests-passed').textContent = stats.passed;
+            document.getElementById('tests-failed').textContent = stats.failed;
+            document.getElementById('tests-warnings').textContent = stats.warnings;
+        }
+
+        function displayResult(testName, result) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-section';
+
+            const status = result.passed ? 'success' : 'error';
+            if (result.passed) {
+                stats.passed++;
+            } else {
+                stats.failed++;
+            }
+            updateStatsDisplay();
+
+            let detailsHtml = '<ul>';
+            for (const [key, value] of Object.entries(result.details)) {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
+                detailsHtml += `<li><strong>${key}:</strong> ${escapeHtml(valueStr)}</li>`;
+            }
+            detailsHtml += '</ul>';
+
+            resultDiv.innerHTML = `
+                <h2>${result.passed ? '✅' : '❌'} ${testName}</h2>
+                <div class="test-result ${status}">
+                    <strong>Status:</strong> ${result.passed ? 'PASSED' : 'FAILED'}
+                    ${detailsHtml}
+                </div>
+            `;
+
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('console').innerHTML = '';
+            stats = { run: 0, passed: 0, failed: 0, warnings: 0 };
+            updateStatsDisplay();
+            console.log('🔄 Test results cleared\n');
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            console.log('🎯 AGENT 4 Validation Enhancement Test Suite Loaded');
+            console.log('📋 Ready to test order-specific validation improvements\n');
+        });
+    </script>
+</body>
+</html>

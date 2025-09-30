@@ -61,13 +61,31 @@ class DesignPreviewGenerator {
             isValid: false,
             errors: [],
             warnings: [],
-            imageCount: 0
+            imageCount: 0,
+            dataSource: 'unknown', // Track data source
+            hasOrderWrapper: false // Track if wrapped in order response
         };
 
         try {
             if (!designData || typeof designData !== 'object') {
                 result.errors.push('Design data is not a valid object');
                 return result;
+            }
+
+            // 🎯 AGENT 4: ORDER DATA WRAPPER DETECTION
+            // Check if data is wrapped in WooCommerce order response format
+            if (designData.order_id && designData.design_data) {
+                console.log('🎯 AGENT 4: Order response wrapper detected, extracting nested design_data...');
+                result.hasOrderWrapper = true;
+                result.dataSource = 'woocommerce_order';
+
+                // Extract nested design data
+                designData = designData.design_data;
+
+                if (!designData || typeof designData !== 'object') {
+                    result.errors.push('Order response contains invalid nested design_data');
+                    return result;
+                }
             }
 
             const viewKeys = Object.keys(designData);
@@ -171,6 +189,22 @@ class DesignPreviewGenerator {
                         result.warnings.push(`Image ${index}: ScaleY (${coords.scaleY}) may be outside expected range`);
                     }
                 }
+
+                // 🎯 AGENT 4: COORDINATE PRECISION VALIDATION
+                // Check for coordinate transformation artifacts (excessive decimal precision)
+                const checkPrecision = (value, name) => {
+                    if (typeof value === 'number' && !isNaN(value)) {
+                        const decimalPlaces = (value.toString().split('.')[1] || '').length;
+                        if (decimalPlaces > 6) {
+                            result.warnings.push(`Image ${index}: ${name} has excessive decimal precision (${decimalPlaces} places) - possible transformation artifact`);
+                        }
+                    }
+                };
+
+                checkPrecision(coords.left, 'left');
+                checkPrecision(coords.top, 'top');
+                checkPrecision(coords.scaleX, 'scaleX');
+                checkPrecision(coords.scaleY, 'scaleY');
             });
 
             // Set valid if no errors
@@ -199,12 +233,56 @@ class DesignPreviewGenerator {
             needsTransformation: false,
             compatibilityErrors: [],
             compatibilityWarnings: [],
-            detectedStructures: []
+            detectedStructures: [],
+            orderMetadata: null, // 🎯 AGENT 4: Track order-specific metadata
+            canvasDimensions: null // 🎯 AGENT 4: Track canvas dimensions
         };
 
         if (!designData || typeof designData !== 'object') {
             result.compatibilityErrors.push('Invalid design data: not an object');
             return result;
+        }
+
+        // 🎯 AGENT 4: ORDER RESPONSE WRAPPER DETECTION
+        // Check if data is wrapped in WooCommerce order response format
+        if (designData.order_id && designData.design_data) {
+            console.log('🎯 AGENT 4: Order response wrapper detected in compatibility check');
+            result.detectedStructures.push('woocommerce_order_wrapper');
+
+            // Extract order metadata
+            result.orderMetadata = {
+                order_id: designData.order_id,
+                mockup_url: designData.mockup_url,
+                has_design_data: designData.has_design_data,
+                has_mockup_url: designData.has_mockup_url,
+                has_canvas_dimensions: designData.has_canvas_dimensions,
+                timestamp: designData.timestamp
+            };
+
+            // Extract canvas dimensions from order response if available
+            if (designData.canvas_dimensions) {
+                result.canvasDimensions = {
+                    width: designData.canvas_dimensions.width,
+                    height: designData.canvas_dimensions.height,
+                    source: 'order_response'
+                };
+                console.log('🎯 AGENT 4: Canvas dimensions from order response:', result.canvasDimensions);
+            }
+
+            // Check if order has design data
+            if (!designData.has_design_data || !designData.design_data) {
+                result.compatibilityErrors.push('Order response indicates no design data available');
+                result.format = 'woocommerce_order_no_data';
+                return result;
+            }
+
+            // Extract nested design data for further validation
+            designData = designData.design_data;
+
+            if (!designData || typeof designData !== 'object') {
+                result.compatibilityErrors.push('Order response contains invalid nested design_data');
+                return result;
+            }
         }
 
         // Check for Hive Mind objects format
@@ -496,7 +574,41 @@ class DesignPreviewGenerator {
         ctx.font = '10px Arial, sans-serif';
         ctx.fillStyle = '#0066cc';
 
-        if (message.includes('Data structure incompatibility')) {
+        // 🎯 AGENT 4: ORDER-SPECIFIC ERROR GUIDANCE
+        if (message.includes('Order response')) {
+            ctx.fillText(
+                'WooCommerce order data format issue detected',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+            ctx.fillText(
+                'Check order meta fields for design_data',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 30
+            );
+        } else if (message.includes('no design data available')) {
+            ctx.fillText(
+                'Order has no design data in _design_data meta field',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+            ctx.fillText(
+                'Verify order was created with design tool',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 30
+            );
+        } else if (message.includes('Canvas dimensions')) {
+            ctx.fillText(
+                'Missing canvas dimensions - using defaults',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 15
+            );
+            ctx.fillText(
+                'Check design_data.canvas.width/height',
+                canvas.width / (2 * pixelRatio),
+                canvas.height / (2 * pixelRatio) + 30
+            );
+        } else if (message.includes('Data structure incompatibility')) {
             ctx.fillText(
                 'Hive Mind → Canvas format mismatch detected',
                 canvas.width / (2 * pixelRatio),
@@ -683,10 +795,62 @@ class DesignPreviewGenerator {
             return null;
         }
 
+        // 🎯 AGENT 4: ORDER RESPONSE WRAPPER HANDLING
+        // Check if data is wrapped in WooCommerce order response format
+        let orderMetadata = null;
+        let canvasDimensionsFromOrder = null;
+
+        if (designData.order_id && designData.design_data) {
+            console.log('🎯 AGENT 4: Order response wrapper detected in transformation');
+
+            // Preserve order metadata for reference
+            orderMetadata = {
+                order_id: designData.order_id,
+                mockup_url: designData.mockup_url,
+                timestamp: designData.timestamp
+            };
+
+            // Preserve canvas dimensions from order response
+            if (designData.canvas_dimensions) {
+                canvasDimensionsFromOrder = {
+                    width: designData.canvas_dimensions.width,
+                    height: designData.canvas_dimensions.height
+                };
+                console.log('🎯 AGENT 4: Preserved canvas dimensions from order:', canvasDimensionsFromOrder);
+            }
+
+            // Check if order has design data
+            if (!designData.has_design_data || !designData.design_data) {
+                console.error('❌ AGENT 4: Order response indicates no design data available');
+                return null;
+            }
+
+            // Extract nested design data
+            designData = designData.design_data;
+
+            if (!designData || typeof designData !== 'object') {
+                console.error('❌ AGENT 4: Order response contains invalid nested design_data');
+                return null;
+            }
+        }
+
         // If data already has view-based structure with images, return as-is
         const firstViewKey = Object.keys(designData)[0];
         if (firstViewKey && designData[firstViewKey] && designData[firstViewKey].images) {
             console.log('✅ AGENT 3: Data already in Canvas Reconstruction format');
+
+            // 🎯 AGENT 4: CANVAS DIMENSION RESTORATION
+            // If canvas dimensions were in order response but missing in design data, restore them
+            if (canvasDimensionsFromOrder && designData[firstViewKey]) {
+                const firstView = designData[firstViewKey];
+                if (!firstView.canvas || !firstView.canvas.width || !firstView.canvas.height) {
+                    console.log('🎯 AGENT 4: Restoring canvas dimensions from order response');
+                    firstView.canvas = canvasDimensionsFromOrder;
+                } else {
+                    console.log('🎯 AGENT 4: Canvas dimensions already present in design data');
+                }
+            }
+
             return designData;
         }
 
@@ -694,7 +858,7 @@ class DesignPreviewGenerator {
         if (designData.objects && Array.isArray(designData.objects)) {
             console.log('🎯 AGENT 3: Converting from Hive Mind objects format...');
 
-            const transformedData = this.convertObjectsToImages(designData);
+            const transformedData = this.convertObjectsToImages(designData, canvasDimensionsFromOrder);
             console.log('✅ AGENT 3: Successfully transformed objects to images format', transformedData);
             return transformedData;
         }
@@ -703,7 +867,7 @@ class DesignPreviewGenerator {
         if (designData.elements && Array.isArray(designData.elements)) {
             console.log('🎯 AGENT 3: Converting from elements format...');
 
-            const transformedData = this.convertElementsToImages(designData);
+            const transformedData = this.convertElementsToImages(designData, canvasDimensionsFromOrder);
             console.log('✅ AGENT 3: Successfully transformed elements to images format', transformedData);
             return transformedData;
         }
@@ -715,9 +879,10 @@ class DesignPreviewGenerator {
     /**
      * 🎯 AGENT 3: Convert objects array to Canvas Reconstruction images format
      * @param {Object} designData - Data with objects array
+     * @param {Object} canvasDimensionsFromOrder - Canvas dimensions from order response (optional)
      * @returns {Object} Canvas Reconstruction compatible format
      */
-    convertObjectsToImages(designData) {
+    convertObjectsToImages(designData, canvasDimensionsFromOrder = null) {
         const images = [];
 
         designData.objects.forEach((obj, index) => {
@@ -750,6 +915,28 @@ class DesignPreviewGenerator {
             }
         });
 
+        // 🎯 AGENT 4: CANVAS DIMENSION EXTRACTION with fallback priority
+        // Priority: 1) Order response, 2) Design data canvas, 3) Default 780x580
+        let canvasWidth = 780;
+        let canvasHeight = 580;
+        let dimensionSource = 'default';
+
+        if (canvasDimensionsFromOrder) {
+            canvasWidth = canvasDimensionsFromOrder.width || 780;
+            canvasHeight = canvasDimensionsFromOrder.height || 580;
+            dimensionSource = 'order_response';
+            console.log('🎯 AGENT 4: Using canvas dimensions from order response');
+        } else if (designData.canvas) {
+            canvasWidth = designData.canvas.width || 780;
+            canvasHeight = designData.canvas.height || 580;
+            dimensionSource = 'design_data';
+            console.log('🎯 AGENT 4: Using canvas dimensions from design data');
+        } else {
+            console.log('🎯 AGENT 4: Using default canvas dimensions (780x580)');
+        }
+
+        console.log(`🎯 AGENT 4: Canvas dimensions - Width: ${canvasWidth}, Height: ${canvasHeight} (source: ${dimensionSource})`);
+
         // Create view-based structure for Canvas Reconstruction Engine
         const viewId = 'hive_mind_view';
         return {
@@ -759,8 +946,9 @@ class DesignPreviewGenerator {
                 variation_id: designData.variation_id || viewId,
                 images: images,
                 canvas: {
-                    width: designData.canvas?.width || 780,
-                    height: designData.canvas?.height || 580
+                    width: canvasWidth,
+                    height: canvasHeight,
+                    _dimension_source: dimensionSource // Track source for debugging
                 }
             }
         };
@@ -769,9 +957,10 @@ class DesignPreviewGenerator {
     /**
      * 🎯 AGENT 3: Convert elements array to Canvas Reconstruction images format
      * @param {Object} designData - Data with elements array
+     * @param {Object} canvasDimensionsFromOrder - Canvas dimensions from order response (optional)
      * @returns {Object} Canvas Reconstruction compatible format
      */
-    convertElementsToImages(designData) {
+    convertElementsToImages(designData, canvasDimensionsFromOrder = null) {
         const images = [];
 
         designData.elements.forEach((element, index) => {
@@ -792,13 +981,37 @@ class DesignPreviewGenerator {
             }
         });
 
+        // 🎯 AGENT 4: CANVAS DIMENSION EXTRACTION with fallback priority
+        let canvasWidth = 780;
+        let canvasHeight = 580;
+        let dimensionSource = 'default';
+
+        if (canvasDimensionsFromOrder) {
+            canvasWidth = canvasDimensionsFromOrder.width || 780;
+            canvasHeight = canvasDimensionsFromOrder.height || 580;
+            dimensionSource = 'order_response';
+            console.log('🎯 AGENT 4: Using canvas dimensions from order response (elements)');
+        } else if (designData.canvas) {
+            canvasWidth = designData.canvas.width || 780;
+            canvasHeight = designData.canvas.height || 580;
+            dimensionSource = 'design_data';
+            console.log('🎯 AGENT 4: Using canvas dimensions from design data (elements)');
+        } else {
+            console.log('🎯 AGENT 4: Using default canvas dimensions (elements: 780x580)');
+        }
+
         const viewId = designData.template_view_id || 'elements_view';
         return {
             [viewId]: {
                 view_name: 'Elements Design View',
                 system_id: designData.system_id || Date.now().toString(),
                 variation_id: designData.variation_id || viewId,
-                images: images
+                images: images,
+                canvas: {
+                    width: canvasWidth,
+                    height: canvasHeight,
+                    _dimension_source: dimensionSource
+                }
             }
         };
     }

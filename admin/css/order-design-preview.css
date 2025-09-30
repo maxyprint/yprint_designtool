@@ -1,0 +1,527 @@
+/**
+ * 🎨 AGENT 5 DELIVERABLE: WooCommerce Order Design Preview Styles
+ * Professional CSS for Design Preview Meta Box
+ *
+ * Features:
+ * - WooCommerce admin design language integration
+ * - Professional state management (loading, success, error)
+ * - Smooth animations and transitions
+ * - Responsive design for all screen sizes
+ * - Print-friendly styles
+ * - Accessibility compliant (WCAG 2.1)
+ *
+ * Author: AGENT 5 - UI/UX Enhancement Specialist
+ * Context: WooCommerce Order Design Preview System
+ */
+
+/* ================================================
+   WOOCOMMERCE COLOR PALETTE
+   ================================================ */
+:root {
+    --wc-primary: #0073aa;
+    --wc-primary-hover: #005177;
+    --wc-primary-light: #e7f5fe;
+    --wc-success: #46b450;
+    --wc-success-light: #d4edda;
+    --wc-warning: #ffc107;
+    --wc-warning-light: #fff3cd;
+    --wc-error: #dc3232;
+    --wc-error-light: #f8d7da;
+    --wc-bg: #f1f1f1;
+    --wc-border: #ddd;
+    --wc-text: #555;
+    --wc-text-dark: #23282d;
+    --wc-white: #ffffff;
+}
+
+/* ================================================
+   META BOX BASE STYLES
+   ================================================ */
+.wc-order-design-preview-wrapper {
+    background: var(--wc-white);
+    padding: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.wc-order-design-preview-wrapper p {
+    margin: 0 0 15px 0;
+}
+
+.wc-order-design-preview-wrapper strong {
+    color: var(--wc-text-dark);
+}
+
+/* ================================================
+   PREVIEW BUTTON STYLES
+   ================================================ */
+#wc-order-preview-button {
+    background: var(--wc-primary);
+    color: var(--wc-white);
+    border: none;
+    border-radius: 3px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    text-shadow: none;
+    line-height: 1.5;
+}
+
+#wc-order-preview-button .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    vertical-align: middle;
+}
+
+#wc-order-preview-button:hover {
+    background: var(--wc-primary-hover);
+    border-color: var(--wc-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+#wc-order-preview-button:active {
+    background: #004a6f;
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+#wc-order-preview-button:disabled {
+    background: #a0a5aa;
+    border-color: #a0a5aa;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+#wc-order-preview-button:disabled:hover {
+    transform: none;
+}
+
+#wc-order-preview-button:focus {
+    outline: 2px solid var(--wc-primary);
+    outline-offset: 2px;
+}
+
+/* ================================================
+   PREVIEW CONTAINER STATES
+   ================================================ */
+#wc-order-design-preview-container {
+    display: none;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid var(--wc-border);
+    border-radius: 4px;
+    animation: slideDown 0.3s ease-out;
+}
+
+#wc-order-design-preview-container.visible {
+    display: block;
+}
+
+/* Loading State */
+.design-preview-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.design-preview-loading .spinner {
+    float: none;
+    margin: 0 auto 15px;
+    display: block;
+}
+
+.design-preview-loading p {
+    margin: 15px 0 0;
+    color: var(--wc-text);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Content State */
+.design-preview-content {
+    display: none;
+}
+
+.design-preview-content.visible {
+    display: block;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Error State */
+.design-preview-error {
+    display: none;
+    padding: 15px;
+    background: var(--wc-warning-light);
+    border-left: 4px solid var(--wc-warning);
+    border-radius: 3px;
+}
+
+.design-preview-error.visible {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.design-preview-error strong {
+    color: #856404;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.design-preview-error .error-message {
+    margin: 8px 0 0 0;
+    color: #856404;
+    font-size: 13px;
+}
+
+/* Success State */
+.design-preview-success {
+    padding: 12px;
+    background: var(--wc-primary-light);
+    border-left: 4px solid var(--wc-primary);
+    border-radius: 3px;
+    margin-bottom: 15px;
+}
+
+.design-preview-success strong {
+    color: var(--wc-primary);
+    display: block;
+    margin-bottom: 5px;
+}
+
+.design-preview-success p {
+    margin: 8px 0 0 0;
+    font-size: 12px;
+    color: var(--wc-text);
+}
+
+/* ================================================
+   CANVAS CONTAINER STYLES
+   ================================================ */
+#design-canvas-container {
+    background: var(--wc-white);
+    border: 1px solid var(--wc-border);
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    margin-top: 15px;
+}
+
+.design-preview-content canvas {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #e1e1e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    background: var(--wc-white);
+}
+
+#design-canvas-container p {
+    margin-top: 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+/* ================================================
+   ANIMATIONS
+   ================================================ */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Loading spinner animation */
+.spinner.is-active {
+    animation: spin 1s linear infinite;
+}
+
+/* ================================================
+   BUTTON SIZE VARIATIONS
+   ================================================ */
+.wc-order-design-preview-wrapper .button-large {
+    font-size: 14px;
+    height: auto;
+    line-height: 1.5;
+    padding: 8px 16px;
+}
+
+/* ================================================
+   RESPONSIVE DESIGN
+   ================================================ */
+
+/* Tablet: 768px - 1199px */
+@media (max-width: 1199px) {
+    .wc-order-design-preview-wrapper {
+        padding: 10px;
+    }
+
+    #wc-order-preview-button {
+        font-size: 13px;
+        padding: 7px 14px;
+    }
+
+    #wc-order-design-preview-container {
+        padding: 12px;
+    }
+
+    .design-preview-loading {
+        padding: 30px 15px;
+    }
+
+    #design-canvas-container {
+        padding: 15px;
+    }
+}
+
+/* Mobile: < 768px */
+@media (max-width: 767px) {
+    .wc-order-design-preview-wrapper {
+        padding: 8px;
+    }
+
+    #wc-order-preview-button {
+        width: 100%;
+        justify-content: center;
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+
+    #wc-order-design-preview-container {
+        padding: 10px;
+        margin-top: 15px;
+    }
+
+    .design-preview-loading {
+        padding: 25px 10px;
+    }
+
+    .design-preview-loading p {
+        font-size: 13px;
+    }
+
+    #design-canvas-container {
+        padding: 12px;
+    }
+
+    .design-preview-content canvas {
+        max-width: 100%;
+    }
+
+    .design-preview-success,
+    .design-preview-error {
+        padding: 12px;
+        font-size: 13px;
+    }
+}
+
+/* ================================================
+   PRINT STYLES
+   ================================================ */
+@media print {
+    .wc-order-design-preview-wrapper {
+        background: white;
+        border: 1px solid #000;
+    }
+
+    #wc-order-preview-button {
+        display: none;
+    }
+
+    .design-preview-loading,
+    .design-preview-error {
+        display: none;
+    }
+
+    .design-preview-content {
+        display: block !important;
+    }
+
+    #design-canvas-container {
+        border: 1px solid #000;
+        box-shadow: none;
+        page-break-inside: avoid;
+    }
+
+    .design-preview-content canvas {
+        max-width: 100%;
+        border: 1px solid #000;
+        box-shadow: none;
+    }
+
+    /* Ensure canvas prints properly */
+    @page {
+        margin: 2cm;
+    }
+}
+
+/* ================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ================================================ */
+.wc-order-design-preview-wrapper *:focus {
+    outline: 2px solid var(--wc-primary);
+    outline-offset: 2px;
+}
+
+.wc-order-design-preview-wrapper .screen-reader-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ================================================
+   WOOCOMMERCE COMPATIBILITY
+   ================================================ */
+/* Ensure compatibility with WooCommerce admin styles */
+.woocommerce-layout #wc-order-preview-button {
+    height: auto;
+}
+
+/* HPOS (High-Performance Order Storage) compatibility */
+.woocommerce_page_wc-orders .wc-order-design-preview-wrapper {
+    margin: 0;
+}
+
+/* ================================================
+   HOVER EFFECTS AND TRANSITIONS
+   ================================================ */
+.design-preview-content {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#design-canvas-container {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#design-canvas-container:hover {
+    border-color: #c3c4c7;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ================================================
+   LOADING STATES WITH VISUAL FEEDBACK
+   ================================================ */
+.design-preview-loading::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 15px;
+    border: 3px solid var(--wc-bg);
+    border-top-color: var(--wc-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ================================================
+   SUCCESS MESSAGE ENHANCEMENTS
+   ================================================ */
+.design-preview-success::before {
+    content: '✓';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--wc-primary);
+}
+
+/* ================================================
+   ERROR MESSAGE ENHANCEMENTS
+   ================================================ */
+.design-preview-error::before {
+    content: '⚠';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--wc-warning);
+}
+
+/* ================================================
+   DARK MODE SUPPORT (OPTIONAL)
+   ================================================ */
+@media (prefers-color-scheme: dark) {
+    /* WooCommerce admin doesn't have native dark mode yet,
+       but this future-proofs the design */
+    .wc-order-design-preview-wrapper {
+        background: #1e1e1e;
+        color: #e0e0e0;
+    }
+
+    #wc-order-design-preview-container {
+        background: #2a2a2a;
+        border-color: #444;
+    }
+
+    .design-preview-content canvas {
+        border-color: #444;
+        background: #fff;
+    }
+}
+
+/* ================================================
+   HIGH CONTRAST MODE SUPPORT
+   ================================================ */
+@media (prefers-contrast: high) {
+    #wc-order-preview-button {
+        border: 2px solid currentColor;
+    }
+
+    .design-preview-content canvas {
+        border: 2px solid #000;
+    }
+
+    .design-preview-success,
+    .design-preview-error {
+        border-left-width: 6px;
+    }
+}
+
+/* ================================================
+   REDUCED MOTION SUPPORT
+   ================================================ */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    #wc-order-preview-button:hover {
+        transform: none;
+    }
+}

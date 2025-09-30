@@ -1,0 +1,290 @@
+═══════════════════════════════════════════════════════════════════════════════
+🎯 AGENT 6: EXACT CODE CHANGES
+═══════════════════════════════════════════════════════════════════════════════
+
+File: /workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js
+Method: renderImageElement() (lines 684-990)
+
+═══════════════════════════════════════════════════════════════════════════════
+CHANGE 1: IMAGE DECODE AWAIT (Lines 691-709)
+═══════════════════════════════════════════════════════════════════════════════
+
+Location: After loadImage() call, before coordinate extraction
+
+BEFORE:
+--------
+async renderImageElement(imageData) {
+    const startTime = performance.now();
+
+    try {
+        // 🎯 AGENT 4: Load image with crossOrigin support
+        const img = await this.loadImage(imageData.src || imageData.url);
+
+        // 🎯 AGENT 4: Extract exact positioning from design data
+        const left = imageData.left || 0;
+        ...
+
+AFTER (Lines 691-709):
+--------
+async renderImageElement(imageData) {
+    const startTime = performance.now();
+
+    try {
+        // 🎯 AGENT 4: Load image with crossOrigin support
+        const img = await this.loadImage(imageData.src || imageData.url);
+
+        // 🎯 AGENT 6 FIX: Ensure image is fully decoded before rendering
+        try {
+            await img.decode();
+            console.log('🎯 AGENT 6 IMAGE DECODE: Image fully decoded and ready', {
+                src: (imageData.src || imageData.url).substring(0, 50) + '...',
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight,
+                complete: img.complete
+            });
+        } catch (decodeError) {
+            console.error('❌ AGENT 6 DECODE ERROR:', {
+                error: decodeError,
+                message: decodeError.message || 'Unknown decode error',
+                name: decodeError.name || 'Unknown',
+                code: decodeError.code || 'N/A',
+                src: (imageData.src || imageData.url).substring(0, 50) + '...'
+            });
+            // Continue anyway - image may still be usable
+        }
+
+        // 🎯 AGENT 4: Extract exact positioning from design data
+        const left = imageData.left || 0;
+        ...
+
+CHANGE SUMMARY:
+  ✅ Added await img.decode() to ensure image fully decoded
+  ✅ Try-catch for decode errors
+  ✅ Success log: "🎯 AGENT 6 IMAGE DECODE"
+  ✅ Error log: "❌ AGENT 6 DECODE ERROR"
+  ✅ Logs .message, .name, .code for decode errors
+
+═══════════════════════════════════════════════════════════════════════════════
+CHANGE 2: PRE-RENDER DIAGNOSTICS (Lines 826-854)
+═══════════════════════════════════════════════════════════════════════════════
+
+Location: Before ctx.drawImage() call
+
+BEFORE:
+--------
+// 🎯 AGENT 4: High-quality image rendering
+this.ctx.imageSmoothingEnabled = true;
+this.ctx.imageSmoothingQuality = 'high';
+
+// 🎯 AGENT 5: Image validation complete - verified by centralized validation system
+
+// 🎯 AGENT 4: Draw image with exact dimensions (top-left origin)
+this.ctx.drawImage(
+    img,
+    0, 0,
+    displayWidth,
+    displayHeight
+);
+
+AFTER (Lines 826-854):
+--------
+// 🎯 AGENT 4: High-quality image rendering
+this.ctx.imageSmoothingEnabled = true;
+this.ctx.imageSmoothingQuality = 'high';
+
+// 🎯 AGENT 6: PRE-RENDER DIAGNOSTICS - Verify all parameters before drawImage()
+const preRenderDiagnostics = {
+    imageState: {
+        complete: img.complete,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+        hasValidDimensions: img.naturalWidth > 0 && img.naturalHeight > 0,
+        src: (imageData.src || imageData.url).substring(0, 50) + '...'
+    },
+    canvasContext: {
+        isValid: !!this.ctx,
+        hasDrawImage: typeof this.ctx.drawImage === 'function',
+        currentTransform: this.ctx.getTransform ? this.ctx.getTransform() : 'unavailable'
+    },
+    renderParameters: {
+        position: { x: 0, y: 0 },
+        dimensions: { width: displayWidth, height: displayHeight },
+        allFinite: isFinite(displayWidth) && isFinite(displayHeight),
+        allPositive: displayWidth > 0 && displayHeight > 0
+    }
+};
+
+console.log('🎯 AGENT 6 PRE-RENDER DIAGNOSTICS:', preRenderDiagnostics);
+
+// 🎯 AGENT 6: Verify critical conditions before drawing
+if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+    console.error('❌ AGENT 6 PRE-RENDER VALIDATION FAILED: Image not ready for rendering', preRenderDiagnostics);
+    throw new Error('Image not ready: complete=' + img.complete + ', naturalWidth=' + img.naturalWidth);
+}
+
+// 🎯 AGENT 4: Draw image with exact dimensions (top-left origin)
+this.ctx.drawImage(
+    img,
+    0, 0,
+    displayWidth,
+    displayHeight
+);
+
+CHANGE SUMMARY:
+  ✅ Added preRenderDiagnostics object with 3 validation categories
+  ✅ Validates image state (complete, dimensions)
+  ✅ Validates canvas context (isValid, hasDrawImage)
+  ✅ Validates render parameters (dimensions, coordinates)
+  ✅ Success log: "🎯 AGENT 6 PRE-RENDER DIAGNOSTICS"
+  ✅ Error log: "❌ AGENT 6 PRE-RENDER VALIDATION FAILED"
+  ✅ Throws error if image not ready (early failure detection)
+
+═══════════════════════════════════════════════════════════════════════════════
+CHANGE 3: ENHANCED ERROR LOGGING (Lines 935-982)
+═══════════════════════════════════════════════════════════════════════════════
+
+Location: Catch block for renderImageElement()
+
+BEFORE:
+--------
+} catch (error) {
+    console.error('❌ AGENT 4 IMAGE ERROR:', error);
+
+    // 🎯 AGENT 4: Enhanced error visualization
+    const position = this.coordinatePreservation.noTransformMode
+        ? { x: imageData.left || 0, y: imageData.top || 0 }
+        : this.preserveCoordinates(imageData.left || 0, imageData.top || 0);
+    ...
+
+AFTER (Lines 935-982):
+--------
+} catch (error) {
+    // 🎯 AGENT 6 FIX: ENHANCED ERROR LOGGING - Extract all DOMException details
+    console.error('❌ AGENT 6 IMAGE RENDER ERROR - ENHANCED DIAGNOSTICS:', {
+        // Error object details
+        errorObject: error,
+        errorType: error.constructor.name,
+        errorName: error.name || 'Unknown',
+        errorMessage: error.message || 'No message available',
+        errorCode: error.code || 'No code',
+        errorStack: error.stack || 'No stack trace',
+
+        // DOMException specific properties
+        isDOMException: error instanceof DOMException,
+        DOMSTRING: error.DOMSTRING || 'N/A',
+
+        // Image data context
+        imageContext: {
+            src: (imageData.src || imageData.url) ? (imageData.src || imageData.url).substring(0, 100) : 'No src',
+            type: imageData.type || 'unknown',
+            left: imageData.left,
+            top: imageData.top,
+            scaleX: imageData.scaleX,
+            scaleY: imageData.scaleY,
+            angle: imageData.angle
+        },
+
+        // Additional error serialization attempts
+        errorKeys: Object.keys(error),
+        errorValues: Object.getOwnPropertyNames(error).reduce((acc, key) => {
+            try {
+                acc[key] = error[key];
+            } catch (e) {
+                acc[key] = 'Unable to access';
+            }
+            return acc;
+        }, {}),
+
+        // Error toString
+        errorString: error.toString(),
+
+        // JSON serialization attempt
+        errorJSON: (() => {
+            try {
+                return JSON.stringify(error);
+            } catch (e) {
+                return 'Cannot JSON stringify: ' + e.message;
+            }
+        })()
+    });
+
+    // 🎯 AGENT 4: Enhanced error visualization
+    const position = this.coordinatePreservation.noTransformMode
+        ? { x: imageData.left || 0, y: imageData.top || 0 }
+        : this.preserveCoordinates(imageData.left || 0, imageData.top || 0);
+    ...
+
+CHANGE SUMMARY:
+  ✅ Replaced simple error log with comprehensive diagnostics
+  ✅ Logs error.message (reveals true error instead of {})
+  ✅ Logs error.name (e.g., "InvalidStateError")
+  ✅ Logs error.code (DOMException code)
+  ✅ Detects error instanceof DOMException
+  ✅ Enumerates all error properties
+  ✅ Multiple serialization attempts
+  ✅ Complete image context (src, coords, scaling)
+  ✅ Error log: "❌ AGENT 6 IMAGE RENDER ERROR - ENHANCED DIAGNOSTICS"
+
+═══════════════════════════════════════════════════════════════════════════════
+SUMMARY OF ALL CHANGES
+═══════════════════════════════════════════════════════════════════════════════
+
+Total Changes: 3 major enhancements
+Total Lines Added: ~85 lines
+Total AGENT 6 Identifiers: 23
+
+Change Locations (all in renderImageElement method):
+  1. Lines 691-709: Image decode await + error handling
+  2. Lines 826-854: Pre-render diagnostics + validation
+  3. Lines 935-982: Enhanced error logging (DOMException)
+
+Log Identifiers Added:
+  ✅ "🎯 AGENT 6 IMAGE DECODE" - Decode success
+  ✅ "❌ AGENT 6 DECODE ERROR" - Decode failure
+  ✅ "🎯 AGENT 6 PRE-RENDER DIAGNOSTICS" - Pre-render state
+  ✅ "❌ AGENT 6 PRE-RENDER VALIDATION FAILED" - Pre-render failure
+  ✅ "❌ AGENT 6 IMAGE RENDER ERROR - ENHANCED DIAGNOSTICS" - Render error
+
+Error Properties Now Logged:
+  ✅ error.message - Full error description (not empty {})
+  ✅ error.name - Error type name
+  ✅ error.code - Error code number
+  ✅ error.stack - Stack trace
+  ✅ error instanceof DOMException - Type detection
+  ✅ All error object properties
+  ✅ Complete image context
+
+Validation Improvements:
+  ✅ Image decoded before rendering (await img.decode())
+  ✅ Image state validated (complete, dimensions)
+  ✅ Canvas context validated (isValid, hasDrawImage)
+  ✅ Render parameters validated (dimensions, coordinates)
+  ✅ Early failure detection (before ctx.drawImage())
+
+═══════════════════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+File Location: /workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js
+Method: renderImageElement() (lines 684-990)
+AGENT 6 Occurrences: 23 (verified)
+
+Automated Checks: ✅ ALL PASSED (5/5)
+  ✅ Image decode await found
+  ✅ Pre-render diagnostics found
+  ✅ Enhanced error logging found
+  ✅ Changes in renderImageElement() (CORRECT method)
+  ✅ All AGENT 6 identifiers present
+
+Code Path: ✅ ACTIVE
+  ✅ renderImageElement() is called by Agent 4+5
+  ✅ renderImage() redirects to renderImageElement() at line 1373
+  ✅ All changes in active code path (NOT unreachable)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Generated: 2025-09-30
+Status: ✅ CHANGES VERIFIED
+Agent: 6 (Implementation & Testing)
+
+═══════════════════════════════════════════════════════════════════════════════

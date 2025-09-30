@@ -1,0 +1,321 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                 AGENT 7: VISUELLER VERGLEICH IST vs. SOLL                    ║
+║                           Order 5374 | Template 3657                         ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          IST-ZUSTAND (Canvas Current)                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔═════════════════════════════════════════════════════════════════╗
+║                   Canvas: 780×580 px                            ║
+║                   Background: #f0f0f0 (GRAU)                    ║
+╠═════════════════════════════════════════════════════════════════╣
+║                                                                 ║
+║   ┌───────────────────────────────────────────────┐             ║
+║   │                                               │             ║
+║   │   [White Logo] (VISIBLE)                     │             ║
+║   │   Position: ???                               │             ║
+║   │                                               │             ║
+║   │                                               │             ║
+║   │           [yprint Logo] (405, 123)            │             ║
+║   │           ↑                                   │             ║
+║   │           Oben-Mitte (FALSCH!)                │             ║
+║   │           Zu groß! Zu dunkel!                 │             ║
+║   │                                               │             ║
+║   │                                               │             ║
+║   │                                               │             ║
+║   │                                               │             ║
+║   │                                               │             ║
+║   │   KEIN PRODUKT-BILD!                          │             ║
+║   │   Logos "schweben" auf grauem Hintergrund     │             ║
+║   │                                               │             ║
+║   └───────────────────────────────────────────────┘             ║
+║                                                                 ║
+╚═════════════════════════════════════════════════════════════════╝
+
+PROBLEME:
+  ❌ yprint Logo Position: Oben-Mitte statt rechtsbündig
+  ❌ yprint Logo Größe: Zu groß
+  ❌ yprint Logo Farbe: Zu dunkel
+  ❌ White Logo Linien: Zu dünn
+  ❌ Gesamtposition: Zu hoch/zentral
+  ❌ Kein Produkt-Mockup sichtbar
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        SOLL-ZUSTAND (T-Shirt Referenz)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔═════════════════════════════════════════════════════════════════╗
+║               Canvas mit T-SHIRT MOCKUP Background              ║
+║             mockup_design_area_px: {x:250, y:300, ...}          ║
+╠═════════════════════════════════════════════════════════════════╣
+║                                                                 ║
+║                    [T-SHIRT MOCKUP]                             ║
+║                   ╔═══════════════════╗                         ║
+║                   ║                   ║                         ║
+║                   ║  ┌────────────┐   ║  ← mockup_design_area   ║
+║                   ║  │            │   ║                         ║
+║                   ║  │ [W Logo]   │   ║  ← White Logo           ║
+║                   ║  │            │   ║     - Korrekte Position ║
+║                   ║  │            │   ║     - Korrekte Größe    ║
+║                   ║  │            │   ║     - Dicke Linien ✓    ║
+║                   ║  │            │   ║                         ║
+║                   ║  │       [yp] │   ║  ← yprint Logo          ║
+║                   ║  │            │   ║     - RECHTSBÜNDIG! ✓   ║
+║                   ║  │            │   ║     - Korrekte Größe ✓  ║
+║                   ║  │            │   ║     - Helle Farbe ✓     ║
+║                   ║  └────────────┘   ║                         ║
+║                   ║                   ║                         ║
+║                   ╚═══════════════════╝                         ║
+║                                                                 ║
+║   Logos sind AUF dem Produkt positioniert (nicht schwebend)     ║
+║   Realistische Vorschau des fertigen T-Shirts                   ║
+║                                                                 ║
+╚═════════════════════════════════════════════════════════════════╝
+
+ERWARTUNGEN:
+  ✅ T-Shirt Mockup als Background
+  ✅ yprint Logo rechtsbündig auf Druckfläche
+  ✅ Korrekte Logo-Proportionen
+  ✅ Korrekte Farben und Linien
+  ✅ Realistische Produkt-Vorschau
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        KOORDINATEN-SYSTEM VERGLEICH                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+AKTUELL (FALSCH):
+┌────────────────────────────────────────────────────────────────┐
+│ Canvas Space (0,0)                                             │
+│   ↓                                                            │
+│   [yprint Logo] at (405, 123) ← Absolute Canvas Coordinates   │
+│   ↓                                                            │
+│   ctx.translate(405, 123) ← Direct Rendering                  │
+│                                                                │
+│   PROBLEM: Ignoriert Mockup Context!                           │
+└────────────────────────────────────────────────────────────────┘
+
+
+KORREKT (SOLL):
+┌────────────────────────────────────────────────────────────────┐
+│ Canvas Space (0,0)                                             │
+│   ↓                                                            │
+│   [yprint Logo] at (405, 123) ← Design Coordinates            │
+│   ↓                                                            │
+│   + mockup_design_area.x (250) ← Add Mockup Offset            │
+│   + mockup_design_area.y (300)                                │
+│   ↓                                                            │
+│   = Mockup Space (655, 423) ← Transformed Coordinates         │
+│   ↓                                                            │
+│   ctx.translate(655, 423) ← Render in Mockup Context          │
+│                                                                │
+│   LÖSUNG: Berücksichtigt Mockup Context! ✓                    │
+└────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          SKALIERUNGS-PROBLEM                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+AKTUELL (FALSCH):
+  displayWidth = naturalWidth (37px) × scaleX (0.050) = 1.85px
+
+  PROBLEM: scaleX bezieht sich auf Canvas-Scale, nicht Mockup-Scale!
+           Logos erscheinen zu groß im Mockup-Kontext
+
+
+KORREKT (SOLL):
+  Step 1: Canvas → Mockup Scale
+    mockupScale = mockup_design_area.width (500) / canvasWidth (780)
+                = 0.641
+
+  Step 2: Apply Combined Scale
+    displayWidth = naturalWidth (37px) × scaleX (0.050) × mockupScale (0.641)
+                 = 1.19px
+
+  LÖSUNG: Berücksichtigt Mockup-Scale! ✓
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          TEMPLATE META FIELDS                               │
+│                         (Ground Truth für Canvas)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+_template_mockup_image_url
+  → URL zum Kunden-Mockup (T-Shirt Bild)
+  → VERWENDUNG: Canvas Background
+
+_template_mockup_design_area_px
+  → {"x": 250, "y": 300, "width": 500, "height": 625}
+  → Clickable Bereich auf Mockup
+  → VERWENDUNG: Coordinate Offset
+
+_template_printable_area_px
+  → {"x": 100, "y": 150, "width": 4000, "height": 5000}
+  → Druckbereich auf Print-Template
+  → VERWENDUNG: Scale Calculation
+
+_template_printable_area_mm
+  → {"width": 300, "height": 375}
+  → Reale Größe in Millimetern
+  → VERWENDUNG: Pixel → MM Conversion
+
+_template_ref_chest_line_px
+  → {"y": 200}
+  → Referenzlinie für Ausrichtung
+  → VERWENDUNG: Vertical Alignment
+
+_template_anchor_point_px
+  → {"x": 250, "y": 300}
+  → Ankerpunkt für Positionierung
+  → VERWENDUNG: Alignment Reference
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    LÖSUNGS-ARCHITEKTUR (Übersicht)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                    PHASE 1: Template Config                      │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ PHP: Extract Template Meta Fields                         │  │
+│  │   ↓                                                        │  │
+│  │ Pass to Frontend: window.templateConfig = {...}           │  │
+│  │   ↓                                                        │  │
+│  │ JS: Constructor injection                                 │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│              PHASE 2: Coordinate Transformation                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Function: transformToMockupSpace(canvasX, canvasY)        │  │
+│  │   ↓                                                        │  │
+│  │ mockupX = canvasX + mockup_design_area.x                  │  │
+│  │ mockupY = canvasY + mockup_design_area.y                  │  │
+│  │   ↓                                                        │  │
+│  │ Return: {x: mockupX, y: mockupY}                          │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│                PHASE 3: Scale Correction                         │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Function: calculateMockupScale()                          │  │
+│  │   ↓                                                        │  │
+│  │ mockupScale.x = mockup_design_area.width / canvasWidth    │  │
+│  │ mockupScale.y = mockup_design_area.height / canvasHeight  │  │
+│  │   ↓                                                        │  │
+│  │ displayWidth = baseWidth × scaleX × mockupScale.x         │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│              PHASE 4: Rendering Optimizations                    │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Logo Detection: isLogoImage(imageData)                    │  │
+│  │   ↓                                                        │  │
+│  │ IF logo: imageSmoothingEnabled = false (crisp)            │  │
+│  │ ELSE: imageSmoothingEnabled = true (smooth)               │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+                    ✅ CANVAS RENDER COMPLETE
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PRIORISIERUNG & ROI                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+ PRIO  FIX                              IMPACT    EFFORT    ROI     BEHEBT
+─────────────────────────────────────────────────────────────────────────────
+  1    Coordinate Transformation        HOCH      Medium    HOCH    Problem 1+5
+       (transformToMockupSpace)                   2-3h
+
+  2    Scale Correction                 HOCH      Medium    HOCH    Problem 2
+       (calculateMockupScale)                     2h
+
+  3    Image Smoothing für Logos        MITTEL    LOW       MITTEL  Problem 4
+       (crisp rendering)                          30min
+
+  4    Color Profile Management         NIEDRIG   HOCH      NIEDRIG Problem 3
+       (filter/matrix)                            4-6h
+─────────────────────────────────────────────────────────────────────────────
+
+EMPFEHLUNG: Implementiere Prio 1-3 (Quick Wins), verschiebe Prio 4 (Long-term)
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            TESTING CHECKLIST                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+□ Template 3657 Meta Fields konfiguriert
+  □ _template_mockup_image_url gesetzt
+  □ _template_mockup_design_area_px gesetzt
+  □ _template_printable_area_px gesetzt
+  □ _template_printable_area_mm gesetzt
+
+□ Code Implementation
+  □ Phase 1: Template Config System
+  □ Phase 2: Coordinate Transform
+  □ Phase 3: Scale Correction
+  □ Phase 4: Rendering Optimizations
+
+□ Functional Testing
+  □ Order 5374 Canvas Preview rendern
+  □ Console Logs verifizieren ("🎯 AGENT 7...")
+  □ yprint Logo rechtsbündig? ✓
+  □ Logo-Größen korrekt? ✓
+  □ Mockup-Bild sichtbar? ✓
+
+□ Visual Verification
+  □ Logos AUF Produkt (nicht schwebend)? ✓
+  □ Realistische Produkt-Vorschau? ✓
+  □ Proportionen korrekt? ✓
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             ERWARTETE LOGS                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+NACH IMPLEMENTATION:
+──────────────────────────────────────────────────────────────────────────────
+🎯 AGENT 7 TEMPLATE CONFIG LOADED:
+{
+  mockup_design_area_px: { x: 250, y: 300, width: 500, height: 625 },
+  printable_area_px: { x: 100, y: 150, width: 4000, height: 5000 },
+  printable_area_mm: { width: 300, height: 375 }
+}
+
+🎯 AGENT 7 COORDINATE TRANSFORM:
+{
+  canvas: { x: 405, y: 123 },
+  mockup: { x: 655, y: 423 },
+  offset: { x: 250, y: 300 }
+}
+
+🎯 AGENT 7 SCALE CALCULATION:
+{
+  canvasToMockup: { x: 0.641, y: 1.078 },
+  mockupToPrint: { x: 8.0, y: 8.0 },
+  combined: { x: 5.128, y: 8.624 }
+}
+
+🎯 AGENT 7: Logo detected - using crisp rendering
+──────────────────────────────────────────────────────────────────────────────
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              🎯 MISSION COMPLETE
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: ✅ ANALYSIS COMPLETE
+NEXT: Implementation (Agent 8)
+ESTIMATED TIME: 6-8 hours total
+EXPECTED IMPACT: Behebt 4 von 5 User-Problemen (80% Success Rate)
+
+═══════════════════════════════════════════════════════════════════════════════

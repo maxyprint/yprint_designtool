@@ -1,0 +1,332 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║            AGENT 3: CANVAS RENDERING PIPELINE - COORDINATE FLOW              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: CANVAS INITIALIZATION (Lines 112-179)                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Original Canvas Spec:                                                       │
+│  ┌─────────────────────────┐                                                │
+│  │  780 × 580 pixels       │  ← Design data coordinate space                │
+│  │  (25.4cm × 30.2cm)      │                                                │
+│  └─────────────────────────┘                                                │
+│                                                                               │
+│  Display Canvas:                                                             │
+│  ┌─────────────────────────┐                                                │
+│  │  displayWidth = 780px   │  ← enforceExactDimensions = true               │
+│  │  displayHeight = 580px  │                                                │
+│  └─────────────────────────┘                                                │
+│           ↓                                                                  │
+│  Physical Canvas (devicePixelRatio = 2):                                    │
+│  ┌─────────────────────────┐                                                │
+│  │  1560 × 1160 pixels     │  ← Actual pixel buffer                        │
+│  │  (High DPI rendering)   │                                                │
+│  └─────────────────────────┘                                                │
+│           ↓                                                                  │
+│  Context Scaling Applied:                                                   │
+│  ctx.scale(2, 2)            ← Converts logical → physical automatically     │
+│                                                                               │
+│  Scale Factors:                                                              │
+│  this.scaleX = 780 / 780 = 1.0  ✓ Perfect 1:1 mapping                      │
+│  this.scaleY = 580 / 580 = 1.0  ✓ No scaling needed                        │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: IMAGE DATA EXTRACTION (Lines 752-761)                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Input: imageData object from design_data                                   │
+│  {                                                                            │
+│    type: "image",                                                            │
+│    left: 100,           ← X coordinate                                       │
+│    top: 50,             ← Y coordinate                                       │
+│    width: 200,          ← Base width                                         │
+│    height: 150,         ← Base height                                        │
+│    scaleX: 0.8,         ← Horizontal scaling                                 │
+│    scaleY: 0.8,         ← Vertical scaling                                   │
+│    angle: 45,           ← Rotation in degrees                                │
+│    src: "image.jpg"                                                          │
+│  }                                                                            │
+│           ↓                                                                  │
+│  Extracted Values:                                                           │
+│  left = 100                                                                  │
+│  top = 50                                                                    │
+│  scaleX = 0.8                                                                │
+│  scaleY = 0.8                                                                │
+│  angle = 45° × π/180 = 0.785 radians                                        │
+│  baseWidth = 200                                                             │
+│  baseHeight = 150                                                            │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 3: COORDINATE PRESERVATION (Lines 759-761, 399-430)                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Coordinate Preservation Mode: ACTIVE                                        │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ coordinatePreservation: {                                │               │
+│  │   noTransformMode: true,        ← ZERO TRANSFORMATIONS   │               │
+│  │   preserveOriginalCoords: true, ← EXACT VALUES           │               │
+│  │   validateCoordinates: true,    ← LOGGING ENABLED        │               │
+│  │   allowedTolerance: 0.1         ← Sub-pixel accuracy     │               │
+│  │ }                                                         │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  Transformation Logic:                                                       │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ if (noTransformMode) {                                   │               │
+│  │   position = { x: left, y: top };  ← DIRECT PASS-THROUGH │               │
+│  │ } else {                                                 │               │
+│  │   position = preserveCoordinates(left, top);             │               │
+│  │   // Would apply: x * scaleX, y * scaleY               │               │
+│  │ }                                                         │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  Result:                                                                     │
+│  position = { x: 100, y: 50 }  ← NO SCALING APPLIED                         │
+│                                                                               │
+│  ⚠️  WARNING: If canvas is resized (scaleX ≠ 1.0), coordinates will NOT     │
+│      scale automatically. This works perfectly for exact dimensions but     │
+│      may cause misalignment if canvas size changes.                         │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 4: DIMENSION CALCULATION (Lines 808-834)                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Base Dimensions (from image data or natural size):                         │
+│  baseWidth = 200px                                                           │
+│  baseHeight = 150px                                                          │
+│                                                                               │
+│  Apply Scaling Factors:                                                      │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ displayWidth = baseWidth × scaleX                        │               │
+│  │              = 200 × 0.8                                 │               │
+│  │              = 160px                                     │               │
+│  │                                                          │               │
+│  │ displayHeight = baseHeight × scaleY                      │               │
+│  │               = 150 × 0.8                                │               │
+│  │               = 120px                                    │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  Visual Representation:                                                      │
+│  Original:         Scaled:                                                   │
+│  ┌────────────┐    ┌─────────┐                                              │
+│  │   200px    │    │  160px  │                                              │
+│  │            │    │         │                                              │
+│  │   150px    │ →  │  120px  │  (0.8× scale)                               │
+│  │            │    │         │                                              │
+│  └────────────┘    └─────────┘                                              │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 5: VALIDATION CHECKS (Lines 811-871)                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Validation Pipeline:                                                        │
+│                                                                               │
+│  [1] Base Dimension Validation (Lines 812-820)                              │
+│      ✓ baseWidth > 0 && baseHeight > 0                                      │
+│      ✓ No zero or negative dimensions                                       │
+│                                                                               │
+│  [2] Scale Factor Validation (Lines 823-830)                                │
+│      ✓ scaleX > 0 && scaleY > 0                                             │
+│      ✓ isFinite(scaleX) && isFinite(scaleY)                                 │
+│      ✓ !isNaN(scaleX) && !isNaN(scaleY)                                     │
+│                                                                               │
+│  [3] Display Dimension Validation (Lines 837-844)                           │
+│      ✓ displayWidth > 0 && displayHeight > 0                                │
+│      ✓ isFinite(displayWidth) && isFinite(displayHeight)                    │
+│      ✓ !isNaN(displayWidth) && !isNaN(displayHeight)                        │
+│                                                                               │
+│  [4] Comprehensive Validation (Lines 847-871)                               │
+│      ✓ Image loaded and complete                                            │
+│      ✓ Position coordinates finite                                          │
+│      ✓ Rotation angle valid                                                 │
+│      ⚠  Canvas bounds check (may be off-screen)                             │
+│      ⚠  Sub-pixel rendering warning (< 1px)                                 │
+│                                                                               │
+│  Validation Result:                                                          │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ {                                                        │               │
+│  │   isValid: true,                                         │               │
+│  │   errors: [],                                            │               │
+│  │   warnings: [],                                          │               │
+│  │   diagnostics: {                                         │               │
+│  │     totalErrors: 0,                                      │               │
+│  │     totalWarnings: 0,                                    │               │
+│  │     renderingSafe: true                                  │               │
+│  │   }                                                      │               │
+│  │ }                                                        │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  ✅ All validations passed - proceed to rendering                           │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 6: CANVAS TRANSFORMATION (Lines 888-897)                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Canvas State Before Transformation:                                         │
+│  ┌───────────────────────────────────────┐                                  │
+│  │ (0,0)                                 │                                  │
+│  │   ┌───────────────────────────────┐   │                                  │
+│  │   │ Canvas: 780×580               │   │                                  │
+│  │   │ Context scaled by pixelRatio  │   │                                  │
+│  │   │ (automatic HiDPI handling)    │   │                                  │
+│  │   └───────────────────────────────┘   │                                  │
+│  └───────────────────────────────────────┘                                  │
+│                                                                               │
+│  Step 1: ctx.save() - Save current state                                    │
+│                                                                               │
+│  Step 2: ctx.translate(100, 50) - Move origin                               │
+│  ┌───────────────────────────────────────┐                                  │
+│  │ (0,0) Original origin                 │                                  │
+│  │   │                                   │                                  │
+│  │   │                                   │                                  │
+│  │   └──→ (100,50) NEW ORIGIN *          │                                  │
+│  │                 ↓                     │                                  │
+│  │                 ↓                     │                                  │
+│  └───────────────────────────────────────┘                                  │
+│                                                                               │
+│  Step 3: ctx.rotate(0.785) - Rotate 45° around new origin                  │
+│  ┌───────────────────────────────────────┐                                  │
+│  │                                       │                                  │
+│  │           (100,50) *                  │                                  │
+│  │                  ↗  ← Rotated axes    │                                  │
+│  │                 ↗                     │                                  │
+│  │                ↗                      │                                  │
+│  │               ↗  45°                  │                                  │
+│  └───────────────────────────────────────┘                                  │
+│                                                                               │
+│  Rotation Note: Rotates around TOP-LEFT corner (100,50)                     │
+│  ⚠️  If design tool expects CENTER rotation, this would be different!       │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 7: IMAGE RENDERING (Lines 933-939)                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Rendering Configuration:                                                    │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ ctx.imageSmoothingEnabled = true;                        │               │
+│  │ ctx.imageSmoothingQuality = 'high';                      │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  Draw Command:                                                               │
+│  ┌──────────────────────────────────────────────────────────┐               │
+│  │ ctx.drawImage(                                           │               │
+│  │   img,                  ← Loaded image object            │               │
+│  │   0, 0,                 ← Position (0,0) in TRANSFORMED  │               │
+│  │                           coordinate system              │               │
+│  │   160, 120              ← Scaled dimensions              │               │
+│  │ );                                                       │               │
+│  └──────────────────────────────────────────────────────────┘               │
+│                                                                               │
+│  Visual Result (in transformed coordinate space):                           │
+│  ┌───────────────────────────────────────┐                                  │
+│  │           * (100,50) - Rotation pivot │                                  │
+│  │          ┌─────────┐                  │                                  │
+│  │         ╱│  Image  │╲  ← 45° rotated  │                                  │
+│  │        ╱ │  160×120│ ╲                │                                  │
+│  │       ╱  └─────────┘  ╲               │                                  │
+│  │      ╱                 ╲              │                                  │
+│  └───────────────────────────────────────┘                                  │
+│                                                                               │
+│  Final Position on Canvas:                                                   │
+│  - Top-left corner at: (100, 50) in canvas coordinates                      │
+│  - Image dimensions: 160×120 pixels                                         │
+│  - Rotation: 45° clockwise around top-left                                  │
+│  - Physical rendering: 320×240 pixels (2x DPI)                              │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 8: STATE RESTORATION (Line 941)                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ctx.restore();  ← Resets all transformations                               │
+│                                                                               │
+│  Canvas returns to:                                                          │
+│  - Origin at (0,0)                                                           │
+│  - No rotation                                                               │
+│  - Base scale (pixelRatio only)                                             │
+│                                                                               │
+│  Ready for next element rendering                                           │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         CRITICAL FINDINGS SUMMARY                            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  ✅ WORKS CORRECTLY:                                                         ║
+║  • DevicePixelRatio handling (automatic HiDPI)                              ║
+║  • Dimension scaling formulas (displayWidth = baseWidth × scaleX)           ║
+║  • Coordinate preservation (1:1 pass-through when scaleX=1.0)               ║
+║  • Validation system (prevents invisible rendering)                         ║
+║  • Canvas transformations (standard translate/rotate/draw)                  ║
+║                                                                              ║
+║  ⚠️  POTENTIAL ISSUES:                                                       ║
+║  • Canvas resizing: noTransformMode ignores this.scaleX/this.scaleY         ║
+║  • Rotation origin: Uses top-left corner (verify design tool expects same)  ║
+║  • Template scaling: Verify coordinates are in 780×580 space                ║
+║                                                                              ║
+║  ❓ QUESTIONS FOR HIVE MIND:                                                 ║
+║  1. Are design_data coordinates in canvas (780×580) or template space?      ║
+║  2. Should rotation be around top-left or center point?                     ║
+║  3. What happens when enforceExactDimensions = false?                       ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    COORDINATE PRECISION TRACKING                             ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Input:   left = 100, top = 50                                              ║
+║           ↓ (no transformation)                                             ║
+║  Output:  position.x = 100, position.y = 50                                 ║
+║           ↓ (context translate)                                             ║
+║  Canvas:  Origin moved to (100, 50)                                         ║
+║           ↓ (draw at 0,0 in transformed space)                              ║
+║  Result:  Image top-left at canvas (100, 50)                                ║
+║           ↓ (pixelRatio × 2)                                                ║
+║  Physical: Image at physical pixels (200, 100)                              ║
+║                                                                              ║
+║  Precision Loss: NONE (exact integer coordinates preserved)                 ║
+║                                                                              ║
+║  Floating-Point Example:                                                     ║
+║  Input:   left = 100.5, top = 50.75                                         ║
+║  Output:  position.x = 100.5, position.y = 50.75                            ║
+║  Result:  Sub-pixel rendering at (100.5, 50.75)                             ║
+║  Physical: (201, 101.5) on 2x DPI display                                   ║
+║                                                                              ║
+║  ✅ Sub-pixel precision fully supported                                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF AGENT 3 VISUAL COORDINATE FLOW ANALYSIS
+═══════════════════════════════════════════════════════════════════════════════
+File: /workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js
+Lines Analyzed: 724-1050 (renderImageElement), 112-179 (init), 399-430 (coords)
+Generated: 2025-09-30
+Status: ✅ PIPELINE ANALYSIS COMPLETE
+═══════════════════════════════════════════════════════════════════════════════
