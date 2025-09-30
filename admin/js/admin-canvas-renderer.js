@@ -1721,6 +1721,10 @@ class AdminCanvasRenderer {
 
         console.log('🎯 AGENT 7 RENDERING PIPELINE: Starting integrated render...', designData);
 
+        // 🎯 AGENT 8: Initialize Design Fidelity Comparator
+        const fidelityComparator = new DesignFidelityComparator(designData);
+        console.log('🎯 AGENT 8: Original Design Metrics:', fidelityComparator.original);
+
         try {
             // 🎯 AGENT 7: Clear canvas and prepare for rendering
             this.clearCanvas();
@@ -1732,7 +1736,7 @@ class AdminCanvasRenderer {
             if (designData.objects && Array.isArray(designData.objects)) {
                 // New format: direct objects array
                 objectsToRender = designData.objects;
-                backgroundUrl = designData.background || options.backgroundUrl;
+                backgroundUrl = designData.background || designData.mockup_url || options.backgroundUrl;
             } else {
                 // Legacy format: nested view structure
                 const viewKeys = Object.keys(designData);
@@ -1744,8 +1748,12 @@ class AdminCanvasRenderer {
                 const firstView = designData[viewKeys[0]];
                 if (firstView && firstView.images) {
                     objectsToRender = firstView.images;
+                    backgroundUrl = firstView.background || firstView.mockup_url || options.backgroundUrl;
                 }
             }
+
+            // 🎨 AGENT 7: LOG BACKGROUND URL FOR DEBUGGING
+            console.log('🎨 AGENT 7: Background URL extracted:', backgroundUrl || 'NO BACKGROUND URL FOUND');
 
             // 🎯 AGENT 7: STEP 1 - Render background (Agent 3)
             if (backgroundUrl) {
@@ -1839,8 +1847,22 @@ class AdminCanvasRenderer {
                 objectsPerSecond: (objectsToRender.length / (totalTime / 1000)).toFixed(1)
             };
 
+            // 🎯 AGENT 8: Capture rendered state and compare
+            console.log('🎯 AGENT 8: Capturing rendered state...');
+            fidelityComparator.captureRenderedState(this.canvas, this);
+
+            const fidelityReport = fidelityComparator.compareDesignFidelity();
+            console.log('🎯 AGENT 8: DESIGN FIDELITY REPORT:', fidelityReport);
+
+            if (!fidelityReport.success) {
+                console.error('❌ AGENT 8: DESIGN FIDELITY ISSUES DETECTED:');
+                fidelityReport.issues.forEach(issue => {
+                    console.error(`  ❌ ${issue.type}:`, issue);
+                });
+            }
+
             // 🎯 AGENT 7: FINAL VALIDATION & QUALITY CHECK
-            const qualityCheck = this.performQualityCheck(renderResults, designData);
+            const qualityCheck = this.performQualityCheck(renderResults, designData, fidelityReport);
 
             console.log('🎯 AGENT 7 RENDERING COMPLETE:', {
                 ...renderResults,
@@ -1864,49 +1886,68 @@ class AdminCanvasRenderer {
     }
 
     /**
-     * 🎯 AGENT 7: QUALITY CHECK SYSTEM
-     * Perform 1:1 replica quality validation
+     * 🎯 AGENT 7+8: QUALITY CHECK SYSTEM
+     * Perform 1:1 replica quality validation with AGENT 8 fidelity scoring
      * @param {Object} renderResults - Rendering results
      * @param {Object} originalData - Original design data
+     * @param {Object} fidelityReport - AGENT 8 fidelity report
      * @returns {Object} Quality check results
      */
-    performQualityCheck(renderResults, originalData) {
+    performQualityCheck(renderResults, originalData, fidelityReport = null) {
         const qualityCheck = {
             is1to1Replica: false,
             coordinatePreservation: true,
             dimensionAccuracy: true,
             renderingSuccess: true,
+            fidelityScore: 0,
+            fidelityIssues: [],
             score: 0,
             issues: []
         };
 
-        // Check rendering success rate
-        const successRate = ((renderResults.totalObjects - renderResults.errors.length) / renderResults.totalObjects) * 100;
-        if (successRate < 100) {
-            qualityCheck.renderingSuccess = false;
-            qualityCheck.issues.push(`Rendering errors: ${renderResults.errors.length}/${renderResults.totalObjects} objects failed`);
+        // 🎯 AGENT 8: Use fidelity report if available
+        if (fidelityReport) {
+            qualityCheck.fidelityScore = fidelityReport.fidelityScore;
+            qualityCheck.fidelityIssues = fidelityReport.issues;
+            qualityCheck.is1to1Replica = fidelityReport.fidelityScore === 100;
+            qualityCheck.score = fidelityReport.fidelityScore;
+
+            // Add fidelity issues to main issues list
+            if (fidelityReport.issues.length > 0) {
+                qualityCheck.issues.push(...fidelityReport.issues.map(issue =>
+                    `${issue.type}: ${issue.message || JSON.stringify(issue)}`
+                ));
+            }
+        } else {
+            // Legacy quality check (fallback if AGENT 8 not available)
+            // Check rendering success rate
+            const successRate = ((renderResults.totalObjects - renderResults.errors.length) / renderResults.totalObjects) * 100;
+            if (successRate < 100) {
+                qualityCheck.renderingSuccess = false;
+                qualityCheck.issues.push(`Rendering errors: ${renderResults.errors.length}/${renderResults.totalObjects} objects failed`);
+            }
+
+            // Check coordinate preservation
+            if (!this.coordinatePreservation.noTransformMode) {
+                qualityCheck.coordinatePreservation = false;
+                qualityCheck.issues.push('Coordinate transformation applied - not 1:1 replica');
+            }
+
+            // Check dimension accuracy
+            if (!this.dimensionPreservation.enforceExactDimensions) {
+                qualityCheck.dimensionAccuracy = false;
+                qualityCheck.issues.push('Canvas dimensions not exact - scaling applied');
+            }
+
+            // Calculate overall quality score
+            let score = 0;
+            if (qualityCheck.renderingSuccess) score += 40;
+            if (qualityCheck.coordinatePreservation) score += 30;
+            if (qualityCheck.dimensionAccuracy) score += 30;
+
+            qualityCheck.score = score;
+            qualityCheck.is1to1Replica = score === 100;
         }
-
-        // Check coordinate preservation
-        if (!this.coordinatePreservation.noTransformMode) {
-            qualityCheck.coordinatePreservation = false;
-            qualityCheck.issues.push('Coordinate transformation applied - not 1:1 replica');
-        }
-
-        // Check dimension accuracy
-        if (!this.dimensionPreservation.enforceExactDimensions) {
-            qualityCheck.dimensionAccuracy = false;
-            qualityCheck.issues.push('Canvas dimensions not exact - scaling applied');
-        }
-
-        // Calculate overall quality score
-        let score = 0;
-        if (qualityCheck.renderingSuccess) score += 40;
-        if (qualityCheck.coordinatePreservation) score += 30;
-        if (qualityCheck.dimensionAccuracy) score += 30;
-
-        qualityCheck.score = score;
-        qualityCheck.is1to1Replica = score === 100;
 
         return qualityCheck;
     }
@@ -2134,7 +2175,438 @@ class AdminCanvasRenderer {
     }
 }
 
+/**
+ * 🎯 DESIGN FIDELITY COMPARATOR
+ * Extracts and compares metrics between original design data and rendered output
+ * Part of the 7-Agent Canvas Rendering System
+ */
+class DesignFidelityComparator {
+    constructor(originalDesignData) {
+        this.original = this.extractOriginalMetrics(originalDesignData);
+        this.rendered = null;
+    }
+
+    extractOriginalMetrics(designData) {
+        return {
+            canvas: {
+                width: designData.canvas?.width || 780,
+                height: designData.canvas?.height || 580,
+                aspectRatio: (designData.canvas?.width || 780) / (designData.canvas?.height || 580)
+            },
+            background: {
+                url: designData.background || designData.mockup_url || null,
+                expected: !!(designData.background || designData.mockup_url)
+            },
+            elements: this.extractElementMetrics(designData),
+            timestamp: Date.now(),
+            source: 'original_design_data'
+        };
+    }
+
+    extractElementMetrics(designData) {
+        const elements = [];
+        const objects = designData.objects || this.flattenElements(designData);
+
+        objects.forEach((obj, index) => {
+            elements.push({
+                index: index,
+                type: obj.type || 'image',
+                id: obj.id,
+                position: {
+                    left: obj.left || obj.x || 0,
+                    top: obj.top || obj.y || 0
+                },
+                dimensions: {
+                    width: obj.width || 0,
+                    height: obj.height || 0
+                },
+                transform: {
+                    scaleX: obj.scaleX || 1,
+                    scaleY: obj.scaleY || 1,
+                    angle: obj.angle || 0
+                },
+                src: obj.src || obj.url || null
+            });
+        });
+
+        return elements;
+    }
+
+    flattenElements(designData) {
+        // Handle nested view structure
+        const viewKeys = Object.keys(designData);
+        if (viewKeys.length === 0) return [];
+
+        const firstView = designData[viewKeys[0]];
+        if (firstView && firstView.images) {
+            return firstView.images;
+        }
+
+        return [];
+    }
+
+    /**
+     * 🎯 AGENT 2: RENDERED STATE CAPTURE SPECIALIST
+     * Capture the current rendered state of the canvas
+     * @param {HTMLCanvasElement} canvas - Canvas element
+     * @param {AdminCanvasRenderer} canvasRenderer - Canvas renderer instance
+     * @returns {Object} Captured rendered state
+     */
+    captureRenderedState(canvas, canvasRenderer) {
+        this.rendered = {
+            canvas: this.captureCanvasMetrics(canvas),
+            background: this.captureBackgroundState(canvas),
+            elements: this.captureRenderedElements(canvasRenderer),
+            timestamp: Date.now(),
+            source: 'rendered_canvas_state'
+        };
+
+        return this.rendered;
+    }
+
+    /**
+     * 🎯 AGENT 2: CANVAS METRICS CAPTURE
+     * Capture canvas dimensions, styling, and viewport information
+     * @param {HTMLCanvasElement} canvas - Canvas element
+     * @returns {Object} Canvas metrics
+     */
+    captureCanvasMetrics(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(canvas);
+        const container = canvas.parentElement;
+        const containerStyle = window.getComputedStyle(container);
+
+        return {
+            width: canvas.width / (window.devicePixelRatio || 1),
+            height: canvas.height / (window.devicePixelRatio || 1),
+            aspectRatio: (canvas.width / (window.devicePixelRatio || 1)) /
+                        (canvas.height / (window.devicePixelRatio || 1)),
+
+            styleWidth: parseInt(canvas.style.width) || rect.width,
+            styleHeight: parseInt(canvas.style.height) || rect.height,
+
+            visible: rect.width > 0 && rect.height > 0,
+            inViewport: rect.top < window.innerHeight && rect.bottom > 0,
+
+            containerFlex: containerStyle.display === 'flex',
+            containerMinHeight: parseInt(containerStyle.minHeight) || 0
+        };
+    }
+
+    /**
+     * 🎯 AGENT 2: BACKGROUND STATE CAPTURE
+     * Capture background rendering state by sampling canvas pixels
+     * @param {HTMLCanvasElement} canvas - Canvas element
+     * @returns {Object} Background state
+     */
+    captureBackgroundState(canvas) {
+        const ctx = canvas.getContext('2d');
+        const sampleWidth = Math.min(canvas.width, 10);
+        const sampleHeight = Math.min(canvas.height, 10);
+        const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+
+        let whitePixelCount = 0;
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            if (r > 250 && g > 250 && b > 250) whitePixelCount++;
+        }
+
+        const totalPixels = imageData.data.length / 4;
+        const whitePercentage = (whitePixelCount / totalPixels) * 100;
+
+        return {
+            loaded: whitePercentage < 90,
+            whitePercentage: whitePercentage,
+            isEmpty: whitePercentage > 95
+        };
+    }
+
+    /**
+     * 🎯 AGENT 2: RENDERED ELEMENTS CAPTURE
+     * Capture all rendered elements with their actual positions and dimensions
+     * @param {AdminCanvasRenderer} canvasRenderer - Canvas renderer instance
+     * @returns {Array} Array of rendered element data
+     */
+    captureRenderedElements(canvasRenderer) {
+        const renderedElements = [];
+
+        if (canvasRenderer.renderingStatistics && canvasRenderer.renderingStatistics.renderedObjects) {
+            canvasRenderer.renderingStatistics.renderedObjects.forEach((obj, index) => {
+                renderedElements.push({
+                    index: index,
+                    type: obj.type,
+                    position: {
+                        left: obj.actualLeft || obj.left,
+                        top: obj.actualTop || obj.top
+                    },
+                    dimensions: {
+                        width: obj.actualWidth || obj.width,
+                        height: obj.actualHeight || obj.height
+                    },
+                    transform: {
+                        scaleX: obj.actualScaleX || obj.scaleX,
+                        scaleY: obj.actualScaleY || obj.scaleY,
+                        angle: obj.actualAngle || obj.angle
+                    },
+                    renderSuccess: obj.renderSuccess || false
+                });
+            });
+        }
+
+        return renderedElements;
+    }
+
+    /**
+     * 🎯 AGENT 3: DESIGN FIDELITY COMPARISON ENGINE
+     * Compare original design data with rendered output
+     * @returns {Object} Comparison result with fidelity score and issues
+     */
+    compareDesignFidelity() {
+        if (!this.rendered) {
+            return {
+                success: false,
+                error: 'Rendered state not captured yet'
+            };
+        }
+
+        const comparison = {
+            canvas: this.compareCanvas(),
+            background: this.compareBackground(),
+            elements: this.compareElements(),
+            timestamp: Date.now()
+        };
+
+        const issues = [
+            ...comparison.canvas.issues,
+            ...comparison.background.issues,
+            ...comparison.elements.issues
+        ];
+
+        return {
+            success: issues.length === 0,
+            fidelityScore: this.calculateFidelityScore(comparison),
+            issues: issues,
+            comparison: comparison
+        };
+    }
+
+    /**
+     * 🎯 AGENT 3: CANVAS COMPARISON METHOD
+     * Compare canvas dimensions and configuration
+     * @returns {Object} Canvas comparison result
+     */
+    compareCanvas() {
+        const orig = this.original.canvas;
+        const rend = this.rendered.canvas;
+        const issues = [];
+
+        const widthDiff = Math.abs(orig.width - rend.width);
+        if (widthDiff > 1) {
+            issues.push({
+                type: 'canvas_width_mismatch',
+                expected: orig.width,
+                actual: rend.width,
+                difference: widthDiff,
+                severity: 'critical'
+            });
+        }
+
+        const heightDiff = Math.abs(orig.height - rend.height);
+        if (heightDiff > 1) {
+            issues.push({
+                type: 'canvas_height_mismatch',
+                expected: orig.height,
+                actual: rend.height,
+                difference: heightDiff,
+                severity: 'critical'
+            });
+        }
+
+        const ratioDiff = Math.abs(orig.aspectRatio - rend.aspectRatio);
+        if (ratioDiff > 0.01) {
+            issues.push({
+                type: 'canvas_aspect_ratio_mismatch',
+                expected: orig.aspectRatio.toFixed(3),
+                actual: rend.aspectRatio.toFixed(3),
+                difference: ratioDiff.toFixed(3),
+                severity: 'critical',
+                likelyCause: 'Canvas squashed by container CSS'
+            });
+        }
+
+        if (rend.containerFlex) {
+            issues.push({
+                type: 'container_uses_flex',
+                severity: 'high',
+                likelyCause: 'Flex container may compress canvas',
+                recommendation: 'Use display:block instead'
+            });
+        }
+
+        if (rend.containerMinHeight < orig.height) {
+            issues.push({
+                type: 'container_min_height_too_small',
+                expected: `>= ${orig.height}px`,
+                actual: `${rend.containerMinHeight}px`,
+                severity: 'high',
+                likelyCause: 'Container height constraint'
+            });
+        }
+
+        return {
+            match: issues.length === 0,
+            issues: issues,
+            metrics: { original: orig, rendered: rend }
+        };
+    }
+
+    /**
+     * 🎯 AGENT 3: BACKGROUND COMPARISON METHOD
+     * Compare background rendering state
+     * @returns {Object} Background comparison result
+     */
+    compareBackground() {
+        const orig = this.original.background;
+        const rend = this.rendered.background;
+        const issues = [];
+
+        if (orig.expected && !rend.loaded) {
+            issues.push({
+                type: 'background_missing',
+                expected: 'Mockup background loaded',
+                actual: `${rend.whitePercentage.toFixed(1)}% white pixels`,
+                severity: 'critical',
+                likelyCause: 'Background URL not passed to renderer',
+                expectedUrl: orig.url
+            });
+        }
+
+        if (rend.isEmpty) {
+            issues.push({
+                type: 'canvas_appears_empty',
+                actual: `${rend.whitePercentage.toFixed(1)}% white/empty`,
+                severity: 'critical',
+                likelyCause: 'No content rendered or rendering failed silently'
+            });
+        }
+
+        return {
+            match: issues.length === 0,
+            issues: issues,
+            metrics: { original: orig, rendered: rend }
+        };
+    }
+
+    /**
+     * 🎯 AGENT 3: ELEMENTS COMPARISON METHOD
+     * Compare element count and positioning
+     * @returns {Object} Elements comparison result
+     */
+    compareElements() {
+        const orig = this.original.elements;
+        const rend = this.rendered.elements;
+        const issues = [];
+
+        if (orig.length !== rend.length) {
+            issues.push({
+                type: 'element_count_mismatch',
+                expected: orig.length,
+                actual: rend.length,
+                severity: 'critical',
+                likelyCause: 'Some elements failed to render'
+            });
+        }
+
+        const maxElements = Math.max(orig.length, rend.length);
+        for (let i = 0; i < maxElements; i++) {
+            const origEl = orig[i];
+            const rendEl = rend[i];
+
+            if (!origEl) {
+                issues.push({
+                    type: 'extra_element_rendered',
+                    elementIndex: i,
+                    severity: 'medium'
+                });
+                continue;
+            }
+
+            if (!rendEl) {
+                issues.push({
+                    type: 'element_not_rendered',
+                    elementIndex: i,
+                    elementType: origEl.type,
+                    severity: 'critical'
+                });
+                continue;
+            }
+
+            const leftDiff = Math.abs(origEl.position.left - rendEl.position.left);
+            const topDiff = Math.abs(origEl.position.top - rendEl.position.top);
+
+            if (leftDiff > 1 || topDiff > 1) {
+                issues.push({
+                    type: 'element_position_mismatch',
+                    elementIndex: i,
+                    elementType: origEl.type,
+                    expected: origEl.position,
+                    actual: rendEl.position,
+                    difference: { left: leftDiff, top: topDiff },
+                    severity: leftDiff > 10 || topDiff > 10 ? 'high' : 'medium',
+                    likelyCause: 'Coordinate transformation or scaling issue'
+                });
+            }
+        }
+
+        return {
+            match: issues.length === 0,
+            issues: issues,
+            metrics: { original: orig, rendered: rend }
+        };
+    }
+
+    /**
+     * 🎯 AGENT 3: FIDELITY SCORE CALCULATOR
+     * Calculate overall fidelity score based on comparison issues
+     * @param {Object} comparison - Comparison result object
+     * @returns {number} Fidelity score (0-100)
+     */
+    calculateFidelityScore(comparison) {
+        const countBySeverity = (issues, severity) =>
+            issues.filter(i => i.severity === severity).length;
+
+        const criticalIssues = countBySeverity([
+            ...comparison.canvas.issues,
+            ...comparison.background.issues,
+            ...comparison.elements.issues
+        ], 'critical');
+
+        const highIssues = countBySeverity([
+            ...comparison.canvas.issues,
+            ...comparison.background.issues,
+            ...comparison.elements.issues
+        ], 'high');
+
+        const mediumIssues = countBySeverity([
+            ...comparison.canvas.issues,
+            ...comparison.background.issues,
+            ...comparison.elements.issues
+        ], 'medium');
+
+        let score = 100;
+        score -= criticalIssues * 50;
+        score -= highIssues * 20;
+        score -= mediumIssues * 5;
+
+        return Math.max(0, score);
+    }
+}
+
 // Global exposure for admin context
 window.AdminCanvasRenderer = AdminCanvasRenderer;
+window.DesignFidelityComparator = DesignFidelityComparator;
 
 console.log('✅ ADMIN CANVAS RENDERER: Class loaded and ready');
+console.log('✅ DESIGN FIDELITY COMPARATOR: Class loaded and ready');

@@ -4855,6 +4855,35 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("🔧 [DUAL-DATA] Original data preserved for HTML, transformed data created for Agent 3");
         }
 
+        // 🎨 AGENT 6: EXTRACT MOCKUP BACKGROUND URL
+        $mockup_background_url = null;
+
+        // Strategy 1: Try to get from design_data
+        if ($design_data && isset($design_data['background'])) {
+            $mockup_background_url = $design_data['background'];
+        }
+
+        // Strategy 2: Try to get from mockup_url field
+        if (!$mockup_background_url && $design_data && isset($design_data['mockup_url'])) {
+            $mockup_background_url = $design_data['mockup_url'];
+        }
+
+        // Strategy 3: Try to get from template/product metadata
+        if (!$mockup_background_url) {
+            foreach ($order->get_items() as $item) {
+                $template_id = $item->get_meta('_yprint_template_id');
+                if ($template_id) {
+                    $mockup_url = get_post_meta($template_id, '_mockup_image_url', true);
+                    if ($mockup_url) {
+                        $mockup_background_url = $mockup_url;
+                        break;
+                    }
+                }
+            }
+        }
+
+        error_log("🎨 AGENT 6 MOCKUP EXTRACTION: " . ($mockup_background_url ? $mockup_background_url : 'NOT FOUND'));
+
         // Build preview HTML with professional design controls
         ob_start();
         ?>
@@ -5292,13 +5321,15 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                         <!-- Canvas Container for Agent 3 System -->
                         <div id="agent3-canvas-container" style="
-                            min-height: 300px;
+                            width: 100%;
+                            max-width: 800px;
+                            aspect-ratio: 780 / 580;
+                            min-height: 580px;
                             border: 1px solid #ddd;
                             border-radius: 4px;
                             background: #f9f9f9;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
+                            overflow: auto;
+                            position: relative;
                             font-size: 14px;
                             color: #666;
                         ">
@@ -5433,7 +5464,7 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         // 🎨 AGENT 3: JavaScript Integration - Generate canvas initialization script separately
         if ($design_data) {
-            $canvas_script = $this->generateAgent3CanvasScript($design_data, $order_id);
+            $canvas_script = $this->generateAgent3CanvasScript($design_data, $order_id, $mockup_background_url);
             // Extract script content without <script> tags for separate execution
             $canvas_script_content = $this->extractScriptContent($canvas_script);
             if ($canvas_script_content && ($this->validateJavaScriptContent($canvas_script_content) || $this->isGeneratedSafeScript($canvas_script_content))) {
@@ -5877,7 +5908,7 @@ private function build_print_provider_email_content($order, $design_items, $note
      * 🎨 AGENT 3: Generate Canvas Integration Script
      * Creates JavaScript code to initialize the Agent 3 Canvas Rendering System
      */
-    private function generateAgent3CanvasScript($design_data, $order_id) {
+    private function generateAgent3CanvasScript($design_data, $order_id, $mockup_url = null) {
         // Transform design data to Agent 3 format if needed
         $agent3_design_data = $this->transformToAgent3Format($design_data);
 
@@ -5902,6 +5933,7 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                 // 🎯 AGENT 4: Enhanced data flow for Canvas Integration
                 const designData = <?php echo json_encode($agent3_design_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+                const mockupBackgroundUrl = <?php echo json_encode($mockup_url); ?>;
                 const orderInfo = {
                     id: <?php echo intval($order_id); ?>,
                     number: '<?php echo esc_js(wc_get_order($order_id)->get_order_number()); ?>'
@@ -5973,7 +6005,8 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                             previewGenerator.generatePreview(designData, {
                                 loadingText: `Rendering Order #${orderInfo.number}...`,
-                                enableDebugInfo: true
+                                enableDebugInfo: true,
+                                backgroundUrl: mockupBackgroundUrl
                             }).then(() => {
                                 updateStatus('✅ Canvas preview rendered successfully!', 'success');
                                 exportButton.disabled = false;
@@ -6122,7 +6155,9 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'canvas' => [
                     'width' => $canvas_width,
                     'height' => $canvas_height
-                ]
+                ],
+                'background' => $design_data['background'] ?? null,
+                'mockup_url' => $design_data['mockup_url'] ?? null
             ]
         ];
     }
