@@ -6328,11 +6328,49 @@ private function build_print_provider_email_content($order, $design_items, $note
         $canvas_width = 780;  // Standard canvas width
         $canvas_height = 580; // Standard canvas height
 
+        // 🎯 AGENT 11: Extract mockup image from template for realistic preview
+        $mockup_url = null;
+        if ($template_id) {
+            // Strategy 1: Try template mockup meta
+            $mockup_url = get_post_meta($template_id, '_template_mockup_image_url', true);
+            if ($mockup_url && !empty(trim($mockup_url))) {
+                error_log("🎯 AGENT 11 CONVERSION: Found mockup from template meta (_template_mockup_image_url)");
+            } else {
+                // Strategy 2: Try template featured image
+                $thumbnail_id = get_post_thumbnail_id($template_id);
+                if ($thumbnail_id) {
+                    $mockup_url = wp_get_attachment_image_url($thumbnail_id, 'full');
+                    if ($mockup_url) {
+                        error_log("🎯 AGENT 11 CONVERSION: Using template featured image as mockup");
+                    }
+                }
+            }
+        }
+
+        // 🎯 AGENT 11 FALLBACK: Use product featured image if template has no mockup
+        if (!$mockup_url) {
+            $product = $item->get_product();
+            if ($product && $product->get_image_id()) {
+                $mockup_url = wp_get_attachment_image_url($product->get_image_id(), 'full');
+                if ($mockup_url) {
+                    error_log("🎯 AGENT 11 CONVERSION: Using product featured image as mockup fallback");
+                }
+            }
+        }
+
+        // 🎯 AGENT 11: Filter out color codes - only use real image URLs
+        if ($mockup_url && preg_match('/^(#|rgb|hsl)/i', $mockup_url)) {
+            error_log("🎯 AGENT 11 CONVERSION: Mockup is a color code ($mockup_url), ignoring");
+            $mockup_url = null;
+        }
+
+        error_log("🎯 AGENT 11 CONVERSION MOCKUP FINAL: " . ($mockup_url ?: 'NOT FOUND - using #ffffff fallback'));
+
         // Create Fabric.js compatible canvas data
         $canvas_data = [
             'version' => '5.3.0',
             'objects' => $canvas_objects,
-            'background' => '#ffffff',
+            'background' => $mockup_url ?: '#ffffff',  // 🎯 AGENT 11: Use mockup or fallback to white
             'canvas' => [
                 'width' => $canvas_width,
                 'height' => $canvas_height,
@@ -6344,7 +6382,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'converted_at' => current_time('mysql'),
                 'order_id' => $order_id,
                 'template_id' => $template_id,
-                'original_view_name' => $first_view['view_name'] ?? 'Design View'
+                'original_view_name' => $first_view['view_name'] ?? 'Design View',
+                'mockup_source' => $mockup_url ? 'template/product' : 'none'  // 🎯 AGENT 11: Track mockup source
             ]
         ];
 
