@@ -94,6 +94,14 @@ class AdminCanvasRenderer {
         this.accuracyTolerance = 0.1; // ENHANCED: Sub-pixel 0.1px tolerance
         this.precisionMatrix = new Map(); // Matrix cache for complex transforms
         this.subpixelOptimization = true; // Enable sub-pixel rendering
+
+        // 🎯 AGENT 8: RENDERING STATISTICS for Self-Diagnostic System
+        this.renderingStatistics = {
+            renderedObjects: [],  // Track all successfully rendered objects
+            errors: [],           // Track rendering errors
+            startTime: null,
+            endTime: null
+        };
     }
 
     /**
@@ -931,6 +939,30 @@ class AdminCanvasRenderer {
                 });
             }
 
+            // 🎯 AGENT 8: Track successfully rendered object for Self-Diagnostic System
+            if (isEffectivelyVisible) {
+                this.renderingStatistics.renderedObjects.push({
+                    type: 'image',
+                    id: imageData.id,
+                    left: position.x,
+                    top: position.y,
+                    actualLeft: position.x,
+                    actualTop: position.y,
+                    width: displayWidth,
+                    height: displayHeight,
+                    actualWidth: displayWidth,
+                    actualHeight: displayHeight,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    actualScaleX: scaleX,
+                    actualScaleY: scaleY,
+                    angle: angle * 180 / Math.PI,
+                    actualAngle: angle * 180 / Math.PI,
+                    renderSuccess: true,
+                    renderTime: renderTime
+                });
+            }
+
         } catch (error) {
             // 🎯 AGENT 6 FIX: ENHANCED ERROR LOGGING - Extract all DOMException details
             console.error('❌ AGENT 6 IMAGE RENDER ERROR - ENHANCED DIAGNOSTICS:', {
@@ -1005,6 +1037,14 @@ class AdminCanvasRenderer {
             this.ctx.fillText(imageData.type || 'unknown', position.x + 50, position.y + 45);
 
             this.ctx.restore();
+
+            // 🎯 AGENT 8: Track rendering error for Self-Diagnostic System
+            this.renderingStatistics.errors.push({
+                type: 'image',
+                id: imageData.id,
+                error: error.message || 'Unknown error',
+                errorType: error.name || 'Error'
+            });
         }
     }
 
@@ -1721,6 +1761,14 @@ class AdminCanvasRenderer {
 
         console.log('🎯 AGENT 7 RENDERING PIPELINE: Starting integrated render...', designData);
 
+        // 🎯 AGENT 8: Reset rendering statistics for new render
+        this.renderingStatistics = {
+            renderedObjects: [],
+            errors: [],
+            startTime: startTime,
+            endTime: null
+        };
+
         // 🎯 AGENT 8: Initialize Design Fidelity Comparator
         const fidelityComparator = new DesignFidelityComparator(designData);
         console.log('🎯 AGENT 8: Original Design Metrics:', fidelityComparator.original);
@@ -1846,6 +1894,9 @@ class AdminCanvasRenderer {
                 averagePerObject: `${(totalTime / objectsToRender.length).toFixed(2)}ms`,
                 objectsPerSecond: (objectsToRender.length / (totalTime / 1000)).toFixed(1)
             };
+
+            // 🎯 AGENT 8: Mark rendering complete
+            this.renderingStatistics.endTime = performance.now();
 
             // 🎯 AGENT 8: Capture rendered state and compare
             console.log('🎯 AGENT 8: Capturing rendered state...');
