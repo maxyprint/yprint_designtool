@@ -4873,16 +4873,65 @@ private function build_print_provider_email_content($order, $design_items, $note
             foreach ($order->get_items() as $item) {
                 $template_id = $item->get_meta('_yprint_template_id');
                 if ($template_id) {
+                    // 🎯 AGENT 10 FIX: Correct meta key is _template_mockup_image_url
+                    $mockup_url = get_post_meta($template_id, '_template_mockup_image_url', true);
+                    if ($mockup_url) {
+                        $mockup_background_url = $mockup_url;
+                        error_log("🎯 AGENT 10 MOCKUP: Found from template meta (_template_mockup_image_url)");
+                        break;
+                    }
+
+                    // 🎯 AGENT 10 FALLBACK 1: Try legacy meta key
                     $mockup_url = get_post_meta($template_id, '_mockup_image_url', true);
                     if ($mockup_url) {
                         $mockup_background_url = $mockup_url;
+                        error_log("🎯 AGENT 10 MOCKUP: Found from legacy meta (_mockup_image_url)");
                         break;
                     }
                 }
             }
         }
 
-        error_log("🎨 AGENT 6 MOCKUP EXTRACTION: " . ($mockup_background_url ? $mockup_background_url : 'NOT FOUND'));
+        // 🎯 AGENT 10 STRATEGY 4: Get product featured image as mockup
+        if (!$mockup_background_url) {
+            foreach ($order->get_items() as $item) {
+                $product = $item->get_product();
+                if ($product && $product->get_image_id()) {
+                    $image_url = wp_get_attachment_image_url($product->get_image_id(), 'full');
+                    if ($image_url) {
+                        $mockup_background_url = $image_url;
+                        error_log("🎯 AGENT 10 MOCKUP: Using product featured image as mockup");
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 🎯 AGENT 10 STRATEGY 5: Get template thumbnail as mockup
+        if (!$mockup_background_url) {
+            foreach ($order->get_items() as $item) {
+                $template_id = $item->get_meta('_yprint_template_id');
+                if ($template_id) {
+                    $thumbnail_id = get_post_thumbnail_id($template_id);
+                    if ($thumbnail_id) {
+                        $image_url = wp_get_attachment_image_url($thumbnail_id, 'full');
+                        if ($image_url) {
+                            $mockup_background_url = $image_url;
+                            error_log("🎯 AGENT 10 MOCKUP: Using template thumbnail as mockup");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 🎯 AGENT 10: Only use background color if it's an image URL, not a color
+        if ($mockup_background_url && preg_match('/^(#|rgb|hsl)/i', $mockup_background_url)) {
+            error_log("🎯 AGENT 10 MOCKUP: Background is a color ($mockup_background_url), not an image - ignoring");
+            $mockup_background_url = null;
+        }
+
+        error_log("🎯 AGENT 10 MOCKUP EXTRACTION FINAL: " . ($mockup_background_url ? $mockup_background_url : 'NOT FOUND - will render logos without product mockup'));
 
         // Build preview HTML with professional design controls
         ob_start();
