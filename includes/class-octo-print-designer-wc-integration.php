@@ -4845,6 +4845,13 @@ private function build_print_provider_email_content($order, $design_items, $note
             }
         }
 
+        // 🎯 DUAL-FORMAT FIX: Transform data for canvas compatibility
+        // Apply Agent 3 format transformation to ensure JavaScript renderer gets correct structure
+        if ($design_data) {
+            $design_data = $this->transformToAgent3Format($design_data);
+            error_log("🔧 [AJAX HANDLER] Applied transformToAgent3Format() to design data before sending to browser");
+        }
+
         // Build preview HTML with professional design controls
         ob_start();
         ?>
