@@ -1282,20 +1282,43 @@ class AdminCanvasRenderer {
         const startTime = performance.now();
 
         try {
-            const img = await this.loadImage(imageData.url);
+            // 🎯 COMPATIBILITY FIX: Handle both flat and nested property formats
+            // Try url first (nested format), then src (flat format)
+            const imageUrl = imageData.url || imageData.src;
+            if (!imageUrl) {
+                console.error('❌ RENDER ERROR: No image URL found', imageData);
+                throw new Error('Image URL missing - neither url nor src property found');
+            }
+
+            const img = await this.loadImage(imageUrl);
+
+            // 🎯 COMPATIBILITY FIX: Check both flat properties and transform object
+            // Try flat properties first (new format), then fall back to transform object
             const transform = imageData.transform || {};
 
-            // Extract transform properties
-            const left = transform.left || 0;
-            const top = transform.top || 0;
-            const scaleX = transform.scaleX || 1;
-            const scaleY = transform.scaleY || 1;
-            const angle = (transform.angle || 0) * Math.PI / 180; // Convert to radians
+            const left = imageData.left ?? transform.left ?? 0;
+            const top = imageData.top ?? transform.top ?? 0;
+            const scaleX = imageData.scaleX ?? transform.scaleX ?? 1;
+            const scaleY = imageData.scaleY ?? transform.scaleY ?? 1;
+            const angle = ((imageData.angle ?? transform.angle ?? 0) * Math.PI / 180); // Convert to radians
+
+            console.log('🎯 RENDER IMAGE COMPATIBILITY:', {
+                id: imageData.id,
+                hasUrl: !!imageData.url,
+                hasSrc: !!imageData.src,
+                hasFlatProps: imageData.left !== undefined,
+                hasTransformObj: !!imageData.transform,
+                resolvedUrl: imageUrl,
+                resolvedCoords: { left, top, scaleX, scaleY, angle: angle * 180 / Math.PI }
+            });
 
             // 🎯 PRECISION TRANSFORM: Use cached coordinates for performance
             const cacheKey = `${imageData.id}_${left}_${top}`;
             const pos = this.getCachedTransform(cacheKey, { left, top });
-            const dimensions = this.calculateImageDimensions(img, transform);
+
+            // Build resolved transform object for dimension calculation
+            const resolvedTransform = { left, top, scaleX, scaleY, angle: angle * 180 / Math.PI };
+            const dimensions = this.calculateImageDimensions(img, resolvedTransform);
 
             // Performance check: Start transform timing
             const transformStart = performance.now();
@@ -1346,7 +1369,7 @@ class AdminCanvasRenderer {
                 id: imageData.id,
                 position: `${left.toFixed(2)}, ${top.toFixed(2)}`,
                 scale: `${(scaleX * 100).toFixed(1)}%, ${(scaleY * 100).toFixed(1)}%`,
-                angle: (transform.angle || 0).toFixed(1) + '°',
+                angle: (angle * 180 / Math.PI).toFixed(1) + '°',
                 timing: {
                     total: `${totalTime.toFixed(2)}ms`,
                     transform: `${transformTime.toFixed(2)}ms`

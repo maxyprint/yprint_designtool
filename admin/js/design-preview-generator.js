@@ -113,47 +113,63 @@ class DesignPreviewGenerator {
                     result.warnings.push(`Image ${index}: Missing ID`);
                 }
 
-                if (!img.url) {
-                    result.errors.push(`Image ${index}: Missing URL`);
+                // 🎯 COMPATIBILITY FIX: Accept both url and src properties
+                const imageUrl = img.url || img.src;
+                if (!imageUrl) {
+                    result.errors.push(`Image ${index}: Missing URL (neither url nor src property found)`);
                     return;
                 }
 
                 // Validate URL format
                 try {
-                    new URL(img.url);
+                    new URL(imageUrl);
                 } catch (e) {
                     result.errors.push(`Image ${index}: Invalid URL format`);
                 }
 
-                // 🎯 AGENT 5: ENHANCED COORDINATE VALIDATION
-                if (img.transform) {
-                    const transform = img.transform;
-                    const requiredProps = ['left', 'top', 'scaleX', 'scaleY'];
+                // 🎯 AGENT 5: ENHANCED COORDINATE VALIDATION - Support both flat and nested properties
+                // Check if properties are at root level (flat format) or in transform object (nested format)
+                const hasFlatProps = img.left !== undefined && img.top !== undefined;
+                const hasTransformObj = img.transform && typeof img.transform === 'object';
 
-                    requiredProps.forEach(prop => {
-                        if (typeof transform[prop] !== 'number') {
-                            result.warnings.push(`Image ${index}: Transform ${prop} is not a number`);
-                        } else if (isNaN(transform[prop])) {
-                            result.errors.push(`Image ${index}: Transform ${prop} is NaN`);
-                        }
-                    });
+                if (!hasFlatProps && !hasTransformObj) {
+                    result.warnings.push(`Image ${index}: No coordinate data (neither flat properties nor transform object)`);
+                    return;
+                }
 
-                    // 🎯 AGENT 2: COORDINATE PRESERVATION VALIDATION
-                    // Validate coordinate ranges for 780x580 canvas
-                    if (transform.left < -1000 || transform.left > 2000) {
-                        result.warnings.push(`Image ${index}: Left coordinate (${transform.left}) may be outside expected range`);
+                // Use flat properties if available, otherwise use transform object
+                const coords = hasFlatProps ? img : (img.transform || {});
+                const requiredProps = ['left', 'top', 'scaleX', 'scaleY'];
+
+                requiredProps.forEach(prop => {
+                    if (typeof coords[prop] !== 'number') {
+                        result.warnings.push(`Image ${index}: ${prop} is not a number`);
+                    } else if (isNaN(coords[prop])) {
+                        result.errors.push(`Image ${index}: ${prop} is NaN`);
                     }
-                    if (transform.top < -1000 || transform.top > 2000) {
-                        result.warnings.push(`Image ${index}: Top coordinate (${transform.top}) may be outside expected range`);
+                });
+
+                // 🎯 AGENT 2: COORDINATE PRESERVATION VALIDATION
+                // Validate coordinate ranges for 780x580 canvas
+                if (coords.left !== undefined) {
+                    if (coords.left < -1000 || coords.left > 2000) {
+                        result.warnings.push(`Image ${index}: Left coordinate (${coords.left}) may be outside expected range`);
                     }
-                    if (transform.scaleX <= 0 || transform.scaleX > 10) {
-                        result.warnings.push(`Image ${index}: ScaleX (${transform.scaleX}) may be outside expected range`);
+                }
+                if (coords.top !== undefined) {
+                    if (coords.top < -1000 || coords.top > 2000) {
+                        result.warnings.push(`Image ${index}: Top coordinate (${coords.top}) may be outside expected range`);
                     }
-                    if (transform.scaleY <= 0 || transform.scaleY > 10) {
-                        result.warnings.push(`Image ${index}: ScaleY (${transform.scaleY}) may be outside expected range`);
+                }
+                if (coords.scaleX !== undefined) {
+                    if (coords.scaleX <= 0 || coords.scaleX > 10) {
+                        result.warnings.push(`Image ${index}: ScaleX (${coords.scaleX}) may be outside expected range`);
                     }
-                } else {
-                    result.warnings.push(`Image ${index}: No transform data`);
+                }
+                if (coords.scaleY !== undefined) {
+                    if (coords.scaleY <= 0 || coords.scaleY > 10) {
+                        result.warnings.push(`Image ${index}: ScaleY (${coords.scaleY}) may be outside expected range`);
+                    }
                 }
             });
 
@@ -709,7 +725,8 @@ class DesignPreviewGenerator {
                 // 🎯 AGENT 2: EXACT COORDINATE PRESERVATION - Flatten properties for AdminCanvasRenderer compatibility
                 images.push({
                     id: obj.id || `hive_img_${index}`,
-                    url: obj.src,
+                    url: obj.src,  // Map src to url for renderImage compatibility
+                    src: obj.src,  // Keep src for renderImageElement compatibility
                     type: 'image',
                     // Flatten coordinate properties for direct access by AdminCanvasRenderer
                     left: parseFloat(obj.left || 0),
