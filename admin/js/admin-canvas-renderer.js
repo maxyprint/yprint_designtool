@@ -238,6 +238,24 @@ class AdminCanvasRenderer {
         const startTime = performance.now();
 
         try {
+            // 🎯 AGENT 3: Check if this is a color (hex/rgb) or image URL
+            const isColor = /^(#[0-9A-Fa-f]{3,8}|rgb|rgba|hsl|hsla)/i.test(templateUrl);
+
+            if (isColor) {
+                // Render solid color background
+                if (this.backgroundRenderer.logBackgroundRender) {
+                    console.log('🎯 AGENT 3 BACKGROUND: Rendering solid color:', templateUrl);
+                }
+                this.ctx.save();
+                this.ctx.fillStyle = templateUrl;
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                this.ctx.restore();
+
+                const renderTime = performance.now() - startTime;
+                console.log(`🎯 AGENT 3 BACKGROUND: Color background rendered in ${renderTime.toFixed(2)}ms`);
+                return;
+            }
+
             // 🎯 AGENT 3: Load background image with caching
             let backgroundImg;
             if (this.backgroundRenderer.backgroundCache.has(templateUrl)) {
