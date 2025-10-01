@@ -744,6 +744,278 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 AGENT 5: LEGACY VISUAL CORRECTION HEURISTIC
+     * ==============================================
+     * Intelligent correction system for legacy design data without metadata
+     *
+     * REFERENCES:
+     * - Agent 1: Database analysis shows two data sources (_design_data, _db_processed_views)
+     * - Agent 2: Root cause - missing metadata.designer_offset in legacy data
+     * - Agent 3: Renderer function map shows extractDesignerOffset() as correction point
+     * - Agent 4: Correction matrix defines offset ranges and confidence thresholds
+     *
+     * DETECTION STRATEGY:
+     * 1. Check for metadata.designer_offset (if exists, not legacy)
+     * 2. Check for metadata.source === 'db_processed_views' (legacy indicator)
+     * 3. Analyze coordinate patterns (heuristic detection)
+     * 4. Apply confidence-based corrections
+     *
+     * CORRECTION LOGIC:
+     * - Legacy Type A: db_processed_views data (high confidence)
+     * - Legacy Type B: Missing metadata (medium confidence, needs heuristic)
+     * - Legacy Type C: Coordinate pattern analysis (variable confidence)
+     *
+     * FAIL-SAFE:
+     * - Only apply corrections when confidence > 0.6
+     * - Extensive logging for debugging
+     * - Version tracking for rollback capability
+     *
+     * @param {Object} designData - Design data to analyze
+     * @returns {Object} Correction results with confidence score
+     * @version 1.0.0 (Agent 5 Implementation - October 2025)
+     */
+    applyLegacyVisualCorrection(designData) {
+        const correctionResult = {
+            applied: false,
+            legacyType: null,
+            confidence: 0,
+            offsetX: 0,
+            offsetY: 0,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            method: null,
+            diagnostics: {}
+        };
+
+        console.log('🎯 AGENT 5: Starting Legacy Visual Correction Analysis...');
+
+        // STEP 1: Check if data is NOT legacy (has modern metadata)
+        if (designData.metadata?.designer_offset) {
+            correctionResult.method = 'modern_metadata';
+            correctionResult.diagnostics.reason = 'Modern metadata present - no correction needed';
+            console.log('✅ AGENT 5: Modern metadata detected - skipping legacy correction');
+            return correctionResult;
+        }
+
+        // STEP 2: Detect Legacy Type A - db_processed_views source
+        const isDbProcessedViews = designData.metadata?.source === 'db_processed_views';
+        if (isDbProcessedViews) {
+            correctionResult.legacyType = 'TYPE_A_DB_PROCESSED_VIEWS';
+            correctionResult.confidence = 0.95; // High confidence for known legacy type
+            correctionResult.method = 'db_source_detection';
+
+            console.log('🎯 AGENT 5: Legacy Type A detected (db_processed_views source)');
+        }
+
+        // STEP 3: Detect Legacy Type B - Missing capture_version
+        const missingVersion = !designData.metadata?.capture_version;
+        if (missingVersion && !isDbProcessedViews) {
+            correctionResult.legacyType = 'TYPE_B_MISSING_VERSION';
+            correctionResult.confidence = 0.7; // Medium confidence
+            correctionResult.method = 'version_detection';
+
+            console.log('🎯 AGENT 5: Legacy Type B detected (missing capture_version)');
+        }
+
+        // STEP 4: Heuristic Coordinate Pattern Analysis
+        const elements = designData.objects || designData.elements || [];
+        if (elements.length === 0) {
+            console.log('⚠️ AGENT 5: No elements to analyze - aborting correction');
+            return correctionResult;
+        }
+
+        // Calculate coordinate statistics
+        const coordStats = this._calculateCoordinateStatistics(elements);
+        console.log('🎯 AGENT 5: Coordinate Statistics:', coordStats);
+
+        // STEP 5: Apply Agent 4 Correction Matrix
+        const correctionMatrix = this._getCorrectionMatrix(coordStats, correctionResult.legacyType);
+
+        // STEP 6: Confidence-based decision
+        if (correctionMatrix.confidence > 0.6) {
+            correctionResult.applied = true;
+            correctionResult.confidence = correctionMatrix.confidence;
+            correctionResult.offsetX = correctionMatrix.offsetX;
+            correctionResult.offsetY = correctionMatrix.offsetY;
+            correctionResult.scaleX = correctionMatrix.scaleX;
+            correctionResult.scaleY = correctionMatrix.scaleY;
+            correctionResult.method = correctionMatrix.method;
+            correctionResult.diagnostics = correctionMatrix.diagnostics;
+
+            // Apply to renderer state
+            this.designerOffset.x = correctionResult.offsetX;
+            this.designerOffset.y = correctionResult.offsetY;
+            this.designerOffset.detected = true;
+            this.designerOffset.source = `agent5_${correctionMatrix.method}`;
+
+            if (correctionMatrix.scaleX !== 1.0 || correctionMatrix.scaleY !== 1.0) {
+                this.canvasScaling.scaleX = correctionMatrix.scaleX;
+                this.canvasScaling.scaleY = correctionMatrix.scaleY;
+                this.canvasScaling.detected = true;
+                this.canvasScaling.source = 'agent5_heuristic';
+            }
+
+            console.log('✅ AGENT 5: Legacy correction APPLIED:', {
+                type: correctionResult.legacyType,
+                confidence: correctionResult.confidence.toFixed(2),
+                offset: `${correctionResult.offsetX.toFixed(1)}, ${correctionResult.offsetY.toFixed(1)}`,
+                scale: `${correctionResult.scaleX.toFixed(3)}, ${correctionResult.scaleY.toFixed(3)}`,
+                method: correctionResult.method
+            });
+        } else {
+            console.log('⚠️ AGENT 5: Low confidence - correction NOT applied:', {
+                confidence: correctionMatrix.confidence.toFixed(2),
+                threshold: 0.6
+            });
+        }
+
+        return correctionResult;
+    }
+
+    /**
+     * 🎯 AGENT 5: Calculate Coordinate Statistics
+     * Helper function to analyze element coordinate patterns
+     * @private
+     */
+    _calculateCoordinateStatistics(elements) {
+        let sumX = 0, sumY = 0;
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        let count = 0;
+
+        for (const el of elements) {
+            const x = el.left || el.x || 0;
+            const y = el.top || el.y || 0;
+            const width = (el.width || 0) * (el.scaleX || 1);
+            const height = (el.height || 0) * (el.scaleY || 1);
+
+            sumX += x;
+            sumY += y;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + width);
+            maxY = Math.max(maxY, y + height);
+            count++;
+        }
+
+        return {
+            avgX: sumX / count,
+            avgY: sumY / count,
+            minX: minX === Infinity ? 0 : minX,
+            minY: minY === Infinity ? 0 : minY,
+            maxX: maxX === -Infinity ? 0 : maxX,
+            maxY: maxY === -Infinity ? 0 : maxY,
+            count: count,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2,
+            rangeX: maxX - minX,
+            rangeY: maxY - minY
+        };
+    }
+
+    /**
+     * 🎯 AGENT 5: Get Correction Matrix
+     * Applies Agent 4 correction matrix based on coordinate patterns
+     * @private
+     */
+    _getCorrectionMatrix(coordStats, legacyType) {
+        const matrix = {
+            confidence: 0,
+            offsetX: 0,
+            offsetY: 0,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            method: 'none',
+            diagnostics: {}
+        };
+
+        // Pattern 1: High X/Y coordinates (likely designer offset present)
+        const highCoordinates = coordStats.avgX > 350 || coordStats.avgY > 250;
+
+        // Pattern 2: Coordinates exceed current canvas bounds
+        const exceedsBounds = coordStats.maxX > this.canvasWidth || coordStats.maxY > this.canvasHeight;
+
+        // Pattern 3: Center point suggests larger canvas
+        const largeCanvasPattern = coordStats.centerX > 500 || coordStats.centerY > 400;
+
+        // CORRECTION MATRIX LOGIC (Based on Agent 4)
+
+        // Case 1: db_processed_views + high coordinates (HIGHEST CONFIDENCE)
+        if (legacyType === 'TYPE_A_DB_PROCESSED_VIEWS' && highCoordinates) {
+            matrix.confidence = 0.95;
+            matrix.offsetX = Math.min(Math.max(coordStats.avgX - 330, 0), 100);
+            matrix.offsetY = Math.min(Math.max(coordStats.avgY - 165, 0), 80);
+            matrix.method = 'type_a_high_coords';
+            matrix.diagnostics = {
+                pattern: 'DB source + elevated coordinates',
+                avgPosition: `${coordStats.avgX.toFixed(0)}, ${coordStats.avgY.toFixed(0)}`,
+                recommendation: 'Apply strong offset correction'
+            };
+        }
+
+        // Case 2: Coordinates exceed bounds (CANVAS SCALING NEEDED)
+        else if (exceedsBounds) {
+            matrix.confidence = 0.85;
+
+            // Estimate original canvas size (likely 1100×850)
+            const estimatedWidth = 1100;
+            const estimatedHeight = 850;
+
+            matrix.scaleX = this.canvasWidth / estimatedWidth;
+            matrix.scaleY = this.canvasHeight / estimatedHeight;
+            matrix.method = 'bounds_exceeded_scaling';
+            matrix.diagnostics = {
+                pattern: 'Elements exceed canvas bounds',
+                maxBounds: `${coordStats.maxX.toFixed(0)}, ${coordStats.maxY.toFixed(0)}`,
+                currentCanvas: `${this.canvasWidth}×${this.canvasHeight}`,
+                estimatedOriginal: `${estimatedWidth}×${estimatedHeight}`,
+                recommendation: 'Apply canvas dimension scaling'
+            };
+        }
+
+        // Case 3: Large canvas pattern (MEDIUM CONFIDENCE)
+        else if (largeCanvasPattern) {
+            matrix.confidence = 0.75;
+            matrix.scaleX = this.canvasWidth / 1100;
+            matrix.scaleY = this.canvasHeight / 850;
+            matrix.offsetX = Math.min(coordStats.avgX * 0.1, 60);
+            matrix.offsetY = Math.min(coordStats.avgY * 0.1, 40);
+            matrix.method = 'large_canvas_pattern';
+            matrix.diagnostics = {
+                pattern: 'Center point suggests larger canvas',
+                center: `${coordStats.centerX.toFixed(0)}, ${coordStats.centerY.toFixed(0)}`,
+                recommendation: 'Apply combined offset + scaling'
+            };
+        }
+
+        // Case 4: Missing version + moderate coordinates (LOW-MEDIUM CONFIDENCE)
+        else if (legacyType === 'TYPE_B_MISSING_VERSION' && coordStats.avgX > 200) {
+            matrix.confidence = 0.65;
+            matrix.offsetX = Math.min(coordStats.avgX * 0.15, 50);
+            matrix.offsetY = Math.min(coordStats.avgY * 0.15, 30);
+            matrix.method = 'type_b_moderate_coords';
+            matrix.diagnostics = {
+                pattern: 'Missing version + moderate coordinate elevation',
+                avgPosition: `${coordStats.avgX.toFixed(0)}, ${coordStats.avgY.toFixed(0)}`,
+                recommendation: 'Apply conservative offset correction'
+            };
+        }
+
+        // Case 5: Low confidence - don't correct
+        else {
+            matrix.confidence = 0.3;
+            matrix.method = 'insufficient_evidence';
+            matrix.diagnostics = {
+                pattern: 'Coordinate patterns inconclusive',
+                avgPosition: `${coordStats.avgX.toFixed(0)}, ${coordStats.avgY.toFixed(0)}`,
+                recommendation: 'Do not apply correction (risk of making it worse)'
+            };
+        }
+
+        return matrix;
+    }
+
+    /**
      * 🎯 AGENT 2: COORDINATE PRESERVATION - Zero-transformation coordinate system
      * Apply zero transformations to preserve exact original coordinates
      * 🎯 HIVE MIND: Now includes Designer-Offset compensation
@@ -2333,6 +2605,18 @@ class AdminCanvasRenderer {
 
         // 🎯 CANVAS SCALING: Extract canvas dimension scaling from metadata
         this.extractCanvasScaling(designData);
+
+        // 🎯 AGENT 5: Apply Legacy Visual Correction Heuristic
+        // This runs AFTER extractDesignerOffset/extractCanvasScaling to allow override
+        // if legacy patterns are detected with high confidence
+        const legacyCorrection = this.applyLegacyVisualCorrection(designData);
+        if (legacyCorrection.applied) {
+            console.log('🎯 AGENT 5: Legacy correction system engaged', {
+                type: legacyCorrection.legacyType,
+                confidence: legacyCorrection.confidence,
+                method: legacyCorrection.method
+            });
+        }
 
         // 🎯 AGENT 8: Initialize Design Fidelity Comparator
         const fidelityComparator = new DesignFidelityComparator(designData);
