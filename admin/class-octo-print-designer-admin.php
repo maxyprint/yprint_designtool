@@ -1393,15 +1393,43 @@ class Octo_Print_Designer_Admin {
             error_log('⚠️ AGENT 7: Using default canvas dimensions - 780x580');
         }
 
+        // 🎯 AGENT 12: Extract template ID and print area coordinates
+        $template_id = null;
+        $print_area = null;
+
+        // Try to get template ID from order items
+        foreach ($order->get_items() as $item_id => $item) {
+            $template_id = $item->get_meta('_yprint_template_id', true);
+            if ($template_id) {
+                error_log('✅ AGENT 12: Found template ID ' . $template_id . ' in item ' . $item_id);
+                break;
+            }
+        }
+
+        // Extract print area if template ID found
+        if ($template_id) {
+            $print_area = $wc_integration->extract_print_area_coordinates($template_id);
+            if ($print_area) {
+                error_log('✅ AGENT 12: Print area extracted for template ' . $template_id);
+            } else {
+                error_log('⚠️ AGENT 12: No print area data found for template ' . $template_id);
+            }
+        } else {
+            error_log('⚠️ AGENT 12: No template ID found in order items');
+        }
+
         // ✅ SUCCESS RESPONSE: Complete data structure
         $response_data = [
             'order_id' => $order_id,
             'design_data' => $design_data,
             'mockup_url' => $mockup_url ?: null,
             'canvas_dimensions' => $canvas_dimensions,
+            'template_id' => $template_id,
+            'print_area' => $print_area,
             'has_design_data' => !empty($design_data),
             'has_mockup_url' => !empty($mockup_url),
             'has_canvas_dimensions' => !empty($canvas_dimensions),
+            'has_print_area' => !empty($print_area),
             'timestamp' => current_time('c')
         ];
 

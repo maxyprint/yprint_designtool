@@ -6716,4 +6716,102 @@ private function build_print_provider_email_content($order, $design_items, $note
         error_log('❌ AGENT 7 has_design_data: No valid design data found for order ' . $order_id);
         return false;
     }
+
+    /**
+     * 🎯 AGENT 12: Extract print area coordinates from template variations
+     *
+     * @param int $template_id Template post ID
+     * @param string $variation_id Variation ID (null = default)
+     * @param string $view_id View ID (default: 'front')
+     * @return array|null Print area data or null if not found
+     */
+    public function extract_print_area_coordinates($template_id, $variation_id = null, $view_id = 'front') {
+        if (!$template_id) {
+            error_log('🔍 AGENT 12: No template ID provided for print area extraction');
+            return null;
+        }
+
+        error_log('🔍 AGENT 12: Extracting print area for template ' . $template_id);
+
+        // Get template variations meta
+        $variations = get_post_meta($template_id, '_template_variations', true);
+
+        if (empty($variations) || !is_array($variations)) {
+            error_log('⚠️ AGENT 12: No variations found for template ' . $template_id);
+            return null;
+        }
+
+        // Find default variation if not specified
+        if (!$variation_id) {
+            foreach ($variations as $var_id => $var_data) {
+                if (isset($var_data['is_default']) && $var_data['is_default']) {
+                    $variation_id = $var_id;
+                    error_log('✅ AGENT 12: Using default variation: ' . $variation_id);
+                    break;
+                }
+            }
+
+            // If still no variation, use first one
+            if (!$variation_id) {
+                $variation_id = array_key_first($variations);
+                error_log('✅ AGENT 12: Using first variation: ' . $variation_id);
+            }
+        }
+
+        // Get variation data
+        if (!isset($variations[$variation_id])) {
+            error_log('❌ AGENT 12: Variation ' . $variation_id . ' not found');
+            return null;
+        }
+
+        $variation = $variations[$variation_id];
+
+        // Get view data
+        if (!isset($variation['views']) || !isset($variation['views'][$view_id])) {
+            error_log('❌ AGENT 12: View ' . $view_id . ' not found in variation ' . $variation_id);
+            return null;
+        }
+
+        $view = $variation['views'][$view_id];
+
+        // Extract safe zone (print area)
+        $safe_zone = isset($view['safeZone']) ? $view['safeZone'] : null;
+        $image_zone = isset($view['imageZone']) ? $view['imageZone'] : null;
+
+        if (!$safe_zone) {
+            error_log('⚠️ AGENT 12: No safeZone found for view ' . $view_id);
+            return null;
+        }
+
+        $print_area = [
+            'x' => isset($safe_zone['left']) ? floatval($safe_zone['left']) : 0,
+            'y' => isset($safe_zone['top']) ? floatval($safe_zone['top']) : 0,
+            'width' => isset($safe_zone['width']) ? floatval($safe_zone['width']) : 780,
+            'height' => isset($safe_zone['height']) ? floatval($safe_zone['height']) : 580,
+            'scaleX' => isset($safe_zone['scaleX']) ? floatval($safe_zone['scaleX']) : 1.0,
+            'scaleY' => isset($safe_zone['scaleY']) ? floatval($safe_zone['scaleY']) : 1.0,
+            'angle' => isset($safe_zone['angle']) ? floatval($safe_zone['angle']) : 0
+        ];
+
+        // Also include image zone if available
+        if ($image_zone) {
+            $print_area['image_zone'] = [
+                'x' => isset($image_zone['left']) ? floatval($image_zone['left']) : 0,
+                'y' => isset($image_zone['top']) ? floatval($image_zone['top']) : 0,
+                'scaleX' => isset($image_zone['scaleX']) ? floatval($image_zone['scaleX']) : 1.0,
+                'scaleY' => isset($image_zone['scaleY']) ? floatval($image_zone['scaleY']) : 1.0,
+                'angle' => isset($image_zone['angle']) ? floatval($image_zone['angle']) : 0
+            ];
+        }
+
+        // Get mockup image ID if available
+        if (isset($view['image'])) {
+            $print_area['mockup_image_id'] = intval($view['image']);
+            $print_area['mockup_url'] = wp_get_attachment_url($view['image']);
+        }
+
+        error_log('✅ AGENT 12: Print area extracted: ' . json_encode($print_area));
+
+        return $print_area;
+    }
 }
