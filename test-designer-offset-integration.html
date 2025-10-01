@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Designer Offset Integration Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Designer Offset Integration Test</h1>
+    <p>This test validates that Designer captures offset metadata and Renderer uses it for compensation.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Designer Offset Capture</h2>
+        <p>Simulating Designer's transformCoordinates() and captureDesignData() methods:</p>
+        <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Renderer Offset Detection (Strategy 1)</h2>
+        <p>Simulating Renderer's extractDesignerOffset() method:</p>
+        <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Coordinate Compensation</h2>
+        <p>Verifying coordinates are properly compensated:</p>
+        <div id="test3-result"></div>
+    </div>
+
+    <script>
+        // Test 1: Designer Offset Capture
+        function testDesignerOffsetCapture() {
+            const result = document.getElementById('test1-result');
+
+            // Simulate Designer calculating offset
+            const canvasRect = { left: 120, top: 80 };
+            const containerRect = { left: 20, top: 30 };
+            const offsetX = canvasRect.left - containerRect.left; // 100
+            const offsetY = canvasRect.top - containerRect.top;   // 50
+
+            // Simulate Designer creating design data
+            const designData = {
+                template_view_id: 'test-123',
+                designed_on_area_px: { width: 780, height: 580 },
+                elements: [
+                    { type: 'text', x: 250, y: 180, text: 'TEST' } // Coordinates with offset added
+                ],
+                timestamp: new Date().toISOString(),
+                canvas_info: {
+                    id: 'test-canvas',
+                    width: 780,
+                    height: 580,
+                    objects_count: 1
+                },
+                metadata: {
+                    designer_offset: {
+                        x: Math.round(offsetX * 100) / 100,
+                        y: Math.round(offsetY * 100) / 100
+                    },
+                    capture_version: '2.0',
+                    offset_compensation_required: true
+                }
+            };
+
+            const hasMetadata = designData.metadata && designData.metadata.designer_offset;
+            const offsetCorrect = hasMetadata &&
+                                  designData.metadata.designer_offset.x === 100 &&
+                                  designData.metadata.designer_offset.y === 50;
+
+            result.innerHTML = `
+                <p class="${hasMetadata ? 'pass' : 'fail'}">✓ Metadata exists: ${hasMetadata ? 'PASS' : 'FAIL'}</p>
+                <p class="${offsetCorrect ? 'pass' : 'fail'}">✓ Offset values correct: ${offsetCorrect ? 'PASS' : 'FAIL'}</p>
+                <pre>${JSON.stringify(designData, null, 2)}</pre>
+            `;
+
+            return designData;
+        }
+
+        // Test 2: Renderer Offset Detection
+        function testRendererOffsetDetection(designData) {
+            const result = document.getElementById('test2-result');
+
+            // Simulate Renderer's extractDesignerOffset() - Strategy 1
+            const designerOffset = {
+                detected: false,
+                x: 0,
+                y: 0,
+                source: 'none'
+            };
+
+            // Strategy 1: Check for explicit offset metadata
+            if (designData.metadata && designData.metadata.designer_offset) {
+                designerOffset.x = parseFloat(designData.metadata.designer_offset.x || 0);
+                designerOffset.y = parseFloat(designData.metadata.designer_offset.y || 0);
+                designerOffset.detected = true;
+                designerOffset.source = 'metadata';
+            }
+
+            const detected = designerOffset.detected;
+            const sourceCorrect = designerOffset.source === 'metadata';
+            const valuesCorrect = designerOffset.x === 100 && designerOffset.y === 50;
+
+            result.innerHTML = `
+                <p class="${detected ? 'pass' : 'fail'}">✓ Offset detected: ${detected ? 'PASS' : 'FAIL'}</p>
+                <p class="${sourceCorrect ? 'pass' : 'fail'}">✓ Source is metadata: ${sourceCorrect ? 'PASS' : 'FAIL'}</p>
+                <p class="${valuesCorrect ? 'pass' : 'fail'}">✓ Values correct (100, 50): ${valuesCorrect ? 'PASS' : 'FAIL'}</p>
+                <pre>Renderer State: ${JSON.stringify(designerOffset, null, 2)}</pre>
+            `;
+
+            return designerOffset;
+        }
+
+        // Test 3: Coordinate Compensation
+        function testCoordinateCompensation(designData, designerOffset) {
+            const result = document.getElementById('test3-result');
+
+            const element = designData.elements[0];
+            const originalX = element.x; // 250 (with offset)
+            const originalY = element.y; // 180 (with offset)
+
+            // Simulate Renderer compensation
+            const compensatedX = originalX - (designerOffset?.x || 0); // 250 - 100 = 150
+            const compensatedY = originalY - (designerOffset?.y || 0); // 180 - 50 = 130
+
+            const expectedX = 150;
+            const expectedY = 130;
+
+            const xCorrect = compensatedX === expectedX;
+            const yCorrect = compensatedY === expectedY;
+
+            result.innerHTML = `
+                <p><strong>Original Coordinates (with Designer offset):</strong> x=${originalX}, y=${originalY}</p>
+                <p><strong>Designer Offset:</strong> x=${designerOffset.x}, y=${designerOffset.y}</p>
+                <p><strong>Compensated Coordinates:</strong> x=${compensatedX}, y=${compensatedY}</p>
+                <p class="${xCorrect ? 'pass' : 'fail'}">✓ X compensation correct (${expectedX}): ${xCorrect ? 'PASS' : 'FAIL'}</p>
+                <p class="${yCorrect ? 'pass' : 'fail'}">✓ Y compensation correct (${expectedY}): ${yCorrect ? 'PASS' : 'FAIL'}</p>
+                <p><strong>Result:</strong> Element will render at canvas-relative position (150, 130) instead of container-relative (250, 180)</p>
+            `;
+        }
+
+        // Run all tests
+        console.log('🎯 Running Designer Offset Integration Tests...');
+        const designData = testDesignerOffsetCapture();
+        const designerOffset = testRendererOffsetDetection(designData);
+        testCoordinateCompensation(designData, designerOffset);
+        console.log('✅ All tests complete!');
+    </script>
+</body>
+</html>

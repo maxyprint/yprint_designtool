@@ -507,6 +507,9 @@ class ProductionReadyDesignDataCapture {
             // Alle Elemente des Canvas erfassen
             const elements = this.captureCanvasElements(primaryCanvas.canvas);
 
+            // Get designer offset for renderer compensation
+            const designerOffset = this.getDesignerOffset();
+
             const designData = {
                 template_view_id,
                 designed_on_area_px,
@@ -517,6 +520,14 @@ class ProductionReadyDesignDataCapture {
                     width: primaryCanvas.canvas.width,
                     height: primaryCanvas.canvas.height,
                     objects_count: primaryCanvas.canvas.getObjects().length
+                },
+                metadata: {
+                    designer_offset: {
+                        x: Math.round(designerOffset.x * 100) / 100, // Round to 2 decimals
+                        y: Math.round(designerOffset.y * 100) / 100
+                    },
+                    capture_version: '2.0',
+                    offset_compensation_required: true
                 }
             };
 
@@ -774,6 +785,9 @@ class ProductionReadyDesignDataCapture {
             const offsetX = canvasRect.left - containerRect.left;
             const offsetY = canvasRect.top - containerRect.top;
 
+            // Store offset for metadata (will be saved in captureDesignData)
+            this.currentOffset = { x: offsetX, y: offsetY };
+
             return {
                 x: canvasX + offsetX,
                 y: canvasY + offsetY
@@ -781,8 +795,16 @@ class ProductionReadyDesignDataCapture {
 
         } catch (error) {
             console.warn('⚠️ Coordinate transformation failed:', error.message);
+            this.currentOffset = { x: 0, y: 0 };
             return { x: canvasX, y: canvasY };
         }
+    }
+
+    /**
+     * Get current designer offset for metadata
+     */
+    getDesignerOffset() {
+        return this.currentOffset || { x: 0, y: 0 };
     }
 
     /**
