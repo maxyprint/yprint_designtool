@@ -38,6 +38,16 @@ class AdminCanvasRenderer {
             allowedTolerance: 0.1        // Sub-pixel tolerance for validation
         };
 
+        // 🎯 HIVE MIND: DESIGNER-OFFSET COMPENSATION
+        // Designer adds Canvas-Container offset during capture (transformCoordinates)
+        // Renderer must subtract this offset to achieve 1:1 alignment
+        this.designerOffset = {
+            x: 0,  // Will be extracted from design_data metadata or calculated
+            y: 0,  // Will be extracted from design_data metadata or calculated
+            detected: false,
+            source: null  // 'metadata' or 'calculated' or 'default'
+        };
+
         // 🎯 AGENT 3: MOCKUP BACKGROUND RENDERER
         this.backgroundRenderer = {
             templateSupport: true,           // Enable template background rendering
@@ -415,8 +425,74 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 HIVE MIND: DESIGNER-OFFSET EXTRACTION
+     * Extracts offset values that Designer added during capture (transformCoordinates)
+     * Designer adds canvasRect.left/top - containerRect.left/top to coordinates
+     * Renderer must detect and compensate this offset for 1:1 alignment
+     * @param {Object} designData - Design data with potential metadata.designer_offset
+     */
+    extractDesignerOffset(designData) {
+        // Strategy 1: Check for explicit offset metadata (future-proof)
+        if (designData.metadata && designData.metadata.designer_offset) {
+            this.designerOffset.x = parseFloat(designData.metadata.designer_offset.x || 0);
+            this.designerOffset.y = parseFloat(designData.metadata.designer_offset.y || 0);
+            this.designerOffset.detected = true;
+            this.designerOffset.source = 'metadata';
+            console.log('🎯 HIVE MIND: Designer offset extracted from metadata:', this.designerOffset);
+            return;
+        }
+
+        // Strategy 2: Calculate offset from canvas_info if available
+        if (designData.canvas_info && designData.canvas_info.offset) {
+            this.designerOffset.x = parseFloat(designData.canvas_info.offset.x || 0);
+            this.designerOffset.y = parseFloat(designData.canvas_info.offset.y || 0);
+            this.designerOffset.detected = true;
+            this.designerOffset.source = 'canvas_info';
+            console.log('🎯 HIVE MIND: Designer offset extracted from canvas_info:', this.designerOffset);
+            return;
+        }
+
+        // Strategy 3: Heuristic detection based on coordinate patterns
+        // If all elements have suspiciously similar offset patterns, detect it
+        const elements = designData.objects || designData.elements || [];
+        if (elements.length > 0) {
+            // Analyze first few elements to detect systematic offset
+            const sampleSize = Math.min(3, elements.length);
+            const samples = elements.slice(0, sampleSize);
+
+            // Check if coordinates are suspiciously high (likely offset added)
+            const avgX = samples.reduce((sum, el) => sum + (el.x || el.left || 0), 0) / sampleSize;
+            const avgY = samples.reduce((sum, el) => sum + (el.y || el.top || 0), 0) / sampleSize;
+
+            // Heuristic: If average position is in upper-left quadrant but far from origin,
+            // there might be a systematic offset (typical canvas centering adds 50-100px)
+            if (avgX > 40 && avgX < 200 && avgY > 40 && avgY < 200) {
+                // Conservative estimate: Use typical canvas-container offset
+                this.designerOffset.x = 0; // Keep at 0 for now, needs more data
+                this.designerOffset.y = 0; // Keep at 0 for now, needs more data
+                this.designerOffset.detected = false;
+                this.designerOffset.source = 'heuristic_inconclusive';
+                console.log('🎯 HIVE MIND: Designer offset heuristic inconclusive:', {
+                    avgX: avgX.toFixed(1),
+                    avgY: avgY.toFixed(1),
+                    note: 'Coordinates suggest possible offset, but not confident enough to compensate'
+                });
+                return;
+            }
+        }
+
+        // Strategy 4: Default - No offset compensation (safest for legacy data)
+        this.designerOffset.x = 0;
+        this.designerOffset.y = 0;
+        this.designerOffset.detected = false;
+        this.designerOffset.source = 'default_no_offset';
+        console.log('🎯 HIVE MIND: No designer offset detected, using zero offset (safe default)');
+    }
+
+    /**
      * 🎯 AGENT 2: COORDINATE PRESERVATION - Zero-transformation coordinate system
      * Apply zero transformations to preserve exact original coordinates
+     * 🎯 HIVE MIND: Now includes Designer-Offset compensation
      * @param {number} x - X coordinate
      * @param {number} y - Y coordinate
      * @param {Object} options - Transform options
@@ -425,26 +501,40 @@ class AdminCanvasRenderer {
     preserveCoordinates(x, y, options = {}) {
         // 🎯 AGENT 2: NO TRANSFORMATION MODE - Return exact coordinates
         if (this.coordinatePreservation.noTransformMode) {
+            // 🎯 HIVE MIND: Apply Designer-Offset compensation
+            // Designer added offset during capture, we subtract it during render
+            const compensatedX = x - this.designerOffset.x;
+            const compensatedY = y - this.designerOffset.y;
+
             const result = {
-                x: x, // EXACT preservation - no scaling
-                y: y, // EXACT preservation - no scaling
+                x: compensatedX, // EXACT preservation with offset compensation
+                y: compensatedY, // EXACT preservation with offset compensation
                 originalX: x,
                 originalY: y,
+                offsetCompensation: {
+                    applied: this.designerOffset.detected,
+                    offsetX: this.designerOffset.x,
+                    offsetY: this.designerOffset.y,
+                    source: this.designerOffset.source
+                },
                 preservation: {
                     noTransformation: true,
                     exactCoordinates: true,
                     scaleApplied: false,
-                    agent: 'AGENT_2_COORDINATE_PRESERVATION'
+                    offsetCompensated: this.designerOffset.detected,
+                    agent: 'AGENT_2_COORDINATE_PRESERVATION_WITH_HIVE_MIND_OFFSET'
                 }
             };
 
-            // 🎯 AGENT 2: COORDINATE VALIDATION LOGGING
+            // 🎯 AGENT 2 + HIVE MIND: COORDINATE VALIDATION LOGGING
             if (this.coordinatePreservation.validateCoordinates) {
-                console.log('🎯 AGENT 2 COORDINATE PRESERVATION:', {
+                console.log('🎯 AGENT 2 + HIVE MIND COORDINATE PRESERVATION:', {
                     input: `${x}, ${y}`,
+                    designerOffset: `${this.designerOffset.x}, ${this.designerOffset.y}`,
                     output: `${result.x}, ${result.y}`,
-                    preserved: result.x === x && result.y === y,
-                    transformation: 'NONE - 1:1 Replica Mode'
+                    offsetApplied: this.designerOffset.detected,
+                    offsetSource: this.designerOffset.source,
+                    transformation: 'NONE - 1:1 Replica Mode + Offset Compensation'
                 });
             }
 
@@ -782,8 +872,9 @@ class AdminCanvasRenderer {
             const angle = (imageData.angle || 0) * Math.PI / 180;
 
             // 🎯 AGENT 4: Apply coordinate preservation (no transformation)
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: left, y: top }
+                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
                 : this.preserveCoordinates(left, top);
 
             // 🎯 AGENT 9 COORDINATE VERIFICATION: Comprehensive coordinate tracking
@@ -1109,8 +1200,9 @@ class AdminCanvasRenderer {
             });
 
             // 🎯 AGENT 4: Enhanced error visualization
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: imageData.left || 0, y: imageData.top || 0 }
+                ? { x: (imageData.left || 0) - this.designerOffset.x, y: (imageData.top || 0) - this.designerOffset.y }
                 : this.preserveCoordinates(imageData.left || 0, imageData.top || 0);
 
             this.ctx.save();
@@ -1173,8 +1265,9 @@ class AdminCanvasRenderer {
             const strokeWidth = textData.strokeWidth || 0;
 
             // 🎯 AGENT 5: Apply coordinate preservation (no transformation)
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: left, y: top }
+                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
                 : this.preserveCoordinates(left, top);
 
             // 🎯 AGENT 5: Load font if web font
@@ -1255,8 +1348,9 @@ class AdminCanvasRenderer {
             console.error('❌ AGENT 5 TEXT ERROR:', error);
 
             // 🎯 AGENT 5: Enhanced error visualization for text
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: textData.left || 0, y: textData.top || 0 }
+                ? { x: (textData.left || 0) - this.designerOffset.x, y: (textData.top || 0) - this.designerOffset.y }
                 : this.preserveCoordinates(textData.left || 0, textData.top || 0);
 
             this.ctx.save();
@@ -1337,8 +1431,9 @@ class AdminCanvasRenderer {
             const radius = shapeData.radius || 0;
 
             // 🎯 AGENT 6: Apply coordinate preservation (no transformation)
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: left, y: top }
+                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
                 : this.preserveCoordinates(left, top);
 
             // 🎯 AGENT 6: Calculate exact dimensions with preserved scaling
@@ -1448,8 +1543,9 @@ class AdminCanvasRenderer {
             console.error('❌ AGENT 6 SHAPE ERROR:', error);
 
             // 🎯 AGENT 6: Enhanced error visualization for shapes
+            // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             const position = this.coordinatePreservation.noTransformMode
-                ? { x: shapeData.left || 0, y: shapeData.top || 0 }
+                ? { x: (shapeData.left || 0) - this.designerOffset.x, y: (shapeData.top || 0) - this.designerOffset.y }
                 : this.preserveCoordinates(shapeData.left || 0, shapeData.top || 0);
 
             this.ctx.save();
@@ -1657,9 +1753,17 @@ class AdminCanvasRenderer {
 
             if (this.coordinatePreservation.noTransformMode) {
                 // NO TRANSFORM MODE: Use exact extracted coordinates
-                renderX = left;
-                renderY = top;
-                console.log('🎯 AGENT 3: Using NO-TRANSFORM mode - exact coordinates:', { renderX, renderY });
+                // 🎯 HIVE MIND: Apply designer offset compensation
+                renderX = left - this.designerOffset.x;
+                renderY = top - this.designerOffset.y;
+                console.log('🎯 AGENT 3 + HIVE MIND: Using NO-TRANSFORM mode with offset compensation:', {
+                    originalX: left,
+                    originalY: top,
+                    offsetX: this.designerOffset.x,
+                    offsetY: this.designerOffset.y,
+                    renderX,
+                    renderY
+                });
             } else {
                 // LEGACY TRANSFORM MODE: Apply coordinate transformation
                 const cacheKey = `${imageData.id}_${left}_${top}`;
@@ -1885,6 +1989,9 @@ class AdminCanvasRenderer {
             startTime: startTime,
             endTime: null
         };
+
+        // 🎯 HIVE MIND: Extract Designer-Offset from design_data metadata
+        this.extractDesignerOffset(designData);
 
         // 🎯 AGENT 8: Initialize Design Fidelity Comparator
         const fidelityComparator = new DesignFidelityComparator(designData);
