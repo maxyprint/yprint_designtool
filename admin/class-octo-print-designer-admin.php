@@ -1368,7 +1368,7 @@ class Octo_Print_Designer_Admin {
         }
 
         // Get WC Integration instance to check for design data
-        $wc_integration = new Octo_Print_Designer_WC_Integration();
+        $wc_integration = Octo_Print_Designer_WC_Integration::get_instance();
 
         // Only add meta box if order has design data
         if (!$wc_integration->has_design_data($order_id)) {
