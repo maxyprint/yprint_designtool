@@ -48,6 +48,18 @@ class AdminCanvasRenderer {
             source: null  // 'metadata' or 'calculated' or 'default'
         };
 
+        // 🎯 CANVAS DIMENSION SCALING COMPENSATION
+        // Designer may capture on different canvas size (e.g., 1100×850 vs 780×580)
+        // Renderer must scale coordinates to match current canvas dimensions
+        this.canvasScaling = {
+            scaleX: 1.0,  // Will be calculated from metadata.canvas_dimensions
+            scaleY: 1.0,  // Will be calculated from metadata.canvas_dimensions
+            detected: false,
+            source: null,  // 'metadata' or 'heuristic' or 'none'
+            originalDimensions: null,  // {width, height} from capture
+            currentDimensions: null    // {width, height} for rendering
+        };
+
         // 🎯 AGENT 3: MOCKUP BACKGROUND RENDERER
         this.backgroundRenderer = {
             templateSupport: true,           // Enable template background rendering
@@ -490,6 +502,79 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 CANVAS DIMENSION SCALING DETECTION
+     * Detects if design was captured on different canvas dimensions
+     * Calculates scaling factors to compensate for size mismatch
+     * @param {Object} designData - Design data with potential metadata.canvas_dimensions
+     */
+    extractCanvasScaling(designData) {
+        this.canvasScaling.currentDimensions = {
+            width: this.canvasWidth,
+            height: this.canvasHeight
+        };
+
+        // Strategy 1: Check for explicit canvas dimensions in metadata
+        if (designData.metadata && designData.metadata.canvas_dimensions) {
+            this.canvasScaling.originalDimensions = {
+                width: parseInt(designData.metadata.canvas_dimensions.width),
+                height: parseInt(designData.metadata.canvas_dimensions.height)
+            };
+
+            this.canvasScaling.scaleX = this.canvasWidth / this.canvasScaling.originalDimensions.width;
+            this.canvasScaling.scaleY = this.canvasHeight / this.canvasScaling.originalDimensions.height;
+            this.canvasScaling.detected = (
+                this.canvasScaling.originalDimensions.width !== this.canvasWidth ||
+                this.canvasScaling.originalDimensions.height !== this.canvasHeight
+            );
+            this.canvasScaling.source = 'metadata';
+
+            console.log('🎯 CANVAS SCALING: Dimension mismatch detected from metadata:', {
+                original: `${this.canvasScaling.originalDimensions.width}×${this.canvasScaling.originalDimensions.height}`,
+                current: `${this.canvasWidth}×${this.canvasHeight}`,
+                scaleX: this.canvasScaling.scaleX.toFixed(3),
+                scaleY: this.canvasScaling.scaleY.toFixed(3)
+            });
+            return;
+        }
+
+        // Strategy 2: Heuristic detection for legacy data
+        const elements = designData.objects || designData.elements || [];
+        if (elements.length > 0) {
+            // Calculate average position - if unusually high, likely larger canvas
+            const avgX = elements.reduce((sum, el) => sum + (el.left || el.x || 0), 0) / elements.length;
+            const avgY = elements.reduce((sum, el) => sum + (el.top || el.y || 0), 0) / elements.length;
+
+            // Heuristic: Common canvas size 1100×850 (responsive mode)
+            // If avgX > 400 (52% of 780), likely captured on larger canvas
+            if (avgX > 400 || avgY > 300) {
+                this.canvasScaling.originalDimensions = { width: 1100, height: 850 };
+                this.canvasScaling.scaleX = 780 / 1100; // 0.709
+                this.canvasScaling.scaleY = 580 / 850;  // 0.682
+                this.canvasScaling.detected = true;
+                this.canvasScaling.source = 'heuristic';
+
+                console.log('🎯 CANVAS SCALING: Heuristic detection suggests larger canvas:', {
+                    avgPosition: `${avgX.toFixed(0)}, ${avgY.toFixed(0)}`,
+                    estimatedOriginal: '1100×850',
+                    current: '780×580',
+                    scaleX: this.canvasScaling.scaleX.toFixed(3),
+                    scaleY: this.canvasScaling.scaleY.toFixed(3),
+                    confidence: 'medium'
+                });
+                return;
+            }
+        }
+
+        // Strategy 3: No scaling needed
+        this.canvasScaling.scaleX = 1.0;
+        this.canvasScaling.scaleY = 1.0;
+        this.canvasScaling.detected = false;
+        this.canvasScaling.source = 'none';
+        this.canvasScaling.originalDimensions = this.canvasScaling.currentDimensions;
+        console.log('🎯 CANVAS SCALING: No dimension mismatch detected, using 1:1 scaling');
+    }
+
+    /**
      * 🎯 AGENT 2: COORDINATE PRESERVATION - Zero-transformation coordinate system
      * Apply zero transformations to preserve exact original coordinates
      * 🎯 HIVE MIND: Now includes Designer-Offset compensation
@@ -503,12 +588,19 @@ class AdminCanvasRenderer {
         if (this.coordinatePreservation.noTransformMode) {
             // 🎯 HIVE MIND: Apply Designer-Offset compensation
             // Designer added offset during capture, we subtract it during render
-            const compensatedX = x - this.designerOffset.x;
-            const compensatedY = y - this.designerOffset.y;
+            let compensatedX = x - this.designerOffset.x;
+            let compensatedY = y - this.designerOffset.y;
+
+            // 🎯 CANVAS SCALING: Apply dimension scaling compensation
+            // Designer may have captured on different canvas size, scale coordinates
+            if (this.canvasScaling.detected) {
+                compensatedX = compensatedX * this.canvasScaling.scaleX;
+                compensatedY = compensatedY * this.canvasScaling.scaleY;
+            }
 
             const result = {
-                x: compensatedX, // EXACT preservation with offset compensation
-                y: compensatedY, // EXACT preservation with offset compensation
+                x: compensatedX, // EXACT preservation with offset + scaling compensation
+                y: compensatedY, // EXACT preservation with offset + scaling compensation
                 originalX: x,
                 originalY: y,
                 offsetCompensation: {
@@ -517,12 +609,20 @@ class AdminCanvasRenderer {
                     offsetY: this.designerOffset.y,
                     source: this.designerOffset.source
                 },
+                scalingCompensation: {
+                    applied: this.canvasScaling.detected,
+                    scaleX: this.canvasScaling.scaleX,
+                    scaleY: this.canvasScaling.scaleY,
+                    source: this.canvasScaling.source,
+                    originalCanvas: this.canvasScaling.originalDimensions,
+                    currentCanvas: this.canvasScaling.currentDimensions
+                },
                 preservation: {
                     noTransformation: true,
                     exactCoordinates: true,
-                    scaleApplied: false,
+                    scaleApplied: this.canvasScaling.detected,
                     offsetCompensated: this.designerOffset.detected,
-                    agent: 'AGENT_2_COORDINATE_PRESERVATION_WITH_HIVE_MIND_OFFSET'
+                    agent: 'AGENT_2_COORDINATE_PRESERVATION_WITH_HIVE_MIND_OFFSET_AND_SCALING'
                 }
             };
 
@@ -873,9 +973,22 @@ class AdminCanvasRenderer {
 
             // 🎯 AGENT 4: Apply coordinate preservation (no transformation)
             // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
-            const position = this.coordinatePreservation.noTransformMode
-                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
-                : this.preserveCoordinates(left, top);
+            // 🎯 CANVAS SCALING: Apply dimension scaling compensation
+            let position;
+            if (this.coordinatePreservation.noTransformMode) {
+                let x = left - this.designerOffset.x;
+                let y = top - this.designerOffset.y;
+
+                // Apply canvas dimension scaling
+                if (this.canvasScaling.detected) {
+                    x = x * this.canvasScaling.scaleX;
+                    y = y * this.canvasScaling.scaleY;
+                }
+
+                position = { x, y };
+            } else {
+                position = this.preserveCoordinates(left, top);
+            }
 
             // 🎯 AGENT 9 COORDINATE VERIFICATION: Comprehensive coordinate tracking
             const coordinateVerification = {
@@ -947,8 +1060,14 @@ class AdminCanvasRenderer {
             }
 
             // 🎯 AGENT 4: Calculate exact image dimensions with preserved scaling
-            const displayWidth = baseWidth * scaleX;
-            const displayHeight = baseHeight * scaleY;
+            // 🎯 CANVAS SCALING: Apply dimension scaling to display size
+            let displayWidth = baseWidth * scaleX;
+            let displayHeight = baseHeight * scaleY;
+
+            if (this.canvasScaling.detected) {
+                displayWidth = displayWidth * this.canvasScaling.scaleX;
+                displayHeight = displayHeight * this.canvasScaling.scaleY;
+            }
 
             // 🎯 AGENT 5: BOUNDS CHECKING - Validate final display dimensions
             if (!displayWidth || !displayHeight || displayWidth <= 0 || displayHeight <= 0 ||
@@ -1992,6 +2111,9 @@ class AdminCanvasRenderer {
 
         // 🎯 HIVE MIND: Extract Designer-Offset from design_data metadata
         this.extractDesignerOffset(designData);
+
+        // 🎯 CANVAS SCALING: Extract canvas dimension scaling from metadata
+        this.extractCanvasScaling(designData);
 
         // 🎯 AGENT 8: Initialize Design Fidelity Comparator
         const fidelityComparator = new DesignFidelityComparator(designData);

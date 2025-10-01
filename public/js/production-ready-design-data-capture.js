@@ -526,8 +526,14 @@ class ProductionReadyDesignDataCapture {
                         x: Math.round(designerOffset.x * 100) / 100, // Round to 2 decimals
                         y: Math.round(designerOffset.y * 100) / 100
                     },
-                    capture_version: '2.0',
-                    offset_compensation_required: true
+                    canvas_dimensions: {
+                        width: primaryCanvas.canvas.width,
+                        height: primaryCanvas.canvas.height,
+                        source: 'fabric_canvas'
+                    },
+                    capture_version: '2.1',
+                    offset_compensation_required: true,
+                    dimension_scaling_required: true
                 }
             };
 
