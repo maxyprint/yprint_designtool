@@ -653,6 +653,35 @@ class AdminCanvasRenderer {
      * @param {Object} designData - Design data with potential metadata.canvas_dimensions
      */
     extractCanvasScaling(designData) {
+        // 🎯 SCENARIO A: Skip canvas scaling extraction for legacy data (already corrected)
+        // Detection logic must match applyLegacyDataCorrection() to ensure consistency
+        const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
+        const missingCaptureVersion = !designData.metadata?.capture_version;
+        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
+        const isLegacyData = isLegacyDbFormat || (missingCaptureVersion && missingDesignerOffset);
+
+        if (isLegacyData) {
+            this.canvasScaling.scaleX = 1;
+            this.canvasScaling.scaleY = 1;
+            this.canvasScaling.detected = false;
+            this.canvasScaling.source = 'scenario_a_legacy_skip';
+            this.canvasScaling.originalDimensions = {
+                width: this.canvasWidth,
+                height: this.canvasHeight
+            };
+            this.canvasScaling.currentDimensions = {
+                width: this.canvasWidth,
+                height: this.canvasHeight
+            };
+            console.log('🎯 SCENARIO A: Legacy data detected - skipping canvas scaling extraction', {
+                reason: 'Data already corrected by applyLegacyDataCorrection()',
+                isDbProcessedViews: isLegacyDbFormat,
+                missingCaptureVersion: missingCaptureVersion,
+                missingDesignerOffset: missingDesignerOffset
+            });
+            return;
+        }
+
         this.canvasScaling.currentDimensions = {
             width: this.canvasWidth,
             height: this.canvasHeight
@@ -1485,6 +1514,30 @@ class AdminCanvasRenderer {
                 }
 
                 position = { x, y };
+
+                // 🔍 MULTIPLE CORRECTION LAYER SYNDROME - DIAGNOSTIC LOGGING
+                console.log('🔍 COORDINATE TRANSFORMATION AUDIT:', {
+                    step1_input: { left, top },
+                    step2_offsetCompensation: {
+                        offsetX: this.designerOffset.x,
+                        offsetY: this.designerOffset.y,
+                        offsetSource: this.designerOffset.source,
+                        afterOffset: { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
+                    },
+                    step3_scalingCompensation: {
+                        scaleX: this.canvasScaling.scaleX,
+                        scaleY: this.canvasScaling.scaleY,
+                        scalingDetected: this.canvasScaling.detected,
+                        scalingSource: this.canvasScaling.source,
+                        afterScaling: position
+                    },
+                    finalPosition: position,
+                    totalDelta: {
+                        deltaX: Math.abs(position.x - left),
+                        deltaY: Math.abs(position.y - top)
+                    },
+                    warningThreshold: Math.abs(position.y - top) > 100 ? '⚠️ DELTA >100PX!' : 'OK'
+                });
             } else {
                 position = this.preserveCoordinates(left, top);
             }
