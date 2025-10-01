@@ -611,13 +611,13 @@ private function check_yprint_dependency() {
                 border: 1px solid #c3c4c7;
                 border-radius: 4px;
                 padding: 20px;
-                text-align: center;
+                text-align: left;
                 box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
             }
 
             .design-canvas-container {
                 position: relative;
-                display: inline-block;
+                display: block;
                 background: #fff;
                 border: 2px solid #c3c4c7;
                 border-radius: 4px;

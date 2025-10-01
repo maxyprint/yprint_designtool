@@ -212,11 +212,12 @@
     border: 1px solid var(--wc-border);
     border-radius: 4px;
     padding: 20px;
-    text-align: center;
+    text-align: left;
     margin-top: 15px;
 }
 
 .design-preview-content canvas {
+    display: block;
     max-width: 100%;
     height: auto;
     border: 1px solid #e1e1e1;

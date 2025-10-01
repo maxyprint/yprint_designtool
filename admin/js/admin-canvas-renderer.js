@@ -194,6 +194,10 @@ class AdminCanvasRenderer {
         container.innerHTML = ''; // Clear existing content
         container.appendChild(this.canvas);
 
+        // Force block display to prevent inline layout issues
+        this.canvas.style.display = 'block';
+        this.canvas.style.margin = '0';
+
         console.log('✅ RENDERER: Canvas initialized', {
             displaySize: `${displayWidth}x${displayHeight}`,
             canvasSize: `${this.canvas.width}x${this.canvas.height}`,

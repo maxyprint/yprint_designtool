@@ -100,13 +100,13 @@
     border: 2px dashed #c3c4c7;
     border-radius: 8px;
     padding: 30px;
-    text-align: center;
+    text-align: left;
     position: relative;
     min-height: 400px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: flex-start;
     transition: all 0.3s ease;
 }
 
