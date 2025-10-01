@@ -766,21 +766,44 @@ class AdminCanvasRenderer {
      * @version 2.0.0 (Data Correction Approach - October 2025)
      */
     applyLegacyDataCorrection(designData) {
-        console.log('🔍 LEGACY DATA CORRECTION: Analyzing design data...');
+        console.log('🔍 LEGACY DATA CORRECTION: Analyzing design data...', {
+            hasMetadata: !!designData.metadata,
+            metadataSource: designData.metadata?.source,
+            hasCaptureVersion: !!designData.metadata?.capture_version,
+            hasDesignerOffset: designData.metadata?.designer_offset !== undefined,
+            topLevelKeys: Object.keys(designData).slice(0, 5)
+        });
 
         // STEP 1: Detect if this is problematic legacy data
+        // Multiple detection methods for robustness
         const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
+        const missingCaptureVersion = !designData.metadata?.capture_version;
+        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
 
-        if (!isLegacyDbFormat) {
-            console.log('✅ LEGACY DATA CORRECTION: Modern format detected - no correction needed');
+        // Legacy data characteristics:
+        // - Missing modern metadata (capture_version, designer_offset)
+        // - OR explicitly marked as db_processed_views
+        const isLegacyData = isLegacyDbFormat || (missingCaptureVersion && missingDesignerOffset);
+
+        if (!isLegacyData) {
+            console.log('✅ LEGACY DATA CORRECTION: Modern format detected - no correction needed', {
+                reason: 'Has modern metadata',
+                hasCaptureVersion: !missingCaptureVersion,
+                hasDesignerOffset: !missingDesignerOffset
+            });
             return {
                 applied: false,
-                reason: 'Not legacy db_processed_views format',
+                reason: 'Modern format with complete metadata',
                 designData: designData // Return unchanged
             };
         }
 
-        console.log('🎯 LEGACY DATA CORRECTION: Legacy db_processed_views detected - applying data transformation...');
+        console.log('🎯 LEGACY DATA CORRECTION: Legacy data detected - applying data transformation...', {
+            isDbProcessedViews: isLegacyDbFormat,
+            missingCaptureVersion: missingCaptureVersion,
+            missingDesignerOffset: missingDesignerOffset,
+            detectionMethod: isLegacyDbFormat ? 'db_processed_views_marker' : 'missing_metadata'
+        });
 
         // STEP 2: Define the correction matrix (measured from Order 5378 analysis)
         const CORRECTION_MATRIX = {
