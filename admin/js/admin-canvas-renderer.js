@@ -444,6 +444,27 @@ class AdminCanvasRenderer {
      * @param {Object} designData - Design data with potential metadata.designer_offset
      */
     extractDesignerOffset(designData) {
+        // 🎯 SCENARIO A: Skip offset extraction for legacy data (already corrected)
+        // Detection logic must match applyLegacyDataCorrection() to ensure consistency
+        const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
+        const missingCaptureVersion = !designData.metadata?.capture_version;
+        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
+        const isLegacyData = isLegacyDbFormat || (missingCaptureVersion && missingDesignerOffset);
+
+        if (isLegacyData) {
+            this.designerOffset.x = 0;
+            this.designerOffset.y = 0;
+            this.designerOffset.detected = false;
+            this.designerOffset.source = 'scenario_a_legacy_skip';
+            console.log('🎯 SCENARIO A: Legacy data detected - skipping offset extraction', {
+                reason: 'Data already corrected by applyLegacyDataCorrection()',
+                isDbProcessedViews: isLegacyDbFormat,
+                missingCaptureVersion: missingCaptureVersion,
+                missingDesignerOffset: missingDesignerOffset
+            });
+            return;
+        }
+
         // Strategy 1: Check for explicit offset metadata (future-proof)
         if (designData.metadata && designData.metadata.designer_offset) {
             this.designerOffset.x = parseFloat(designData.metadata.designer_offset.x || 0);
