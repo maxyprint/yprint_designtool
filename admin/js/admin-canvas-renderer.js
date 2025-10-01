@@ -545,8 +545,8 @@ class AdminCanvasRenderer {
             const avgY = elements.reduce((sum, el) => sum + (el.top || el.y || 0), 0) / elements.length;
 
             // Heuristic: Common canvas size 1100×850 (responsive mode)
-            // If avgX > 400 (52% of 780), likely captured on larger canvas
-            if (avgX > 400 || avgY > 300) {
+            // If avgX > 350 (45% of 780), likely captured on larger canvas
+            if (avgX > 350 || avgY > 250) {
                 this.canvasScaling.originalDimensions = { width: 1100, height: 850 };
                 this.canvasScaling.scaleX = 780 / 1100; // 0.709
                 this.canvasScaling.scaleY = 580 / 850;  // 0.682
