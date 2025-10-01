@@ -82,20 +82,25 @@ class Octo_Print_Designer_Admin {
         $this->load_context_optimized_scripts($admin_context);
 
         wp_enqueue_media();
-        
+
+        // 🎯 AGENT 4: Hash-based bundle versioning for optimal browser caching
+        // Use file hash instead of rand() to enable proper cache invalidation
+        $vendor_bundle_hash = md5_file(OCTO_PRINT_DESIGNER_PATH . 'admin/js/dist/vendor.bundle.js');
+        $admin_bundle_hash = md5_file(OCTO_PRINT_DESIGNER_PATH . 'admin/js/dist/admin.bundle.js');
+
         wp_enqueue_script(
             'octo-print-designer-vendor',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/dist/vendor.bundle.js',
             [], // no dependencies for vendor
-            rand(),
+            $vendor_bundle_hash,
             true
         );
-        
+
         wp_enqueue_script(
             'octo-print-designer-admin',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/dist/admin.bundle.js',
             ['octo-print-designer-vendor'], // vendor bundle must load first
-            rand(),
+            $admin_bundle_hash,
             true
         );
 
@@ -1577,7 +1582,7 @@ class Octo_Print_Designer_Admin {
                             previewHtml += '<p style="margin: 8px 0 0 0; font-size: 12px; color: #555;">Die Design-Vorschau wird automatisch gerendert.</p>';
                             previewHtml += '</div>';
 
-                            previewHtml += '<div id="design-canvas-container-' + orderId + '" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 20px; text-align: center;">';
+                            previewHtml += '<div id="design-canvas-container-' + orderId + '" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 20px; text-align: left; min-height: 580px;">';
                             previewHtml += '<canvas id="design-preview-canvas-' + orderId + '" style="max-width: 100%; height: auto; border: 1px solid #e1e1e1;"></canvas>';
                             previewHtml += '<p style="margin-top: 15px; font-size: 12px; color: #666;">Canvas wird initialisiert...</p>';
                             previewHtml += '</div>';

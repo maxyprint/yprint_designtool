@@ -467,21 +467,47 @@ class AdminCanvasRenderer {
         // Strategy 3: Heuristic detection based on coordinate patterns
         // If all elements have suspiciously similar offset patterns, detect it
         const elements = designData.objects || designData.elements || [];
+        // Strategy 3: AGGRESSIVE HEURISTIC FOR LEGACY DATA
         if (elements.length > 0) {
-            // Analyze first few elements to detect systematic offset
-            const sampleSize = Math.min(3, elements.length);
+            const sampleSize = Math.min(5, elements.length);
             const samples = elements.slice(0, sampleSize);
-
-            // Check if coordinates are suspiciously high (likely offset added)
             const avgX = samples.reduce((sum, el) => sum + (el.x || el.left || 0), 0) / sampleSize;
             const avgY = samples.reduce((sum, el) => sum + (el.y || el.top || 0), 0) / sampleSize;
 
-            // Heuristic: If average position is in upper-left quadrant but far from origin,
-            // there might be a systematic offset (typical canvas centering adds 50-100px)
+            // Check if this is legacy data (no metadata)
+            const isLegacyData = !designData.metadata?.designer_offset &&
+                                 (designData.metadata?.source === 'db_processed_views' ||
+                                  !designData.metadata?.capture_version);
+
+            if (isLegacyData && (avgX > 350 || avgY > 200)) {
+                // Estimate offset based on typical canvas position (780×580)
+                // Elements centered at ~390 suggest ~60px offset from container
+                const estimatedOffsetX = Math.min(Math.max(avgX - 330, 0), 100);
+                const estimatedOffsetY = Math.min(Math.max(avgY - 165, 0), 80);
+
+                if (estimatedOffsetX > 20 || estimatedOffsetY > 20) {
+                    this.designerOffset.x = estimatedOffsetX;
+                    this.designerOffset.y = estimatedOffsetY;
+                    this.designerOffset.detected = true;
+                    this.designerOffset.source = 'heuristic_legacy_compensation';
+
+                    console.log('🎯 HIVE MIND: Legacy data detected - applying estimated offset compensation:', {
+                        isLegacyData,
+                        avgPosition: { x: avgX.toFixed(1), y: avgY.toFixed(1) },
+                        estimatedOffset: {
+                            x: estimatedOffsetX.toFixed(1),
+                            y: estimatedOffsetY.toFixed(1)
+                        },
+                        confidence: estimatedOffsetX > 40 || estimatedOffsetY > 40 ? 'HIGH' : 'MEDIUM'
+                    });
+                    return;
+                }
+            }
+
+            // If heuristic inconclusive, log for debugging
             if (avgX > 40 && avgX < 200 && avgY > 40 && avgY < 200) {
-                // Conservative estimate: Use typical canvas-container offset
-                this.designerOffset.x = 0; // Keep at 0 for now, needs more data
-                this.designerOffset.y = 0; // Keep at 0 for now, needs more data
+                this.designerOffset.x = 0;
+                this.designerOffset.y = 0;
                 this.designerOffset.detected = false;
                 this.designerOffset.source = 'heuristic_inconclusive';
                 console.log('🎯 HIVE MIND: Designer offset heuristic inconclusive:', {
@@ -2169,6 +2195,9 @@ class AdminCanvasRenderer {
         this.isRendering = true;
         const startTime = performance.now();
 
+        // 🎯 AGENT 6: Start performance monitoring
+        window.hiveMindMonitor?.startRender();
+
         console.log('🎯 AGENT 7 RENDERING PIPELINE: Starting integrated render...', designData);
 
         // 🎯 FIX 7: Update canvas dimensions from design data if provided
@@ -2352,6 +2381,10 @@ class AdminCanvasRenderer {
 
             // 🎯 AGENT 7: FINAL VALIDATION & QUALITY CHECK
             const qualityCheck = this.performQualityCheck(renderResults, designData, fidelityReport);
+
+            // 🎯 AGENT 6: End performance monitoring and record fidelity score
+            window.hiveMindMonitor?.endRender();
+            window.hiveMindMonitor?.recordFidelityScore(qualityCheck.fidelityScore);
 
             console.log('🎯 AGENT 7 RENDERING COMPLETE:', {
                 ...renderResults,

@@ -216,6 +216,15 @@
     margin-top: 15px;
 }
 
+/* ================================================
+   CANVAS CONTAINER FIXES - HIVE MIND DELIVERABLE
+   ================================================ */
+[id^="design-canvas-container-"] {
+    min-height: 580px !important;
+    text-align: left !important;
+    display: block;
+}
+
 .design-preview-content canvas {
     display: block;
     max-width: 100%;
