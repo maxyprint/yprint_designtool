@@ -466,7 +466,39 @@ class AdminCanvasRenderer {
 
         // Strategy 3: Heuristic detection based on coordinate patterns
         // If all elements have suspiciously similar offset patterns, detect it
-        const elements = designData.objects || designData.elements || [];
+
+        // Extract elements from various data structures
+        let elements = [];
+
+        // Try direct access first
+        if (designData.objects && Array.isArray(designData.objects)) {
+            elements = designData.objects;
+        } else if (designData.elements && Array.isArray(designData.elements)) {
+            elements = designData.elements;
+        }
+        // Try nested design_data structure (WooCommerce order format)
+        else if (designData.design_data && designData.design_data.design_elements) {
+            // Iterate through design_elements to find element_data
+            const designElements = designData.design_data.design_elements;
+            for (const itemKey in designElements) {
+                const item = designElements[itemKey];
+                if (item.element_data && item.element_data.objects) {
+                    elements = item.element_data.objects;
+                    break; // Use first item's objects
+                }
+            }
+        }
+
+        console.log('🎯 HIVE MIND DEBUG: Element extraction:', {
+            elementsFound: elements.length,
+            dataStructure: designData.objects ? 'direct.objects' :
+                           designData.elements ? 'direct.elements' :
+                           designData.design_data ? 'nested.design_elements' : 'unknown',
+            sampleElement: elements[0] ? {
+                left: elements[0].left,
+                top: elements[0].top
+            } : null
+        });
         // Strategy 3: AGGRESSIVE HEURISTIC FOR LEGACY DATA
         if (elements.length > 0) {
             const sampleSize = Math.min(5, elements.length);
@@ -474,10 +506,29 @@ class AdminCanvasRenderer {
             const avgX = samples.reduce((sum, el) => sum + (el.x || el.left || 0), 0) / sampleSize;
             const avgY = samples.reduce((sum, el) => sum + (el.y || el.top || 0), 0) / sampleSize;
 
+            console.log('🎯 HIVE MIND DEBUG: Heuristic calculation:', {
+                sampleSize,
+                avgX: avgX.toFixed(1),
+                avgY: avgY.toFixed(1),
+                sampleCoords: samples.map(el => ({
+                    x: el.x || el.left,
+                    y: el.y || el.top
+                }))
+            });
+
             // Check if this is legacy data (no metadata)
             const isLegacyData = !designData.metadata?.designer_offset &&
                                  (designData.metadata?.source === 'db_processed_views' ||
                                   !designData.metadata?.capture_version);
+
+            console.log('🎯 HIVE MIND DEBUG: Legacy data check:', {
+                isLegacyData,
+                hasDesignerOffset: !!designData.metadata?.designer_offset,
+                source: designData.metadata?.source,
+                captureVersion: designData.metadata?.capture_version,
+                avgXthreshold: avgX > 350,
+                avgYthreshold: avgY > 200
+            });
 
             if (isLegacyData && (avgX > 350 || avgY > 200)) {
                 // Estimate offset based on typical canvas position (780×580)
