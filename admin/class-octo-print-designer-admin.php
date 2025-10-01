@@ -1285,55 +1285,112 @@ class Octo_Print_Designer_Admin {
             return;
         }
 
-        // 🎨 DATA EXTRACTION: Design data from order meta
-        $design_data_raw = $order->get_meta('_design_data', true);
+        // 🔍 AGENT 7 FIX: Use comprehensive data extraction instead of simple meta check
+        $wc_integration = Octo_Print_Designer_WC_Integration::get_instance();
 
-        if (empty($design_data_raw)) {
-            error_log('⚠️ DESIGN PREVIEW: No design data found for order ' . $order_id);
-            wp_send_json_error([
-                'message' => 'No design data found for this order',
-                'code' => 'NO_DESIGN_DATA',
-                'order_id' => $order_id
-            ]);
-            return;
+        error_log('🔍 AGENT 7: Attempting comprehensive design data extraction for order ' . $order_id);
+
+        // Try comprehensive extraction first (handles both _design_data and _db_processed_views)
+        $extracted_data = $wc_integration->extract_design_data_with_canvas_metadata($order_id);
+
+        $design_data = null;
+        $mockup_url = null;
+
+        if ($extracted_data && is_array($extracted_data)) {
+            error_log('✅ AGENT 7: Successfully extracted design data via comprehensive method');
+
+            // Use extracted data for preview
+            $design_data = $extracted_data;
+
+            // Try to extract mockup URL from design elements
+            if (isset($extracted_data['design_elements']) && is_array($extracted_data['design_elements'])) {
+                foreach ($extracted_data['design_elements'] as $element) {
+                    if (isset($element['element_data']['backgroundImage'])) {
+                        $mockup_url = $element['element_data']['backgroundImage'];
+                        error_log('🔍 AGENT 7: Found mockup in design elements: ' . $mockup_url);
+                        break;
+                    }
+                }
+            }
+
+            // Fallback: Try order meta for mockup
+            if (!$mockup_url) {
+                $mockup_url = $order->get_meta('_mockup_image_url', true);
+                if ($mockup_url) {
+                    error_log('🔍 AGENT 7: Found mockup in order meta: ' . $mockup_url);
+                }
+            }
+
+        } else {
+            // Fallback to original method
+            error_log('⚠️ AGENT 7: Comprehensive extraction failed, trying direct meta access');
+
+            $design_data_raw = $order->get_meta('_design_data', true);
+
+            if (empty($design_data_raw)) {
+                error_log('❌ AGENT 7: No design data found in any source for order ' . $order_id);
+                wp_send_json_error([
+                    'message' => 'No design data found for this order',
+                    'code' => 'NO_DESIGN_DATA',
+                    'order_id' => $order_id
+                ]);
+                return;
+            }
+
+            error_log('🔍 AGENT 7: Raw design data type: ' . gettype($design_data_raw));
+
+            // Parse design data (may be stored as JSON string)
+            $design_data = is_string($design_data_raw) ? json_decode($design_data_raw, true) : $design_data_raw;
+
+            if (json_last_error() !== JSON_ERROR_NONE && is_string($design_data_raw)) {
+                error_log('❌ AGENT 7: Invalid JSON in design data - Error: ' . json_last_error_msg());
+                wp_send_json_error([
+                    'message' => 'Invalid design data format',
+                    'code' => 'INVALID_JSON',
+                    'json_error' => json_last_error_msg()
+                ]);
+                return;
+            }
+
+            $mockup_url = $order->get_meta('_mockup_image_url', true);
+            error_log('🔍 AGENT 7: Mockup URL from meta: ' . ($mockup_url ?: 'NOT FOUND'));
         }
 
-        // 🔍 DEBUG: Log raw design data structure
-        error_log('🔍 DESIGN PREVIEW: Raw design data type: ' . gettype($design_data_raw));
-
-        // Parse design data (may be stored as JSON string)
-        $design_data = is_string($design_data_raw) ? json_decode($design_data_raw, true) : $design_data_raw;
-
-        if (json_last_error() !== JSON_ERROR_NONE && is_string($design_data_raw)) {
-            error_log('❌ DESIGN PREVIEW: Invalid JSON in design data - Error: ' . json_last_error_msg());
-            wp_send_json_error([
-                'message' => 'Invalid design data format',
-                'code' => 'INVALID_JSON',
-                'json_error' => json_last_error_msg()
-            ]);
-            return;
-        }
-
-        // 🖼️ DATA EXTRACTION: Mockup image URL
-        $mockup_url = $order->get_meta('_mockup_image_url', true);
-
-        // 🔍 DEBUG: Log mockup URL
-        error_log('🔍 DESIGN PREVIEW: Mockup URL: ' . ($mockup_url ?: 'NOT FOUND'));
-
-        // 📐 DATA EXTRACTION: Canvas dimensions from design data
+        // 🔍 AGENT 7: Enhanced canvas dimension extraction with 3-tier fallback
         $canvas_dimensions = null;
-        if (isset($design_data['canvas']) && is_array($design_data['canvas'])) {
+
+        // Tier 1: From extracted data (design_elements)
+        if (isset($extracted_data['design_elements'])) {
+            foreach ($extracted_data['design_elements'] as $element) {
+                if (isset($element['element_data']['width']) && isset($element['element_data']['height'])) {
+                    $canvas_dimensions = [
+                        'width' => floatval($element['element_data']['width']),
+                        'height' => floatval($element['element_data']['height'])
+                    ];
+                    error_log('✅ AGENT 7: Canvas dimensions from extracted data - ' . $canvas_dimensions['width'] . 'x' . $canvas_dimensions['height']);
+                    break;
+                }
+            }
+        }
+
+        // Tier 2: From design_data['canvas'] if extracted data didn't have dimensions
+        if (!$canvas_dimensions && isset($design_data['canvas']) && is_array($design_data['canvas'])) {
             $canvas_dimensions = [
                 'width' => floatval($design_data['canvas']['width'] ?? 0),
                 'height' => floatval($design_data['canvas']['height'] ?? 0)
             ];
+            if ($canvas_dimensions['width'] > 0 && $canvas_dimensions['height'] > 0) {
+                error_log('✅ AGENT 7: Canvas dimensions from design_data - ' . $canvas_dimensions['width'] . 'x' . $canvas_dimensions['height']);
+            }
         }
 
-        // 🔍 DEBUG: Log canvas dimensions
-        if ($canvas_dimensions) {
-            error_log('🔍 DESIGN PREVIEW: Canvas dimensions - Width: ' . $canvas_dimensions['width'] . ', Height: ' . $canvas_dimensions['height']);
-        } else {
-            error_log('⚠️ DESIGN PREVIEW: No canvas dimensions found in design data');
+        // Tier 3: Default fallback
+        if (!$canvas_dimensions || $canvas_dimensions['width'] == 0 || $canvas_dimensions['height'] == 0) {
+            $canvas_dimensions = [
+                'width' => 780.0,
+                'height' => 580.0
+            ];
+            error_log('⚠️ AGENT 7: Using default canvas dimensions - 780x580');
         }
 
         // ✅ SUCCESS RESPONSE: Complete data structure

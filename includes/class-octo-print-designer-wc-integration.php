@@ -6662,28 +6662,58 @@ private function build_print_provider_email_content($order, $design_items, $note
      */
     public function has_design_data($order_id) {
         if (!$order_id) {
+            error_log('🔍 AGENT 7 has_design_data: Invalid order ID');
             return false;
         }
 
-        // Check for stored design data
+        error_log('🔍 AGENT 7 has_design_data: Checking order ' . $order_id);
+
+        // Check 1: Stored design data in post meta (legacy orders)
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
         if (!empty($stored_design_data)) {
-            return true;
+            // Validate it's not just whitespace or empty JSON
+            $trimmed = is_string($stored_design_data) ? trim($stored_design_data) : '';
+            if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
+                error_log('✅ AGENT 7 has_design_data: Found _design_data (post meta)');
+                return true;
+            } else {
+                error_log('⚠️ AGENT 7 has_design_data: _design_data exists but is empty/invalid');
+            }
+        } else {
+            error_log('🔍 AGENT 7 has_design_data: No _design_data in post meta');
         }
 
-        // Check for _db_processed_views in order items
+        // Check 2: Order-level meta (HPOS compatibility)
         $order = wc_get_order($order_id);
         if (!$order) {
+            error_log('❌ AGENT 7 has_design_data: Order not found');
             return false;
         }
 
-        foreach ($order->get_items() as $item) {
-            $processed_views = $item->get_meta('_db_processed_views');
-            if (!empty($processed_views)) {
+        $order_design_data = $order->get_meta('_design_data', true);
+        if (!empty($order_design_data) && is_string($order_design_data)) {
+            $trimmed = trim($order_design_data);
+            if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
+                error_log('✅ AGENT 7 has_design_data: Found _design_data (order meta)');
                 return true;
             }
         }
 
+        // Check 3: _db_processed_views in order items (legacy format)
+        foreach ($order->get_items() as $item_id => $item) {
+            $processed_views = $item->get_meta('_db_processed_views');
+            if (!empty($processed_views)) {
+                // Validate it's an array or serialized data
+                if (is_array($processed_views) || (is_string($processed_views) && strlen($processed_views) > 10)) {
+                    error_log('✅ AGENT 7 has_design_data: Found _db_processed_views in item ' . $item_id);
+                    return true;
+                } else {
+                    error_log('⚠️ AGENT 7 has_design_data: _db_processed_views exists but is invalid in item ' . $item_id);
+                }
+            }
+        }
+
+        error_log('❌ AGENT 7 has_design_data: No valid design data found for order ' . $order_id);
         return false;
     }
 }
