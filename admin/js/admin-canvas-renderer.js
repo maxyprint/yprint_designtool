@@ -467,52 +467,93 @@ class AdminCanvasRenderer {
         // Strategy 3: Heuristic detection based on coordinate patterns
         // If all elements have suspiciously similar offset patterns, detect it
 
+        // 🎯 DEBUG: Log incoming data structure
+        console.log('🎯 HIVE MIND DEBUG: extractDesignerOffset received data:', {
+            hasObjects: !!designData.objects,
+            hasElements: !!designData.elements,
+            hasDesignData: !!designData.design_data,
+            topLevelKeys: Object.keys(designData).slice(0, 5),
+            dataPreview: JSON.stringify(designData).substring(0, 200) + '...'
+        });
+
         // Extract elements from various data structures
         let elements = [];
+        let dataStructure = 'unknown';
 
-        // Try direct access first
+        // PATH 1: Try direct objects access first
         if (designData.objects && Array.isArray(designData.objects)) {
+            console.log('🎯 EXTRACTION PATH 1: Found designData.objects');
             elements = designData.objects;
-        } else if (designData.elements && Array.isArray(designData.elements)) {
-            elements = designData.elements;
+            dataStructure = 'direct.objects';
         }
-        // Try nested design_data structure (WooCommerce order format)
+        // PATH 2: Try direct elements access
+        else if (designData.elements && Array.isArray(designData.elements)) {
+            console.log('🎯 EXTRACTION PATH 2: Found designData.elements');
+            elements = designData.elements;
+            dataStructure = 'direct.elements';
+        }
+        // PATH 3: Try nested design_data structure (WooCommerce order format)
         else if (designData.design_data && designData.design_data.design_elements) {
+            console.log('🎯 EXTRACTION PATH 3: Found nested design_data.design_elements');
             // Iterate through design_elements to find element_data
             const designElements = designData.design_data.design_elements;
             for (const itemKey in designElements) {
+                console.log('🎯 PATH 3: Checking item:', itemKey);
                 const item = designElements[itemKey];
                 if (item.element_data && item.element_data.objects) {
+                    console.log('✅ PATH 3: Found objects in item', itemKey);
                     elements = item.element_data.objects;
+                    dataStructure = 'nested.design_elements';
                     break; // Use first item's objects
                 }
             }
         }
+        // PATH 4: Try view-based structure (transformed format)
+        else {
+            console.log('🎯 EXTRACTION PATH 4: Checking for view-based structure...');
+            const viewKeys = Object.keys(designData);
+            console.log('🎯 PATH 4: Top-level keys:', viewKeys);
 
-        console.log('🎯 HIVE MIND DEBUG: Element extraction:', {
+            if (viewKeys.length > 0) {
+                const firstViewKey = viewKeys[0];
+                const firstView = designData[firstViewKey];
+
+                console.log('🎯 PATH 4: Checking first view:', firstViewKey, {
+                    hasImages: !!firstView?.images,
+                    isArray: Array.isArray(firstView?.images)
+                });
+
+                if (firstView && firstView.images && Array.isArray(firstView.images)) {
+                    console.log('✅ PATH 4: Found view-based images array');
+                    elements = firstView.images;
+                    dataStructure = 'view.images';
+                }
+            }
+        }
+
+        console.log('🎯 HIVE MIND DEBUG: Element extraction result:', {
             elementsFound: elements.length,
-            dataStructure: designData.objects ? 'direct.objects' :
-                           designData.elements ? 'direct.elements' :
-                           designData.design_data ? 'nested.design_elements' : 'unknown',
+            dataStructure: dataStructure,
             sampleElement: elements[0] ? {
-                left: elements[0].left,
-                top: elements[0].top
+                left: elements[0].left || elements[0].transform?.left,
+                top: elements[0].top || elements[0].transform?.top
             } : null
         });
         // Strategy 3: AGGRESSIVE HEURISTIC FOR LEGACY DATA
         if (elements.length > 0) {
             const sampleSize = Math.min(5, elements.length);
             const samples = elements.slice(0, sampleSize);
-            const avgX = samples.reduce((sum, el) => sum + (el.x || el.left || 0), 0) / sampleSize;
-            const avgY = samples.reduce((sum, el) => sum + (el.y || el.top || 0), 0) / sampleSize;
+            // Support both direct coordinates and transform object
+            const avgX = samples.reduce((sum, el) => sum + (el.x || el.left || el.transform?.left || 0), 0) / sampleSize;
+            const avgY = samples.reduce((sum, el) => sum + (el.y || el.top || el.transform?.top || 0), 0) / sampleSize;
 
             console.log('🎯 HIVE MIND DEBUG: Heuristic calculation:', {
                 sampleSize,
                 avgX: avgX.toFixed(1),
                 avgY: avgY.toFixed(1),
                 sampleCoords: samples.map(el => ({
-                    x: el.x || el.left,
-                    y: el.y || el.top
+                    x: el.x || el.left || el.transform?.left,
+                    y: el.y || el.top || el.transform?.top
                 }))
             });
 
