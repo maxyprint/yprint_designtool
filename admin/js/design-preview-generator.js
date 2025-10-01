@@ -814,31 +814,9 @@ class DesignPreviewGenerator {
             return null;
         }
 
-        // 🎯 AGENT 8: Transform design_elements wrapper format
-        if (designData.design_elements && typeof designData.design_elements === 'object') {
-            console.log('🎯 AGENT 8: Transforming design_elements wrapper...');
-
-            const elements = Object.values(designData.design_elements);
-            const firstElement = elements[0];
-
-            if (firstElement && firstElement.element_data) {
-                console.log('✅ AGENT 8: Extracted element_data from design_elements');
-                designData = firstElement.element_data;
-
-                // Log transformation details
-                console.log('🎯 AGENT 8: Transformed structure:', {
-                    hasObjects: !!designData.objects,
-                    hasBackground: !!designData.background,
-                    hasCanvas: !!designData.canvas
-                });
-            } else {
-                console.error('❌ AGENT 8: design_elements found but no valid element_data');
-                return null;
-            }
-        }
-
-        // 🎯 AGENT 4: ORDER RESPONSE WRAPPER HANDLING
+        // 🎯 AGENT 4: ORDER RESPONSE WRAPPER HANDLING (MUST BE FIRST!)
         // Check if data is wrapped in WooCommerce order response format
+        // This unwraps the outer layer to expose inner wrappers like design_elements
         let orderMetadata = null;
         let canvasDimensionsFromOrder = null;
 
@@ -869,9 +847,38 @@ class DesignPreviewGenerator {
 
             // Extract nested design data
             designData = designData.design_data;
+            console.log('🎯 AGENT 4: Unwrapped order wrapper, checking inner structure...', {
+                hasDesignElements: !!designData.design_elements,
+                hasObjects: !!designData.objects,
+                hasImages: !!Object.keys(designData)[0] && !!designData[Object.keys(designData)[0]]?.images
+            });
 
             if (!designData || typeof designData !== 'object') {
                 console.error('❌ AGENT 4: Order response contains invalid nested design_data');
+                return null;
+            }
+        }
+
+        // 🎯 AGENT 8: Transform design_elements wrapper format (AFTER ORDER UNWRAP!)
+        // Now that order wrapper is unwrapped, design_elements is accessible at root level
+        if (designData.design_elements && typeof designData.design_elements === 'object') {
+            console.log('🎯 AGENT 8: Transforming design_elements wrapper...');
+
+            const elements = Object.values(designData.design_elements);
+            const firstElement = elements[0];
+
+            if (firstElement && firstElement.element_data) {
+                console.log('✅ AGENT 8: Extracted element_data from design_elements');
+                designData = firstElement.element_data;
+
+                // Log transformation details
+                console.log('🎯 AGENT 8: Transformed structure:', {
+                    hasObjects: !!designData.objects,
+                    hasBackground: !!designData.background,
+                    hasCanvas: !!designData.canvas
+                });
+            } else {
+                console.error('❌ AGENT 8: design_elements found but no valid element_data');
                 return null;
             }
         }
