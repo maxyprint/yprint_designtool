@@ -562,18 +562,18 @@ class AdminCanvasRenderer {
                                  (designData.metadata?.source === 'db_processed_views' ||
                                   !designData.metadata?.capture_version);
 
-            console.log('🎯 HIVE MIND DEBUG: Legacy data check:', {
-                isLegacyData,
-                hasDesignerOffset: !!designData.metadata?.designer_offset,
-                source: designData.metadata?.source,
-                captureVersion: designData.metadata?.capture_version,
-                avgXthreshold: avgX > 350,
-                avgYthreshold: avgY > 200
-            });
-
             // 🎯 HIVE MIND FIX: Smart threshold based on element count
             const xThreshold = elements.length === 1 ? 380 : 400;
             const yThreshold = elements.length === 1 ? 180 : 200;
+
+            console.log('🎯 HIVE MIND: Legacy offset detection:', {
+                isLegacyData,
+                elementCount: elements.length,
+                thresholds: { x: xThreshold, y: yThreshold },
+                avgPosition: { x: avgX.toFixed(1), y: avgY.toFixed(1) },
+                willTrigger: avgX > xThreshold || avgY > yThreshold,
+                source: designData.metadata?.source
+            });
 
             if (isLegacyData && (avgX > xThreshold || avgY > yThreshold)) {
                 // Estimate offset based on typical canvas position (780×580)
