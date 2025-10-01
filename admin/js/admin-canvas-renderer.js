@@ -571,7 +571,11 @@ class AdminCanvasRenderer {
                 avgYthreshold: avgY > 200
             });
 
-            if (isLegacyData && (avgX > 350 || avgY > 200)) {
+            // 🎯 HIVE MIND FIX: Smart threshold based on element count
+            const xThreshold = elements.length === 1 ? 380 : 400;
+            const yThreshold = elements.length === 1 ? 180 : 200;
+
+            if (isLegacyData && (avgX > xThreshold || avgY > yThreshold)) {
                 // Estimate offset based on typical canvas position (780×580)
                 // Elements centered at ~390 suggest ~60px offset from container
                 const estimatedOffsetX = Math.min(Math.max(avgX - 330, 0), 100);
@@ -583,8 +587,10 @@ class AdminCanvasRenderer {
                     this.designerOffset.detected = true;
                     this.designerOffset.source = 'heuristic_legacy_compensation';
 
-                    console.log('🎯 HIVE MIND: Legacy data detected - applying estimated offset compensation:', {
+                    console.log('🎯 HIVE MIND: Legacy offset detected:', {
                         isLegacyData,
+                        elementCount: elements.length,
+                        thresholds: { x: xThreshold, y: yThreshold },
                         avgPosition: { x: avgX.toFixed(1), y: avgY.toFixed(1) },
                         estimatedOffset: {
                             x: estimatedOffsetX.toFixed(1),
