@@ -540,26 +540,71 @@ class AdminCanvasRenderer {
         // Strategy 2: Heuristic detection for legacy data
         const elements = designData.objects || designData.elements || [];
         if (elements.length > 0) {
-            // Calculate average position - if unusually high, likely larger canvas
-            const avgX = elements.reduce((sum, el) => sum + (el.left || el.x || 0), 0) / elements.length;
-            const avgY = elements.reduce((sum, el) => sum + (el.top || el.y || 0), 0) / elements.length;
+            // Multi-strategy heuristic detection for canvas size
+            // Strategy 2a: Analyze element bounds (max X/Y values)
+            let maxX = 0, maxY = 0;
+            let avgX = 0, avgY = 0;
+
+            for (const el of elements) {
+                const x = el.left || el.x || 0;
+                const y = el.top || el.y || 0;
+                const width = (el.width || 0) * (el.scaleX || 1);
+                const height = (el.height || 0) * (el.scaleY || 1);
+
+                maxX = Math.max(maxX, x + width);
+                maxY = Math.max(maxY, y + height);
+                avgX += x;
+                avgY += y;
+            }
+
+            avgX /= elements.length;
+            avgY /= elements.length;
+
+            // Strategy 2b: Check coordinate density patterns
+            // Count elements in different quadrants to determine likely canvas size
+            let confidence = 0;
+            let estimatedWidth = this.canvasWidth;
+            let estimatedHeight = this.canvasHeight;
 
             // Heuristic: Common canvas size 1100×850 (responsive mode)
-            // If avgX > 350 (45% of 780), likely captured on larger canvas
-            if (avgX > 350 || avgY > 250) {
-                this.canvasScaling.originalDimensions = { width: 1100, height: 850 };
-                this.canvasScaling.scaleX = 780 / 1100; // 0.709
-                this.canvasScaling.scaleY = 580 / 850;  // 0.682
+            // Multiple detection criteria for higher confidence
+            const criteria = {
+                avgPositionHigh: avgX > 350 || avgY > 250,  // Average position suggests larger canvas
+                maxBoundsExceed: maxX > 780 || maxY > 580,  // Element bounds exceed current canvas
+                coordinateDensity: avgX > 400 || avgY > 300 // High coordinate values (50%+ of 780/580)
+            };
+
+            // Calculate confidence score
+            if (criteria.maxBoundsExceed) confidence += 0.9;  // Strong indicator
+            if (criteria.coordinateDensity) confidence += 0.6; // Medium indicator
+            if (criteria.avgPositionHigh) confidence += 0.4;   // Weak indicator
+
+            // If confidence > 0.5, assume larger canvas (1100×850)
+            if (confidence > 0.5) {
+                estimatedWidth = 1100;
+                estimatedHeight = 850;
+                this.canvasScaling.originalDimensions = { width: estimatedWidth, height: estimatedHeight };
+
+                // 🎯 BUG FIX: BIDIRECTIONAL SCALING
+                // Old logic: Always scale DOWN (780/1100 = 0.709)
+                // New logic: Dynamic scaling based on current vs original
+                this.canvasScaling.scaleX = this.canvasWidth / estimatedWidth;  // Could be UP or DOWN
+                this.canvasScaling.scaleY = this.canvasHeight / estimatedHeight;
                 this.canvasScaling.detected = true;
                 this.canvasScaling.source = 'heuristic';
 
-                console.log('🎯 CANVAS SCALING: Heuristic detection suggests larger canvas:', {
-                    avgPosition: `${avgX.toFixed(0)}, ${avgY.toFixed(0)}`,
-                    estimatedOriginal: '1100×850',
-                    current: '780×580',
+                console.log('🎯 CANVAS SCALING: Heuristic detection suggests different canvas size:', {
+                    analysis: {
+                        avgPosition: `${avgX.toFixed(0)}, ${avgY.toFixed(0)}`,
+                        maxBounds: `${maxX.toFixed(0)}, ${maxY.toFixed(0)}`,
+                        criteria: criteria,
+                        confidence: confidence.toFixed(2)
+                    },
+                    estimatedOriginal: `${estimatedWidth}×${estimatedHeight}`,
+                    current: `${this.canvasWidth}×${this.canvasHeight}`,
                     scaleX: this.canvasScaling.scaleX.toFixed(3),
                     scaleY: this.canvasScaling.scaleY.toFixed(3),
-                    confidence: 'medium'
+                    direction: this.canvasScaling.scaleX > 1 ? 'SCALE UP' : 'SCALE DOWN'
                 });
                 return;
             }
@@ -1373,7 +1418,13 @@ class AdminCanvasRenderer {
 
             // 🎯 AGENT 5: Font properties with defaults
             const fontFamily = textData.fontFamily || 'Arial, sans-serif';
-            const fontSize = (textData.fontSize || 16) * scaleY; // Scale font size
+            let fontSize = (textData.fontSize || 16) * scaleY; // Scale font size
+
+            // 🎯 CANVAS SCALING: Apply dimension scaling to font size
+            if (this.canvasScaling.detected) {
+                fontSize = fontSize * this.canvasScaling.scaleY;
+            }
+
             const fontWeight = textData.fontWeight || 'normal';
             const fontStyle = textData.fontStyle || 'normal';
             const textAlign = textData.textAlign || 'left';
@@ -1385,9 +1436,22 @@ class AdminCanvasRenderer {
 
             // 🎯 AGENT 5: Apply coordinate preservation (no transformation)
             // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
-            const position = this.coordinatePreservation.noTransformMode
-                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
-                : this.preserveCoordinates(left, top);
+            // 🎯 CANVAS SCALING: Apply dimension scaling compensation
+            let position;
+            if (this.coordinatePreservation.noTransformMode) {
+                let x = left - this.designerOffset.x;
+                let y = top - this.designerOffset.y;
+
+                // Apply canvas dimension scaling
+                if (this.canvasScaling.detected) {
+                    x = x * this.canvasScaling.scaleX;
+                    y = y * this.canvasScaling.scaleY;
+                }
+
+                position = { x, y };
+            } else {
+                position = this.preserveCoordinates(left, top);
+            }
 
             // 🎯 AGENT 5: Load font if web font
             if (this.textRenderer.fontLoadingSupport && fontFamily !== 'Arial, sans-serif') {
@@ -1404,8 +1468,17 @@ class AdminCanvasRenderer {
                 this.ctx.rotate(angle);
             }
 
-            // Apply scaling
-            this.ctx.scale(scaleX, scaleY);
+            // Apply scaling with canvas dimension scaling
+            let finalScaleX = scaleX;
+            let finalScaleY = scaleY;
+
+            // 🎯 CANVAS SCALING: Apply dimension scaling to element scale
+            if (this.canvasScaling.detected) {
+                finalScaleX = scaleX * this.canvasScaling.scaleX;
+                finalScaleY = scaleY * this.canvasScaling.scaleY;
+            }
+
+            this.ctx.scale(finalScaleX, finalScaleY);
 
             // 🎯 AGENT 5: Set font properties
             this.ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -1551,13 +1624,32 @@ class AdminCanvasRenderer {
 
             // 🎯 AGENT 6: Apply coordinate preservation (no transformation)
             // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
-            const position = this.coordinatePreservation.noTransformMode
-                ? { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
-                : this.preserveCoordinates(left, top);
+            // 🎯 CANVAS SCALING: Apply dimension scaling compensation
+            let position;
+            if (this.coordinatePreservation.noTransformMode) {
+                let x = left - this.designerOffset.x;
+                let y = top - this.designerOffset.y;
+
+                // Apply canvas dimension scaling
+                if (this.canvasScaling.detected) {
+                    x = x * this.canvasScaling.scaleX;
+                    y = y * this.canvasScaling.scaleY;
+                }
+
+                position = { x, y };
+            } else {
+                position = this.preserveCoordinates(left, top);
+            }
 
             // 🎯 AGENT 6: Calculate exact dimensions with preserved scaling
-            const displayWidth = width * scaleX;
-            const displayHeight = height * scaleY;
+            // 🎯 CANVAS SCALING: Apply dimension scaling to display size
+            let displayWidth = width * scaleX;
+            let displayHeight = height * scaleY;
+
+            if (this.canvasScaling.detected) {
+                displayWidth = displayWidth * this.canvasScaling.scaleX;
+                displayHeight = displayHeight * this.canvasScaling.scaleY;
+            }
 
             // Save context state
             this.ctx.save();
