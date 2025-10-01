@@ -39,7 +39,7 @@ $test_design_data = [
 $test_order_id = 5374;
 
 // Initialize the WooCommerce integration class
-$wc_integration = new Octo_Print_Designer_WC_Integration();
+$wc_integration = Octo_Print_Designer_WC_Integration::get_instance();
 
 echo "1. TESTING generateAgent3CanvasScript() Method\n";
 echo "============================================\n";

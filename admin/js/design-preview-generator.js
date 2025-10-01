@@ -318,6 +318,25 @@ class DesignPreviewGenerator {
             result.needsTransformation = false;
         }
 
+        // 🎯 AGENT 3: DESIGN_ELEMENTS FORMAT DETECTION
+        // Check for design_elements format (from WC order extraction)
+        if (designData.design_elements && typeof designData.design_elements === 'object') {
+            result.detectedStructures.push('design_elements_wrapper');
+
+            // Check if at least one element has element_data
+            const elements = Object.values(designData.design_elements);
+            const hasValidElement = elements.some(el => el && el.element_data);
+
+            if (hasValidElement) {
+                result.format = 'design_elements_wrapper';
+                result.isCompatible = true;
+                result.needsTransformation = true;
+                console.log('🎯 AGENT 8: design_elements format detected, will transform');
+            } else {
+                result.compatibilityErrors.push('design_elements found but no valid element_data');
+            }
+        }
+
         // Set compatibility based on transformation capability
         if (result.needsTransformation && result.compatibilityErrors.length === 0) {
             result.isCompatible = true;
@@ -793,6 +812,29 @@ class DesignPreviewGenerator {
         if (!designData || typeof designData !== 'object') {
             console.error('❌ AGENT 3: Invalid design data for transformation');
             return null;
+        }
+
+        // 🎯 AGENT 8: Transform design_elements wrapper format
+        if (designData.design_elements && typeof designData.design_elements === 'object') {
+            console.log('🎯 AGENT 8: Transforming design_elements wrapper...');
+
+            const elements = Object.values(designData.design_elements);
+            const firstElement = elements[0];
+
+            if (firstElement && firstElement.element_data) {
+                console.log('✅ AGENT 8: Extracted element_data from design_elements');
+                designData = firstElement.element_data;
+
+                // Log transformation details
+                console.log('🎯 AGENT 8: Transformed structure:', {
+                    hasObjects: !!designData.objects,
+                    hasBackground: !!designData.background,
+                    hasCanvas: !!designData.canvas
+                });
+            } else {
+                console.error('❌ AGENT 8: design_elements found but no valid element_data');
+                return null;
+            }
         }
 
         // 🎯 AGENT 4: ORDER RESPONSE WRAPPER HANDLING
