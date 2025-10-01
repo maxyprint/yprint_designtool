@@ -1,5 +1,27 @@
 # Changelog - Hive Mind Fixes
 
+## [1.2.0] - 2025-10-01
+
+### 🎯 Critical Fixes
+
+#### Heuristic Threshold Adjustment - False Positive Prevention
+- **Problem:** Legacy canvas scaling heuristic had overly aggressive thresholds causing false positives on modern designs
+- **Root Cause:**
+  - Initial threshold: avgX > 350 OR avgY > 250 (too low)
+  - Modern single-element designs (avgX ~367) incorrectly flagged as legacy
+  - Applied unnecessary scaling to already-correct coordinates
+- **Solution:** Smart threshold based on element count
+  - Single element: xThreshold=380, yThreshold=180 (stricter)
+  - Multiple elements: xThreshold=400, yThreshold=200 (standard)
+  - Prevents false positives while catching genuine legacy data
+- **Files:** `admin/js/admin-canvas-renderer.js` (Lines 574-578)
+- **Impact:** Order 5376+ render correctly without false-positive scaling
+
+**Commit:** c0788d0 - Initial threshold lowering (350/250)
+**Commit:** 8e6691f - Smart threshold implementation (element-count based)
+
+---
+
 ## [1.1.0] - 2025-10-01
 
 ### 🎯 Major Fixes
