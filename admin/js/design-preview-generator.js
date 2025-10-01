@@ -469,13 +469,20 @@ class DesignPreviewGenerator {
                 console.warn('⚠️ AGENT 7 PREVIEW WARNINGS:', validation.warnings);
             }
 
-            // 🎯 AGENT 7: Prepare integrated rendering options
+            // 🎯 AGENT 7 + FIX 7: Prepare integrated rendering options with canvas dimensions
             const renderOptions = {
                 ...options,
                 enableValidation: this.integrationSystem.validationEnabled,
                 coordinateValidation: this.integrationSystem.coordinateValidation,
-                performanceMonitoring: this.integrationSystem.performanceMonitoring
+                performanceMonitoring: this.integrationSystem.performanceMonitoring,
+                // 🎯 FIX 7: Pass original canvas dimensions for coordinate space alignment
+                canvasDimensions: {
+                    width: transformedData.canvas?.width || designData.canvas?.width || 780,
+                    height: transformedData.canvas?.height || designData.canvas?.height || 580
+                }
             };
+
+            console.log('🎯 FIX 7: Canvas dimensions for rendering:', renderOptions.canvasDimensions);
 
             // 🎯 AGENT 7: Execute integrated rendering pipeline
             console.log('🎯 AGENT 7: Executing 7-agent rendering pipeline...');

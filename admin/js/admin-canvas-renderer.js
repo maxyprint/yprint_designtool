@@ -108,9 +108,31 @@ class AdminCanvasRenderer {
      * Initialize the canvas renderer
      * @param {string} containerId - ID of the container element
      * @param {Object} options - Rendering options
+     * @param {Object} options.canvasDimensions - Original canvas dimensions {width, height}
      */
     init(containerId, options = {}) {
         console.log('🎨 ADMIN RENDERER: Initializing canvas renderer...');
+
+        // 🎯 FIX 7: Dynamic Canvas Dimension Detection
+        // Use actual canvas dimensions from design_data to ensure coordinate space alignment
+        if (options.canvasDimensions) {
+            const originalWidth = options.canvasDimensions.width;
+            const originalHeight = options.canvasDimensions.height;
+
+            if (originalWidth && originalHeight && originalWidth > 0 && originalHeight > 0) {
+                this.storedCanvasWidth = this.canvasWidth; // Store default for scaling calculation
+                this.storedCanvasHeight = this.canvasHeight;
+                this.canvasWidth = originalWidth;
+                this.canvasHeight = originalHeight;
+
+                console.log(`🎯 FIX 7: Using canvas dimensions from design data: ${originalWidth}×${originalHeight}`);
+                console.log(`🎯 FIX 7: Previous default was: ${this.storedCanvasWidth}×${this.storedCanvasHeight}`);
+
+                // Update dimension preservation tracking
+                this.dimensionPreservation.originalWidth = originalWidth;
+                this.dimensionPreservation.originalHeight = originalHeight;
+            }
+        }
 
         const container = document.getElementById(containerId);
         if (!container) {
@@ -1830,6 +1852,28 @@ class AdminCanvasRenderer {
 
         console.log('🎯 AGENT 7 RENDERING PIPELINE: Starting integrated render...', designData);
 
+        // 🎯 FIX 7: Update canvas dimensions from design data if provided
+        if (options.canvasDimensions) {
+            const { width, height } = options.canvasDimensions;
+            if (width && height && width > 0 && height > 0) {
+                if (this.canvasWidth !== width || this.canvasHeight !== height) {
+                    console.log(`🎯 FIX 7: Updating canvas dimensions from ${this.canvasWidth}×${this.canvasHeight} to ${width}×${height}`);
+                    this.canvasWidth = width;
+                    this.canvasHeight = height;
+                    this.dimensionPreservation.originalWidth = width;
+                    this.dimensionPreservation.originalHeight = height;
+
+                    // Recalculate scale factors for display
+                    const displayWidth = parseInt(this.canvas.style.width) || width;
+                    const displayHeight = parseInt(this.canvas.style.height) || height;
+                    this.scaleX = displayWidth / this.canvasWidth;
+                    this.scaleY = displayHeight / this.canvasHeight;
+
+                    console.log(`🎯 FIX 7: Updated scale factors: scaleX=${this.scaleX.toFixed(4)}, scaleY=${this.scaleY.toFixed(4)}`);
+                }
+            }
+        }
+
         // 🎯 AGENT 8: Reset rendering statistics for new render
         this.renderingStatistics = {
             renderedObjects: [],
@@ -2414,32 +2458,72 @@ class DesignFidelityComparator {
     }
 
     /**
-     * 🎯 AGENT 2: BACKGROUND STATE CAPTURE
-     * Capture background rendering state by sampling canvas pixels
+     * 🎯 AGENT 2 + FIX 5: BACKGROUND STATE CAPTURE (Multi-Region Sampling)
+     * Capture background rendering state by sampling multiple canvas regions
+     * Samples 5 regions (corners + center) to avoid false positives from logos positioned away from origin
      * @param {HTMLCanvasElement} canvas - Canvas element
-     * @returns {Object} Background state
+     * @returns {Object} Background state with region details
      */
     captureBackgroundState(canvas) {
         const ctx = canvas.getContext('2d');
-        const sampleWidth = Math.min(canvas.width, 10);
-        const sampleHeight = Math.min(canvas.height, 10);
-        const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+        const sampleSize = 20; // Sample 20×20 pixels per region
 
-        let whitePixelCount = 0;
-        for (let i = 0; i < imageData.data.length; i += 4) {
-            const r = imageData.data[i];
-            const g = imageData.data[i + 1];
-            const b = imageData.data[i + 2];
-            if (r > 250 && g > 250 && b > 250) whitePixelCount++;
-        }
+        // Define 5 sampling regions: corners + center
+        const regions = [
+            { x: 0, y: 0, name: 'top-left' }, // Top-left corner
+            { x: canvas.width - sampleSize, y: 0, name: 'top-right' }, // Top-right corner
+            { x: Math.floor((canvas.width - sampleSize) / 2), y: Math.floor((canvas.height - sampleSize) / 2), name: 'center' }, // Center
+            { x: 0, y: canvas.height - sampleSize, name: 'bottom-left' }, // Bottom-left corner
+            { x: canvas.width - sampleSize, y: canvas.height - sampleSize, name: 'bottom-right' } // Bottom-right corner
+        ];
 
-        const totalPixels = imageData.data.length / 4;
-        const whitePercentage = (whitePixelCount / totalPixels) * 100;
+        let totalWhitePixels = 0;
+        let totalSampledPixels = 0;
+        const regionResults = [];
+
+        regions.forEach(region => {
+            // Ensure sampling region is within canvas bounds
+            const x = Math.max(0, Math.min(region.x, canvas.width - sampleSize));
+            const y = Math.max(0, Math.min(region.y, canvas.height - sampleSize));
+            const width = Math.min(sampleSize, canvas.width - x);
+            const height = Math.min(sampleSize, canvas.height - y);
+
+            const imageData = ctx.getImageData(x, y, width, height);
+            let whitePixelCount = 0;
+
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const r = imageData.data[i];
+                const g = imageData.data[i + 1];
+                const b = imageData.data[i + 2];
+                if (r > 250 && g > 250 && b > 250) whitePixelCount++;
+            }
+
+            const regionPixels = imageData.data.length / 4;
+            const regionWhitePercentage = (whitePixelCount / regionPixels) * 100;
+
+            regionResults.push({
+                region: region.name,
+                whitePercentage: regionWhitePercentage.toFixed(1),
+                hasContent: regionWhitePercentage < 95
+            });
+
+            totalWhitePixels += whitePixelCount;
+            totalSampledPixels += regionPixels;
+        });
+
+        const overallWhitePercentage = (totalWhitePixels / totalSampledPixels) * 100;
+        const hasContent = regionResults.some(r => r.hasContent);
 
         return {
-            loaded: whitePercentage < 90,
-            whitePercentage: whitePercentage,
-            isEmpty: whitePercentage > 95
+            loaded: hasContent,
+            whitePercentage: overallWhitePercentage,
+            isEmpty: !hasContent,
+            regionDetails: regionResults,
+            samplingInfo: {
+                regionsChecked: regions.length,
+                sampleSize: `${sampleSize}×${sampleSize}px`,
+                totalPixelsSampled: totalSampledPixels
+            }
         };
     }
 
