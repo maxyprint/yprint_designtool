@@ -92,3 +92,12 @@ function run_octo_print_designer() {
 
 }
 run_octo_print_designer();
+
+/**
+ * Load WP-CLI commands if WP-CLI is available
+ *
+ * @since 3.0.0
+ */
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	require_once plugin_dir_path( __FILE__ ) . 'includes/cli/class-design-data-migration-command.php';
+}
