@@ -2313,6 +2313,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $storage_start = microtime(true);
                 $json_string = json_encode($design_data_json);
 
+                // HPOS FIX: Use $order->update_meta_data() instead of update_post_meta()
                 // Compress large JSON data for storage efficiency
                 if (strlen($json_string) > 10000) { // 10KB threshold
                     $compressed = gzcompress($json_string, 6);
@@ -2320,14 +2321,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                         error_log(sprintf("📊 [DB OPTIMIZER] Compressed design data: %d -> %d bytes (%.1f%% reduction)",
                             strlen($json_string), strlen($compressed),
                             (1 - strlen($compressed) / strlen($json_string)) * 100));
-                        $meta_result = update_post_meta($order_id, '_design_data_compressed', base64_encode($compressed));
+                        $order->update_meta_data('_design_data_compressed', base64_encode($compressed));
                         // Keep uncompressed for compatibility
-                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                        $order->update_meta_data('_design_data', wp_slash($json_string));
+                        $meta_result = $order->save();
                     } else {
-                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                        $order->update_meta_data('_design_data', wp_slash($json_string));
+                        $meta_result = $order->save();
                     }
                 } else {
-                    $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                    $order->update_meta_data('_design_data', wp_slash($json_string));
+                    $meta_result = $order->save();
                 }
 
                 $storage_time = (microtime(true) - $storage_start) * 1000;
@@ -2493,9 +2497,10 @@ private function build_print_provider_email_content($order, $design_items, $note
             true
         );
         
+        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // 🧠 DATABASE OPTIMIZER: Performance-optimized metadata retrieval
         $retrieval_start = microtime(true);
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $stored_design_data = $order->get_meta('_design_data', true);
         $retrieval_time = (microtime(true) - $retrieval_start) * 1000;
 
         if ($stored_design_data) {
@@ -3323,8 +3328,9 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         // Continuing with button render
 
+        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // Check if stored design data exists (check both _design_data and _db_processed_views)
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $stored_design_data = $order->get_meta('_design_data', true);
         $db_processed_views = null;
         $all_meta_debug = [];
 
@@ -4969,8 +4975,9 @@ private function build_print_provider_email_content($order, $design_items, $note
         // 🐛 DEBUG: Order validation and initial data check
         error_log("✅ [AJAX DEBUG] Order #{$order_id} found successfully");
 
+        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // Get stored design data
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        $stored_design_data = $order->get_meta('_design_data', true);
         $design_data = null;
 
         // 🐛 DEBUG: Analyze available data sources
@@ -6745,7 +6752,8 @@ private function build_print_provider_email_content($order, $design_items, $note
         $precision_calculator = new PrecisionCalculator();
 
         // Check for direct design data storage
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
+        $stored_design_data = $order->get_meta('_design_data', true);
         $extracted_data = [];
 
         if ($stored_design_data) {
