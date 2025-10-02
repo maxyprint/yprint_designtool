@@ -1099,19 +1099,33 @@ class AdminCanvasRenderer {
      * @version 2.0.0 (Data Correction Approach - October 2025)
      */
     applyLegacyDataCorrection(designData) {
+        // 🎯 FIX: Extract metadata from view wrapper if present (same logic as classifyDataFormat)
+        let metadata = designData.metadata;
+
+        // Check if data is in view-wrapper format (e.g., hive_mind_view)
+        if (!metadata) {
+            const viewKeys = Object.keys(designData).filter(k =>
+                designData[k] && typeof designData[k] === 'object' && designData[k].images
+            );
+            if (viewKeys.length > 0) {
+                metadata = designData[viewKeys[0]].metadata;
+                console.log('🔍 LEGACY CORRECTION: Extracted metadata from view wrapper:', viewKeys[0]);
+            }
+        }
+
         console.log('🔍 LEGACY DATA CORRECTION: Analyzing design data...', {
-            hasMetadata: !!designData.metadata,
-            metadataSource: designData.metadata?.source,
-            hasCaptureVersion: !!designData.metadata?.capture_version,
-            hasDesignerOffset: designData.metadata?.designer_offset !== undefined,
+            hasMetadata: !!metadata,
+            metadataSource: metadata?.source,
+            hasCaptureVersion: !!metadata?.capture_version,
+            hasDesignerOffset: metadata?.designer_offset !== undefined,
             topLevelKeys: Object.keys(designData).slice(0, 5)
         });
 
         // STEP 1: Detect if this is problematic legacy data
         // Multiple detection methods for robustness
-        const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
-        const missingCaptureVersion = !designData.metadata?.capture_version;
-        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
+        const isLegacyDbFormat = metadata?.source === 'db_processed_views';
+        const missingCaptureVersion = !metadata?.capture_version;
+        const missingDesignerOffset = metadata?.designer_offset === undefined;
 
         // Legacy data characteristics:
         // - Missing modern metadata (capture_version, designer_offset)
