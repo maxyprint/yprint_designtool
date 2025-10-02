@@ -2052,63 +2052,80 @@ setTimeout(function () {
         return _regeneratorRuntime().wrap(function _callee12$(_context12) {
           while (1) switch (_context12.prev = _context12.next) {
             case 0:
-              designData = JSON.parse(design.design_data); // Load the template first
-              _context12.next = 3;
+              designData = JSON.parse(design.design_data);
+
+              // PHASE 3.1 FIX: Format Detection - support both Golden Standard and Legacy formats
+              if (!(designData.metadata && designData.metadata.capture_version)) {
+                _context12.next = 9;
+                break;
+              }
+              // Golden Standard Format detected
+              console.log("[PHASE 3.1 FIX] Loading Golden Standard format (version: " + designData.metadata.capture_version + ")");
+              _context12.next = 6;
+              return this.applyGoldenStandardFormat(designData);
+            case 6:
+              return _context12.abrupt("return");
+            case 9:
+              // Legacy format (variationImages) - existing logic below
+              console.log("[PHASE 3.1 FIX] Loading legacy variationImages format");
+
+              // Load the template first
+              _context12.next = 12;
               return this.loadTemplate(designData.templateId);
-            case 3:
+            case 12:
               // Clear existing images
               this.variationImages.clear();
 
               // Restore variation images - handle both formats
               _i3 = 0, _Object$entries2 = Object.entries(designData.variationImages || {});
-            case 5:
+            case 13:
               if (!(_i3 < _Object$entries2.length)) {
-                _context12.next = 33;
+                _context12.next = 41;
                 break;
               }
               _Object$entries2$_i = _slicedToArray(_Object$entries2[_i3], 2), key = _Object$entries2$_i[0], value = _Object$entries2$_i[1];
               _key$split = key.split('_'), _key$split2 = _slicedToArray(_key$split, 2), variationId = _key$split2[0], viewId = _key$split2[1];
               if (!Array.isArray(value)) {
-                _context12.next = 28;
+                _context12.next = 36;
                 break;
               }
               // New format: array of images
               _iterator5 = _createForOfIteratorHelper(value);
-              _context12.prev = 10;
+              _context12.prev = 18;
               _iterator5.s();
-            case 12:
+            case 20:
               if ((_step5 = _iterator5.n()).done) {
-                _context12.next = 18;
+                _context12.next = 26;
                 break;
               }
               imageData = _step5.value;
-              _context12.next = 16;
+              _context12.next = 24;
               return this.restoreViewImage(variationId, viewId, imageData);
-            case 16:
-              _context12.next = 12;
+            case 24:
+              _context12.next = 20;
               break;
-            case 18:
-              _context12.next = 23;
-              break;
-            case 20:
-              _context12.prev = 20;
-              _context12.t0 = _context12["catch"](10);
-              _iterator5.e(_context12.t0);
-            case 23:
-              _context12.prev = 23;
-              _iterator5.f();
-              return _context12.finish(23);
             case 26:
-              _context12.next = 30;
+              _context12.next = 31;
               break;
             case 28:
-              _context12.next = 30;
-              return this.restoreViewImage(variationId, viewId, value);
-            case 30:
-              _i3++;
-              _context12.next = 5;
+              _context12.prev = 28;
+              _context12.t0 = _context12["catch"](18);
+              _iterator5.e(_context12.t0);
+            case 31:
+              _context12.prev = 31;
+              _iterator5.f();
+              return _context12.finish(31);
+            case 34:
+              _context12.next = 38;
               break;
-            case 33:
+            case 36:
+              _context12.next = 38;
+              return this.restoreViewImage(variationId, viewId, value);
+            case 38:
+              _i3++;
+              _context12.next = 13;
+              break;
+            case 41:
               // Load the template again to refresh the view
               this.loadTemplate(designData.templateId);
 
@@ -2116,30 +2133,144 @@ setTimeout(function () {
               this.currentDesignId = design.id;
               this.modalNameInput.value = design.name;
               this.modalDesignId.value = design.id;
-            case 37:
+            case 45:
             case "end":
               return _context12.stop();
           }
-        }, _callee12, this, [[10, 20, 23, 26]]);
+        }, _callee12, this, [[18, 28, 31, 34]]);
       }));
       function applyDesignState(_x6) {
         return _applyDesignState.apply(this, arguments);
       }
       return applyDesignState;
     }()
+
+    /**
+     * PHASE 3.1 FIX: Load Golden Standard Format
+     * Converts Golden Standard objects[] array back to variationImages Map structure
+     * This is the INVERSE operation of collectDesignState()
+     */
   }, {
-    key: "restoreViewImage",
+    key: "applyGoldenStandardFormat",
     value: function () {
-      var _restoreViewImage = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee13(variationId, viewId, imageData) {
-        var img, key;
+      var _applyGoldenStandardFormat = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee13(designData) {
+        var _this = this;
+        var objects, metadata, templateId, loadPromises;
         return _regeneratorRuntime().wrap(function _callee13$(_context13) {
           while (1) switch (_context13.prev = _context13.next) {
             case 0:
               _context13.prev = 0;
-              _context13.next = 3;
+              console.log("[PHASE 3.1 FIX] applyGoldenStandardFormat() - Starting Golden Standard load...");
+
+              objects = designData.objects || [];
+              metadata = designData.metadata || {};
+              templateId = metadata.template_id;
+
+              // Validate Golden Standard structure
+              if (!metadata.capture_version) {
+                throw new Error("Invalid Golden Standard format: missing capture_version");
+              }
+
+              console.log("[PHASE 3.1 FIX] Loading " + objects.length + " objects from Golden Standard format (version: " + metadata.capture_version + ")");
+
+              // Clear existing variationImages
+              this.variationImages.clear();
+
+              // Load template if specified
+              if (!templateId) {
+                _context13.next = 14;
+                break;
+              }
+              console.log("[PHASE 3.1 FIX] Loading template: " + templateId);
+              _context13.next = 13;
+              return this.loadTemplate(templateId);
+            case 13:
+            case 14:
+              // Process each object and restore to variationImages Map
+              loadPromises = objects.map(function (obj) {
+                return _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee14() {
+                  var variationId, viewId, imageData;
+                  return _regeneratorRuntime().wrap(function _callee14$(_context14) {
+                    while (1) switch (_context14.prev = _context14.next) {
+                      case 0:
+                        if (obj.type !== "image") {
+                          _context14.next = 9;
+                          break;
+                        }
+
+                        // Extract variation and view IDs from elementMetadata
+                        variationId = obj.elementMetadata && obj.elementMetadata.variation_id;
+                        viewId = obj.elementMetadata && obj.elementMetadata.view_id;
+
+                        if (!(!variationId || !viewId)) {
+                          _context14.next = 6;
+                          break;
+                        }
+                        console.warn("[PHASE 3.1 FIX] Skipping object without variation_id or view_id:", obj);
+                        return _context14.abrupt("return");
+                      case 6:
+
+                        // Reconstruct imageData structure for restoreViewImage()
+                        imageData = {
+                          id: obj.id,
+                          url: obj.src,
+                          transform: {
+                            left: obj.left,
+                            top: obj.top,
+                            scaleX: obj.scaleX,
+                            scaleY: obj.scaleY,
+                            angle: obj.angle || 0
+                          }
+                        };
+
+                        // Use existing restoreViewImage method to load the image
+                        _context14.next = 9;
+                        return _this.restoreViewImage(variationId, viewId, imageData);
+                      case 9:
+                      case "end":
+                        return _context14.stop();
+                    }
+                  }, _callee14);
+                }))();
+              });
+
+              // Wait for all images to load
+              _context13.next = 16;
+              return Promise.all(loadPromises);
+            case 16:
+
+              console.log("[PHASE 3.1 FIX] Golden Standard format loaded successfully - " + objects.length + " objects restored");
+              _context13.next = 22;
+              break;
+            case 19:
+              _context13.prev = 19;
+              _context13.t0 = _context13["catch"](0);
+              console.error("[PHASE 3.1 FIX] Error loading Golden Standard format:", _context13.t0);
+              throw _context13.t0;
+            case 22:
+            case "end":
+              return _context13.stop();
+          }
+        }, _callee13, this, [[0, 19]]);
+      }));
+      function applyGoldenStandardFormat(_x7) {
+        return _applyGoldenStandardFormat.apply(this, arguments);
+      }
+      return applyGoldenStandardFormat;
+    }()
+  }, {
+    key: "restoreViewImage",
+    value: function () {
+      var _restoreViewImage = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee15(variationId, viewId, imageData) {
+        var img, key;
+        return _regeneratorRuntime().wrap(function _callee15$(_context15) {
+          while (1) switch (_context15.prev = _context15.next) {
+            case 0:
+              _context15.prev = 0;
+              _context15.next = 3;
               return fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url);
             case 3:
-              img = _context13.sent;
+              img = _context15.sent;
               // Set image properties
               img.set(_objectSpread({
                 originX: 'center',
@@ -2177,19 +2308,19 @@ setTimeout(function () {
 
               // Bind events to the image
               this.bindImageEvents(img);
-              return _context13.abrupt("return", img);
+              return _context15.abrupt("return", img);
             case 13:
-              _context13.prev = 13;
-              _context13.t0 = _context13["catch"](0);
-              console.error('Error restoring image:', _context13.t0);
-              return _context13.abrupt("return", null);
+              _context15.prev = 13;
+              _context15.t0 = _context15["catch"](0);
+              console.error('Error restoring image:', _context15.t0);
+              return _context15.abrupt("return", null);
             case 17:
             case "end":
-              return _context13.stop();
+              return _context15.stop();
           }
-        }, _callee13, this, [[0, 13]]);
+        }, _callee15, this, [[0, 13]]);
       }));
-      function restoreViewImage(_x7, _x8, _x9) {
+      function restoreViewImage(_x8, _x9, _x10) {
         return _restoreViewImage.apply(this, arguments);
       }
       return restoreViewImage;
@@ -2197,10 +2328,10 @@ setTimeout(function () {
   }, {
     key: "captureCanvasPreview",
     value: function () {
-      var _captureCanvasPreview = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee14() {
+      var _captureCanvasPreview = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee16() {
         var tempCanvasElement, tempCanvas, template, variation, view, backgroundImage, key, imagesArray, widthRatio, heightRatio, clipPath, _iterator6, _step6, imageData, userImage, isDarkShirt;
-        return _regeneratorRuntime().wrap(function _callee14$(_context14) {
-          while (1) switch (_context14.prev = _context14.next) {
+        return _regeneratorRuntime().wrap(function _callee16$(_context16) {
+          while (1) switch (_context16.prev = _context16.next) {
             case 0:
               // Create temporary canvas for preview 
               tempCanvasElement = document.createElement('canvas');
@@ -2209,15 +2340,15 @@ setTimeout(function () {
                 height: 500,
                 backgroundColor: 'white'
               });
-              _context14.prev = 2;
+              _context16.prev = 2;
               // Get the current template view settings
               template = this.templates.get(this.activeTemplateId);
               variation = template.variations.get(this.currentVariation.toString());
               view = variation.views.get(this.currentView); // Add template background with same settings as main canvas
-              _context14.next = 8;
+              _context16.next = 8;
               return fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(view.image_url);
             case 8:
-              backgroundImage = _context14.sent;
+              backgroundImage = _context16.sent;
               backgroundImage.set(_objectSpread(_objectSpread({}, view.imageZone), {}, {
                 selectable: false,
                 evented: false,
@@ -2256,24 +2387,24 @@ setTimeout(function () {
                 originY: 'center'
               }); // Add each image to the preview canvas
               _iterator6 = _createForOfIteratorHelper(imagesArray);
-              _context14.prev = 18;
+              _context16.prev = 18;
               _iterator6.s();
             case 20:
               if ((_step6 = _iterator6.n()).done) {
-                _context14.next = 34;
+                _context16.next = 34;
                 break;
               }
               imageData = _step6.value;
               if (!(!imageData.visible || !imageData.url)) {
-                _context14.next = 24;
+                _context16.next = 24;
                 break;
               }
-              return _context14.abrupt("continue", 32);
+              return _context16.abrupt("continue", 32);
             case 24:
-              _context14.next = 26;
+              _context16.next = 26;
               return fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url);
             case 26:
-              userImage = _context14.sent;
+              userImage = _context16.sent;
               // Set position and transformation
               userImage.set({
                 left: imageData.transform.left * widthRatio,
@@ -2318,34 +2449,34 @@ setTimeout(function () {
               userImage.applyFilters();
               tempCanvas.add(userImage);
             case 32:
-              _context14.next = 20;
+              _context16.next = 20;
               break;
             case 34:
-              _context14.next = 39;
+              _context16.next = 39;
               break;
             case 36:
-              _context14.prev = 36;
-              _context14.t0 = _context14["catch"](18);
-              _iterator6.e(_context14.t0);
+              _context16.prev = 36;
+              _context16.t0 = _context16["catch"](18);
+              _iterator6.e(_context16.t0);
             case 39:
-              _context14.prev = 39;
+              _context16.prev = 39;
               _iterator6.f();
-              return _context14.finish(39);
+              return _context16.finish(39);
             case 42:
               tempCanvas.renderAll();
-              return _context14.abrupt("return", tempCanvas.toDataURL({
+              return _context16.abrupt("return", tempCanvas.toDataURL({
                 format: 'png',
                 quality: 0.8
               }));
             case 44:
-              _context14.prev = 44;
+              _context16.prev = 44;
               tempCanvas.dispose();
-              return _context14.finish(44);
+              return _context16.finish(44);
             case 47:
             case "end":
-              return _context14.stop();
+              return _context16.stop();
           }
-        }, _callee14, this, [[2,, 44, 47], [18, 36, 39, 42]]);
+        }, _callee16, this, [[2,, 44, 47], [18, 36, 39, 42]]);
       }));
       function captureCanvasPreview() {
         return _captureCanvasPreview.apply(this, arguments);
