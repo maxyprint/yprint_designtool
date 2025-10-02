@@ -1009,7 +1009,13 @@ class DesignPreviewGenerator {
                 // 🎯 AGENT 12 FIX: Preserve background/mockup URL from original data
                 background: designData.background || designData.mockup_url || null,
                 // 🎯 AGENT 7 FIX: Preserve metadata to prevent legacy correction on modern data
-                metadata: designData.metadata || null
+                metadata: designData.metadata || {
+                    source: 'hive_mind_converted',
+                    capture_version: '3.0.0',
+                    designer_offset: { x: 0, y: 0 },
+                    conversion_timestamp: Date.now(),
+                    _auto_generated: true
+                }
             }
         };
     }
@@ -1075,7 +1081,13 @@ class DesignPreviewGenerator {
                 // 🎯 AGENT 12 FIX: Preserve background/mockup URL from original data
                 background: designData.background || designData.mockup_url || null,
                 // 🎯 AGENT 7 FIX: Preserve metadata to prevent legacy correction on modern data
-                metadata: designData.metadata || null
+                metadata: designData.metadata || {
+                    source: 'hive_mind_converted',
+                    capture_version: '3.0.0',
+                    designer_offset: { x: 0, y: 0 },
+                    conversion_timestamp: Date.now(),
+                    _auto_generated: true
+                }
             }
         };
     }

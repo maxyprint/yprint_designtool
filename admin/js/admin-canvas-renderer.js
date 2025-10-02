@@ -594,6 +594,12 @@ class AdminCanvasRenderer {
             return 'modern';
         }
 
+        // Detection Method 1.5: converted_from_processed_views WITHOUT capture_version (safeguard)
+        if (metadata?.source === 'converted_from_processed_views') {
+            console.warn('⚠️ AGENT 1 MUTEX: Converted data missing capture_version, treating as MODERN (safeguard)');
+            return 'modern';
+        }
+
         // Detection Method 2: Explicit db_processed_views marker (LEGACY format marker)
         const isLegacyDbFormat = metadata?.source === 'db_processed_views';
         if (isLegacyDbFormat) {
@@ -1259,6 +1265,8 @@ class AdminCanvasRenderer {
                 })),
                 metadata: {
                     source: 'variationImages_normalized',
+                    capture_version: '3.0.0',
+                    designer_offset: { x: 0, y: 0 },
                     template_id: rawData.templateId,
                     variation_id: rawData.currentVariation,
                     original_variation_key: firstVariationKey,
