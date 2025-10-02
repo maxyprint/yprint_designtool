@@ -17,7 +17,79 @@
     function debugWarn(message, data = null) {
         console.warn('%c[DESIGN-LOADER WARNING]', 'color: orange;', message, data || '');
     }
-    
+
+    /**
+     * PHASE 3 - AGENT 3: Normalize design data to Golden Standard format
+     *
+     * Handles 3 formats:
+     * 1. Golden Standard (objects + metadata.capture_version) - pass through
+     * 2. variationImages (nested transform) - flatten and convert
+     * 3. Legacy nested view format - convert to Golden Standard
+     *
+     * @param {Object} data Design data in any format
+     * @returns {Object} Normalized design data in Golden Standard format
+     */
+    function normalizeDesignData(data) {
+        // Already Golden Standard?
+        if (data.objects && data.metadata && data.metadata.capture_version) {
+            debugLog('✅ Design already in Golden Standard format (capture_version: ' + data.metadata.capture_version + ')');
+            return data;
+        }
+
+        // variationImages format?
+        if (data.variationImages) {
+            debugLog('🔄 Converting variationImages format to Golden Standard');
+
+            const variationKeys = Object.keys(data.variationImages);
+            const elements = data.variationImages[variationKeys[0]];
+
+            // Flatten transform
+            const normalizedElements = elements.map(el => {
+                if (el.transform) {
+                    // Move transform properties to root
+                    const flattened = {...el, ...el.transform};
+                    delete flattened.transform;
+                    return flattened;
+                }
+                return el;
+            });
+
+            const normalized = {
+                objects: normalizedElements,
+                metadata: {
+                    capture_version: '2.1-migrated',
+                    source: 'variation_images_normalized',
+                    original_template_id: data.templateId,
+                    original_variation: data.currentVariation
+                }
+            };
+
+            debugLog('✅ variationImages converted: ' + normalizedElements.length + ' elements normalized');
+            return normalized;
+        }
+
+        // Legacy format? (e.g., "167359_189542": {images: [...]})
+        const keys = Object.keys(data);
+        if (keys.length > 0 && data[keys[0]] && data[keys[0]].images) {
+            debugLog('🔄 Converting legacy view format to Golden Standard');
+
+            const normalized = {
+                objects: data[keys[0]].images,
+                metadata: {
+                    capture_version: '1.0-legacy-migrated',
+                    source: 'legacy_normalized',
+                    original_view_key: keys[0]
+                }
+            };
+
+            debugLog('✅ Legacy format converted: ' + data[keys[0]].images.length + ' elements normalized');
+            return normalized;
+        }
+
+        debugWarn('Unknown design format', data);
+        return data;
+    }
+
     // Warte bis Designer geladen ist
     function waitForDesigner() {
         debugLog('Waiting for designer...');
@@ -161,25 +233,29 @@
         try {
             debugLog('=== APPLY DESIGN TO CANVAS START ===');
             debugLog('Parsed design data for application:', parsedDesignData);
-            
-            // Template laden falls verfügbar
-            if (parsedDesignData.templateId) {
-                debugLog('Template ID found:', parsedDesignData.templateId);
-                triggerTemplateLoad(parsedDesignData.templateId);
+
+            // PHASE 3 - AGENT 3: Normalize design data to Golden Standard
+            const normalizedData = normalizeDesignData(parsedDesignData);
+            debugLog('Normalized design data:', normalizedData);
+
+            // Template laden falls verfügbar (check both original and metadata)
+            const templateId = normalizedData.metadata?.original_template_id || parsedDesignData.templateId;
+            if (templateId) {
+                debugLog('Template ID found:', templateId);
+                triggerTemplateLoad(templateId);
             } else {
                 debugWarn('No template ID in design data');
             }
-            
-            // Variation Images verarbeiten
-            if (parsedDesignData.variationImages) {
-                debugLog('Variation images found:', parsedDesignData.variationImages);
-                debugLog('Number of variation image entries:', Object.keys(parsedDesignData.variationImages).length);
-                
+
+            // Process objects in Golden Standard format
+            if (normalizedData.objects && normalizedData.objects.length > 0) {
+                debugLog('Processing ' + normalizedData.objects.length + ' objects from Golden Standard format');
+
                 setTimeout(() => {
-                    processVariationImages(parsedDesignData.variationImages);
-                }, 3000); // Längere Wartezeit für Template-Loading
+                    processGoldenStandardObjects(normalizedData.objects);
+                }, 3000); // Wait for template loading
             } else {
-                debugWarn('No variation images in design data');
+                debugWarn('No objects in normalized design data');
             }
             
             // Design Name setzen
@@ -239,21 +315,21 @@
     function processVariationImages(variationImages) {
         debugLog('=== PROCESS VARIATION IMAGES START ===');
         debugLog('Processing variation images:', variationImages);
-        
+
         let totalImages = 0;
-        
+
         Object.entries(variationImages).forEach(([key, imageData]) => {
             const [variationId, viewId] = key.split('_');
             debugLog(`Processing key: ${key} (variation: ${variationId}, view: ${viewId})`);
             debugLog(`Image data for ${key}:`, imageData);
-            
+
             // Handle both array and single object formats
             const images = Array.isArray(imageData) ? imageData : [imageData];
             debugLog(`Number of images for ${key}:`, images.length);
-            
+
             images.forEach((imgData, index) => {
                 debugLog(`Processing image ${index + 1} for ${key}:`, imgData);
-                
+
                 if (imgData.url) {
                     debugLog(`Adding image to canvas: ${imgData.url}`);
                     addImageToCanvas(imgData.url, imgData.transform || {}, key, index);
@@ -263,9 +339,50 @@
                 }
             });
         });
-        
+
         debugLog(`Total images processed: ${totalImages}`);
         debugLog('=== PROCESS VARIATION IMAGES END ===');
+    }
+
+    /**
+     * PHASE 3 - AGENT 3: Process objects in Golden Standard format
+     */
+    function processGoldenStandardObjects(objects) {
+        debugLog('=== PROCESS GOLDEN STANDARD OBJECTS START ===');
+        debugLog('Processing ' + objects.length + ' objects');
+
+        let totalImages = 0;
+
+        objects.forEach((obj, index) => {
+            debugLog('Processing object ' + (index + 1) + ':', obj);
+
+            // Extract variation_key for grouping
+            const variationKey = obj.elementMetadata?.variation_key || 'default_view';
+
+            // Get image URL (supports both 'src' and 'url' properties)
+            const imageUrl = obj.src || obj.url;
+
+            if (imageUrl) {
+                debugLog('Adding image to canvas: ' + imageUrl);
+
+                // Transform is already flat in Golden Standard format
+                const transform = {
+                    left: obj.left,
+                    top: obj.top,
+                    scaleX: obj.scaleX,
+                    scaleY: obj.scaleY,
+                    angle: obj.angle
+                };
+
+                addImageToCanvas(imageUrl, transform, variationKey, index);
+                totalImages++;
+            } else {
+                debugWarn('No URL/src found for object ' + (index + 1));
+            }
+        });
+
+        debugLog('Total objects processed: ' + totalImages);
+        debugLog('=== PROCESS GOLDEN STANDARD OBJECTS END ===');
     }
     
     function addImageToCanvas(imageUrl, transform, viewKey, imageIndex) {

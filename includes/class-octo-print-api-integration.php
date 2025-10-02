@@ -1152,9 +1152,89 @@ class Octo_Print_API_Integration {
     /**
      * Parse design views from order item (reused from WC Integration)
      */
+    /**
+     * PHASE 3 - AGENT 3: Normalize any design format to Golden Standard
+     *
+     * Handles 3 formats:
+     * 1. Golden Standard (objects + metadata.capture_version) - pass through
+     * 2. variationImages (nested transform) - flatten and convert
+     * 3. Legacy nested (old system) - convert to Golden Standard
+     *
+     * @param array $data Design data in any format
+     * @return array Normalized design data in Golden Standard format
+     */
+    private function normalize_design_data($data) {
+        // Already Golden Standard? Pass through
+        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
+            error_log('✅ [API NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
+            return $data;
+        }
+
+        // variationImages format?
+        if (isset($data['variationImages'])) {
+            error_log('🔄 [API NORMALIZE] Converting variationImages format to Golden Standard');
+
+            $variation_keys = array_keys($data['variationImages']);
+            $elements = $data['variationImages'][$variation_keys[0]];
+
+            // Flatten nested transform
+            $normalized_elements = array_map(function($el) {
+                if (isset($el['transform'])) {
+                    // Move transform properties to root
+                    $flattened = array_merge($el, $el['transform']);
+                    unset($flattened['transform']);
+                    return $flattened;
+                }
+                return $el;
+            }, $elements);
+
+            $normalized = array(
+                'objects' => $normalized_elements,
+                'metadata' => array(
+                    'capture_version' => '2.1-migrated',
+                    'source' => 'variation_images_normalized',
+                    'original_template_id' => $data['templateId'] ?? null,
+                    'original_variation' => $data['currentVariation'] ?? null,
+                    'normalized_at' => current_time('mysql')
+                )
+            );
+
+            error_log('✅ [API NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
+            return $normalized;
+        }
+
+        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
+        $view_keys = array_keys($data);
+        if (!empty($view_keys)) {
+            $first_view_key = $view_keys[0];
+            $first_view = $data[$first_view_key];
+
+            if (is_array($first_view) && isset($first_view['images'])) {
+                error_log('🔄 [API NORMALIZE] Converting legacy view format to Golden Standard');
+
+                $normalized = array(
+                    'objects' => $first_view['images'],
+                    'metadata' => array(
+                        'capture_version' => '1.0-legacy-migrated',
+                        'source' => 'legacy_view_normalized',
+                        'original_view_key' => $first_view_key,
+                        'normalized_at' => current_time('mysql')
+                    )
+                );
+
+                error_log('✅ [API NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
+                return $normalized;
+            }
+        }
+
+        // Unknown format - log error and return unchanged
+        error_log('⚠️ [API NORMALIZE] Unknown design format: ' . json_encode(array_keys($data)));
+        return $data;
+    }
+
     private function parse_design_views($item) {
         $views = array();
-        
+
         // Get processed views data
         $processed_views_json = $item->get_meta('_db_processed_views');
         if (!empty($processed_views_json)) {
@@ -1163,7 +1243,7 @@ class Octo_Print_API_Integration {
             } else {
                 $processed_views = $processed_views_json;
             }
-            
+
             if (is_array($processed_views)) {
                 foreach ($processed_views as $view_key => $view_data) {
                     $views[] = array(
@@ -1176,7 +1256,7 @@ class Octo_Print_API_Integration {
                 }
             }
         }
-        
+
         return $views;
     }
 
@@ -1185,33 +1265,51 @@ class Octo_Print_API_Integration {
      */
     private function parse_view_images($images, $view_data = array(), $item = null) {
         $parsed_images = array();
-        
+
         if (!is_array($images)) {
             return $parsed_images;
         }
-        
+
         foreach ($images as $image) {
-            if (!isset($image['url']) || empty($image['url'])) {
+            // Support both 'url' and 'src' properties (Golden Standard uses 'src')
+            $image_url = $image['url'] ?? $image['src'] ?? null;
+            if (empty($image_url)) {
                 continue;
             }
-            
-            $transform = $image['transform'] ?: array();
-            
+
+            // PHASE 3 - AGENT 3: Handle both nested transform and flat Golden Standard format
+            // Check if transform is nested (old format) or flat (Golden Standard)
+            if (isset($image['transform']) && is_array($image['transform'])) {
+                // Old format with nested transform
+                $transform = $image['transform'];
+            } else {
+                // Golden Standard format with flat properties
+                $transform = array(
+                    'width' => $image['width'] ?? 0,
+                    'height' => $image['height'] ?? 0,
+                    'left' => $image['left'] ?? 0,
+                    'top' => $image['top'] ?? 0,
+                    'scaleX' => $image['scaleX'] ?? 1,
+                    'scaleY' => $image['scaleY'] ?? 1,
+                    'angle' => $image['angle'] ?? 0
+                );
+            }
+
             $parsed_images[] = array(
-                'filename' => $image['filename'] ?: basename($image['url']),
-                'url' => $image['url'],
+                'filename' => $image['filename'] ?? basename($image_url),
+                'url' => $image_url,
                 'preview_url' => $item ? $this->get_design_meta($item, 'preview_url') : '', // NEU: Preview-URL hinzufügen
-                'original_width_px' => $transform['width'] ?: 0,
-                'original_height_px' => $transform['height'] ?: 0,
-                'position_left_px' => round($transform['left'] ?: 0, 2),
-                'position_top_px' => round($transform['top'] ?: 0, 2),
-                'scale_x' => $transform['scaleX'] ?: 1,
-                'scale_y' => $transform['scaleY'] ?: 1,
+                'original_width_px' => $transform['width'] ?? 0,
+                'original_height_px' => $transform['height'] ?? 0,
+                'position_left_px' => round($transform['left'] ?? 0, 2),
+                'position_top_px' => round($transform['top'] ?? 0, 2),
+                'scale_x' => $transform['scaleX'] ?? 1,
+                'scale_y' => $transform['scaleY'] ?? 1,
                 'transform' => $transform,
                 'transform_data' => $transform // Vollständige Transform-Daten für Position-Schätzung
             );
         }
-        
+
         return $parsed_images;
     }
 

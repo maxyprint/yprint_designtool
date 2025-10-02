@@ -1896,16 +1896,75 @@ setTimeout(function () {
       return loadDesign;
     }()
   }, {
+    key: "validateGoldenStandardFormat",
+    value: function validateGoldenStandardFormat(state) {
+      // PHASE 3.1: Format validation before saving
+      // Ensures the state conforms to Golden Standard requirements
+
+      var errors = [];
+
+      // Check objects array exists
+      if (!state.objects || !Array.isArray(state.objects)) {
+        errors.push("Missing or invalid 'objects' array");
+      }
+
+      // Check metadata exists
+      if (!state.metadata || typeof state.metadata !== 'object') {
+        errors.push("Missing or invalid 'metadata' object");
+      }
+
+      // Check capture_version (critical for format detection)
+      if (!state.metadata || !state.metadata.capture_version) {
+        errors.push("Missing 'metadata.capture_version' field");
+      }
+
+      // Validate each object has flat coordinates (not nested)
+      if (state.objects && Array.isArray(state.objects)) {
+        state.objects.forEach(function(obj, index) {
+          if (obj.transform && typeof obj.transform === 'object') {
+            errors.push("Object " + index + " has nested 'transform' - coordinates must be flat");
+          }
+          if (obj.left === undefined || obj.top === undefined) {
+            errors.push("Object " + index + " missing 'left' or 'top' coordinate");
+          }
+          if (typeof obj.left !== 'number' || typeof obj.top !== 'number') {
+            errors.push("Object " + index + " has non-numeric coordinates");
+          }
+        });
+      }
+
+      // Check for forbidden legacy keys
+      if (state.variationImages) {
+        errors.push("State contains forbidden 'variationImages' key - use 'objects' array instead");
+      }
+      if (state.templateId) {
+        errors.push("State contains forbidden 'templateId' key - use 'metadata.template_id' instead");
+      }
+
+      if (errors.length > 0) {
+        console.error("Golden Standard validation failed:", errors);
+        return {
+          valid: false,
+          errors: errors
+        };
+      }
+
+      return {
+        valid: true,
+        errors: []
+      };
+    }
+  }, {
     key: "collectDesignState",
     value: function collectDesignState() {
-      // Create an object representing the current state of the design
-      var state = {
-        templateId: this.activeTemplateId,
-        currentVariation: this.currentVariation,
-        variationImages: {}
-      };
+      // PHASE 3.1: GOLDEN STANDARD FORMAT
+      // Create design state in Golden Standard format (NOT legacy variationImages format)
+      // This prevents the coordinate corruption bug by using flat coordinates
 
-      // Convert the variationImages Map to a plain object with arrays
+      var objects = [];
+      var objectCounter = 0;
+
+      // Convert the variationImages Map to Golden Standard objects array
       var _iterator4 = _createForOfIteratorHelper(this.variationImages),
         _step4;
       try {
@@ -1914,22 +1973,36 @@ setTimeout(function () {
             key = _step4$value[0],
             imagesArray = _step4$value[1];
           if (!imagesArray || imagesArray.length === 0) continue;
-          state.variationImages[key] = imagesArray.map(function (imageData) {
-            // Create a clean version without circular references
-            return {
-              id: imageData.id,
-              url: imageData.url,
-              transform: {
-                left: imageData.transform.left,
-                top: imageData.transform.top,
-                scaleX: imageData.transform.scaleX,
-                scaleY: imageData.transform.scaleY,
-                angle: imageData.transform.angle,
-                width: imageData.transform.width || imageData.fabricImage.width,
-                height: imageData.transform.height || imageData.fabricImage.height
-              },
-              visible: imageData.visible !== undefined ? imageData.visible : true
-            };
+
+          // Parse variation_id and view_id from key (format: "variationId_viewId")
+          var _key$split = key.split('_'),
+            _key$split2 = _slicedToArray(_key$split, 2),
+            variationId = _key$split2[0],
+            viewId = _key$split2[1];
+
+          // Map each image to Golden Standard format with FLAT coordinates
+          imagesArray.forEach(function (imageData) {
+            objectCounter++;
+            objects.push({
+              type: "image",
+              id: imageData.id || "img_" + objectCounter,
+              src: imageData.url,
+              // FLAT COORDINATES - NOT nested in transform object
+              left: imageData.transform.left,
+              top: imageData.transform.top,
+              scaleX: imageData.transform.scaleX,
+              scaleY: imageData.transform.scaleY,
+              angle: imageData.transform.angle || 0,
+              width: imageData.transform.width || imageData.fabricImage.width,
+              height: imageData.transform.height || imageData.fabricImage.height,
+              visible: imageData.visible !== undefined ? imageData.visible : true,
+              // Element metadata for variation/view association
+              elementMetadata: {
+                variation_id: variationId,
+                view_id: viewId,
+                variation_key: key
+              }
+            });
           });
         }
       } catch (err) {
@@ -1937,6 +2010,38 @@ setTimeout(function () {
       } finally {
         _iterator4.f();
       }
+
+      // Build Golden Standard state with metadata
+      var state = {
+        objects: objects,
+        metadata: {
+          capture_version: "3.0.0",  // CRITICAL: Identifies Golden Standard format
+          source: "frontend_designer",
+          template_id: this.activeTemplateId,
+          variation_id: this.currentVariation,
+          canvas_dimensions: {
+            width: this.fabricCanvas ? this.fabricCanvas.width : 780,
+            height: this.fabricCanvas ? this.fabricCanvas.height : 580
+          },
+          designer_offset: { x: 0, y: 0 },
+          saved_at: new Date().toISOString(),
+          format_schema_version: "golden_standard_v1"
+        }
+      };
+
+      // Validate Golden Standard format before returning
+      var validation = this.validateGoldenStandardFormat(state);
+      if (!validation.valid) {
+        console.error("[PHASE 3.1] Golden Standard validation failed:", validation.errors);
+        console.error("[PHASE 3.1] Invalid state:", state);
+        throw new Error("Golden Standard validation failed: " + validation.errors.join(", "));
+      }
+
+      // Success logging
+      console.log("[PHASE 3.1] Golden Standard format validated successfully");
+      console.log("[PHASE 3.1] Objects count:", objects.length);
+      console.log("[PHASE 3.1] Capture version:", state.metadata.capture_version);
+
       return state;
     }
   }, {

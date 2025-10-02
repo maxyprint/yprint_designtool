@@ -2397,30 +2397,49 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $debug_info[] = "Design {$design_id}: JSON parse error - " . json_last_error_msg();
                 continue;
             }
-            
+
             $debug_info[] = "Design {$design_id}: JSON parsed successfully";
-            
-            // Debug: Show what's in the JSON
-            if (isset($design_data['variationImages'])) {
-                $debug_info[] = "Design {$design_id}: variationImages found with " . count($design_data['variationImages']) . " variations";
-            } else {
-                $debug_info[] = "Design {$design_id}: No variationImages in JSON";
+
+            // PHASE 3 - AGENT 3: Normalize design data to Golden Standard
+            $design_data = $this->normalize_design_data($design_data);
+            $debug_info[] = "Design {$design_id}: Normalized to format: " . ($design_data['metadata']['source'] ?? 'unknown');
+
+            // Check if we have objects in Golden Standard format
+            if (!isset($design_data['objects'])) {
+                $debug_info[] = "Design {$design_id}: No objects found after normalization";
                 $debug_info[] = "Design {$design_id}: Available keys: " . implode(', ', array_keys($design_data));
                 continue;
             }
-            
-            // Convert variationImages to processed_views format
-            // Structure is: "167359_189542" => [image1, image2, ...]
+
+            $debug_info[] = "Design {$design_id}: Found " . count($design_data['objects']) . " objects in Golden Standard format";
+
+            // PHASE 3 - AGENT 3: Process normalized Golden Standard format
+            // Group objects by variation_key to create processed_views
             $processed_views = array();
-            
-            foreach ($design_data['variationImages'] as $combined_key => $images_array) {
-                $debug_info[] = "Design {$design_id}: Processing combined key {$combined_key}";
-                
+
+            // Get variation info from metadata
+            $variation_id = $design_data['metadata']['variation_id'] ?? 'default';
+            $template_id = $design_data['metadata']['template_id'] ?? null;
+
+            // Group objects by their variation_key
+            $objects_by_view = array();
+            foreach ($design_data['objects'] as $obj) {
+                $variation_key = $obj['elementMetadata']['variation_key'] ?? 'default_view';
+                if (!isset($objects_by_view[$variation_key])) {
+                    $objects_by_view[$variation_key] = array();
+                }
+                $objects_by_view[$variation_key][] = $obj;
+            }
+
+            // Convert to processed_views format
+            foreach ($objects_by_view as $combined_key => $objects) {
+                $debug_info[] = "Design {$design_id}: Processing view key {$combined_key}";
+
                 // Split the combined key "167359_189542" into variation_id and view_id
                 $parts = explode('_', $combined_key);
-                $variation_id = $parts[0] ?? $combined_key;
+                $view_variation_id = $parts[0] ?? $variation_id;
                 $view_id = $parts[1] ?? 'default';
-                
+
                 // Try to get view name from the order item's product_images data
                 $view_name = 'Design View';
                 $product_images_json = $item->get_meta('_design_product_images');
@@ -2435,17 +2454,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                         }
                     }
                 }
-                
-                if (is_array($images_array) && !empty($images_array)) {
+
+                if (!empty($objects)) {
                     $processed_views[$combined_key] = array(
                         'view_name' => $view_name,
                         'system_id' => $view_id,
-                        'variation_id' => $variation_id,
-                        'images' => $images_array
+                        'variation_id' => $view_variation_id,
+                        'images' => $objects
                     );
-                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$variation_id} with " . count($images_array) . " images";
+                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$view_variation_id} with " . count($objects) . " objects";
                 } else {
-                    $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid images array";
+                    $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid objects";
                 }
             }
             
@@ -2533,6 +2552,145 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
+     * PHASE 3: Golden Standard Schema Validator
+     * Validates design data against the Golden Standard format
+     *
+     * @param array $data Design data to validate
+     * @return true|WP_Error True if valid, WP_Error if invalid
+     */
+    private function validate_design_data_schema($data) {
+        // Rule 1: Must have objects array
+        if (!isset($data['objects']) || !is_array($data['objects'])) {
+            return new WP_Error('missing_objects', 'Design data must have objects array');
+        }
+
+        // Rule 2: Must have metadata with capture_version
+        if (!isset($data['metadata']['capture_version'])) {
+            return new WP_Error('missing_capture_version', 'Design data must have metadata.capture_version');
+        }
+
+        // Rule 3: No nested transform (elements must have flat coordinates)
+        foreach ($data['objects'] as $element) {
+            if (isset($element['transform'])) {
+                return new WP_Error('nested_transform', 'Elements must have flat coordinates, not nested transform');
+            }
+        }
+
+        // Rule 4: No forbidden keys (legacy format indicators)
+        $forbidden = ['variationImages', 'templateId', 'currentVariation'];
+        if (!empty(array_intersect($forbidden, array_keys($data)))) {
+            return new WP_Error('forbidden_format', 'Design contains legacy format keys');
+        }
+
+        return true;
+    }
+
+    /**
+     * PHASE 3: Validation Statistics Helper
+     * Tracks validation results for monitoring and analysis
+     *
+     * @param bool $result Validation result (true = passed, false = failed)
+     */
+    /**
+     * PHASE 3 - AGENT 3: Normalize any design format to Golden Standard
+     *
+     * Handles 3 formats:
+     * 1. Golden Standard (objects + metadata.capture_version) - pass through
+     * 2. variationImages (nested transform) - flatten and convert
+     * 3. Legacy nested (old system) - convert to Golden Standard
+     *
+     * @param array $data Design data in any format
+     * @return array Normalized design data in Golden Standard format
+     */
+    private function normalize_design_data($data) {
+        // Already Golden Standard? Pass through
+        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
+            error_log('✅ [NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
+            return $data;
+        }
+
+        // variationImages format?
+        if (isset($data['variationImages'])) {
+            error_log('🔄 [NORMALIZE] Converting variationImages format to Golden Standard');
+
+            $variation_keys = array_keys($data['variationImages']);
+            $elements = $data['variationImages'][$variation_keys[0]];
+
+            // Flatten nested transform
+            $normalized_elements = array_map(function($el) {
+                if (isset($el['transform'])) {
+                    // Move transform properties to root
+                    $flattened = array_merge($el, $el['transform']);
+                    unset($flattened['transform']);
+                    return $flattened;
+                }
+                return $el;
+            }, $elements);
+
+            $normalized = array(
+                'objects' => $normalized_elements,
+                'metadata' => array(
+                    'capture_version' => '2.1-migrated',
+                    'source' => 'variation_images_normalized',
+                    'original_template_id' => $data['templateId'] ?? null,
+                    'original_variation' => $data['currentVariation'] ?? null,
+                    'normalized_at' => current_time('mysql')
+                )
+            );
+
+            error_log('✅ [NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
+            return $normalized;
+        }
+
+        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
+        $view_keys = array_keys($data);
+        if (!empty($view_keys)) {
+            $first_view_key = $view_keys[0];
+            $first_view = $data[$first_view_key];
+
+            if (is_array($first_view) && isset($first_view['images'])) {
+                error_log('🔄 [NORMALIZE] Converting legacy view format to Golden Standard');
+
+                $normalized = array(
+                    'objects' => $first_view['images'],
+                    'metadata' => array(
+                        'capture_version' => '1.0-legacy-migrated',
+                        'source' => 'legacy_view_normalized',
+                        'original_view_key' => $first_view_key,
+                        'normalized_at' => current_time('mysql')
+                    )
+                );
+
+                error_log('✅ [NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
+                return $normalized;
+            }
+        }
+
+        // Unknown format - log error and return unchanged
+        error_log('⚠️ [NORMALIZE] Unknown design format in normalize_design_data: ' . json_encode(array_keys($data)));
+        return $data;
+    }
+
+    private function increment_validation_stat($result) {
+        $stats = get_option('design_validation_stats', array(
+            'total' => 0,
+            'passed' => 0,
+            'failed' => 0,
+            'last_updated' => null
+        ));
+
+        $stats['total']++;
+        if ($result === true) {
+            $stats['passed']++;
+        } else {
+            $stats['failed']++;
+        }
+        $stats['last_updated'] = current_time('mysql');
+
+        update_option('design_validation_stats', $stats);
+    }
+
+    /**
      * NEW: Cart Integration Method
      */
     public function add_design_data_to_cart($cart_item_data, $product_id, $variation_id) {
@@ -2553,15 +2711,44 @@ private function build_print_provider_email_content($order, $design_items, $note
 
     /**
      * NEW: Order Line Item Persistence
+     * PHASE 3: Enhanced with Golden Standard validation (Phase A: Log-Only Mode)
      */
     public function save_design_data_to_order($item, $cart_item_key, $values, $order) {
         if (!empty($values['_design_data_json'])) {
             $design_data = $values['_design_data_json'];
 
-            // Store in order item meta
-            $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+            // PHASE 3: Check kill switch
+            if (defined('DISABLE_DESIGN_VALIDATION') && DISABLE_DESIGN_VALIDATION) {
+                // Kill switch enabled - skip validation entirely
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("📦 Design data saved to order item (validation disabled): " . $item->get_id());
+                return;
+            }
 
-            error_log("📦 Design data saved to order item: " . $item->get_id());
+            // PHASE 3 - PHASE A: LOG-ONLY MODE
+            // Validate design data but don't block saves yet
+            $validation_result = $this->validate_design_data_schema($design_data);
+
+            if (is_wp_error($validation_result)) {
+                // Log the error but DON'T block the save
+                error_log(sprintf(
+                    '⚠️ [VALIDATION LOG-ONLY] Design validation would fail for order %d: %s (Code: %s)',
+                    $order->get_id(),
+                    $validation_result->get_error_message(),
+                    $validation_result->get_error_code()
+                ));
+
+                $this->increment_validation_stat(false);
+
+                // Continue saving anyway (log-only mode)
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("📦 Design data saved to order item (validation failed but logged): " . $item->get_id());
+            } else {
+                // Validation passed
+                $this->increment_validation_stat(true);
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("✅ Design data saved to order item (validation passed): " . $item->get_id());
+            }
         }
     }
 

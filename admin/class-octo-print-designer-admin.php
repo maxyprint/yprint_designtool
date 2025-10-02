@@ -1239,6 +1239,86 @@ class Octo_Print_Designer_Admin {
     }
 
     /**
+     * PHASE 3 - AGENT 3: Normalize any design format to Golden Standard
+     *
+     * Handles 3 formats:
+     * 1. Golden Standard (objects + metadata.capture_version) - pass through
+     * 2. variationImages (nested transform) - flatten and convert
+     * 3. Legacy nested (old system) - convert to Golden Standard
+     *
+     * @param array $data Design data in any format
+     * @return array Normalized design data in Golden Standard format
+     */
+    private function normalize_design_data($data) {
+        // Already Golden Standard? Pass through
+        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
+            error_log('✅ [ADMIN NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
+            return $data;
+        }
+
+        // variationImages format?
+        if (isset($data['variationImages'])) {
+            error_log('🔄 [ADMIN NORMALIZE] Converting variationImages format to Golden Standard');
+
+            $variation_keys = array_keys($data['variationImages']);
+            $elements = $data['variationImages'][$variation_keys[0]];
+
+            // Flatten nested transform
+            $normalized_elements = array_map(function($el) {
+                if (isset($el['transform'])) {
+                    // Move transform properties to root
+                    $flattened = array_merge($el, $el['transform']);
+                    unset($flattened['transform']);
+                    return $flattened;
+                }
+                return $el;
+            }, $elements);
+
+            $normalized = array(
+                'objects' => $normalized_elements,
+                'metadata' => array(
+                    'capture_version' => '2.1-migrated',
+                    'source' => 'variation_images_normalized',
+                    'original_template_id' => $data['templateId'] ?? null,
+                    'original_variation' => $data['currentVariation'] ?? null,
+                    'normalized_at' => current_time('mysql')
+                )
+            );
+
+            error_log('✅ [ADMIN NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
+            return $normalized;
+        }
+
+        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
+        $view_keys = array_keys($data);
+        if (!empty($view_keys)) {
+            $first_view_key = $view_keys[0];
+            $first_view = $data[$first_view_key];
+
+            if (is_array($first_view) && isset($first_view['images'])) {
+                error_log('🔄 [ADMIN NORMALIZE] Converting legacy view format to Golden Standard');
+
+                $normalized = array(
+                    'objects' => $first_view['images'],
+                    'metadata' => array(
+                        'capture_version' => '1.0-legacy-migrated',
+                        'source' => 'legacy_view_normalized',
+                        'original_view_key' => $first_view_key,
+                        'normalized_at' => current_time('mysql')
+                    )
+                );
+
+                error_log('✅ [ADMIN NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
+                return $normalized;
+            }
+        }
+
+        // Unknown format - log error and return unchanged
+        error_log('⚠️ [ADMIN NORMALIZE] Unknown design format: ' . json_encode(array_keys($data)));
+        return $data;
+    }
+
+    /**
      * 🎨 WOOCOMMERCE ORDER DESIGN PREVIEW
      * AJAX Handler: Get design data from order for preview generation
      *
@@ -1359,6 +1439,12 @@ class Octo_Print_Designer_Admin {
 
             $mockup_url = $order->get_meta('_mockup_image_url', true);
             error_log('🔍 AGENT 7: Mockup URL from meta: ' . ($mockup_url ?: 'NOT FOUND'));
+        }
+
+        // PHASE 3 - AGENT 3: Normalize design data to Golden Standard format
+        if (!empty($design_data) && is_array($design_data)) {
+            $design_data = $this->normalize_design_data($design_data);
+            error_log('✅ [ADMIN PREVIEW] Design data normalized for preview');
         }
 
         // 🔍 AGENT 7: Enhanced canvas dimension extraction with 3-tier fallback

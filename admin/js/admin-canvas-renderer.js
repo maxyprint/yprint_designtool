@@ -10,6 +10,92 @@
  * - Pure HTML5 Canvas rendering
  */
 
+/**
+ * 🎯 AGENT 5: COORDINATE AUDIT TRAIL CLASS
+ * Comprehensive logging system that tracks EVERY coordinate transformation
+ * in the rendering pipeline to identify where coordinates are lost/modified
+ */
+class CoordinateAuditTrail {
+    constructor(elementId, elementType) {
+        this.elementId = elementId;
+        this.elementType = elementType;
+        this.entries = [];
+        this.startTime = performance.now();
+        this.warnings = [];
+        this.activeTransformations = 0;
+    }
+    record(stage, data) {
+        const entry = {stage: stage, timestamp: performance.now() - this.startTime, coordinates: { ...data.coordinates }, transformation: data.transformation || null, metadata: data.metadata || {}};
+        this.entries.push(entry);
+        if (data.transformation && data.transformation.delta) {
+            const magnitude = data.transformation.magnitude || 0;
+            if (magnitude > 0.1) { this.activeTransformations++; }
+        }
+        return entry;
+    }
+    recordTransformation(stage, before, after, transformType) {
+        const deltaX = after.x - before.x; const deltaY = after.y - before.y; const magnitude = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        this.record(stage, {coordinates: after, transformation: {type: transformType, delta: {x: deltaX, y: deltaY}, magnitude: magnitude}, metadata: {before, after}});
+        return {deltaX, deltaY, magnitude};
+    }
+    detectAnomalies(config) {
+        const anomalies = [];
+        for (let i = 0; i < this.entries.length; i++) {
+            const entry = this.entries[i];
+            if (entry.transformation && entry.transformation.magnitude > config.maxDeltaWarning) {
+                anomalies.push({type: 'LARGE_DELTA', stage: entry.stage, magnitude: entry.transformation.magnitude.toFixed(2), threshold: config.maxDeltaWarning, message: `Single step delta exceeds ${config.maxDeltaWarning}px threshold`});
+            }
+        }
+        if (this.entries.length >= 2) {
+            const first = this.entries[0].coordinates; const last = this.entries[this.entries.length - 1].coordinates;
+            const totalDeltaX = last.x - first.x; const totalDeltaY = last.y - first.y; const totalMagnitude = Math.sqrt(totalDeltaX * totalDeltaX + totalDeltaY * totalDeltaY);
+            if (totalMagnitude > config.maxTotalMagnitude) {
+                anomalies.push({type: 'LARGE_TOTAL_MAGNITUDE', totalMagnitude: totalMagnitude.toFixed(2), threshold: config.maxTotalMagnitude, message: `Total transformation magnitude exceeds ${config.maxTotalMagnitude}px threshold`});
+            }
+        }
+        if (this.activeTransformations > config.maxTransformStages) {
+            anomalies.push({type: 'MULTIPLE_CORRECTION_SYNDROME', activeTransformations: this.activeTransformations, threshold: config.maxTransformStages, message: `Too many active transformations (${this.activeTransformations} > ${config.maxTransformStages}) - potential multiple correction layers`});
+        }
+        this.warnings = anomalies; return anomalies;
+    }
+    getReport(config = null) {
+        const totalTime = performance.now() - this.startTime; const finalCoordinates = this.entries.length > 0 ? this.entries[this.entries.length - 1].coordinates : null;
+        let anomalies = this.warnings; if (config && config.detectAnomalies) { anomalies = this.detectAnomalies(config); }
+        return {elementId: this.elementId, elementType: this.elementType, totalStages: this.entries.length, totalTime: totalTime.toFixed(2) + 'ms', activeTransformations: this.activeTransformations, stages: this.entries, finalCoordinates: finalCoordinates, anomalies: anomalies, hasWarnings: anomalies.length > 0};
+    }
+    formatConsoleOutput(config = null) {
+        const report = this.getReport(config); const lines = [];
+        lines.push('═══════════════════════════════════════════════════════');
+        lines.push(`COORDINATE AUDIT TRAIL - ${this.elementType} #${this.elementId}`);
+        lines.push('═══════════════════════════════════════════════════════');
+        for (let i = 0; i < report.stages.length; i++) {
+            const stage = report.stages[i]; const stageNum = i + 1; const coords = stage.coordinates;
+            let line = `Stage ${stageNum} [${stage.timestamp.toFixed(1)}ms]: ${stage.stage.padEnd(25)} → (${coords.x.toFixed(1)}, ${coords.y.toFixed(1)})`;
+            if (stage.transformation && stage.transformation.magnitude > 0.1) {
+                const delta = stage.transformation.delta; const mag = stage.transformation.magnitude; const sign = delta.y >= 0 ? '+' : '';
+                line += ` [Δ ${sign}${delta.y.toFixed(1)}px, mag: ${mag.toFixed(1)}px]`;
+                if (config && mag > config.maxDeltaWarning) { line += ' ⚠️ LARGE DELTA!'; }
+            } else { line += ' [Δ 0px]'; }
+            lines.push(line);
+        }
+        lines.push('───────────────────────────────────────────────────────');
+        if (report.stages.length >= 2) {
+            const first = report.stages[0].coordinates; const last = report.stages[report.stages.length - 1].coordinates;
+            const totalDeltaX = last.x - first.x; const totalDeltaY = last.y - first.y; const totalMag = Math.sqrt(totalDeltaX * totalDeltaX + totalDeltaY * totalDeltaY);
+            const status = (config && totalMag > config.maxTotalMagnitude) ? '⚠️' : '✅';
+            lines.push(`Total Magnitude: ${totalMag.toFixed(2)}px ${status}`);
+            lines.push(`Active Transformations: ${report.activeTransformations}`);
+        }
+        if (report.hasWarnings) {
+            lines.push('───────────────────────────────────────────────────────');
+            lines.push('⚠️ ANOMALIES DETECTED:');
+            for (const anomaly of report.anomalies) { lines.push(`   - [${anomaly.type}] ${anomaly.message}`); }
+        }
+        lines.push('═══════════════════════════════════════════════════════');
+        return lines.join('\n');
+    }
+}
+
 class AdminCanvasRenderer {
     constructor() {
         // 🎯 AGENT 1: EXACT CANVAS DIMENSIONS - 780×580 from design_data
@@ -124,6 +210,43 @@ class AdminCanvasRenderer {
             startTime: null,
             endTime: null
         };
+
+        // 🎯 AGENT 5: AUDIT TRAIL SYSTEM for coordinate transformation tracking
+        this.auditTrailEnabled = true;  // Enable/disable audit trail globally
+        this.auditTrailConfig = {
+            logToConsole: true,          // Output to console
+            detectAnomalies: true,       // Automatic anomaly detection
+            maxDeltaWarning: 100,        // Alert if delta >100px in single step
+            maxTotalMagnitude: 200,      // Alert if total magnitude >200px
+            maxTransformStages: 3        // Alert if >3 active transformations
+        };
+
+        // 🎯 AGENT 2: VISUAL VALIDATION LAYER - Pixel Sampling System
+        this.visualValidation = {
+            enabled: true,                    // Enable visual validation
+            pixelSamplingEnabled: true,       // Enable pixel sampling validation
+            validationThreshold: 0.6,         // Minimum confidence score (60%)
+            samplePointCount: 5,              // Number of sample points (center + 4 corners)
+            backgroundThreshold: 250,         // RGB threshold for white background (250-255)
+            alphaThreshold: 10,               // Minimum alpha value for content detection
+            validationResults: [],            // Store validation results for analysis
+            logValidation: true               // Log validation results
+        };
+
+        // 🎯 AGENT 1: CORRECTION MUTEX - Ensures only ONE correction system is active
+        // This prevents compound corrections that cause visual errors
+        this.correctionStrategy = {
+            active: null,           // 'legacy' | 'modern_metadata' | 'heuristic' | null
+            legacyApplied: false,   // Track if legacy correction was applied
+            offsetApplied: false,   // Track if designer offset was applied
+            scalingApplied: false,  // Track if canvas scaling was applied
+            dataFormat: null,       // 'legacy_db' | 'modern' | 'unknown'
+            mutexEnabled: true,     // Enable mutex protection
+            validationEnabled: true // Enable validation checks
+        };
+
+        // 🎯 AGENT 2: Initialize Pixel Sampling Validator
+        this.pixelValidator = new PixelSamplingValidator(this);
     }
 
     /**
@@ -437,6 +560,84 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 AGENT 1: DATA FORMAT CLASSIFICATION
+     * Classifies design data format to determine which correction strategy to use
+     * This ensures only ONE correction system is active (Mutex Pattern)
+     * @param {Object} designData - Design data to classify
+     * @returns {string} 'legacy_db' | 'modern' | 'unknown'
+     */
+    classifyDataFormat(designData) {
+        console.log('🔍 AGENT 1 MUTEX: Classifying data format...', {
+            hasMetadata: !!designData.metadata,
+            metadataSource: designData.metadata?.source,
+            hasCaptureVersion: !!designData.metadata?.capture_version,
+            hasDesignerOffset: designData.metadata?.designer_offset !== undefined
+        });
+
+        // Detection Method 1: Explicit db_processed_views marker (highest priority)
+        const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
+        if (isLegacyDbFormat) {
+            console.log('✅ AGENT 1 MUTEX: Format = LEGACY_DB (explicit marker)');
+            return 'legacy_db';
+        }
+
+        // Detection Method 2: Missing modern metadata markers
+        const missingCaptureVersion = !designData.metadata?.capture_version;
+        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
+        const hasModernMetadata = !missingCaptureVersion || !missingDesignerOffset;
+
+        if (missingCaptureVersion && missingDesignerOffset) {
+            console.log('✅ AGENT 1 MUTEX: Format = LEGACY_DB (missing modern metadata)');
+            return 'legacy_db';
+        }
+
+        if (hasModernMetadata) {
+            console.log('✅ AGENT 1 MUTEX: Format = MODERN (has modern metadata)');
+            return 'modern';
+        }
+
+        // Default: Unable to determine
+        console.log('⚠️ AGENT 1 MUTEX: Format = UNKNOWN (unable to classify)');
+        return 'unknown';
+    }
+
+    /**
+     * 🎯 AGENT 1: CORRECTION MUTEX VALIDATOR
+     * Validates that only ONE correction system is active
+     * Throws error if multiple systems are detected
+     * @throws {Error} If mutex violation detected
+     */
+    validateCorrectionMutex() {
+        if (!this.correctionStrategy.mutexEnabled) {
+            return; // Mutex disabled, skip validation
+        }
+
+        const activeSystems = [];
+        if (this.correctionStrategy.legacyApplied) activeSystems.push('Legacy Data Correction');
+        if (this.correctionStrategy.offsetApplied) activeSystems.push('Designer Offset');
+        if (this.correctionStrategy.scalingApplied) activeSystems.push('Canvas Scaling');
+
+        if (activeSystems.length > 1) {
+            const error = `❌ AGENT 1 MUTEX VIOLATION: Multiple correction systems active simultaneously: ${activeSystems.join(', ')}`;
+            console.error(error, {
+                legacyApplied: this.correctionStrategy.legacyApplied,
+                offsetApplied: this.correctionStrategy.offsetApplied,
+                scalingApplied: this.correctionStrategy.scalingApplied,
+                activeStrategy: this.correctionStrategy.active,
+                dataFormat: this.correctionStrategy.dataFormat
+            });
+
+            if (this.correctionStrategy.validationEnabled) {
+                throw new Error(error);
+            }
+        } else if (activeSystems.length === 1) {
+            console.log('✅ AGENT 1 MUTEX: Validation passed - Single correction system active:', activeSystems[0]);
+        } else {
+            console.log('✅ AGENT 1 MUTEX: Validation passed - No correction systems active (modern data)');
+        }
+    }
+
+    /**
      * 🎯 HIVE MIND: DESIGNER-OFFSET EXTRACTION
      * Extracts offset values that Designer added during capture (transformCoordinates)
      * Designer adds canvasRect.left/top - containerRect.left/top to coordinates
@@ -444,8 +645,18 @@ class AdminCanvasRenderer {
      * @param {Object} designData - Design data with potential metadata.designer_offset
      */
     extractDesignerOffset(designData) {
+        // 🎯 AGENT 1 MUTEX: Check if legacy correction already applied
+        if (this.correctionStrategy.legacyApplied) {
+            this.designerOffset.x = 0;
+            this.designerOffset.y = 0;
+            this.designerOffset.detected = false;
+            this.designerOffset.source = 'mutex_skip_legacy_active';
+            console.log('🔒 AGENT 1 MUTEX: Skipping designer offset - Legacy correction active');
+            return;
+        }
+
         // 🎯 SCENARIO A: Skip offset extraction for legacy data (already corrected)
-        // Detection logic must match applyLegacyDataCorrection() to ensure consistency
+        // Detection logic must match classifyDataFormat() to ensure consistency
         const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
         const missingCaptureVersion = !designData.metadata?.capture_version;
         const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
@@ -471,6 +682,11 @@ class AdminCanvasRenderer {
             this.designerOffset.y = parseFloat(designData.metadata.designer_offset.y || 0);
             this.designerOffset.detected = true;
             this.designerOffset.source = 'metadata';
+
+            // 🎯 AGENT 1 MUTEX: Track offset application
+            this.correctionStrategy.offsetApplied = true;
+            this.correctionStrategy.active = 'modern_metadata';
+
             console.log('🎯 HIVE MIND: Designer offset extracted from metadata:', this.designerOffset);
             return;
         }
@@ -481,6 +697,11 @@ class AdminCanvasRenderer {
             this.designerOffset.y = parseFloat(designData.canvas_info.offset.y || 0);
             this.designerOffset.detected = true;
             this.designerOffset.source = 'canvas_info';
+
+            // 🎯 AGENT 1 MUTEX: Track offset application
+            this.correctionStrategy.offsetApplied = true;
+            this.correctionStrategy.active = 'modern_metadata';
+
             console.log('🎯 HIVE MIND: Designer offset extracted from canvas_info:', this.designerOffset);
             return;
         }
@@ -608,6 +829,10 @@ class AdminCanvasRenderer {
                     this.designerOffset.detected = true;
                     this.designerOffset.source = 'heuristic_legacy_compensation';
 
+                    // 🎯 AGENT 1 MUTEX: Track heuristic offset application
+                    this.correctionStrategy.offsetApplied = true;
+                    this.correctionStrategy.active = 'heuristic';
+
                     console.log('🎯 HIVE MIND: Legacy offset detected:', {
                         isLegacyData,
                         elementCount: elements.length,
@@ -653,8 +878,26 @@ class AdminCanvasRenderer {
      * @param {Object} designData - Design data with potential metadata.canvas_dimensions
      */
     extractCanvasScaling(designData) {
+        // 🎯 AGENT 1 MUTEX: Check if legacy correction already applied
+        if (this.correctionStrategy.legacyApplied) {
+            this.canvasScaling.scaleX = 1;
+            this.canvasScaling.scaleY = 1;
+            this.canvasScaling.detected = false;
+            this.canvasScaling.source = 'mutex_skip_legacy_active';
+            this.canvasScaling.originalDimensions = {
+                width: this.canvasWidth,
+                height: this.canvasHeight
+            };
+            this.canvasScaling.currentDimensions = {
+                width: this.canvasWidth,
+                height: this.canvasHeight
+            };
+            console.log('🔒 AGENT 1 MUTEX: Skipping canvas scaling - Legacy correction active');
+            return;
+        }
+
         // 🎯 SCENARIO A: Skip canvas scaling extraction for legacy data (already corrected)
-        // Detection logic must match applyLegacyDataCorrection() to ensure consistency
+        // Detection logic must match classifyDataFormat() to ensure consistency
         const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
         const missingCaptureVersion = !designData.metadata?.capture_version;
         const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
@@ -701,6 +944,14 @@ class AdminCanvasRenderer {
                 this.canvasScaling.originalDimensions.height !== this.canvasHeight
             );
             this.canvasScaling.source = 'metadata';
+
+            // 🎯 AGENT 1 MUTEX: Track canvas scaling application (only if actually scaling)
+            if (this.canvasScaling.detected) {
+                this.correctionStrategy.scalingApplied = true;
+                if (!this.correctionStrategy.active) {
+                    this.correctionStrategy.active = 'modern_metadata';
+                }
+            }
 
             console.log('🎯 CANVAS SCALING: Dimension mismatch detected from metadata:', {
                 original: `${this.canvasScaling.originalDimensions.width}×${this.canvasScaling.originalDimensions.height}`,
@@ -766,6 +1017,12 @@ class AdminCanvasRenderer {
                 this.canvasScaling.scaleY = this.canvasHeight / estimatedHeight;
                 this.canvasScaling.detected = true;
                 this.canvasScaling.source = 'heuristic';
+
+                // 🎯 AGENT 1 MUTEX: Track heuristic scaling application
+                this.correctionStrategy.scalingApplied = true;
+                if (!this.correctionStrategy.active) {
+                    this.correctionStrategy.active = 'heuristic';
+                }
 
                 console.log('🎯 CANVAS SCALING: Heuristic detection suggests different canvas size:', {
                     analysis: {
@@ -924,6 +1181,11 @@ class AdminCanvasRenderer {
 
         console.log(`✅ LEGACY DATA CORRECTION: Transformed ${elementsTransformed} elements successfully`);
         console.log('📊 LEGACY DATA CORRECTION: Data is now ready for 1:1 rendering');
+
+        // 🎯 AGENT 1 MUTEX: Mark legacy correction as applied
+        this.correctionStrategy.legacyApplied = true;
+        this.correctionStrategy.active = 'legacy';
+        this.correctionStrategy.dataFormat = 'legacy_db';
 
         return {
             applied: true,
@@ -1499,47 +1761,99 @@ class AdminCanvasRenderer {
             const scaleY = imageData.scaleY || 1;
             const angle = (imageData.angle || 0) * Math.PI / 180;
 
+            // 🎯 AGENT 5: AUDIT TRAIL - Initialize coordinate tracking
+            let auditTrail = null;
+            if (this.auditTrailEnabled) {
+                auditTrail = new CoordinateAuditTrail(
+                    imageData.id || `img_${Date.now()}`,
+                    imageData.type || 'image'
+                );
+
+                // Stage 1: Record input data (after legacy correction if applied)
+                auditTrail.record('Input Data', {
+                    coordinates: { x: left, y: top },
+                    metadata: {
+                        source: this.correctionStrategy.legacyApplied ? 'database_legacy_corrected' : 'database',
+                        legacyCorrectionApplied: this.correctionStrategy.legacyApplied,
+                        dataFormat: this.correctionStrategy.dataFormat,
+                        scaleX: scaleX,
+                        scaleY: scaleY,
+                        angle: angle
+                    }
+                });
+            }
+
             // 🎯 AGENT 4: Apply coordinate preservation (no transformation)
             // 🎯 HIVE MIND: Apply offset compensation in noTransformMode
             // 🎯 CANVAS SCALING: Apply dimension scaling compensation
             let position;
             if (this.coordinatePreservation.noTransformMode) {
+                // Stage 2: After offset compensation
                 let x = left - this.designerOffset.x;
                 let y = top - this.designerOffset.y;
 
-                // Apply canvas dimension scaling
+                if (auditTrail && this.designerOffset.detected) {
+                    auditTrail.recordTransformation(
+                        'Offset Compensation',
+                        { x: left, y: top },
+                        { x, y },
+                        'designer_offset'
+                    );
+                } else if (auditTrail) {
+                    auditTrail.record('Offset Skip', {
+                        coordinates: { x, y },
+                        metadata: { reason: 'No designer offset detected' }
+                    });
+                }
+
+                // Stage 3: Apply canvas dimension scaling
+                const beforeScaling = { x, y };
                 if (this.canvasScaling.detected) {
                     x = x * this.canvasScaling.scaleX;
                     y = y * this.canvasScaling.scaleY;
+
+                    if (auditTrail) {
+                        auditTrail.recordTransformation(
+                            'Scaling Compensation',
+                            beforeScaling,
+                            { x, y },
+                            'canvas_dimension_scaling'
+                        );
+                    }
+                } else if (auditTrail) {
+                    auditTrail.record('Scaling Skip', {
+                        coordinates: { x, y },
+                        metadata: { reason: 'No canvas scaling detected' }
+                    });
                 }
 
                 position = { x, y };
 
-                // 🔍 MULTIPLE CORRECTION LAYER SYNDROME - DIAGNOSTIC LOGGING
-                console.log('🔍 COORDINATE TRANSFORMATION AUDIT:', {
-                    step1_input: { left, top },
-                    step2_offsetCompensation: {
-                        offsetX: this.designerOffset.x,
-                        offsetY: this.designerOffset.y,
-                        offsetSource: this.designerOffset.source,
-                        afterOffset: { x: left - this.designerOffset.x, y: top - this.designerOffset.y }
-                    },
-                    step3_scalingCompensation: {
-                        scaleX: this.canvasScaling.scaleX,
-                        scaleY: this.canvasScaling.scaleY,
-                        scalingDetected: this.canvasScaling.detected,
-                        scalingSource: this.canvasScaling.source,
-                        afterScaling: position
-                    },
-                    finalPosition: position,
-                    totalDelta: {
-                        deltaX: Math.abs(position.x - left),
-                        deltaY: Math.abs(position.y - top)
-                    },
-                    warningThreshold: Math.abs(position.y - top) > 100 ? '⚠️ DELTA >100PX!' : 'OK'
-                });
+                // Stage 4: Record final position
+                if (auditTrail) {
+                    auditTrail.record('Final Position', {
+                        coordinates: position,
+                        metadata: {
+                            mode: 'noTransformMode',
+                            totalDeltaX: position.x - left,
+                            totalDeltaY: position.y - top
+                        }
+                    });
+
+                    // Generate and log audit report
+                    if (this.auditTrailConfig.logToConsole) {
+                        console.log(auditTrail.formatConsoleOutput(this.auditTrailConfig));
+                    }
+                }
             } else {
                 position = this.preserveCoordinates(left, top);
+
+                if (auditTrail) {
+                    auditTrail.record('Transform Mode', {
+                        coordinates: position,
+                        metadata: { mode: 'preserveCoordinates' }
+                    });
+                }
             }
 
             // 🎯 AGENT 9 COORDINATE VERIFICATION: Comprehensive coordinate tracking
@@ -2711,6 +3025,20 @@ class AdminCanvasRenderer {
             endTime: null
         };
 
+        // 🎯 AGENT 1 MUTEX: Reset correction strategy for new render
+        this.correctionStrategy = {
+            active: null,
+            legacyApplied: false,
+            offsetApplied: false,
+            scalingApplied: false,
+            dataFormat: null,
+            mutexEnabled: true,
+            validationEnabled: true
+        };
+
+        // 🎯 AGENT 1 MUTEX: Classify data format BEFORE applying any corrections
+        this.correctionStrategy.dataFormat = this.classifyDataFormat(designData);
+
         // 🎯 LEGACY DATA CORRECTION: Transform legacy data BEFORE any other processing
         // This must run FIRST to correct faulty database coordinates before rendering
         const legacyDataCorrection = this.applyLegacyDataCorrection(designData);
@@ -2731,6 +3059,30 @@ class AdminCanvasRenderer {
         // 🎯 CANVAS SCALING: Extract canvas dimension scaling from metadata
         // This should be 1:1 for legacy data after correction
         this.extractCanvasScaling(designData);
+
+        // 🎯 AGENT 1 MUTEX: Validate that only ONE correction system is active
+        try {
+            this.validateCorrectionMutex();
+        } catch (error) {
+            console.error('❌ AGENT 1 MUTEX: Validation failed:', error.message);
+            // Continue rendering but log the mutex violation
+        }
+
+        // 🎯 AGENT 1 MUTEX: Log final correction strategy status
+        console.log('🎯 AGENT 1 MUTEX: Correction Strategy Status:', {
+            dataFormat: this.correctionStrategy.dataFormat,
+            activeStrategy: this.correctionStrategy.active,
+            corrections: {
+                legacy: this.correctionStrategy.legacyApplied,
+                offset: this.correctionStrategy.offsetApplied,
+                scaling: this.correctionStrategy.scalingApplied
+            },
+            systems: {
+                legacyCorrection: this.correctionStrategy.legacyApplied ? 'ACTIVE' : 'INACTIVE',
+                designerOffset: this.correctionStrategy.offsetApplied ? `ACTIVE (${this.designerOffset.x}, ${this.designerOffset.y})` : 'INACTIVE',
+                canvasScaling: this.correctionStrategy.scalingApplied ? `ACTIVE (${this.canvasScaling.scaleX.toFixed(3)}, ${this.canvasScaling.scaleY.toFixed(3)})` : 'INACTIVE'
+            }
+        });
 
         // 🎯 AGENT 8: Initialize Design Fidelity Comparator
         const fidelityComparator = new DesignFidelityComparator(designData);
