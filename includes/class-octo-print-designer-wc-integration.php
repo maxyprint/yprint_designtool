@@ -6525,16 +6525,54 @@ private function build_print_provider_email_content($order, $design_items, $note
         $object_counter = 0;
 
         foreach ($first_view['images'] as $image_data) {
-            if (!isset($image_data['url']) || !isset($image_data['transform'])) {
+            // 🎯 FIX: Support both Legacy Format AND Golden Standard Format
+
+            // Detect format by checking for nested 'transform' object
+            $is_legacy_format = isset($image_data['url']) && isset($image_data['transform']);
+            $is_golden_standard = (isset($image_data['src']) || isset($image_data['url'])) && isset($image_data['left']);
+
+            if (!$is_legacy_format && !$is_golden_standard) {
+                error_log("⚠️ [DATA CONVERTER] Skipping object with unknown format (missing required properties)");
                 continue;
             }
 
-            $transform = $image_data['transform'];
+            // Extract image URL (both formats use different property names)
+            $image_url = null;
+            if ($is_legacy_format) {
+                $image_url = $image_data['url'];
+            } elseif ($is_golden_standard) {
+                $image_url = $image_data['src'] ?? $image_data['url'] ?? null;
+            }
+
+            if (!$image_url) {
+                error_log("⚠️ [DATA CONVERTER] Skipping object without image URL");
+                continue;
+            }
+
+            // Extract transform properties (handle both nested and flat structures)
+            if ($is_legacy_format) {
+                // Legacy format: nested transform object
+                $transform = $image_data['transform'];
+                error_log("🔄 [DATA CONVERTER] Converting legacy format object");
+            } else {
+                // Golden Standard format: flat properties at root level
+                $transform = [
+                    'left' => $image_data['left'] ?? 0,
+                    'top' => $image_data['top'] ?? 0,
+                    'width' => $image_data['width'] ?? 100,
+                    'height' => $image_data['height'] ?? 100,
+                    'scaleX' => $image_data['scaleX'] ?? 1,
+                    'scaleY' => $image_data['scaleY'] ?? 1,
+                    'angle' => $image_data['angle'] ?? 0,
+                ];
+                error_log("🎯 [DATA CONVERTER] Converting Golden Standard format object");
+            }
+
             $canvas_objects[] = [
-                'type' => 'image',
+                'type' => $image_data['type'] ?? 'image',
                 'version' => '5.3.0',
-                'originX' => 'left',
-                'originY' => 'top',
+                'originX' => $image_data['originX'] ?? 'left',
+                'originY' => $image_data['originY'] ?? 'top',
                 'left' => floatval($transform['left'] ?? 0),
                 'top' => floatval($transform['top'] ?? 0),
                 'width' => intval($transform['width'] ?? 100),
@@ -6542,7 +6580,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'scaleX' => floatval($transform['scaleX'] ?? 1),
                 'scaleY' => floatval($transform['scaleY'] ?? 1),
                 'angle' => floatval($transform['angle'] ?? 0),
-                'src' => $image_data['url'],
+                'src' => $image_url,
                 'visible' => $image_data['visible'] ?? true,
                 'crossOrigin' => 'anonymous',
                 // Add unique ID for canvas rendering
