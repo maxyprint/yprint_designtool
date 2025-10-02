@@ -1,0 +1,230 @@
+{
+  "root_cause_synthesis": {
+    "primary_bug": "variationImages format from deo6_octo_user_designs table is structurally incompatible with rendering pipeline. Code attempts to extract design elements using Object.keys()[0] which returns primitive 'templateId' instead of the 'variationImages' object",
+    "secondary_bugs": [
+      "normalizeVariationImagesFormat() function exists but is NOT called in renderDesignPreview() pipeline",
+      "classifyDataFormat() doesn't detect variationImages format, causing misclassification as 'legacy_db'",
+      "1 remaining HPOS-incompatible update_post_meta() call in API integration (minor)",
+      "Transform coordinates nested in element.transform.left instead of flat element.left structure"
+    ],
+    "failure_sequence": [
+      "Step 1: Backend sends variationImages format from deo6_octo_user_designs table",
+      "Step 2: classifyDataFormat() checks metadata.capture_version → undefined",
+      "Step 3: Misclassified as 'legacy_db' due to missing metadata",
+      "Step 4: renderDesignPreview() tries designData[viewKeys[0]] → gets 'templateId' = '3657' (primitive)",
+      "Step 5: Code expects '3657'.images → undefined (primitives have no .images property)",
+      "Step 6: objectsToRender = [] (empty array)",
+      "Step 7: Early return at line 3130 due to empty array",
+      "Step 8: Canvas stays blank, user sees nothing"
+    ]
+  },
+
+  "all_fixes_needed": [
+    {
+      "priority": "CRITICAL",
+      "fix_id": "FIX-1",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "function": "renderDesignPreview",
+      "line": "3043 (after classifyDataFormat call)",
+      "current_code": "const dataFormat = this.classifyDataFormat(designData);\nconst legacyDataCorrection = this.applyLegacyDataCorrection(designData);",
+      "fixed_code": "// 🎯 FIX: Normalize variationImages BEFORE classification\ndesignData = this.normalizeVariationImagesFormat(designData);\n\nconst dataFormat = this.classifyDataFormat(designData);\nconst legacyDataCorrection = this.applyLegacyDataCorrection(designData);",
+      "reason": "The normalizeVariationImagesFormat() function exists but is never called. This is THE critical fix - inserting one line that calls the existing function will solve Order #5378's blank canvas issue."
+    },
+    {
+      "priority": "CRITICAL",
+      "fix_id": "FIX-2",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "function": "classifyDataFormat",
+      "line": "569-602 (entire function)",
+      "current_code": "classifyDataFormat(designData) {\n    const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';\n    const missingCaptureVersion = !designData.metadata?.capture_version;\n    const missingDesignerOffset = designData.metadata?.designer_offset === undefined;\n    \n    if (missingCaptureVersion && missingDesignerOffset) {\n        return 'legacy_db';\n    }\n    return 'modern';\n}",
+      "fixed_code": "classifyDataFormat(designData) {\n    // PRIORITY 1: Check for variationImages (should be normalized by now)\n    if (designData.metadata?.source === 'variationImages_normalized') {\n        console.log('📊 Data Format: variationImages (normalized)');\n        return 'variationImages_normalized';\n    }\n    \n    // PRIORITY 2: Explicit legacy marker\n    if (designData.metadata?.source === 'db_processed_views') {\n        console.log('📊 Data Format: legacy_db');\n        return 'legacy_db';\n    }\n    \n    // PRIORITY 3: Modern format with metadata\n    const hasModernMetadata = designData.metadata?.capture_version &&\n                              designData.metadata?.designer_offset !== undefined;\n    \n    if (hasModernMetadata && designData.objects) {\n        console.log('📊 Data Format: modern');\n        return 'modern';\n    }\n    \n    // PRIORITY 4: Legacy fallback\n    const missingCaptureVersion = !designData.metadata?.capture_version;\n    const missingDesignerOffset = designData.metadata?.designer_offset === undefined;\n    \n    if (missingCaptureVersion && missingDesignerOffset) {\n        console.log('📊 Data Format: legacy_db (fallback)');\n        return 'legacy_db';\n    }\n    \n    console.warn('⚠️ Data Format: unknown');\n    return 'unknown';\n}",
+      "reason": "Current function uses negative detection (absence of features). New version uses positive detection and recognizes normalized variationImages by checking metadata.source. Prevents misclassification."
+    },
+    {
+      "priority": "HIGH",
+      "fix_id": "FIX-3",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "function": "applyLegacyDataCorrection",
+      "line": "1080-1085 (start of function)",
+      "current_code": "applyLegacyDataCorrection(designData) {\n    const dataFormat = this.classifyDataFormat(designData);\n    const isLegacyData = dataFormat === 'legacy_db';",
+      "fixed_code": "applyLegacyDataCorrection(designData) {\n    const dataFormat = this.classifyDataFormat(designData);\n    \n    // Skip correction for normalized variationImages\n    if (dataFormat === 'variationImages_normalized') {\n        console.log('⏭️ LEGACY CORRECTION: Skipping - variationImages already normalized');\n        this.correctionStrategy = { legacyApplied: false, dataFormat: 'variationImages_normalized' };\n        return designData;\n    }\n    \n    const isLegacyData = dataFormat === 'legacy_db';",
+      "reason": "Prevents applying legacy corrections (+80px Y, ×1.23 scale) to already-correct variationImages coordinates. Sets correct correction strategy to prevent mutex errors."
+    },
+    {
+      "priority": "MEDIUM",
+      "fix_id": "FIX-4",
+      "file": "/workspaces/yprint_designtool/includes/class-octo-print-api-integration.php",
+      "function": "Various API response handlers",
+      "line": "Search for remaining update_post_meta",
+      "current_code": "update_post_meta($order_id, '_allesklardruck_api_response', $response_data);",
+      "fixed_code": "$order = wc_get_order($order_id);\nif ($order) {\n    $order->update_meta_data('_allesklardruck_api_response', $response_data);\n    $order->save();\n}",
+      "reason": "HPOS compatibility. Current code has 1 remaining post meta call. Should use WC_Order methods. (Only 1 occurrence found, not 19 as originally estimated)"
+    },
+    {
+      "priority": "LOW",
+      "fix_id": "FIX-5",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "function": "normalizeVariationImagesFormat",
+      "line": "1230-1240 (object mapping)",
+      "current_code": "objects: elements.map(el => ({\n    ...el,\n    left: el.transform?.left ?? el.left ?? 0,\n    top: el.transform?.top ?? el.top ?? 0,\n    scaleX: el.transform?.scaleX ?? el.scaleX ?? 1,\n    scaleY: el.transform?.scaleY ?? el.scaleY ?? 1,\n    angle: el.transform?.angle ?? el.angle ?? 0\n}))",
+      "fixed_code": "objects: elements.map(el => ({\n    ...el,\n    // Flatten transform coordinates\n    left: el.transform?.left ?? el.left ?? 0,\n    top: el.transform?.top ?? el.top ?? 0,\n    scaleX: el.transform?.scaleX ?? el.scaleX ?? 1,\n    scaleY: el.transform?.scaleY ?? el.scaleY ?? 1,\n    angle: el.transform?.angle ?? el.angle ?? 0,\n    width: el.transform?.width ?? el.width,\n    height: el.transform?.height ?? el.height,\n    // Remove nested transform to ensure flat structure\n    transform: undefined\n}))",
+      "reason": "Ensures completely flat coordinate structure. Removes nested transform object to prevent any confusion in downstream code. Currently keeps transform object which could cause issues."
+    }
+  ],
+
+  "minimum_fix": {
+    "description": "The ONE fix that solves Order #5378's immediate blank canvas problem",
+    "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+    "function": "renderDesignPreview",
+    "line": "~3043 (after classifyDataFormat call)",
+    "code_change": "// Add this ONE line before classifyDataFormat:\ndesignData = this.normalizeVariationImagesFormat(designData);",
+    "justification": "The normalizer function ALREADY EXISTS (line 1205) and correctly converts variationImages → Golden Standard format. It's just never called. Adding this single line will:\n1. Convert variationImages.['167359_189542'][0].transform.left → objects[0].left\n2. Add metadata.source = 'variationImages_normalized'\n3. Flatten all coordinates\n4. Enable objectsToRender.length > 0 check to pass\n5. Canvas will render successfully"
+  },
+
+  "implementation_plan": {
+    "step_1": {
+      "action": "Apply FIX-1 (CRITICAL)",
+      "detail": "Insert normalization call in renderDesignPreview()",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "line": "~3043",
+      "estimated_time": "5 minutes",
+      "risk": "LOW - Function already exists, just calling it"
+    },
+    "step_2": {
+      "action": "Apply FIX-2 (CRITICAL)",
+      "detail": "Update classifyDataFormat() to recognize normalized format",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "lines": "569-602",
+      "estimated_time": "15 minutes",
+      "risk": "LOW - Adds detection, doesn't change existing logic"
+    },
+    "step_3": {
+      "action": "Apply FIX-3 (HIGH)",
+      "detail": "Skip legacy correction for normalized variationImages",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "lines": "1080-1085",
+      "estimated_time": "10 minutes",
+      "risk": "LOW - Early return with clear logging"
+    },
+    "step_4": {
+      "action": "Apply FIX-5 (LOW)",
+      "detail": "Ensure transform object removed in normalizer",
+      "file": "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "lines": "1230-1240",
+      "estimated_time": "5 minutes",
+      "risk": "VERY LOW - Defensive coding improvement"
+    },
+    "step_5": {
+      "action": "Test with Order #5378",
+      "detail": "Load order admin page, click design preview button",
+      "location": "Browser",
+      "expected_result": "Canvas shows design, console shows 'variationImages (normalized)', objectsToRender.length > 0",
+      "estimated_time": "3 minutes"
+    },
+    "step_6": {
+      "action": "Apply FIX-4 (MEDIUM) - Optional",
+      "detail": "Update remaining HPOS-incompatible call",
+      "file": "/workspaces/yprint_designtool/includes/class-octo-print-api-integration.php",
+      "estimated_time": "10 minutes",
+      "risk": "LOW - Standard HPOS pattern"
+    },
+    "step_7": {
+      "action": "Regression testing",
+      "detail": "Test modern format, legacy format, and variationImages format orders",
+      "estimated_time": "15 minutes"
+    }
+  },
+
+  "testing_checklist": [
+    {
+      "test_id": "TEST-1",
+      "description": "Order #5378 canvas renders",
+      "console_checks": [
+        "Console shows: 🔧 NORMALIZE: Converting variationImages format to Golden Standard",
+        "Console shows: ✅ NORMALIZE: Extracted 1 elements from variationImages",
+        "Console shows: 📊 Data Format: variationImages (normalized)",
+        "Console shows: objectsToRender.length: 1 (NOT 0)",
+        "Canvas element is NOT blank"
+      ],
+      "coordinates_check": "Console should show element at (330.18, 160.50) not (NaN, NaN)",
+      "priority": "CRITICAL"
+    },
+    {
+      "test_id": "TEST-2",
+      "description": "Modern format still works (no regression)",
+      "console_checks": [
+        "Console shows: ℹ️ NORMALIZE: Data is not variationImages format, returning unchanged",
+        "Console shows: 📊 Data Format: modern",
+        "Console shows: Objects rendered successfully"
+      ],
+      "priority": "CRITICAL"
+    },
+    {
+      "test_id": "TEST-3",
+      "description": "Legacy format still works (backward compatibility)",
+      "console_checks": [
+        "Console shows: 📊 Data Format: legacy_db",
+        "Console shows: Legacy correction applied",
+        "Canvas renders correctly with +80px Y correction"
+      ],
+      "priority": "HIGH"
+    },
+    {
+      "test_id": "TEST-4",
+      "description": "Coordinate Audit Trail validates transformations",
+      "console_checks": [
+        "Audit trail shows: Stage 1 - Input coordinates",
+        "Audit trail shows: Stage 2 - Normalization (Δ 0px for variationImages)",
+        "Audit trail shows: Total Magnitude: 0.00px ✅",
+        "Audit trail shows: Active Transformations: 0"
+      ],
+      "priority": "MEDIUM"
+    }
+  ],
+
+  "rollback_plan": {
+    "trigger_conditions": [
+      "Modern format orders fail to render",
+      "Legacy format orders fail to render",
+      "Console shows errors after fixes",
+      "Canvas stays blank for ALL orders"
+    ],
+    "rollback_steps": [
+      "Step 1: Open admin-canvas-renderer.js",
+      "Step 2: Comment out FIX-1 line: // designData = this.normalizeVariationImagesFormat(designData);",
+      "Step 3: Revert classifyDataFormat() to original version",
+      "Step 4: Clear browser cache (Ctrl+Shift+R)",
+      "Step 5: Test modern/legacy orders work again"
+    ],
+    "rollback_time": "2 minutes",
+    "risk_mitigation": "All fixes are additive (not removing code), rollback is safe"
+  },
+
+  "success_criteria": {
+    "immediate_success": {
+      "order_5378_canvas": "NOT blank - shows design elements",
+      "console_output": "No JavaScript errors",
+      "coordinate_values": "Numbers (not NaN)",
+      "object_count": "objectsToRender.length > 0"
+    },
+    "regression_tests": {
+      "modern_orders": "Still render correctly",
+      "legacy_orders": "Still render with corrections",
+      "new_orders": "Save and load successfully"
+    },
+    "performance": {
+      "normalization_overhead": "< 5ms",
+      "total_render_time": "< 150ms (no significant increase)",
+      "memory_usage": "No leaks after 10 renders"
+    }
+  },
+
+  "files_changed_summary": {
+    "total_files": 2,
+    "javascript_files": 1,
+    "php_files": 1,
+    "estimated_total_lines_changed": "~50 lines",
+    "estimated_implementation_time": "1 hour including testing",
+    "risk_level": "LOW"
+  }
+}

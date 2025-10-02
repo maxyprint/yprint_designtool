@@ -1007,7 +1007,9 @@ class DesignPreviewGenerator {
                     _dimension_source: dimensionSource // Track source for debugging
                 },
                 // 🎯 AGENT 12 FIX: Preserve background/mockup URL from original data
-                background: designData.background || designData.mockup_url || null
+                background: designData.background || designData.mockup_url || null,
+                // 🎯 AGENT 7 FIX: Preserve metadata to prevent legacy correction on modern data
+                metadata: designData.metadata || null
             }
         };
     }
@@ -1071,7 +1073,9 @@ class DesignPreviewGenerator {
                     _dimension_source: dimensionSource
                 },
                 // 🎯 AGENT 12 FIX: Preserve background/mockup URL from original data
-                background: designData.background || designData.mockup_url || null
+                background: designData.background || designData.mockup_url || null,
+                // 🎯 AGENT 7 FIX: Preserve metadata to prevent legacy correction on modern data
+                metadata: designData.metadata || null
             }
         };
     }
