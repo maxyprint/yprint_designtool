@@ -106,9 +106,22 @@ class Design_Data_Migration_Command {
 			$this->ensure_backup_column();
 		}
 
+		// Step 1.5: PHASE 3.4 FIX - Check available disk space before migration
+		if ( $backup && ! $dry_run ) {
+			// Count records first to estimate space requirement
+			$where_clause = $force ? '' : "WHERE design_data NOT LIKE '%capture_version%'";
+			$temp_count   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table_name} {$where_clause}" );
+
+			if ( ! $this->check_disk_space( $temp_count ) ) {
+				WP_CLI::error( 'Migration aborted due to insufficient disk space' );
+				return;
+			}
+		}
+
 		// Step 2: Count total records
+		// PHASE 3.4 SECURITY FIX: Use wpdb->prepare() for SQL queries
 		$where_clause = $force ? '' : "WHERE design_data NOT LIKE '%capture_version%'";
-		$count_query  = "SELECT COUNT(*) FROM {$this->table_name} {$where_clause}";
+		$count_query  = $wpdb->prepare( "SELECT COUNT(*) FROM {$this->table_name} {$where_clause}" );
 		$total_count  = (int) $wpdb->get_var( $count_query );
 
 		if ( $limit && $limit < $total_count ) {
@@ -140,7 +153,12 @@ class Design_Data_Migration_Command {
 
 		while ( $offset < $total_count ) {
 			$limit_clause = $limit ? "LIMIT {$limit}" : '';
-			$query        = "SELECT id, design_data FROM {$this->table_name} {$where_clause} ORDER BY id ASC LIMIT {$batch_size} OFFSET {$offset} {$limit_clause}";
+			// PHASE 3.4 SECURITY FIX: Use wpdb->prepare() with placeholders
+			$query        = $wpdb->prepare(
+				"SELECT id, design_data FROM {$this->table_name} {$where_clause} ORDER BY id ASC LIMIT %d OFFSET %d {$limit_clause}",
+				$batch_size,
+				$offset
+			);
 			$results      = $wpdb->get_results( $query, ARRAY_A );
 
 			if ( empty( $results ) ) {
@@ -538,7 +556,8 @@ class Design_Data_Migration_Command {
 			WP_CLI::confirm( '⚠️  Are you SURE you want to rollback? This will restore backup data and OVERWRITE current design_data.' );
 		}
 
-		$limit_clause = $limit ? "LIMIT {$limit}" : '';
+		// PHASE 3.4 SECURITY FIX: Use wpdb->prepare() for SQL query
+		$limit_clause = $limit ? $wpdb->prepare( "LIMIT %d", $limit ) : '';
 		$query        = "SELECT id FROM {$this->table_name} WHERE design_data_backup IS NOT NULL {$limit_clause}";
 		$ids          = $wpdb->get_col( $query );
 
@@ -574,6 +593,65 @@ class Design_Data_Migration_Command {
 		} else {
 			WP_CLI::success( 'Rollback completed!' );
 		}
+	}
+
+	/**
+	 * PHASE 3.4 SECURITY FIX: Check available disk space before migration
+	 *
+	 * Calculates required space for backup column and ensures sufficient disk space
+	 *
+	 * @param int $record_count Number of records to migrate
+	 * @return bool True if sufficient space, false otherwise
+	 */
+	private function check_disk_space( $record_count ) {
+		global $wpdb;
+
+		if ( ! function_exists( 'disk_free_space' ) ) {
+			WP_CLI::warning( '⚠️  Cannot check disk space (disk_free_space function not available)' );
+			return true; // Proceed anyway if function not available
+		}
+
+		// Get average size of design_data field
+		$avg_size_query = "SELECT AVG(LENGTH(design_data)) as avg_size FROM {$this->table_name}";
+		$avg_size       = (float) $wpdb->get_var( $avg_size_query );
+
+		if ( ! $avg_size ) {
+			$avg_size = 10240; // Default 10KB if unable to calculate
+		}
+
+		// Calculate required space: backup column needs ~same space as design_data
+		$required_space = $avg_size * $record_count * 1.2; // 20% buffer
+
+		// Get available disk space
+		$upload_dir     = wp_upload_dir();
+		$disk_path      = $upload_dir['basedir'];
+		$available_space = @disk_free_space( $disk_path );
+
+		if ( false === $available_space ) {
+			WP_CLI::warning( '⚠️  Cannot determine available disk space' );
+			return true; // Proceed anyway
+		}
+
+		$required_mb  = round( $required_space / 1048576, 2 );
+		$available_mb = round( $available_space / 1048576, 2 );
+
+		WP_CLI::line( sprintf( '💾 Disk space check:' ) );
+		WP_CLI::line( sprintf( '   Required: ~%s MB', number_format( $required_mb, 2 ) ) );
+		WP_CLI::line( sprintf( '   Available: %s MB', number_format( $available_mb, 2 ) ) );
+
+		if ( $available_space < $required_space ) {
+			WP_CLI::error( sprintf(
+				'Insufficient disk space! Required: %s MB, Available: %s MB',
+				number_format( $required_mb, 2 ),
+				number_format( $available_mb, 2 )
+			) );
+			return false;
+		}
+
+		WP_CLI::success( '✅ Sufficient disk space available' );
+		WP_CLI::line( '' );
+
+		return true;
 	}
 }
 
