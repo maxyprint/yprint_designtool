@@ -492,6 +492,10 @@ class Octo_Print_Designer_Products {
     private function get_design_details($design, $template_variations, $variation_id) {
         try {
             $design_data = json_decode($design->design_data, true);
+
+            // PHASE 3.3 FIX: Normalize design data to Golden Standard format
+            $design_data = $this->normalize_design_data($design_data);
+
             if (!isset($design_data['variationImages'])) {
                 return false;
             }
@@ -617,6 +621,10 @@ class Octo_Print_Designer_Products {
     private function calculate_design_price($design, $pricing_rules, $template_variations, $variation_id) {
         try {
             $design_data = json_decode($design->design_data, true);
+
+            // PHASE 3.3 FIX: Normalize design data to Golden Standard format
+            $design_data = $this->normalize_design_data($design_data);
+
             if (!isset($design_data['variationImages'])) {
                 return false;
             }
@@ -733,7 +741,10 @@ class Octo_Print_Designer_Products {
     private function get_all_design_images($design, $variation_id, $template_variations) {
         $design_images = [];
         $design_data = json_decode($design->design_data, true);
-        
+
+        // PHASE 3.3 FIX: Normalize design data to Golden Standard format
+        $design_data = $this->normalize_design_data($design_data);
+
         if (!isset($design_data['variationImages'])) {
             return $design_images;
         }
@@ -790,6 +801,86 @@ class Octo_Print_Designer_Products {
         }
         
         return $design_images;
+    }
+
+    /**
+     * PHASE 3.3: Normalize design data to Golden Standard format
+     *
+     * Handles 3 input formats:
+     * 1. Golden Standard (capture_version 3.0.0) - pass through
+     * 2. variationImages (Phase 2) - convert to Golden Standard
+     * 3. Legacy nested (old system) - convert to Golden Standard
+     *
+     * @param array $data Design data in any format
+     * @return array Normalized design data in Golden Standard format
+     */
+    private function normalize_design_data($data) {
+        // Already Golden Standard? Pass through
+        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
+            error_log('✅ [PRODUCTS NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
+            return $data;
+        }
+
+        // variationImages format?
+        if (isset($data['variationImages'])) {
+            error_log('🔄 [PRODUCTS NORMALIZE] Converting variationImages format to Golden Standard');
+
+            $variation_keys = array_keys($data['variationImages']);
+            $elements = $data['variationImages'][$variation_keys[0]];
+
+            // Flatten nested transform
+            $normalized_elements = array_map(function($el) {
+                if (isset($el['transform'])) {
+                    // Move transform properties to root
+                    $flattened = array_merge($el, $el['transform']);
+                    unset($flattened['transform']);
+                    return $flattened;
+                }
+                return $el;
+            }, $elements);
+
+            $normalized = array(
+                'objects' => $normalized_elements,
+                'metadata' => array(
+                    'capture_version' => '2.1-migrated',
+                    'source' => 'variation_images_normalized',
+                    'original_template_id' => $data['templateId'] ?? null,
+                    'original_variation' => $data['currentVariation'] ?? null,
+                    'normalized_at' => current_time('mysql')
+                )
+            );
+
+            error_log('✅ [PRODUCTS NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
+            return $normalized;
+        }
+
+        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
+        $view_keys = array_keys($data);
+        if (!empty($view_keys)) {
+            $first_view_key = $view_keys[0];
+            $first_view = $data[$first_view_key];
+
+            if (is_array($first_view) && isset($first_view['images'])) {
+                error_log('🔄 [PRODUCTS NORMALIZE] Converting legacy view format to Golden Standard');
+
+                $normalized = array(
+                    'objects' => $first_view['images'],
+                    'metadata' => array(
+                        'capture_version' => '1.0-legacy-migrated',
+                        'source' => 'legacy_view_normalized',
+                        'original_view_key' => $first_view_key,
+                        'normalized_at' => current_time('mysql')
+                    )
+                );
+
+                error_log('✅ [PRODUCTS NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
+                return $normalized;
+            }
+        }
+
+        // Unknown format - log error and return unchanged
+        error_log('⚠️ [PRODUCTS NORMALIZE] Unknown design format: ' . json_encode(array_keys($data)));
+        return $data;
     }
 
 }
