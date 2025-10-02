@@ -77,6 +77,31 @@ register_deactivation_hook( __FILE__, 'deactivate_octo_print_designer' );
 require plugin_dir_path( __FILE__ ) . 'includes/class-octo-print-designer.php';
 
 /**
+ * Declare WooCommerce HPOS (High-Performance Order Storage) compatibility
+ *
+ * This notifies WooCommerce that the plugin is fully compatible with the modern
+ * HPOS system and does not use legacy post meta functions for orders.
+ *
+ * @since 1.1.0
+ * @link https://developer.woocommerce.com/docs/features/high-performance-order-storage/
+ */
+add_action('before_woocommerce_init', function() {
+	// Check if WooCommerce HPOS features are available
+	if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+			'custom_order_tables',
+			__FILE__,
+			true  // true = compatible with HPOS
+		);
+
+		// Debug log (only in development)
+		if (defined('WP_DEBUG') && WP_DEBUG) {
+			error_log('Octonove Print Designer: HPOS compatibility declared successfully');
+		}
+	}
+});
+
+/**
  * Begins execution of the plugin.
  *
  * Since everything within the plugin is registered via hooks,

@@ -37,6 +37,9 @@ class Octo_Print_Designer_WC_Integration {
         // NEW: Order integration hook for JSON design data persistence
         add_action('woocommerce_checkout_create_order_line_item', array($this, 'save_design_data_to_order'), 10, 4);
 
+        // 🔧 FIX: Save order-level meta after all items are processed
+        add_action('woocommerce_checkout_create_order', array($this, 'save_order_level_design_data'), 20, 2);
+
         add_filter('woocommerce_order_item_display_meta_key', array($this, 'format_order_item_meta_display'), 10, 3);
         add_filter('woocommerce_order_item_display_meta_value', array($this, 'format_order_item_meta_value'), 10, 3);
         add_filter('woocommerce_admin_order_item_thumbnail', array($this, 'customize_order_item_thumbnail'), 10, 4);
@@ -2721,12 +2724,15 @@ private function build_print_provider_email_content($order, $design_items, $note
     public function save_design_data_to_order($item, $cart_item_key, $values, $order) {
         if (!empty($values['_design_data_json'])) {
             $design_data = $values['_design_data_json'];
+            $json_string = wp_slash(json_encode($design_data));
 
             // PHASE 3: Check kill switch
             if (defined('DISABLE_DESIGN_VALIDATION') && DISABLE_DESIGN_VALIDATION) {
                 // Kill switch enabled - skip validation entirely
-                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
-                error_log("📦 Design data saved to order item (validation disabled): " . $item->get_id());
+                $item->add_meta_data('_design_data', $json_string, true);
+                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
+                $order->update_meta_data('_design_data', $json_string);
+                error_log("📦 Design data saved to order item AND order (validation disabled): " . $item->get_id());
                 return;
             }
 
@@ -2746,14 +2752,36 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $this->increment_validation_stat(false);
 
                 // Continue saving anyway (log-only mode)
-                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
-                error_log("📦 Design data saved to order item (validation failed but logged): " . $item->get_id());
+                $item->add_meta_data('_design_data', $json_string, true);
+                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
+                $order->update_meta_data('_design_data', $json_string);
+                error_log("📦 Design data saved to order item AND order (validation failed but logged): " . $item->get_id());
             } else {
                 // Validation passed
                 $this->increment_validation_stat(true);
-                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
-                error_log("✅ Design data saved to order item (validation passed): " . $item->get_id());
+                $item->add_meta_data('_design_data', $json_string, true);
+                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
+                $order->update_meta_data('_design_data', $json_string);
+                error_log("✅ Design data saved to order item AND order (validation passed): " . $item->get_id());
             }
+        }
+    }
+
+    /**
+     * 🔧 FIX: Save order-level design data after all items are processed
+     * This ensures $order->save() is called to persist the meta_data added in save_design_data_to_order()
+     *
+     * @param WC_Order $order The order object
+     * @param array $data Posted data from checkout
+     */
+    public function save_order_level_design_data($order, $data) {
+        // Save all pending meta_data updates
+        $result = $order->save();
+
+        if ($result) {
+            error_log("✅ Order-level design data persisted for order #" . $order->get_id());
+        } else {
+            error_log("❌ Failed to persist order-level design data for order #" . $order->get_id());
         }
     }
 
@@ -6863,35 +6891,26 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         error_log('🔍 AGENT 7 has_design_data: Checking order ' . $order_id);
 
-        // Check 1: Stored design data in post meta (legacy orders)
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
-        if (!empty($stored_design_data)) {
-            // Validate it's not just whitespace or empty JSON
-            $trimmed = is_string($stored_design_data) ? trim($stored_design_data) : '';
-            if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
-                error_log('✅ AGENT 7 has_design_data: Found _design_data (post meta)');
-                return true;
-            } else {
-                error_log('⚠️ AGENT 7 has_design_data: _design_data exists but is empty/invalid');
-            }
-        } else {
-            error_log('🔍 AGENT 7 has_design_data: No _design_data in post meta');
-        }
-
-        // Check 2: Order-level meta (HPOS compatibility)
+        // HPOS FIX: Get order object first for HPOS compatibility
         $order = wc_get_order($order_id);
         if (!$order) {
             error_log('❌ AGENT 7 has_design_data: Order not found');
             return false;
         }
 
-        $order_design_data = $order->get_meta('_design_data', true);
-        if (!empty($order_design_data) && is_string($order_design_data)) {
-            $trimmed = trim($order_design_data);
+        // Check 1: Stored design data - HPOS FIX: Use $order->get_meta() instead of get_post_meta()
+        $stored_design_data = $order->get_meta('_design_data', true);
+        if (!empty($stored_design_data)) {
+            // Validate it's not just whitespace or empty JSON
+            $trimmed = is_string($stored_design_data) ? trim($stored_design_data) : '';
             if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
                 error_log('✅ AGENT 7 has_design_data: Found _design_data (order meta)');
                 return true;
+            } else {
+                error_log('⚠️ AGENT 7 has_design_data: _design_data exists but is empty/invalid');
             }
+        } else {
+            error_log('🔍 AGENT 7 has_design_data: No _design_data in order meta');
         }
 
         // Check 3: _db_processed_views in order items (legacy format)
