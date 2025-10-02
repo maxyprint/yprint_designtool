@@ -6647,13 +6647,16 @@ private function build_print_provider_email_content($order, $design_items, $note
                 'zoom' => 1
             ],
             // Add metadata to indicate this was converted from print DB
+            // 🎯 AGENT 7 FIX: Prevent false legacy detection by marking as modern format
             'metadata' => [
-                'source' => 'db_processed_views',
+                'source' => 'converted_from_processed_views',  // Changed from 'db_processed_views' to prevent legacy correction
+                'capture_version' => '3.0',                     // Mark as modern Golden Standard format
+                'designer_offset' => ['x' => 0, 'y' => 0],     // Prevent designer offset heuristic
                 'converted_at' => current_time('mysql'),
                 'order_id' => $order_id,
                 'template_id' => $template_id,
                 'original_view_name' => $first_view['view_name'] ?? 'Design View',
-                'mockup_source' => $mockup_url ? 'template/product' : 'none'  // 🎯 AGENT 11: Track mockup source
+                'mockup_source' => $mockup_url ? 'template/product' : 'none'
             ]
         ];
 
