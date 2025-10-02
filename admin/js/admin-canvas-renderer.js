@@ -567,33 +567,53 @@ class AdminCanvasRenderer {
      * @returns {string} 'legacy_db' | 'modern' | 'unknown'
      */
     classifyDataFormat(designData) {
+        // 🎯 FIX: Extract metadata from view wrapper if present
+        let metadata = designData.metadata;
+
+        // Check if data is in view-wrapper format (e.g., hive_mind_view)
+        if (!metadata) {
+            const viewKeys = Object.keys(designData).filter(k =>
+                designData[k] && typeof designData[k] === 'object' && designData[k].images
+            );
+            if (viewKeys.length > 0) {
+                metadata = designData[viewKeys[0]].metadata;
+                console.log('🔍 AGENT 1 MUTEX: Extracted metadata from view wrapper:', viewKeys[0]);
+            }
+        }
+
         console.log('🔍 AGENT 1 MUTEX: Classifying data format...', {
-            hasMetadata: !!designData.metadata,
-            metadataSource: designData.metadata?.source,
-            hasCaptureVersion: !!designData.metadata?.capture_version,
-            hasDesignerOffset: designData.metadata?.designer_offset !== undefined
+            hasMetadata: !!metadata,
+            metadataSource: metadata?.source,
+            hasCaptureVersion: !!metadata?.capture_version,
+            hasDesignerOffset: metadata?.designer_offset !== undefined
         });
 
-        // Detection Method 1: Explicit db_processed_views marker (highest priority)
-        const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
+        // Detection Method 1: Explicit converted_from_processed_views (MODERN format marker)
+        if (metadata?.source === 'converted_from_processed_views' && metadata?.capture_version) {
+            console.log('✅ AGENT 1 MUTEX: Format = MODERN (converted_from_processed_views with capture_version)');
+            return 'modern';
+        }
+
+        // Detection Method 2: Explicit db_processed_views marker (LEGACY format marker)
+        const isLegacyDbFormat = metadata?.source === 'db_processed_views';
         if (isLegacyDbFormat) {
-            console.log('✅ AGENT 1 MUTEX: Format = LEGACY_DB (explicit marker)');
+            console.log('✅ AGENT 1 MUTEX: Format = LEGACY_DB (explicit db_processed_views marker)');
             return 'legacy_db';
         }
 
-        // Detection Method 2: Missing modern metadata markers
-        const missingCaptureVersion = !designData.metadata?.capture_version;
-        const missingDesignerOffset = designData.metadata?.designer_offset === undefined;
-        const hasModernMetadata = !missingCaptureVersion || !missingDesignerOffset;
+        // Detection Method 3: Modern metadata markers present
+        const hasCaptureVersion = !!metadata?.capture_version;
+        const hasDesignerOffset = metadata?.designer_offset !== undefined;
 
-        if (missingCaptureVersion && missingDesignerOffset) {
+        if (hasCaptureVersion && hasDesignerOffset) {
+            console.log('✅ AGENT 1 MUTEX: Format = MODERN (has capture_version + designer_offset)');
+            return 'modern';
+        }
+
+        // Detection Method 4: Missing modern metadata markers → Legacy
+        if (!hasCaptureVersion && !hasDesignerOffset) {
             console.log('✅ AGENT 1 MUTEX: Format = LEGACY_DB (missing modern metadata)');
             return 'legacy_db';
-        }
-
-        if (hasModernMetadata) {
-            console.log('✅ AGENT 1 MUTEX: Format = MODERN (has modern metadata)');
-            return 'modern';
         }
 
         // Default: Unable to determine
