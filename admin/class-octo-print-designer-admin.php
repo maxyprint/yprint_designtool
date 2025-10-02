@@ -238,11 +238,20 @@ class Octo_Print_Designer_Admin {
             );
 
             // 🎨 AGENT 3: WooCommerce Admin Canvas Rendering System
-            // Phase 1: Admin Canvas Renderer (Pure Vanilla JS, no dependencies)
+            // Phase 0: Pixel Sampling Validator (Required by AdminCanvasRenderer)
+            wp_enqueue_script(
+                'octo-pixel-sampling-validator',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/pixel-sampling-validator.js',
+                [], // NO dependencies - pure vanilla JS
+                $this->version . '.validator-v1',
+                true
+            );
+
+            // Phase 1: Admin Canvas Renderer (Pure Vanilla JS, depends on PixelSamplingValidator)
             wp_enqueue_script(
                 'octo-admin-canvas-renderer',
                 OCTO_PRINT_DESIGNER_URL . 'admin/js/admin-canvas-renderer.js',
-                [], // NO dependencies - pure vanilla JS
+                ['octo-pixel-sampling-validator'], // Depends on PixelSamplingValidator
                 $this->version . '.agent3-v1',
                 true
             );
