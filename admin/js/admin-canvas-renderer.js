@@ -1198,6 +1198,72 @@ class AdminCanvasRenderer {
     }
 
     /**
+     * 🎯 FIX: VARIATIONIMAGES FORMAT NORMALIZER
+     * Converts variationImages format to Golden Standard objects[] format
+     * Handles legacy orders with variationImages structure
+     */
+    normalizeVariationImagesFormat(rawData) {
+        console.log('🔍 NORMALIZE: Checking for variationImages format...');
+
+        // Check if this is variationImages format
+        if (rawData.variationImages && typeof rawData.variationImages === 'object') {
+            console.log('🔧 NORMALIZE: Converting variationImages format to Golden Standard');
+
+            const variationKeys = Object.keys(rawData.variationImages);
+            if (variationKeys.length === 0) {
+                console.warn('⚠️ NORMALIZE: variationImages object is empty');
+                return rawData;
+            }
+
+            // Extract elements from first variation
+            const firstVariationKey = variationKeys[0];
+            const elements = rawData.variationImages[firstVariationKey];
+
+            if (!Array.isArray(elements)) {
+                console.warn('⚠️ NORMALIZE: variationImages content is not an array:', typeof elements);
+                return rawData;
+            }
+
+            console.log(`✅ NORMALIZE: Extracted ${elements.length} elements from variationImages`);
+
+            // Convert to Golden Standard format
+            const normalized = {
+                objects: elements.map(el => ({
+                    ...el,
+                    // Ensure transform properties are at root level
+                    left: el.transform?.left ?? el.left ?? 0,
+                    top: el.transform?.top ?? el.top ?? 0,
+                    scaleX: el.transform?.scaleX ?? el.scaleX ?? 1,
+                    scaleY: el.transform?.scaleY ?? el.scaleY ?? 1,
+                    angle: el.transform?.angle ?? el.angle ?? 0
+                })),
+                metadata: {
+                    source: 'variationImages_normalized',
+                    template_id: rawData.templateId,
+                    variation_id: rawData.currentVariation,
+                    original_variation_key: firstVariationKey,
+                    conversion_timestamp: Date.now()
+                },
+                // Preserve background if available
+                background: rawData.mockupUrl || rawData.background,
+                mockup_url: rawData.mockupUrl
+            };
+
+            console.log('✅ NORMALIZE: Conversion complete:', {
+                original_format: 'variationImages',
+                objects_count: normalized.objects.length,
+                has_background: !!normalized.background
+            });
+
+            return normalized;
+        }
+
+        // Not variationImages format, return as-is
+        console.log('ℹ️ NORMALIZE: Data is not variationImages format, returning unchanged');
+        return rawData;
+    }
+
+    /**
      * 🎯 AGENT 5: LEGACY VISUAL CORRECTION HEURISTIC [DEPRECATED]
      * This function is now deprecated in favor of applyLegacyDataCorrection()
      * Kept for backwards compatibility but will not be called in new pipeline
@@ -3035,6 +3101,10 @@ class AdminCanvasRenderer {
             mutexEnabled: true,
             validationEnabled: true
         };
+
+        // 🎯 FIX: NORMALIZE VARIATIONIMAGES FORMAT FIRST
+        // This runs BEFORE any other processing to convert legacy formats
+        designData = this.normalizeVariationImagesFormat(designData);
 
         // 🎯 AGENT 1 MUTEX: Classify data format BEFORE applying any corrections
         this.correctionStrategy.dataFormat = this.classifyDataFormat(designData);

@@ -128,12 +128,11 @@ class Octo_Print_API_Integration {
         if (is_wp_error($result)) {
             wp_send_json_error(array('message' => $result->get_error_message()));
         }
-
-        // Save API response - HPOS FIX: Use $order->update_meta_data() instead of update_post_meta()
-        $order->update_meta_data('_allesklardruck_api_sent', time());
-        $order->update_meta_data('_allesklardruck_api_response', $result);
-        $order->save();
-
+        
+        // Save API response
+        update_post_meta($order_id, '_allesklardruck_api_sent', time());
+        update_post_meta($order_id, '_allesklardruck_api_response', $result);
+        
         // Add order note
         $order->add_order_note(
             sprintf(__('Order sent to AllesKlarDruck API. Response: %s', 'octo-print-designer'), wp_json_encode($result)),
@@ -1153,89 +1152,9 @@ class Octo_Print_API_Integration {
     /**
      * Parse design views from order item (reused from WC Integration)
      */
-    /**
-     * PHASE 3 - AGENT 3: Normalize any design format to Golden Standard
-     *
-     * Handles 3 formats:
-     * 1. Golden Standard (objects + metadata.capture_version) - pass through
-     * 2. variationImages (nested transform) - flatten and convert
-     * 3. Legacy nested (old system) - convert to Golden Standard
-     *
-     * @param array $data Design data in any format
-     * @return array Normalized design data in Golden Standard format
-     */
-    private function normalize_design_data($data) {
-        // Already Golden Standard? Pass through
-        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
-            error_log('✅ [API NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
-            return $data;
-        }
-
-        // variationImages format?
-        if (isset($data['variationImages'])) {
-            error_log('🔄 [API NORMALIZE] Converting variationImages format to Golden Standard');
-
-            $variation_keys = array_keys($data['variationImages']);
-            $elements = $data['variationImages'][$variation_keys[0]];
-
-            // Flatten nested transform
-            $normalized_elements = array_map(function($el) {
-                if (isset($el['transform'])) {
-                    // Move transform properties to root
-                    $flattened = array_merge($el, $el['transform']);
-                    unset($flattened['transform']);
-                    return $flattened;
-                }
-                return $el;
-            }, $elements);
-
-            $normalized = array(
-                'objects' => $normalized_elements,
-                'metadata' => array(
-                    'capture_version' => '2.1-migrated',
-                    'source' => 'variation_images_normalized',
-                    'original_template_id' => $data['templateId'] ?? null,
-                    'original_variation' => $data['currentVariation'] ?? null,
-                    'normalized_at' => current_time('mysql')
-                )
-            );
-
-            error_log('✅ [API NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
-            return $normalized;
-        }
-
-        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
-        $view_keys = array_keys($data);
-        if (!empty($view_keys)) {
-            $first_view_key = $view_keys[0];
-            $first_view = $data[$first_view_key];
-
-            if (is_array($first_view) && isset($first_view['images'])) {
-                error_log('🔄 [API NORMALIZE] Converting legacy view format to Golden Standard');
-
-                $normalized = array(
-                    'objects' => $first_view['images'],
-                    'metadata' => array(
-                        'capture_version' => '1.0-legacy-migrated',
-                        'source' => 'legacy_view_normalized',
-                        'original_view_key' => $first_view_key,
-                        'normalized_at' => current_time('mysql')
-                    )
-                );
-
-                error_log('✅ [API NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
-                return $normalized;
-            }
-        }
-
-        // Unknown format - log error and return unchanged
-        error_log('⚠️ [API NORMALIZE] Unknown design format: ' . json_encode(array_keys($data)));
-        return $data;
-    }
-
     private function parse_design_views($item) {
         $views = array();
-
+        
         // Get processed views data
         $processed_views_json = $item->get_meta('_db_processed_views');
         if (!empty($processed_views_json)) {
@@ -1244,7 +1163,7 @@ class Octo_Print_API_Integration {
             } else {
                 $processed_views = $processed_views_json;
             }
-
+            
             if (is_array($processed_views)) {
                 foreach ($processed_views as $view_key => $view_data) {
                     $views[] = array(
@@ -1257,7 +1176,7 @@ class Octo_Print_API_Integration {
                 }
             }
         }
-
+        
         return $views;
     }
 
@@ -1266,51 +1185,33 @@ class Octo_Print_API_Integration {
      */
     private function parse_view_images($images, $view_data = array(), $item = null) {
         $parsed_images = array();
-
+        
         if (!is_array($images)) {
             return $parsed_images;
         }
-
+        
         foreach ($images as $image) {
-            // Support both 'url' and 'src' properties (Golden Standard uses 'src')
-            $image_url = $image['url'] ?? $image['src'] ?? null;
-            if (empty($image_url)) {
+            if (!isset($image['url']) || empty($image['url'])) {
                 continue;
             }
-
-            // PHASE 3 - AGENT 3: Handle both nested transform and flat Golden Standard format
-            // Check if transform is nested (old format) or flat (Golden Standard)
-            if (isset($image['transform']) && is_array($image['transform'])) {
-                // Old format with nested transform
-                $transform = $image['transform'];
-            } else {
-                // Golden Standard format with flat properties
-                $transform = array(
-                    'width' => $image['width'] ?? 0,
-                    'height' => $image['height'] ?? 0,
-                    'left' => $image['left'] ?? 0,
-                    'top' => $image['top'] ?? 0,
-                    'scaleX' => $image['scaleX'] ?? 1,
-                    'scaleY' => $image['scaleY'] ?? 1,
-                    'angle' => $image['angle'] ?? 0
-                );
-            }
-
+            
+            $transform = $image['transform'] ?: array();
+            
             $parsed_images[] = array(
-                'filename' => $image['filename'] ?? basename($image_url),
-                'url' => $image_url,
+                'filename' => $image['filename'] ?: basename($image['url']),
+                'url' => $image['url'],
                 'preview_url' => $item ? $this->get_design_meta($item, 'preview_url') : '', // NEU: Preview-URL hinzufügen
-                'original_width_px' => $transform['width'] ?? 0,
-                'original_height_px' => $transform['height'] ?? 0,
-                'position_left_px' => round($transform['left'] ?? 0, 2),
-                'position_top_px' => round($transform['top'] ?? 0, 2),
-                'scale_x' => $transform['scaleX'] ?? 1,
-                'scale_y' => $transform['scaleY'] ?? 1,
+                'original_width_px' => $transform['width'] ?: 0,
+                'original_height_px' => $transform['height'] ?: 0,
+                'position_left_px' => round($transform['left'] ?: 0, 2),
+                'position_top_px' => round($transform['top'] ?: 0, 2),
+                'scale_x' => $transform['scaleX'] ?: 1,
+                'scale_y' => $transform['scaleY'] ?: 1,
                 'transform' => $transform,
                 'transform_data' => $transform // Vollständige Transform-Daten für Position-Schätzung
             );
         }
-
+        
         return $parsed_images;
     }
 
@@ -1620,39 +1521,24 @@ class Octo_Print_API_Integration {
         // Extract API response data
         $response_data = $api_response['data'] ?? array();
         $status_code = $api_response['status_code'] ?? 200;
-
-        // HPOS FIX: Get order object for HPOS-compatible meta updates
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            error_log("❌ HPOS FIX: Failed to get order object for ID {$order_id}");
-            return new WP_Error('order_not_found', 'Order not found for meta update');
-        }
-
-        // Save comprehensive API response meta - HPOS FIX: Use $order->update_meta_data()
-        $order->update_meta_data('_allesklardruck_api_sent', $timestamp);
-        $order->update_meta_data('_allesklardruck_api_status_code', $status_code);
-        $order->update_meta_data('_allesklardruck_api_response', $response_data);
-        $order->update_meta_data('_allesklardruck_api_payload', $payload);
-
+        
+        // Save comprehensive API response meta
+        update_post_meta($order_id, '_allesklardruck_api_sent', $timestamp);
+        update_post_meta($order_id, '_allesklardruck_api_status_code', $status_code);
+        update_post_meta($order_id, '_allesklardruck_api_response', $response_data);
+        update_post_meta($order_id, '_allesklardruck_api_payload', $payload);
+        
         // Extract and save specific response fields if available
         if (isset($response_data['orderId'])) {
-            $order->update_meta_data('_allesklardruck_order_id', $response_data['orderId']);
+            update_post_meta($order_id, '_allesklardruck_order_id', $response_data['orderId']);
         }
-
+        
         if (isset($response_data['trackingNumber'])) {
-            $order->update_meta_data('_allesklardruck_tracking_number', $response_data['trackingNumber']);
+            update_post_meta($order_id, '_allesklardruck_tracking_number', $response_data['trackingNumber']);
         }
-
+        
         if (isset($response_data['status'])) {
-            $order->update_meta_data('_allesklardruck_order_status', $response_data['status']);
-        }
-
-        // HPOS FIX: Persist all meta data changes
-        $save_result = $order->save();
-        if (is_wp_error($save_result)) {
-            error_log("❌ HPOS FIX: Failed to save order meta: " . $save_result->get_error_message());
-        } else {
-            error_log("✅ HPOS FIX: Successfully saved API response meta to order {$order_id}");
+            update_post_meta($order_id, '_allesklardruck_order_status', $response_data['status']);
         }
         
         // Create comprehensive order note
@@ -1988,17 +1874,16 @@ class Octo_Print_API_Integration {
         
         // Send to API
         $result = $api_integration->send_order($api_order_data);
-
+        
         if (is_wp_error($result)) {
             wp_send_json_error(array('message' => $result->get_error_message()));
         }
-
-        // Save API response information - HPOS FIX: Use $order->update_meta_data()
-        $order->update_meta_data('_allesklardruck_api_sent', time());
+        
+        // Save API response information
+        update_post_meta($order_id, '_allesklardruck_api_sent', time());
         if (isset($result['response_data']['order_id'])) {
-            $order->update_meta_data('_allesklardruck_order_id', $result['response_data']['order_id']);
+            update_post_meta($order_id, '_allesklardruck_order_id', $result['response_data']['order_id']);
         }
-        $order->save();
         
         // Add order note
         $order->add_order_note(
@@ -2186,25 +2071,16 @@ class Octo_Print_API_Integration {
 
     /**
      * Get API status for a specific order
-     *
+     * 
      * @param int $order_id WordPress order ID
      * @return array Order API status information
      */
     public function get_order_api_status($order_id) {
-        // HPOS FIX: Use WC_Order object instead of get_post_meta()
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            return array(
-                'sent' => false,
-                'error' => 'Order not found'
-            );
-        }
-
-        $api_sent = $order->get_meta('_allesklardruck_api_sent', true);
-        $status_code = $order->get_meta('_allesklardruck_api_status_code', true);
-        $allesklardruck_order_id = $order->get_meta('_allesklardruck_order_id', true);
-        $order_status = $order->get_meta('_allesklardruck_order_status', true);
-        $tracking_number = $order->get_meta('_allesklardruck_tracking_number', true);
+        $api_sent = get_post_meta($order_id, '_allesklardruck_api_sent', true);
+        $status_code = get_post_meta($order_id, '_allesklardruck_api_status_code', true);
+        $allesklardruck_order_id = get_post_meta($order_id, '_allesklardruck_order_id', true);
+        $order_status = get_post_meta($order_id, '_allesklardruck_order_status', true);
+        $tracking_number = get_post_meta($order_id, '_allesklardruck_tracking_number', true);
         
         if (!$api_sent) {
             return array(

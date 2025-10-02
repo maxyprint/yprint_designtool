@@ -37,9 +37,6 @@ class Octo_Print_Designer_WC_Integration {
         // NEW: Order integration hook for JSON design data persistence
         add_action('woocommerce_checkout_create_order_line_item', array($this, 'save_design_data_to_order'), 10, 4);
 
-        // 🔧 FIX: Save order-level meta after all items are processed
-        add_action('woocommerce_checkout_create_order', array($this, 'save_order_level_design_data'), 20, 2);
-
         add_filter('woocommerce_order_item_display_meta_key', array($this, 'format_order_item_meta_display'), 10, 3);
         add_filter('woocommerce_order_item_display_meta_value', array($this, 'format_order_item_meta_value'), 10, 3);
         add_filter('woocommerce_admin_order_item_thumbnail', array($this, 'customize_order_item_thumbnail'), 10, 4);
@@ -909,11 +906,11 @@ private function check_yprint_dependency() {
                 $all_data_complete = false;
             }
         }
-
-        // Get saved print provider email - HPOS FIX: Use $order->get_meta()
-        $print_provider_email = $order->get_meta('_print_provider_email', true);
-        $email_sent = $order->get_meta('_print_provider_email_sent', true);
-
+        
+        // Get saved print provider email
+        $print_provider_email = get_post_meta($order_id, '_print_provider_email', true);
+        $email_sent = get_post_meta($order_id, '_print_provider_email_sent', true);
+        
         wp_nonce_field('octo_send_to_print_provider', 'octo_print_provider_nonce');
         
         ?>
@@ -1834,12 +1831,11 @@ private function check_yprint_dependency() {
         if (is_wp_error($result)) {
             wp_send_json_error(array('message' => $result->get_error_message()));
         }
-
-        // Save email address and sent timestamp - HPOS FIX: Use $order->update_meta_data()
-        $order->update_meta_data('_print_provider_email', $email);
-        $order->update_meta_data('_print_provider_email_sent', time());
-        $order->save();
-
+        
+        // Save email address and sent timestamp
+        update_post_meta($order_id, '_print_provider_email', $email);
+        update_post_meta($order_id, '_print_provider_email_sent', time());
+        
         // Add order note
         $order->add_order_note(
             sprintf(__('Print provider email sent to %s', 'octo-print-designer'), $email),
@@ -2317,7 +2313,6 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $storage_start = microtime(true);
                 $json_string = json_encode($design_data_json);
 
-                // HPOS FIX: Use $order->update_meta_data() instead of update_post_meta()
                 // Compress large JSON data for storage efficiency
                 if (strlen($json_string) > 10000) { // 10KB threshold
                     $compressed = gzcompress($json_string, 6);
@@ -2325,17 +2320,14 @@ private function build_print_provider_email_content($order, $design_items, $note
                         error_log(sprintf("📊 [DB OPTIMIZER] Compressed design data: %d -> %d bytes (%.1f%% reduction)",
                             strlen($json_string), strlen($compressed),
                             (1 - strlen($compressed) / strlen($json_string)) * 100));
-                        $order->update_meta_data('_design_data_compressed', base64_encode($compressed));
+                        $meta_result = update_post_meta($order_id, '_design_data_compressed', base64_encode($compressed));
                         // Keep uncompressed for compatibility
-                        $order->update_meta_data('_design_data', wp_slash($json_string));
-                        $meta_result = $order->save();
+                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
                     } else {
-                        $order->update_meta_data('_design_data', wp_slash($json_string));
-                        $meta_result = $order->save();
+                        $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
                     }
                 } else {
-                    $order->update_meta_data('_design_data', wp_slash($json_string));
-                    $meta_result = $order->save();
+                    $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
                 }
 
                 $storage_time = (microtime(true) - $storage_start) * 1000;
@@ -2405,49 +2397,30 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $debug_info[] = "Design {$design_id}: JSON parse error - " . json_last_error_msg();
                 continue;
             }
-
+            
             $debug_info[] = "Design {$design_id}: JSON parsed successfully";
-
-            // PHASE 3 - AGENT 3: Normalize design data to Golden Standard
-            $design_data = $this->normalize_design_data($design_data);
-            $debug_info[] = "Design {$design_id}: Normalized to format: " . ($design_data['metadata']['source'] ?? 'unknown');
-
-            // Check if we have objects in Golden Standard format
-            if (!isset($design_data['objects'])) {
-                $debug_info[] = "Design {$design_id}: No objects found after normalization";
+            
+            // Debug: Show what's in the JSON
+            if (isset($design_data['variationImages'])) {
+                $debug_info[] = "Design {$design_id}: variationImages found with " . count($design_data['variationImages']) . " variations";
+            } else {
+                $debug_info[] = "Design {$design_id}: No variationImages in JSON";
                 $debug_info[] = "Design {$design_id}: Available keys: " . implode(', ', array_keys($design_data));
                 continue;
             }
-
-            $debug_info[] = "Design {$design_id}: Found " . count($design_data['objects']) . " objects in Golden Standard format";
-
-            // PHASE 3 - AGENT 3: Process normalized Golden Standard format
-            // Group objects by variation_key to create processed_views
+            
+            // Convert variationImages to processed_views format
+            // Structure is: "167359_189542" => [image1, image2, ...]
             $processed_views = array();
-
-            // Get variation info from metadata
-            $variation_id = $design_data['metadata']['variation_id'] ?? 'default';
-            $template_id = $design_data['metadata']['template_id'] ?? null;
-
-            // Group objects by their variation_key
-            $objects_by_view = array();
-            foreach ($design_data['objects'] as $obj) {
-                $variation_key = $obj['elementMetadata']['variation_key'] ?? 'default_view';
-                if (!isset($objects_by_view[$variation_key])) {
-                    $objects_by_view[$variation_key] = array();
-                }
-                $objects_by_view[$variation_key][] = $obj;
-            }
-
-            // Convert to processed_views format
-            foreach ($objects_by_view as $combined_key => $objects) {
-                $debug_info[] = "Design {$design_id}: Processing view key {$combined_key}";
-
+            
+            foreach ($design_data['variationImages'] as $combined_key => $images_array) {
+                $debug_info[] = "Design {$design_id}: Processing combined key {$combined_key}";
+                
                 // Split the combined key "167359_189542" into variation_id and view_id
                 $parts = explode('_', $combined_key);
-                $view_variation_id = $parts[0] ?? $variation_id;
+                $variation_id = $parts[0] ?? $combined_key;
                 $view_id = $parts[1] ?? 'default';
-
+                
                 // Try to get view name from the order item's product_images data
                 $view_name = 'Design View';
                 $product_images_json = $item->get_meta('_design_product_images');
@@ -2462,17 +2435,17 @@ private function build_print_provider_email_content($order, $design_items, $note
                         }
                     }
                 }
-
-                if (!empty($objects)) {
+                
+                if (is_array($images_array) && !empty($images_array)) {
                     $processed_views[$combined_key] = array(
                         'view_name' => $view_name,
                         'system_id' => $view_id,
-                        'variation_id' => $view_variation_id,
-                        'images' => $objects
+                        'variation_id' => $variation_id,
+                        'images' => $images_array
                     );
-                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$view_variation_id} with " . count($objects) . " objects";
+                    $debug_info[] = "Design {$design_id}: Added view '{$view_name}' (ID: {$view_id}) for variation {$variation_id} with " . count($images_array) . " images";
                 } else {
-                    $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid objects";
+                    $debug_info[] = "Design {$design_id}: Skipped {$combined_key} - no valid images array";
                 }
             }
             
@@ -2501,10 +2474,9 @@ private function build_print_provider_email_content($order, $design_items, $note
             true
         );
         
-        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // 🧠 DATABASE OPTIMIZER: Performance-optimized metadata retrieval
         $retrieval_start = microtime(true);
-        $stored_design_data = $order->get_meta('_design_data', true);
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
         $retrieval_time = (microtime(true) - $retrieval_start) * 1000;
 
         if ($stored_design_data) {
@@ -2600,86 +2572,6 @@ private function build_print_provider_email_content($order, $design_items, $note
      *
      * @param bool $result Validation result (true = passed, false = failed)
      */
-    /**
-     * PHASE 3 - AGENT 3: Normalize any design format to Golden Standard
-     *
-     * Handles 3 formats:
-     * 1. Golden Standard (objects + metadata.capture_version) - pass through
-     * 2. variationImages (nested transform) - flatten and convert
-     * 3. Legacy nested (old system) - convert to Golden Standard
-     *
-     * @param array $data Design data in any format
-     * @return array Normalized design data in Golden Standard format
-     */
-    private function normalize_design_data($data) {
-        // Already Golden Standard? Pass through
-        if (isset($data['objects']) && isset($data['metadata']['capture_version'])) {
-            error_log('✅ [NORMALIZE] Design already in Golden Standard format (capture_version: ' . $data['metadata']['capture_version'] . ')');
-            return $data;
-        }
-
-        // variationImages format?
-        if (isset($data['variationImages'])) {
-            error_log('🔄 [NORMALIZE] Converting variationImages format to Golden Standard');
-
-            $variation_keys = array_keys($data['variationImages']);
-            $elements = $data['variationImages'][$variation_keys[0]];
-
-            // Flatten nested transform
-            $normalized_elements = array_map(function($el) {
-                if (isset($el['transform'])) {
-                    // Move transform properties to root
-                    $flattened = array_merge($el, $el['transform']);
-                    unset($flattened['transform']);
-                    return $flattened;
-                }
-                return $el;
-            }, $elements);
-
-            $normalized = array(
-                'objects' => $normalized_elements,
-                'metadata' => array(
-                    'capture_version' => '2.1-migrated',
-                    'source' => 'variation_images_normalized',
-                    'original_template_id' => $data['templateId'] ?? null,
-                    'original_variation' => $data['currentVariation'] ?? null,
-                    'normalized_at' => current_time('mysql')
-                )
-            );
-
-            error_log('✅ [NORMALIZE] variationImages converted: ' . count($normalized_elements) . ' elements normalized');
-            return $normalized;
-        }
-
-        // Legacy nested view format? (e.g., "167359_189542": {images: [...]})
-        $view_keys = array_keys($data);
-        if (!empty($view_keys)) {
-            $first_view_key = $view_keys[0];
-            $first_view = $data[$first_view_key];
-
-            if (is_array($first_view) && isset($first_view['images'])) {
-                error_log('🔄 [NORMALIZE] Converting legacy view format to Golden Standard');
-
-                $normalized = array(
-                    'objects' => $first_view['images'],
-                    'metadata' => array(
-                        'capture_version' => '1.0-legacy-migrated',
-                        'source' => 'legacy_view_normalized',
-                        'original_view_key' => $first_view_key,
-                        'normalized_at' => current_time('mysql')
-                    )
-                );
-
-                error_log('✅ [NORMALIZE] Legacy format converted: ' . count($first_view['images']) . ' elements normalized');
-                return $normalized;
-            }
-        }
-
-        // Unknown format - log error and return unchanged
-        error_log('⚠️ [NORMALIZE] Unknown design format in normalize_design_data: ' . json_encode(array_keys($data)));
-        return $data;
-    }
-
     private function increment_validation_stat($result) {
         $stats = get_option('design_validation_stats', array(
             'total' => 0,
@@ -2725,15 +2617,12 @@ private function build_print_provider_email_content($order, $design_items, $note
     public function save_design_data_to_order($item, $cart_item_key, $values, $order) {
         if (!empty($values['_design_data_json'])) {
             $design_data = $values['_design_data_json'];
-            $json_string = wp_slash(json_encode($design_data));
 
             // PHASE 3: Check kill switch
             if (defined('DISABLE_DESIGN_VALIDATION') && DISABLE_DESIGN_VALIDATION) {
                 // Kill switch enabled - skip validation entirely
-                $item->add_meta_data('_design_data', $json_string, true);
-                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
-                $order->update_meta_data('_design_data', $json_string);
-                error_log("📦 Design data saved to order item AND order (validation disabled): " . $item->get_id());
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("📦 Design data saved to order item (validation disabled): " . $item->get_id());
                 return;
             }
 
@@ -2753,36 +2642,14 @@ private function build_print_provider_email_content($order, $design_items, $note
                 $this->increment_validation_stat(false);
 
                 // Continue saving anyway (log-only mode)
-                $item->add_meta_data('_design_data', $json_string, true);
-                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
-                $order->update_meta_data('_design_data', $json_string);
-                error_log("📦 Design data saved to order item AND order (validation failed but logged): " . $item->get_id());
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("📦 Design data saved to order item (validation failed but logged): " . $item->get_id());
             } else {
                 // Validation passed
                 $this->increment_validation_stat(true);
-                $item->add_meta_data('_design_data', $json_string, true);
-                // 🔧 FIX: Also save to ORDER LEVEL for refresh_print_data compatibility
-                $order->update_meta_data('_design_data', $json_string);
-                error_log("✅ Design data saved to order item AND order (validation passed): " . $item->get_id());
+                $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
+                error_log("✅ Design data saved to order item (validation passed): " . $item->get_id());
             }
-        }
-    }
-
-    /**
-     * 🔧 FIX: Save order-level design data after all items are processed
-     * This ensures $order->save() is called to persist the meta_data added in save_design_data_to_order()
-     *
-     * @param WC_Order $order The order object
-     * @param array $data Posted data from checkout
-     */
-    public function save_order_level_design_data($order, $data) {
-        // Save all pending meta_data updates
-        $result = $order->save();
-
-        if ($result) {
-            error_log("✅ Order-level design data persisted for order #" . $order->get_id());
-        } else {
-            error_log("❌ Failed to persist order-level design data for order #" . $order->get_id());
         }
     }
 
@@ -3357,9 +3224,8 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         // Continuing with button render
 
-        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // Check if stored design data exists (check both _design_data and _db_processed_views)
-        $stored_design_data = $order->get_meta('_design_data', true);
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
         $db_processed_views = null;
         $all_meta_debug = [];
 
@@ -5004,9 +4870,8 @@ private function build_print_provider_email_content($order, $design_items, $note
         // 🐛 DEBUG: Order validation and initial data check
         error_log("✅ [AJAX DEBUG] Order #{$order_id} found successfully");
 
-        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
         // Get stored design data
-        $stored_design_data = $order->get_meta('_design_data', true);
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
         $design_data = null;
 
         // 🐛 DEBUG: Analyze available data sources
@@ -5053,12 +4918,6 @@ private function build_print_provider_email_content($order, $design_items, $note
 
             $processing_time = (microtime(true) - $processing_start) * 1000;
             error_log(sprintf("📊 [DB OPTIMIZER] JSON processing: %.2fms", $processing_time));
-
-            // 🎯 NORMALIZATION: Ensure consistent format
-            if ($design_data) {
-                $design_data = $this->normalize_design_data($design_data);
-                error_log("✅ [NORMALIZE] Design data normalized in ajax_load_design_preview");
-            }
         } else {
             // 🔄 FALLBACK: Try to extract from _db_processed_views
             foreach ($order->get_items() as $item) {
@@ -5068,9 +4927,6 @@ private function build_print_provider_email_content($order, $design_items, $note
                     $design_data = $this->convert_processed_views_to_canvas_data($processed_views_meta, $order_id, $item);
                     if ($design_data) {
                         error_log("✅ [DATA CONVERTER] Successfully converted print data to canvas format");
-                        // 🎯 NORMALIZATION: Ensure consistent format after conversion
-                        $design_data = $this->normalize_design_data($design_data);
-                        error_log("✅ [NORMALIZE] Converted data normalized");
                         break;
                     }
                 }
@@ -6790,8 +6646,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         $precision_calculator = new PrecisionCalculator();
 
         // Check for direct design data storage
-        // HPOS FIX: Use $order->get_meta() instead of get_post_meta()
-        $stored_design_data = $order->get_meta('_design_data', true);
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
         $extracted_data = [];
 
         if ($stored_design_data) {
@@ -6901,40 +6756,34 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         error_log('🔍 AGENT 7 has_design_data: Checking order ' . $order_id);
 
-        // HPOS FIX: Get order object first for HPOS compatibility
+        // Check 1: Stored design data in post meta (legacy orders)
+        $stored_design_data = get_post_meta($order_id, '_design_data', true);
+        if (!empty($stored_design_data)) {
+            // Validate it's not just whitespace or empty JSON
+            $trimmed = is_string($stored_design_data) ? trim($stored_design_data) : '';
+            if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
+                error_log('✅ AGENT 7 has_design_data: Found _design_data (post meta)');
+                return true;
+            } else {
+                error_log('⚠️ AGENT 7 has_design_data: _design_data exists but is empty/invalid');
+            }
+        } else {
+            error_log('🔍 AGENT 7 has_design_data: No _design_data in post meta');
+        }
+
+        // Check 2: Order-level meta (HPOS compatibility)
         $order = wc_get_order($order_id);
         if (!$order) {
             error_log('❌ AGENT 7 has_design_data: Order not found');
             return false;
         }
 
-        // Check 1: Stored design data - HPOS FIX: Use $order->get_meta() instead of get_post_meta()
-        $stored_design_data = $order->get_meta('_design_data', true);
-        if (!empty($stored_design_data)) {
-            // Validate it's not just whitespace or empty JSON
-            $trimmed = is_string($stored_design_data) ? trim($stored_design_data) : '';
+        $order_design_data = $order->get_meta('_design_data', true);
+        if (!empty($order_design_data) && is_string($order_design_data)) {
+            $trimmed = trim($order_design_data);
             if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
                 error_log('✅ AGENT 7 has_design_data: Found _design_data (order meta)');
                 return true;
-            } else {
-                error_log('⚠️ AGENT 7 has_design_data: _design_data exists but is empty/invalid');
-            }
-        } else {
-            error_log('🔍 AGENT 7 has_design_data: No _design_data in order meta');
-        }
-
-        // Check 2: LEGACY ORDERS - _design_data in order items (pre-commit 1fe2419)
-        foreach ($order->get_items() as $item_id => $item) {
-            $item_design_data = $item->get_meta('_design_data', true);
-            if (!empty($item_design_data)) {
-                // Validate it's not just whitespace or empty JSON
-                $trimmed = is_string($item_design_data) ? trim($item_design_data) : '';
-                if ($trimmed !== '' && $trimmed !== '{}' && $trimmed !== '[]') {
-                    error_log('✅ AGENT 7 has_design_data: Found _design_data in order item ' . $item_id . ' (legacy order)');
-                    return true;
-                } else {
-                    error_log('⚠️ AGENT 7 has_design_data: _design_data exists in item but is empty/invalid');
-                }
             }
         }
 
