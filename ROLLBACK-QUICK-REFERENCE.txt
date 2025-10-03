@@ -1,0 +1,217 @@
+================================================================================
+  ROLLBACK QUICK REFERENCE - Canvas Offset Fix (fc3f8b7)
+================================================================================
+
+🚨 EMERGENCY ROLLBACK COMMANDS
+================================================================================
+
+METHOD 1: AUTOMATED (RECOMMENDED)
+---------------------------------
+bash /workspaces/yprint_designtool/AGENT-5-QUICK-ROLLBACK.sh
+
+Time: < 2 minutes
+Reverts: PHP only (safe for most issues)
+
+
+METHOD 2: COMPLETE ROLLBACK (CODE + DATABASE)
+----------------------------------------------
+bash /workspaces/yprint_designtool/complete-rollback.sh [backup.sql]
+
+Time: 5-30 minutes (depends on DB size)
+Reverts: JavaScript + PHP + Database (optional)
+
+
+METHOD 3: FAST CODE-ONLY
+-------------------------
+bash /workspaces/yprint_designtool/code-rollback-fast.sh
+
+Time: < 1 minute
+Reverts: JavaScript + PHP only
+
+
+================================================================================
+🔍 WHEN TO ROLLBACK
+================================================================================
+
+IMMEDIATE ROLLBACK REQUIRED (P0/P1):
+------------------------------------
+✗ Old designs don't load
+✗ Old designs misaligned by 50px
+✗ JavaScript fatal errors ("Uncaught TypeError")
+✗ PHP fatal errors ("Fatal error", "Call to undefined")
+✗ Error rate increase > 10%
+✗ Designer completely broken (white screen)
+✗ Print API payload incorrect
+✗ Customer complaints
+
+→ ACTION: Execute rollback immediately
+
+
+INVESTIGATE FIRST (P2):
+-----------------------
+⚠ Minor visual discrepancy (< 5px)
+⚠ Performance degradation (< 10ms)
+⚠ Single isolated error
+⚠ Edge case failure
+⚠ Console warnings (non-fatal)
+
+→ ACTION: Monitor for 1-4 hours, rollback if issue escalates
+
+
+DO NOT ROLLBACK (Normal Operation):
+------------------------------------
+✓ Console logs with "OFFSET-FIX" (expected)
+✓ Debug logs with offset calculations (expected)
+✓ New designs have metadata.offset_applied (expected)
+✓ Old designs load without metadata (expected backward compatibility)
+
+→ ACTION: Continue monitoring
+
+
+================================================================================
+📋 POST-ROLLBACK VALIDATION CHECKLIST
+================================================================================
+
+□ Code Files Restored
+  grep -c "🔧 OFFSET-FIX" public/js/dist/designer.bundle.js
+  # Expected: 0
+
+  grep -c "🔧 OFFSET-FIX" includes/class-octo-print-api-integration.php
+  # Expected: 0
+
+□ Syntax Valid
+  php -l includes/class-octo-print-api-integration.php
+  # Expected: "No syntax errors detected"
+
+□ Caches Cleared
+  wp cache flush
+  php -r "opcache_reset();"
+
+□ Old Design Loads Correctly
+  # Manual test: Open designer, load existing design, verify position
+
+□ No Errors in Logs
+  tail -50 wp-content/debug.log | grep -i "error\|fatal"
+  # Expected: No new errors
+
+
+================================================================================
+📁 FILE LOCATIONS
+================================================================================
+
+Modified Files:
+  /workspaces/yprint_designtool/public/js/dist/designer.bundle.js
+  /workspaces/yprint_designtool/includes/class-octo-print-api-integration.php
+
+Backup Files (Pre-Fix):
+  /workspaces/yprint_designtool/public/js/dist/designer.bundle.js.backup-pre-offset-fix-1759487255
+  /workspaces/yprint_designtool/includes/class-octo-print-api-integration.php.backup-pre-offset-fix-1759488230
+
+Rollback Scripts:
+  /workspaces/yprint_designtool/AGENT-5-QUICK-ROLLBACK.sh
+  /workspaces/yprint_designtool/complete-rollback.sh
+  /workspaces/yprint_designtool/code-rollback-fast.sh
+  /workspaces/yprint_designtool/validate-rollback.sh
+
+Documentation:
+  /workspaces/yprint_designtool/rollback-procedures.md (full procedures)
+  /workspaces/yprint_designtool/ROLLBACK-QUICK-REFERENCE.txt (this file)
+  /workspaces/yprint_designtool/PRODUCTION-DEPLOYMENT-RUNBOOK.md
+
+
+================================================================================
+🔧 MANUAL ROLLBACK (If Scripts Fail)
+================================================================================
+
+1. Restore JavaScript:
+   cp public/js/dist/designer.bundle.js.backup-pre-offset-fix-1759487255 \
+      public/js/dist/designer.bundle.js
+
+2. Restore PHP:
+   cp includes/class-octo-print-api-integration.php.backup-pre-offset-fix-1759488230 \
+      includes/class-octo-print-api-integration.php
+
+3. Validate PHP:
+   php -l includes/class-octo-print-api-integration.php
+
+4. Clear OPCache:
+   sudo service php8.1-fpm reload
+   # OR
+   wp cache flush
+
+5. Verify:
+   grep -c "🔧 OFFSET-FIX" public/js/dist/designer.bundle.js
+   # Expected: 0
+
+
+================================================================================
+💾 DATABASE ROLLBACK (Only if Database Corruption Detected)
+================================================================================
+
+1. Create Current Backup:
+   wp db export safety-backup-current-state-$(date +%s).sql
+
+2. Restore Pre-Fix Backup:
+   wp db import backup-pre-offset-fix-[timestamp].sql
+
+3. Verify:
+   wp db check
+   wp db query "SELECT COUNT(*) FROM wp_octo_user_designs;"
+
+
+================================================================================
+📞 EMERGENCY CONTACTS
+================================================================================
+
+Lead Developer:     [UPDATE WITH ACTUAL CONTACT]
+DevOps On-Call:     [UPDATE WITH ACTUAL CONTACT]
+Database Admin:     [UPDATE WITH ACTUAL CONTACT]
+Slack Emergency:    #devops-emergency
+
+
+================================================================================
+🔄 RE-APPLYING THE FIX (After Rollback)
+================================================================================
+
+If rollback was necessary and you want to re-apply the fix later:
+
+git checkout fc3f8b7 -- public/js/dist/designer.bundle.js includes/class-octo-print-api-integration.php
+wp cache flush
+php -r "opcache_reset();"
+
+
+================================================================================
+📊 ROLLBACK STATISTICS
+================================================================================
+
+Commit:             fc3f8b7
+Files Changed:      2 (designer.bundle.js + class-octo-print-api-integration.php)
+Lines Changed:      74 total (38 JS + 36 PHP)
+Estimated Time:     < 5 minutes
+Risk Level:         LOW
+Data Loss Risk:     NONE (backward compatible)
+Rollback Count:     [UPDATE AFTER EACH ROLLBACK]
+
+
+================================================================================
+✅ VALIDATION COMMAND
+================================================================================
+
+Run this after rollback to validate success:
+
+bash /workspaces/yprint_designtool/validate-rollback.sh
+
+Expected output:
+  ✅ Passed: 5
+  ❌ Failed: 0
+  🎉 All validation checks passed!
+  ✅ Rollback was successful
+
+
+================================================================================
+END OF QUICK REFERENCE
+================================================================================
+
+Last Updated: 2025-10-03
+Version: 1.0.0
+For detailed procedures, see: rollback-procedures.md

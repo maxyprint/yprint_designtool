@@ -928,7 +928,7 @@ var DesignerWidget = /*#__PURE__*/function () {
         }
 
         var canvasRect = canvasElement.getBoundingClientRect();
-        var containerElement = canvasElement.closest('.designer-editor');
+        var containerElement = canvasElement.parentNode; // .designer-canvas-container - OFFSET-FIX: Use direct parent (0px padding) instead of .designer-editor (50px padding)
 
         if (!containerElement) {
           console.warn('🔧 OFFSET-FIX: .designer-editor container not found, returning zero offset');
