@@ -1,0 +1,355 @@
+{
+  "agent_id": 5,
+  "verdict": "PASS",
+  "analysis_timestamp": "2025-10-02T19:57:28Z",
+  "order_id": 5382,
+
+  "metadata_path_trace": {
+    "step_1_database": {
+      "location": "element_data.metadata",
+      "status": "PRESENT",
+      "structure": {
+        "source": "converted_from_processed_views",
+        "capture_version": "3.0",
+        "designer_offset": {"x": 0, "y": 0},
+        "converted_at": "2025-10-02 19:57:28",
+        "order_id": 5382,
+        "template_id": "3657"
+      },
+      "notes": "Metadata correctly stored in database by convert_processed_views_to_canvas_data() in PHP"
+    },
+
+    "step_2_ajax_response": {
+      "location": "design_elements.item_646.element_data.metadata",
+      "status": "PRESERVED",
+      "wrapper_layers": [
+        "design_elements (WC order wrapper)",
+        "item_646 (element identifier)",
+        "element_data (actual design data)"
+      ],
+      "notes": "AJAX response wraps data but preserves metadata integrity"
+    },
+
+    "step_3_transformation": {
+      "location": "hive_mind_view.metadata",
+      "status": "MOVED_TO_VIEW_WRAPPER",
+      "transformation_function": "DesignPreviewGenerator.transformDataStructure()",
+      "logic": "Unwraps design_elements → objects format → view-based format with metadata at hive_mind_view.metadata",
+      "code_location": "admin/js/design-preview-generator.js lines 869-920",
+      "notes": "Metadata moves from element_data.metadata to hive_mind_view.metadata during view wrapper creation"
+    },
+
+    "step_4_classifyDataFormat": {
+      "location": "Extracted from hive_mind_view.metadata",
+      "status": "SUCCESSFULLY_EXTRACTED",
+      "extraction_logic": {
+        "step_1": "Check designData.metadata (not found)",
+        "step_2": "Search for view wrapper keys with .images property",
+        "step_3": "Extract metadata from designData[viewKey].metadata",
+        "step_4": "Use extracted metadata for classification"
+      },
+      "code_location": "admin/js/admin-canvas-renderer.js lines 569-628",
+      "console_evidence": "🔍 AGENT 1 MUTEX: Extracted metadata from view wrapper: hive_mind_view",
+      "result": "Format classified as MODERN",
+      "notes": "View wrapper extraction logic works correctly"
+    },
+
+    "step_5_applyLegacyDataCorrection": {
+      "location": "Extracted from hive_mind_view.metadata",
+      "status": "SUCCESSFULLY_EXTRACTED",
+      "extraction_logic": "IDENTICAL to classifyDataFormat()",
+      "code_location": "admin/js/admin-canvas-renderer.js lines 1101-1114",
+      "console_evidence": "🔍 LEGACY CORRECTION: Extracted metadata from view wrapper: hive_mind_view",
+      "result": "Modern format detected, correction skipped",
+      "notes": "Fix applied in commit 3323092 ensures metadata extraction works"
+    },
+
+    "path_complete": true,
+    "lost_at_any_step": false,
+    "metadata_integrity": "PRESERVED",
+
+    "critical_insight": "Metadata never gets lost - it moves from top-level to view wrapper during transformation, and both extraction points correctly find it using view wrapper search logic"
+  },
+
+  "view_wrapper_analysis": {
+    "wrapper_type": "hive_mind_view",
+    "wrapper_creation": "convertObjectsToImages() in design-preview-generator.js line 998",
+    "why_wrapper_exists": "Canvas Reconstruction Engine expects view-based structure (e.g., 'hive_mind_view' or '167359_189542'), not flat objects array",
+
+    "extraction_logic": {
+      "algorithm": "Object.keys().filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images)",
+      "explanation": "Finds keys where value is an object with .images property (identifies view wrappers)",
+      "code": "const viewKeys = Object.keys(designData).filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images);",
+      "then": "metadata = designData[viewKeys[0]].metadata"
+    },
+
+    "supported_view_types": [
+      "hive_mind_view (converted from objects array)",
+      "elements_view (converted from elements array)",
+      "{variation_id}_{system_id} (native canvas reconstruction format)",
+      "Any view key with .images property"
+    ],
+
+    "robust": true,
+    "robustness_reasons": [
+      "Generic detection: searches for ANY key with .images property",
+      "Not hardcoded to specific view names",
+      "Works with current AND future view wrapper formats",
+      "Falls back gracefully if no wrapper found"
+    ],
+
+    "edge_cases": [
+      {
+        "case": "Multiple views in data",
+        "behavior": "Uses first view (viewKeys[0])",
+        "risk": "LOW - typically only one view per design data object"
+      },
+      {
+        "case": "No view wrapper (flat structure)",
+        "behavior": "metadata remains undefined, detection falls back to top-level",
+        "risk": "LOW - handled by 'if (!metadata)' check"
+      },
+      {
+        "case": "View wrapper without metadata",
+        "behavior": "metadata = undefined, classified as legacy (correct)",
+        "risk": "NONE - intended behavior"
+      }
+    ]
+  },
+
+  "dual_extraction_comparison": {
+    "classifyDataFormat_extracts": true,
+    "applyLegacyDataCorrection_extracts": true,
+
+    "extraction_code_comparison": {
+      "classifyDataFormat": {
+        "location": "lines 570-582",
+        "code": "let metadata = designData.metadata;\nif (!metadata) {\n  const viewKeys = Object.keys(designData).filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images);\n  if (viewKeys.length > 0) {\n    metadata = designData[viewKeys[0]].metadata;\n  }\n}"
+      },
+      "applyLegacyDataCorrection": {
+        "location": "lines 1103-1114",
+        "code": "let metadata = designData.metadata;\nif (!metadata) {\n  const viewKeys = Object.keys(designData).filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images);\n  if (viewKeys.length > 0) {\n    metadata = designData[viewKeys[0]].metadata;\n  }\n}"
+      }
+    },
+
+    "use_identical_logic": true,
+    "code_duplication_issue": true,
+
+    "maintainability_concern": {
+      "issue": "DUPLICATED CODE - same extraction logic in two places",
+      "risk": "If extraction logic needs updating, must update BOTH locations",
+      "severity": "MEDIUM",
+      "recommendation": "Refactor into shared helper function",
+      "suggested_refactor": {
+        "function_name": "extractMetadata(designData)",
+        "implementation": "extractMetadata(designData) {\n  let metadata = designData.metadata;\n  if (!metadata) {\n    const viewKeys = Object.keys(designData).filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images);\n    if (viewKeys.length > 0) {\n      metadata = designData[viewKeys[0]].metadata;\n      console.log('🔍 Extracted metadata from view wrapper:', viewKeys[0]);\n    }\n  }\n  return metadata;\n}",
+        "usage": "const metadata = this.extractMetadata(designData);"
+      }
+    },
+
+    "could_diverge": true,
+    "divergence_risk": "If one function is updated but the other is forgotten, they could extract metadata differently, causing inconsistent classification",
+
+    "current_status": "SYNCHRONIZED (commit 3323092 applied identical logic to both functions)"
+  },
+
+  "metadata_completeness": {
+    "has_capture_version": true,
+    "has_designer_offset": true,
+    "has_source": true,
+    "all_required_fields": true,
+
+    "field_analysis": {
+      "capture_version": {
+        "value": "3.0",
+        "purpose": "Identifies data capture version (modern vs legacy)",
+        "required": true,
+        "status": "PRESENT"
+      },
+      "designer_offset": {
+        "value": {"x": 0, "y": 0},
+        "purpose": "Designer canvas offset (prevents heuristic offset detection)",
+        "required": true,
+        "status": "PRESENT"
+      },
+      "source": {
+        "value": "converted_from_processed_views",
+        "purpose": "Primary modern format marker (prevents legacy detection)",
+        "required": true,
+        "status": "PRESENT"
+      },
+      "converted_at": {
+        "value": "2025-10-02 19:57:28",
+        "purpose": "Conversion timestamp (debugging/auditing)",
+        "required": false,
+        "status": "PRESENT"
+      },
+      "order_id": {
+        "value": 5382,
+        "purpose": "Source order (debugging/auditing)",
+        "required": false,
+        "status": "PRESENT"
+      },
+      "template_id": {
+        "value": "3657",
+        "purpose": "Source template (debugging/auditing)",
+        "required": false,
+        "status": "PRESENT"
+      }
+    },
+
+    "missing_fields": [],
+
+    "metadata_quality": "EXCELLENT - Contains all required fields plus additional debugging fields"
+  },
+
+  "fix_explanation": {
+    "problem_was": "Metadata located at designData.hive_mind_view.metadata, but applyLegacyDataCorrection() only checked designData.metadata (top level)",
+
+    "why_metadata_moved": "During transformDataStructure(), data gets converted from flat 'objects' array to view-wrapper format. The wrapper object (hive_mind_view) contains .images array and .metadata. This is required by Canvas Reconstruction Engine.",
+
+    "broken_code": {
+      "location": "applyLegacyDataCorrection() before commit 3323092",
+      "logic": "const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';",
+      "problem": "designData.metadata is undefined (metadata is at designData.hive_mind_view.metadata)",
+      "result": "hasMetadata: false, classified as legacy, applied incorrect correction"
+    },
+
+    "fixed_code": {
+      "location": "applyLegacyDataCorrection() after commit 3323092",
+      "logic": "Extract metadata from view wrapper first, then check metadata.source",
+      "solution": "let metadata = designData.metadata;\nif (!metadata) {\n  const viewKeys = Object.keys(designData).filter(k => designData[k] && typeof designData[k] === 'object' && designData[k].images);\n  if (viewKeys.length > 0) {\n    metadata = designData[viewKeys[0]].metadata;\n  }\n}\nconst isLegacyDbFormat = metadata?.source === 'db_processed_views';",
+      "result": "hasMetadata: true, metadataSource: 'converted_from_processed_views', classified as modern, no correction applied"
+    },
+
+    "why_it_works": {
+      "step_1": "Check if metadata exists at top level (designData.metadata)",
+      "step_2": "If not found, search for view wrapper objects (objects with .images property)",
+      "step_3": "Extract metadata from inside the first view wrapper found",
+      "step_4": "Use extracted metadata for legacy detection logic",
+      "outcome": "Metadata is found regardless of whether it's at top level or inside view wrapper"
+    },
+
+    "could_break_anything": false,
+
+    "safety_analysis": {
+      "backward_compatibility": "SAFE - Falls back to top-level metadata if no wrapper exists",
+      "forward_compatibility": "SAFE - Generic detection works with any view wrapper format",
+      "existing_data": "SAFE - Doesn't change data, only changes where metadata is read from",
+      "edge_cases": [
+        {
+          "case": "Data with top-level metadata",
+          "behavior": "Uses top-level metadata (if (!metadata) check prevents overwrite)",
+          "risk": "NONE"
+        },
+        {
+          "case": "Data with no metadata anywhere",
+          "behavior": "metadata = undefined, classified as legacy (correct)",
+          "risk": "NONE"
+        },
+        {
+          "case": "Data with both top-level AND wrapper metadata",
+          "behavior": "Uses top-level metadata (priority to top level)",
+          "risk": "LOW - unlikely to have both, but prioritization is logical"
+        }
+      ]
+    }
+  },
+
+  "commit_chain_analysis": {
+    "commit_1": {
+      "hash": "3dd51d6",
+      "title": "Prevent Double Legacy Correction on Converted Golden Standard Data",
+      "what": "Changed PHP to output metadata.source = 'converted_from_processed_views' instead of 'db_processed_views'",
+      "why": "Prevents frontend from detecting converted data as legacy format",
+      "file": "includes/class-octo-print-designer-wc-integration.php"
+    },
+    "commit_2": {
+      "hash": "c72caca",
+      "title": "Complete Metadata Propagation - Prevent Legacy Misclassification",
+      "what": "Added view wrapper metadata extraction to classifyDataFormat()",
+      "why": "classifyDataFormat() wasn't finding metadata in view wrappers",
+      "file": "admin/js/admin-canvas-renderer.js"
+    },
+    "commit_3": {
+      "hash": "3323092",
+      "title": "View Wrapper Metadata Extraction in applyLegacyDataCorrection()",
+      "what": "Added IDENTICAL view wrapper extraction logic to applyLegacyDataCorrection()",
+      "why": "Complete the fix - both functions now extract metadata consistently",
+      "file": "admin/js/admin-canvas-renderer.js"
+    },
+
+    "fix_completeness": "COMPLETE - All three commits work together to ensure metadata propagation",
+    "dependencies": "All three commits are required for full fix"
+  },
+
+  "console_log_evidence": {
+    "before_fix": {
+      "classifyDataFormat": "🔍 AGENT 1 MUTEX: Classifying data format... {\n  \"hasMetadata\": false,\n  \"hasCaptureVersion\": false,\n  \"hasDesignerOffset\": false\n}",
+      "applyLegacyDataCorrection": "🔍 LEGACY DATA CORRECTION: Analyzing design data... {\n  \"hasMetadata\": false,\n  \"hasCaptureVersion\": false,\n  \"hasDesignerOffset\": false\n}\n🔧 LEGACY DATA CORRECTION: Element transformed:\n  \"top\": \"154.55515149654573 → 234.55515149654573\"",
+      "problem": "Metadata not detected, incorrect legacy correction applied"
+    },
+
+    "after_fix": {
+      "classifyDataFormat": "🔍 AGENT 1 MUTEX: Extracted metadata from view wrapper: hive_mind_view\n🔍 AGENT 1 MUTEX: Classifying data format... {\n  \"hasMetadata\": true,\n  \"metadataSource\": \"converted_from_processed_views\",\n  \"hasCaptureVersion\": true,\n  \"hasDesignerOffset\": true\n}\n✅ AGENT 1 MUTEX: Format = MODERN (converted_from_processed_views with capture_version)",
+      "applyLegacyDataCorrection": "🔍 LEGACY CORRECTION: Extracted metadata from view wrapper: hive_mind_view\n🔍 LEGACY DATA CORRECTION: Analyzing design data... {\n  \"hasMetadata\": true,\n  \"metadataSource\": \"converted_from_processed_views\",\n  \"hasCaptureVersion\": true,\n  \"hasDesignerOffset\": true\n}\n✅ LEGACY DATA CORRECTION: Modern format detected - no correction needed",
+      "solution": "Metadata correctly extracted, modern format detected, no correction applied"
+    }
+  },
+
+  "confidence": "100%",
+
+  "final_assessment": "Metadata propagation is CORRECT",
+
+  "summary": {
+    "verdict": "PASS - Metadata propagation works correctly at all steps",
+
+    "key_findings": [
+      "Metadata exists at every step - never lost",
+      "Metadata moves from top-level to view wrapper during transformation (expected behavior)",
+      "Both extraction points (classifyDataFormat & applyLegacyDataCorrection) use identical logic",
+      "Extraction logic is robust and works with any view wrapper format",
+      "All required metadata fields are present and correct",
+      "Fix prevents double transformation on converted data"
+    ],
+
+    "remaining_issues": [
+      {
+        "issue": "Code duplication",
+        "severity": "MEDIUM",
+        "description": "Metadata extraction logic duplicated in two functions",
+        "recommendation": "Refactor into shared extractMetadata() helper function",
+        "impact": "Maintainability concern, not a functional bug"
+      }
+    ],
+
+    "proof_of_correctness": [
+      "Console logs show metadata extracted successfully",
+      "Classification detects MODERN format (not LEGACY)",
+      "Legacy correction is skipped (no +80px, no ×1.23 scale)",
+      "Elements render at correct coordinates",
+      "Order #5382 now renders correctly"
+    ]
+  },
+
+  "recommendations": [
+    {
+      "priority": "MEDIUM",
+      "recommendation": "Refactor metadata extraction into shared helper function",
+      "benefit": "Eliminates code duplication, ensures extraction logic stays synchronized",
+      "implementation": "Create extractMetadata(designData) method in AdminCanvasRenderer class"
+    },
+    {
+      "priority": "LOW",
+      "recommendation": "Add unit tests for metadata extraction logic",
+      "benefit": "Prevents regression if extraction logic changes",
+      "implementation": "Test with top-level metadata, view wrapper metadata, missing metadata"
+    },
+    {
+      "priority": "LOW",
+      "recommendation": "Document view wrapper format in code comments",
+      "benefit": "Makes it clear why metadata extraction searches for view wrappers",
+      "implementation": "Add JSDoc explaining transformation → view wrapper → metadata location"
+    }
+  ]
+}

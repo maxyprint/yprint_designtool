@@ -1,0 +1,274 @@
+{
+  "analysis_timestamp": "2025-10-03",
+  "analysis_type": "Image Canvas Positioning Research",
+  "source_code_location": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+
+  "image_upload_flow": {
+    "entry_points": [
+      {
+        "method": "File Input",
+        "location": "Line 1350-1352",
+        "code": "this.uploadInput.addEventListener('change', function (e) { _this14.handleFileUpload(e.target.files); });",
+        "description": "Benutzer klickt auf Upload-Zone oder wählt Datei aus"
+      },
+      {
+        "method": "Drag & Drop",
+        "location": "Line 1338-1343",
+        "code": "this.uploadZone.addEventListener('drop', function (e) { ... _this14.handleFileUpload(files); });",
+        "description": "Benutzer zieht Datei auf die Upload-Zone"
+      }
+    ],
+
+    "upload_processing": {
+      "function": "handleFileUpload()",
+      "location": "Line 1355-1469",
+      "validation": [
+        "Allowed types: image/jpeg, image/png",
+        "Max file size: 5MB",
+        "Max images: 20"
+      ],
+      "two_paths": {
+        "logged_in_users": {
+          "location": "Line 1414-1449",
+          "action": "Upload to server via AJAX",
+          "endpoint": "octoPrintDesigner.ajaxUrl",
+          "action_name": "upload_user_image",
+          "result": "Server returns permanent URL and ID"
+        },
+        "non_logged_users": {
+          "location": "Line 1411-1412",
+          "function": "handleTempImageUpload(file)",
+          "action": "Create local data URL",
+          "result": "Temporary in-memory storage"
+        }
+      }
+    },
+
+    "image_grid_addition": {
+      "function": "addImageToGrid(imageUrl, imageId, isTemporary)",
+      "location": "Line 771-826",
+      "purpose": "Adds image thumbnail to library grid",
+      "click_handler": "Line 782-825 - When thumbnail clicked, adds to canvas"
+    }
+  },
+
+  "canvas_positioning_system": {
+    "initial_position_calculation": {
+      "trigger": "When user clicks image thumbnail in library",
+      "location": "Line 784-813",
+      "positioning_code": {
+        "line_792_799": "img.set({ left: _this8.fabricCanvas.width / 2, top: _this8.fabricCanvas.height / 2, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale })",
+        "explanation": "ALLE neuen Bilder werden IMMER auf Canvas-Mitte zentriert"
+      },
+
+      "automatic_centering": {
+        "is_enabled": true,
+        "always_active": true,
+        "calculation": {
+          "horizontal": "fabricCanvas.width / 2",
+          "vertical": "fabricCanvas.height / 2",
+          "origin_point": "center/center",
+          "description": "Bild wird mit seinem Zentrum auf Canvas-Zentrum platziert"
+        }
+      },
+
+      "automatic_scaling": {
+        "is_enabled": true,
+        "location": "Line 788-791",
+        "calculation": {
+          "scaleX": "safeZone.width / img.width",
+          "scaleY": "safeZone.height / img.height",
+          "final_scale": "Math.min(scaleX, scaleY, 1)",
+          "description": "Bild wird automatisch skaliert um in Safe Zone zu passen, max 100% Größe"
+        }
+      }
+    },
+
+    "coordinate_origin_system": {
+      "all_objects_use_center_origin": true,
+      "occurrences_in_code": [
+        "Line 730-731: Template view background image",
+        "Line 738-739: Clip mask",
+        "Line 751-752: Template image",
+        "Line 795-796: User uploaded images",
+        "Line 2276-2277, 2357-2358, 2386-2387, 2415-2416: Various other elements"
+      ],
+      "consistent_pattern": "ALL Fabric.js objects use originX: 'center', originY: 'center'"
+    },
+
+    "positioning_helpers": {
+      "center_button": {
+        "location": "Line 83-100 (Toolbar)",
+        "function": "Manual center positioning",
+        "code": "activeObject.set({ left: fabricCanvas.width / 2, top: fabricCanvas.height / 2 })",
+        "description": "Button in toolbar re-centers selected object"
+      },
+
+      "safe_zone_clipping": {
+        "location": "Line 721-728, Line 741-748",
+        "mechanism": "clipPath: this.clipMask",
+        "description": "Images are clipped to safe zone rectangle",
+        "safe_zone_calculation": {
+          "left": "view.safeZone.left * canvas.width / 100",
+          "top": "view.safeZone.top * canvas.height / 100",
+          "width": "view.safeZone.width",
+          "height": "view.safeZone.height"
+        }
+      }
+    }
+  },
+
+  "drag_and_drop_implementation": {
+    "file_drag_drop": {
+      "events": [
+        "dragover (Line 1328-1332): Visual feedback",
+        "dragleave (Line 1333-1337): Reset visual state",
+        "drop (Line 1338-1343): Handle file drop"
+      ],
+      "positioning": "Same as click upload - always centered"
+    },
+
+    "object_drag_on_canvas": {
+      "enabled": true,
+      "events": {
+        "moving": "Line 1230-1232 - Updates toolbar position",
+        "modified": "Line 1192-1229 - Maintains aspect ratio, stores position",
+        "selection": "Line 1215-1229 - Updates toolbar visibility"
+      },
+      "position_storage": {
+        "function": "updateImageTransform(img)",
+        "location": "Line 1236-1291",
+        "stored_data": "transform: { left, top, scaleX, scaleY, angle, width, height }",
+        "storage_location": "variationImages Map - Key: ${variationId}_${viewId}"
+      }
+    }
+  },
+
+  "position_constraints": {
+    "grid_snap": {
+      "enabled": false,
+      "search_result": "No grid/snap functionality found"
+    },
+
+    "boundary_constraints": {
+      "type": "visual_clipping_only",
+      "mechanism": "clipPath clips rendering but doesn't prevent positioning",
+      "user_can_move_outside": true,
+      "description": "Images can be positioned outside safe zone, they just won't be visible there"
+    },
+
+    "aspect_ratio_lock": {
+      "enabled": true,
+      "enforcement": "Line 1170-1178 - Maintains uniform scale on resize",
+      "code": "if (img.scaleX !== img.scaleY) { var avgScale = (img.scaleX + img.scaleY) / 2; img.set({ scaleX: avgScale, scaleY: avgScale }); }"
+    }
+  },
+
+  "position_persistence": {
+    "storage_mechanism": {
+      "function": "storeViewImage(imageUrl, fabricImage)",
+      "location": "Line 922-976",
+      "data_structure": {
+        "id": "Unique image ID",
+        "url": "Image URL",
+        "transform": {
+          "left": "X position",
+          "top": "Y position",
+          "scaleX": "Horizontal scale",
+          "scaleY": "Vertical scale",
+          "angle": "Rotation",
+          "width": "Original width",
+          "height": "Original height"
+        },
+        "fabricImage": "Reference to Fabric.js object",
+        "visible": "Visibility flag"
+      }
+    },
+
+    "restoration": {
+      "function": "loadViewImage()",
+      "location": "Line 1043-1077",
+      "process": [
+        "1. Gets images array for current variation/view",
+        "2. For each stored image:",
+        "   - If URL exists but no Fabric instance: fabric.Image.fromURL(url)",
+        "   - Applies stored transform via configureAndLoadFabricImage()",
+        "3. Adds to canvas with stored position"
+      ]
+    }
+  },
+
+  "key_findings": {
+    "default_positioning": {
+      "rule": "ALL new images are ALWAYS centered on canvas",
+      "coordinates": "left: canvas.width/2, top: canvas.height/2",
+      "origin": "center/center (image center = position point)",
+      "never_random": true,
+      "never_top_left": true
+    },
+
+    "auto_scaling": {
+      "enabled": true,
+      "fits_to": "Safe Zone dimensions",
+      "max_size": "100% (scale = 1 maximum)"
+    },
+
+    "user_control": {
+      "can_drag": true,
+      "can_scale": true,
+      "can_rotate": true,
+      "position_saved": true,
+      "per_view_per_variation": true
+    },
+
+    "no_smart_positioning": {
+      "auto_avoid_overlap": false,
+      "intelligent_placement": false,
+      "grid_alignment": false,
+      "description": "System only centers - no collision detection or smart layout"
+    }
+  },
+
+  "source_file_structure": {
+    "main_widget_class": {
+      "name": "DesignerWidget",
+      "location": "./public/js/src/Designer.js (bundled)",
+      "bundle": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "lines": "2741 total lines",
+      "webpack_module": "Line 5-8"
+    },
+
+    "key_methods_map": {
+      "handleFileUpload": "Line 1355-1469",
+      "handleTempImageUpload": "Line 1471-1490",
+      "addImageToGrid": "Line 771-826",
+      "storeViewImage": "Line 922-976",
+      "loadViewImage": "Line 1043-1077",
+      "configureAndLoadFabricImage": "Line 1080-1147",
+      "bindImageEvents": "Line 1168-1233",
+      "updateImageTransform": "Line 1236-1291",
+      "renderTemplateView": "Line 718-769",
+      "initializeToolbar": "Line 69-164"
+    }
+  },
+
+  "coordinate_flow_summary": {
+    "step_1": "User uploads/clicks image → handleFileUpload() or click event",
+    "step_2": "Image added to grid → addImageToGrid(url, id)",
+    "step_3": "User clicks thumbnail → fabric.Image.fromURL(url)",
+    "step_4": "Position calculated → left: canvas.width/2, top: canvas.height/2",
+    "step_5": "Scale calculated → Math.min(safeZone.width/img.width, safeZone.height/img.height, 1)",
+    "step_6": "Image stored → storeViewImage(url, fabricImage)",
+    "step_7": "Transform saved → { left, top, scaleX, scaleY, angle, width, height }",
+    "step_8": "On view change → loadViewImage() restores position from storage"
+  },
+
+  "technical_details": {
+    "fabric_js_version": "Using modern ESM import",
+    "coordinate_system": "Pixel-based, origin at top-left of canvas",
+    "position_reference_point": "Center of object (originX/Y: 'center')",
+    "storage_pattern": "Map with composite key: variationId_viewId",
+    "multi_image_support": true,
+    "images_per_view": "Unlimited (stored in array)"
+  }
+}

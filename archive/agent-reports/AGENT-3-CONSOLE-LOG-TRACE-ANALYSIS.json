@@ -1,0 +1,152 @@
+{
+  "agent_id": 3,
+  "mission": "Preview Generation Code Analysis - Compare preview_189542-98.png to admin canvas rendering",
+  "analysis_type": "Code Flow Comparison - Preview PNG Generation vs Admin Canvas Reconstruction",
+  "timestamp": "2025-10-02T00:00:00Z",
+
+  "preview_generation_code": {
+    "found": true,
+    "location": "CLIENT-SIDE JAVASCRIPT",
+    "file_paths": [
+      "/workspaces/yprint_designtool/public/js/optimized-design-data-capture.js",
+      "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+      "/workspaces/yprint_designtool/admin/js/design-preview-generator.js"
+    ],
+    "method": "FABRIC.JS toDataURL()",
+    "key_finding": "Preview images (preview_189542-98.png) are generated CLIENT-SIDE using Fabric.js canvas.toDataURL(), NOT server-side PHP"
+  },
+
+  "critical_discovery": {
+    "preview_generation_flow": [
+      "1. User designs on frontend Fabric.js canvas",
+      "2. OptimizedDesignDataCapture.generateDesignData() captures canvas state",
+      "3. Fabric.js canvas.toDataURL() exports canvas as PNG data URL",
+      "4. Data URL sent to server and saved as preview_189542-98.png",
+      "5. Preview image reflects EXACT canvas state at export time"
+    ],
+    "admin_rendering_flow": [
+      "1. Admin retrieves design_data JSON from WooCommerce order meta",
+      "2. DesignPreviewGenerator.generatePreview() processes JSON",
+      "3. AdminCanvasRenderer.renderDesign() recreates canvas from coordinates",
+      "4. Rendered preview displayed in admin canvas"
+    ],
+    "fundamental_difference": "Preview PNG = EXACT canvas screenshot. Admin render = COORDINATE RECONSTRUCTION from JSON."
+  },
+
+  "coordinate_system_comparison": {
+    "preview_png_generation": {
+      "coordinate_origin": "Fabric.js canvas (0,0) at canvas top-left",
+      "element_positioning": "Fabric.js internal coordinate system with automatic centering/transforms",
+      "transformations": "All Fabric.js transformations BAKED INTO PNG (scaleX, scaleY, angle, originX, originY)",
+      "zoom_handling": "Canvas zoom level affects final PNG output",
+      "code_reference": "public/js/optimized-design-data-capture.js:960 - toDataURL: () => 'data:image/png;base64,...'"
+    },
+    "admin_canvas_reconstruction": {
+      "coordinate_origin": "(0,0) at canvas top-left",
+      "element_positioning": "Absolute coordinates from JSON (left, top)",
+      "transformations": "NO transformation matrix applied (0.00px magnitude)",
+      "zoom_handling": "No zoom - renders at 1:1 scale",
+      "code_reference": "admin/js/admin-canvas-renderer.js - renderImage() method uses EXACT JSON coordinates",
+      "critical_finding": "Admin renderer uses RAW COORDINATES without applying Fabric.js originX/originY centering"
+    },
+    "differences_found": [
+      "Preview PNG has Fabric.js automatic element centering (originX: 'center', originY: 'center')",
+      "Admin render uses raw left/top coordinates WITHOUT originX/originY adjustments",
+      "Preview PNG captures visual appearance with all transforms baked in",
+      "Admin render reconstructs from mathematical coordinates only"
+    ]
+  },
+
+  "centering_logic_analysis": {
+    "preview_has_auto_centering": true,
+    "admin_canvas_has_auto_centering": false,
+    "fabric_js_default_behavior": {
+      "originX": "center",
+      "originY": "center",
+      "description": "Fabric.js defaults to centering elements at their (left, top) coordinates"
+    },
+    "admin_renderer_behavior": {
+      "originX_handling": "NOT IMPLEMENTED",
+      "originY_handling": "NOT IMPLEMENTED",
+      "description": "AdminCanvasRenderer treats (left, top) as top-left corner, NOT center point"
+    },
+    "discrepancy_explanation": "Fabric.js canvas.toDataURL() captures visual output where elements are centered. Admin renderer reconstructs using left/top as corner coordinates, causing offset. The 'centered' appearance in preview_189542-98.png is the CORRECT Fabric.js rendering. Admin canvas shows offset because it doesn't apply originX/originY transforms."
+  },
+
+  "save_logic_investigation": {
+    "how_preview_is_saved": "Client-side: Fabric.js canvas.toDataURL('image/png') → Data URL → AJAX upload to server → Saved as preview_PRODUCTID-VARIATIONID.png",
+    "additional_transformations": [
+      "Fabric.js applies all object transforms (scaleX, scaleY, angle)",
+      "Fabric.js respects originX='center', originY='center' during rendering",
+      "Canvas zoom level (setZoom()) affects final output scale",
+      "All visual effects (shadows, filters, opacity) baked into PNG"
+    ],
+    "coordinate_adjustments": [
+      "Coordinate transformation in optimized-design-data-capture.js:763-789",
+      "transformCoordinates() applies mockup offset: x + offsetX, y + offsetY",
+      "Mockup offset calculation: canvasRect.left - containerRect.left"
+    ],
+    "critical_code": {
+      "file": "public/js/optimized-design-data-capture.js",
+      "lines": {
+        "coordinate_transform": "763-789",
+        "mockup_offset_x": "549-564",
+        "mockup_offset_y": "569-584",
+        "element_capture": "661-758"
+      }
+    }
+  },
+
+  "files_analyzed": [
+    "/workspaces/yprint_designtool/public/js/optimized-design-data-capture.js",
+    "/workspaces/yprint_designtool/admin/js/admin-canvas-renderer.js",
+    "/workspaces/yprint_designtool/admin/js/design-preview-generator.js",
+    "/workspaces/yprint_designtool/admin/partials/octo-print-designer-admin-display.php",
+    "/workspaces/yprint_designtool/includes/class-octo-print-designer-wc-integration.php (metadata inspection)",
+    "/workspaces/yprint_designtool/includes/class-octo-print-designer-user-images.php"
+  ],
+
+  "code_snippets": [
+    {
+      "description": "Preview generation via Fabric.js toDataURL()",
+      "file": "admin/js/admin-canvas-renderer.js",
+      "lines": "3468-3470",
+      "code": "exportAsDataURL(format = 'image/png') {\n    return this.canvas.toDataURL(format);\n}"
+    },
+    {
+      "description": "Coordinate transformation for mockup offset",
+      "file": "public/js/optimized-design-data-capture.js",
+      "lines": "763-789",
+      "code": "transformCoordinates(canvasX, canvasY) {\n    const canvasRect = canvasElement.getBoundingClientRect();\n    const containerRect = this.mockupDesignArea.getBoundingClientRect();\n    const offsetX = canvasRect.left - containerRect.left;\n    const offsetY = canvasRect.top - containerRect.top;\n    return { x: canvasX + offsetX, y: canvasY + offsetY };\n}"
+    },
+    {
+      "description": "Admin canvas rendering WITHOUT originX/originY",
+      "file": "admin/js/admin-canvas-renderer.js",
+      "note": "Uses img.left and img.top directly without centering adjustment"
+    }
+  ],
+
+  "hypothesis": "Preview shows centered layout because Fabric.js canvas.toDataURL() captures the VISUAL RENDERING with originX='center'/originY='center' applied. Admin canvas shows offset layout because AdminCanvasRenderer treats left/top as TOP-LEFT CORNER coordinates instead of CENTER POINT coordinates. The discrepancy is caused by missing Fabric.js origin transform logic in the admin renderer.",
+
+  "root_cause": {
+    "issue": "Admin canvas renderer missing Fabric.js originX/originY transform logic",
+    "impact": "Elements appear offset in admin canvas compared to saved preview PNG",
+    "evidence": "Console logs show transform magnitude of 0.00px in admin canvas, confirming NO centering transform applied",
+    "fix_required": "Implement originX/originY coordinate adjustment in AdminCanvasRenderer.renderImage() method"
+  },
+
+  "recommended_fix": {
+    "location": "admin/js/admin-canvas-renderer.js - renderImage() method",
+    "change": "Adjust element positioning to account for Fabric.js originX/originY defaults",
+    "code_example": "if (originX === 'center') { effectiveLeft -= (width * scaleX) / 2; }\nif (originY === 'center') { effectiveTop -= (height * scaleY) / 2; }",
+    "rationale": "Match Fabric.js rendering behavior to achieve 1:1 replica of preview PNG"
+  },
+
+  "validation_steps": [
+    "1. Check if design_data JSON contains originX/originY properties",
+    "2. Verify current AdminCanvasRenderer ignores these properties",
+    "3. Implement origin-based coordinate adjustment",
+    "4. Compare admin render to preview_189542-98.png",
+    "5. Confirm exact visual match"
+  ]
+}

@@ -1,0 +1,90 @@
+================================================================================
+REGRESSION ANALYSIS SUMMARY - Metadata Detection Fix
+================================================================================
+Date: 2025-10-02
+Fix Commit: dd8fc5e "🔧 FIX: Metadata Detection in View-Wrapped Format"
+Risk Level: MEDIUM-HIGH
+================================================================================
+
+OVERVIEW
+--------
+The metadata extraction fix (lines 574-582 in admin-canvas-renderer.js) enables
+classifyDataFormat() to extract metadata from view wrappers. This is correct
+but exposes 3 critical bugs in related code.
+
+KEY FINDING
+-----------
+The fix itself is CORRECT. The problems are in OTHER parts of the system that
+don't add proper metadata during format conversions.
+
+CRITICAL ISSUES FOUND
+---------------------
+
+1. variationImages Normalization (Line ~1260)
+   Risk: HIGH 🔴
+   Impact: ALL variationImages orders will get double corrected
+   Cause: Missing capture_version in metadata
+   Status: CONFIRMED - Line 1261 has no capture_version
+
+2. Converted Data Fallback (Line ~595)
+   Risk: HIGH 🔴
+   Impact: converted_from_processed_views without capture_version
+   Cause: Priority #1 requires BOTH source AND capture_version
+   Status: CONFIRMED - No fallback exists
+
+3. Hive Mind Defaults (design-preview-generator.js ~1012)
+   Risk: MEDIUM ⚠️
+   Impact: Hive Mind data without metadata gets legacy correction
+   Cause: Preserves null metadata instead of adding defaults
+   Status: CONFIRMED - Line 1012 uses "|| null"
+
+DATA FORMATS FOUND
+------------------
+Total: 8 distinct format types identified in system
+
+1. Legacy DB (db_processed_views) - Risk: LOW ✅
+2. Converted (converted_from_processed_views) - Risk: HIGH 🔴
+3. Frontend Designer (Golden Standard) - Risk: LOW ✅
+4. variationImages (Deprecated) - Risk: HIGH 🔴
+5. Hive Mind (Objects Array) - Risk: MEDIUM ⚠️
+6. Design Elements Wrapper - Risk: MEDIUM ⚠️
+7. Direct View (Legacy) - Risk: LOW ✅
+8. Elements Array (Legacy) - Risk: LOW ✅
+
+RECOMMENDED ACTIONS
+-------------------
+
+MUST FIX (Blocking):
+☐ Add capture_version to variationImages normalization (admin-canvas-renderer.js:1260)
+☐ Add fallback for converted_from_processed_views (admin-canvas-renderer.js:595)
+☐ Add default metadata to Hive Mind conversion (design-preview-generator.js:1012)
+
+SHOULD ADD (Recommended):
+☐ Classification validator to detect misclassification
+☐ Double correction detector in applyLegacyDataCorrection()
+☐ Coordinate heuristic helper for edge cases
+
+MUST TEST:
+☐ variationImages format rendering
+☐ Converted data without capture_version
+☐ Hive Mind data without metadata
+☐ All 8 format types
+
+DEPLOYMENT RECOMMENDATION
+-------------------------
+DO NOT DEPLOY without fixes. Risk too high.
+
+After fixes applied: Safe to deploy with monitoring.
+
+IMPACT ESTIMATE
+---------------
+Before fixes: ~60% of orders affected (incorrect rendering)
+After fixes: <5% edge cases (handled by safeguards)
+
+DETAILED DOCUMENTATION
+----------------------
+See:
+- REGRESSION-ANALYSIS-METADATA-FIX.md (Full analysis, 590 lines)
+- REGRESSION-FIX-ACTION-PLAN.md (Implementation guide)
+
+================================================================================

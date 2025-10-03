@@ -1,0 +1,956 @@
+{
+  "analysis_metadata": {
+    "agent": "Agent 8",
+    "task": "Designer Widget Integration & Architecture Analysis",
+    "timestamp": "2025-10-03",
+    "focus": "Complete system architecture, coordinate systems, initialization pipeline, race conditions"
+  },
+
+  "executive_summary": {
+    "overview": "The Designer Widget is a complex webpack-bundled fabric.js application with multiple coordinate transformation systems and a sophisticated initialization pipeline that includes race condition prevention mechanisms.",
+    "critical_findings": [
+      "Multiple coordinate systems exist across different components (canvas coordinates, template coordinates, safe zone percentages, absolute pixels)",
+      "Complex initialization pipeline with 10+ dependent scripts creates timing vulnerabilities",
+      "Coordinate transformations occur during: view switching, variation switching, template loading, design restoration, and canvas rendering",
+      "Race condition mitigation systems are in place but create complex dependency chains",
+      "The variationImages Map serves as the single source of truth for coordinate storage but undergoes transformations during save/load"
+    ],
+    "coordinate_mismatch_risk": "HIGH - Multiple transformation points and format conversions create opportunities for coordinate drift",
+    "race_condition_risk": "MEDIUM - Mitigated by singleton patterns but timing issues still possible during rapid view/variation switches"
+  },
+
+  "designer_widget_architecture": {
+    "class_structure": {
+      "name": "DesignerWidget",
+      "type": "ES6 Class",
+      "location": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js (lines 38-2740)",
+      "export_mechanism": "Webpack ES6 module export with global window exposure patch (line 2735-2738)",
+      "instantiation": "Single instance pattern - created via octo-print-designer-public.js as window.designerWidgetInstance"
+    },
+
+    "core_data_structures": {
+      "variationImages": {
+        "type": "Map<string, Array<ImageData>>",
+        "key_format": "${variationId}_${viewId}",
+        "purpose": "SINGLE SOURCE OF TRUTH for all user-placed images with their transforms",
+        "data_structure": {
+          "id": "Unique image identifier (img_timestamp_random)",
+          "url": "Image source URL",
+          "transform": {
+            "left": "Canvas left coordinate (pixels, center origin)",
+            "top": "Canvas top coordinate (pixels, center origin)",
+            "scaleX": "Horizontal scale factor",
+            "scaleY": "Vertical scale factor",
+            "angle": "Rotation in degrees",
+            "width": "Original image width",
+            "height": "Original image height"
+          },
+          "fabricImage": "Reference to fabric.Image instance (not serialized)",
+          "visible": "Boolean visibility flag"
+        }
+      },
+
+      "templates": {
+        "type": "Map<templateId, Template>",
+        "purpose": "Template metadata including variations and views",
+        "structure": {
+          "id": "Template ID",
+          "name": "Template name",
+          "defaultVariation": "Default variation ID",
+          "variations": "Map<variationId, Variation>",
+          "variation_structure": {
+            "id": "Variation ID",
+            "color": "Template color overlay",
+            "is_default": "Boolean",
+            "is_dark_shirt": "Affects filter application",
+            "views": "Map<viewId, View>"
+          },
+          "view_structure": {
+            "id": "View ID",
+            "name": "View name (e.g., 'Front', 'Back')",
+            "image_url": "Background template image URL",
+            "safeZone": {
+              "format": "PERCENTAGE-BASED coordinates",
+              "left": "% from canvas left to center",
+              "top": "% from canvas top to center",
+              "width": "Safe zone width in pixels",
+              "height": "Safe zone height in pixels"
+            },
+            "imageZone": {
+              "format": "PERCENTAGE-BASED coordinates",
+              "purpose": "Background template image positioning"
+            },
+            "colorOverlayEnabled": "Boolean",
+            "overlayOpacity": "Number 0-1",
+            "has_custom_image": "Flag set when user adds image"
+          }
+        }
+      },
+
+      "state_tracking": {
+        "currentView": "Currently active view ID",
+        "currentVariation": "Currently active variation ID",
+        "activeTemplateId": "Currently loaded template ID",
+        "currentDesignId": "ID of loaded design (null for new designs)",
+        "fabricCanvas": "Main fabric.Canvas instance",
+        "clipMask": "Safe zone clipping rect",
+        "printingZoneElement": "Visual safe zone indicator"
+      }
+    },
+
+    "initialization_pipeline": {
+      "phase_1_bootstrap": [
+        {
+          "order": 1,
+          "script": "race-condition-analyzer.js",
+          "purpose": "Precision timing measurements for debugging",
+          "loads_in": "head",
+          "critical": false
+        },
+        {
+          "order": 2,
+          "script": "fabric-debug-console.js",
+          "purpose": "Comprehensive fabric loading analysis",
+          "loads_in": "head",
+          "critical": false
+        },
+        {
+          "order": 3,
+          "script": "webpack-bundle-inspector.js",
+          "purpose": "Deep webpack bundle analysis",
+          "loads_in": "head",
+          "critical": false
+        },
+        {
+          "order": 4,
+          "script": "fabric-loading-timeline-tracker.js",
+          "purpose": "Visual loading sequence analysis",
+          "loads_in": "head",
+          "critical": false
+        }
+      ],
+
+      "phase_2_webpack_bundles": [
+        {
+          "order": 5,
+          "script": "vendor.bundle.js",
+          "purpose": "Fabric.js library and dependencies",
+          "size": "~2741 lines",
+          "dependencies": ["debug system"],
+          "critical": true,
+          "exposes": "window.fabric via webpack module system"
+        },
+        {
+          "order": 6,
+          "script": "webpack-fabric-loader-optimized.js",
+          "purpose": "Immediate fabric extraction from webpack",
+          "dependencies": ["vendor.bundle.js"],
+          "critical": true
+        },
+        {
+          "order": 7,
+          "script": "fabric-canvas-singleton.js",
+          "purpose": "Singleton wrapper for fabric.Canvas",
+          "dependencies": ["webpack-fabric-extractor"],
+          "critical": true
+        },
+        {
+          "order": 8,
+          "script": "canvas-initialization-controller.js",
+          "purpose": "Master canvas singleton manager - prevents double initialization",
+          "dependencies": ["fabric-canvas-singleton"],
+          "critical": true,
+          "prevents": "fabric: Trying to initialize a canvas that has already been initialized error"
+        }
+      ],
+
+      "phase_3_designer_core": [
+        {
+          "order": 9,
+          "script": "designer.bundle.js",
+          "purpose": "Main DesignerWidget class and all business logic",
+          "size": "2741 lines",
+          "dependencies": ["vendor.bundle.js", "debug system", "singleton controllers"],
+          "critical": true,
+          "exports": "DesignerWidget class via webpack __webpack_exports__",
+          "global_exposure": "Lines 2734-2738 patch window.DesignerWidget"
+        }
+      ],
+
+      "phase_4_exposure_layer": [
+        {
+          "order": 10,
+          "script": "webpack-designer-patch.js",
+          "purpose": "Aggressive webpack intervention for DesignerWidget exposure (5 strategies)",
+          "dependencies": ["designer.bundle.js"],
+          "strategies": [
+            "Enhanced brute force module search",
+            "DOM-based widget discovery",
+            "Event-based discovery",
+            "Manual widget injection",
+            "Direct constructor access"
+          ]
+        },
+        {
+          "order": 11,
+          "script": "fabric-global-exposer.js",
+          "purpose": "Ensures fabric.js is globally available",
+          "dependencies": ["webpack-designer-patch"]
+        },
+        {
+          "order": 12,
+          "script": "designer-global-exposer.js",
+          "purpose": "Enhanced DesignerWidget global exposure with retry logic (20 attempts x 250ms)",
+          "dependencies": ["fabric-global-exposer"],
+          "methods": [
+            "Direct window.DesignerWidget check",
+            "Webpack __webpack_require__ module extraction",
+            "Webpack chunk system search",
+            "DOM canvas instance extraction"
+          ],
+          "triggers_event": "designerWidgetExposed"
+        }
+      ],
+
+      "phase_5_instance_creation": [
+        {
+          "order": 13,
+          "script": "octo-print-designer-public.js",
+          "purpose": "Creates window.designerWidgetInstance from window.DesignerWidget",
+          "dependencies": ["canvas-singleton", "designer-global-exposer"],
+          "creates": "window.designerWidgetInstance = new DesignerWidget()"
+        }
+      ],
+
+      "phase_6_data_layer": [
+        {
+          "order": 14,
+          "script": "design-data-capture.js",
+          "purpose": "Canvas data extraction system",
+          "dependencies": ["global-instance"]
+        },
+        {
+          "order": 15,
+          "script": "optimized-design-data-capture.js",
+          "purpose": "Issue #18 fix - console spam elimination",
+          "dependencies": ["designer.bundle.js"]
+        },
+        {
+          "order": 16,
+          "script": "design-loader.js",
+          "purpose": "Auto-loads designs from URL parameters with multi-method fabric detection",
+          "dependencies": ["None - standalone with enhanced fabric wait"],
+          "load_trigger": "window.octoPrintDesignerAutoLoad",
+          "format_support": ["Golden Standard", "variationImages", "Legacy nested view"]
+        }
+      ],
+
+      "initialization_sequence": {
+        "designerWidget_constructor": [
+          "1. Query DOM for .octo-print-designer container",
+          "2. Initialize state: currentView=null, currentVariation=null, activeTemplateId=null",
+          "3. Create variationImages Map",
+          "4. storeElementReferences() - cache DOM elements",
+          "5. initializeTemplates() - cache template elements",
+          "6. storeModalElements()",
+          "7. setupModalEvents()",
+          "8. Create ToastManager instance",
+          "9. Call init() async method"
+        ],
+        "init_method_sequence": [
+          "1. initializeCanvas() - Create fabric.Canvas instance (line 355)",
+          "2. initializeToolbar() - Clone and setup image toolbar",
+          "3. Promise.all([loadTemplates(), loadUserImages()]) - Parallel AJAX",
+          "4. setupNavigationEvents()",
+          "5. setupUploadEvents()",
+          "6. setupZoomControls()",
+          "7. setupDesignerToolbar()",
+          "8. setupViewButtons()",
+          "9. updateImagesGridLimit()",
+          "10. handleResize()",
+          "11. updateZoom(100)",
+          "12. loadInitialTemplate() - Load first template or from URL",
+          "13. loadInitialDesign() - If design_id URL param exists"
+        ]
+      },
+
+      "timing_dependencies": {
+        "critical_race_conditions": [
+          {
+            "condition": "design-loader.js vs designer.bundle.js initialization",
+            "risk": "HIGH",
+            "description": "design-loader tries to access fabricCanvas before DesignerWidget.init() completes",
+            "mitigation": "Enhanced fabric detection with multi-method waiting (direct window.fabric, designerWidgetInstance.fabricCanvas, DOM canvas.__fabric)",
+            "current_status": "Mitigated with 15s timeout and 200ms polling"
+          },
+          {
+            "condition": "Multiple canvas initialization attempts",
+            "risk": "MEDIUM",
+            "description": "vendor.bundle.js loads fabric, designer.bundle.js creates canvas, singleton controllers prevent double init",
+            "mitigation": "CanvasInitializationController singleton with maxAttempts=1",
+            "current_status": "Protected by canvas-initialization-controller.js"
+          },
+          {
+            "condition": "View/Variation switching during image load",
+            "risk": "MEDIUM",
+            "description": "User switches view while loadViewImage() is loading fabric.Image.fromURL",
+            "mitigation": "Images stored per view key, loadViewImage() checks current context",
+            "potential_issue": "Race between fabricCanvas.clear() and async image loading"
+          }
+        ]
+      }
+    },
+
+    "coordinate_systems": {
+      "system_1_fabric_canvas": {
+        "name": "Fabric.js Canvas Coordinates",
+        "origin": "Center-origin (originX: 'center', originY: 'center')",
+        "units": "Pixels",
+        "range": {
+          "left": "0 to canvas.width (typically 800px)",
+          "top": "0 to canvas.height (typically 600px)"
+        },
+        "used_in": [
+          "fabricImage.left",
+          "fabricImage.top",
+          "All fabric.Object properties",
+          "variationImages transform storage"
+        ],
+        "coordinate_format": "Absolute pixels from top-left, but objects use center origin"
+      },
+
+      "system_2_template_safe_zone": {
+        "name": "Template Safe Zone Percentages",
+        "origin": "Percentage from canvas edges",
+        "units": "Percentage for position, Pixels for dimensions",
+        "format": {
+          "left": "% from canvas left edge to center point",
+          "top": "% from canvas top edge to center point",
+          "width": "Pixels",
+          "height": "Pixels"
+        },
+        "conversion": "view.safeZone.left * fabricCanvas.width / 100 = absolute left",
+        "used_in": [
+          "Template view.safeZone definition (lines 722-725)",
+          "Template view.imageZone definition (lines 736-737)",
+          "renderTemplateView() conversions"
+        ],
+        "conversion_locations": [
+          "Line 722-723: safeZone left/top to absolute",
+          "Line 736-737: imageZone left/top to absolute",
+          "Line 2355-2356: captureCanvasPreview() imageZone",
+          "Line 2378-2379: captureCanvasPreview() safeZone"
+        ]
+      },
+
+      "system_3_golden_standard": {
+        "name": "Golden Standard Save Format",
+        "description": "FLAT coordinate storage format used for database persistence",
+        "structure": {
+          "objects": [
+            {
+              "type": "image",
+              "id": "img_timestamp_random",
+              "src": "Image URL",
+              "left": "Direct from fabricImage.left (pixels, center-origin)",
+              "top": "Direct from fabricImage.top (pixels, center-origin)",
+              "scaleX": "Scale factor",
+              "scaleY": "Scale factor",
+              "angle": "Rotation degrees",
+              "width": "Original width",
+              "height": "Original height",
+              "elementMetadata": {
+                "variation_id": "Variation identifier",
+                "view_id": "View identifier",
+                "variation_key": "variationId_viewId"
+              }
+            }
+          ],
+          "metadata": {
+            "capture_version": "3.0.0",
+            "source": "frontend_designer",
+            "template_id": "Active template",
+            "current_view": "Active view",
+            "current_variation": "Active variation",
+            "timestamp": "Capture time"
+          }
+        },
+        "coordinate_format": "FLAT - coordinates at root level, NOT nested in transform object",
+        "validation": "Lines 1918-1955 validateGoldenStandardFormat()",
+        "creation": "Lines 1958-2045 collectDesignState()",
+        "restoration": "Lines 2154-2260 applyGoldenStandardFormat()"
+      },
+
+      "system_4_legacy_variation_images": {
+        "name": "Legacy variationImages Format",
+        "description": "NESTED coordinate format (deprecated but still supported)",
+        "structure": {
+          "variationImages": {
+            "variationId_viewId": [
+              {
+                "id": "Image ID",
+                "url": "Image URL",
+                "transform": {
+                  "left": "NESTED coordinate",
+                  "top": "NESTED coordinate",
+                  "scaleX": "Scale",
+                  "scaleY": "Scale",
+                  "angle": "Rotation"
+                }
+              }
+            ]
+          },
+          "templateId": "Template ID (deprecated - should be in metadata)"
+        },
+        "coordinate_format": "NESTED - coordinates inside transform object",
+        "issues": [
+          "Coordinate corruption during double-nesting",
+          "Inconsistent with Golden Standard",
+          "Forbidden keys detected by validation (lines 1937-1942)"
+        ],
+        "migration_path": "design-loader.js normalizeDesignData() converts to Golden Standard"
+      },
+
+      "coordinate_transformation_pipeline": {
+        "save_flow": [
+          {
+            "step": 1,
+            "location": "collectDesignState() line 1959",
+            "input": "variationImages Map with nested transform",
+            "process": "Iterate variationImages, extract imageData.transform.left/top",
+            "output": "Golden Standard objects[] with FLAT left/top"
+          },
+          {
+            "step": 2,
+            "location": "JSON.stringify() in AJAX request",
+            "input": "Golden Standard object",
+            "output": "JSON string for database"
+          }
+        ],
+
+        "load_flow": [
+          {
+            "step": 1,
+            "location": "applyDesignState() line 2055",
+            "input": "design.design_data JSON string from database",
+            "process": "JSON.parse(design.design_data)"
+          },
+          {
+            "step": 2,
+            "location": "Format detection line 2058",
+            "condition": "Check for metadata.capture_version",
+            "path_golden": "applyGoldenStandardFormat() line 2156",
+            "path_legacy": "Legacy loop line 2080"
+          },
+          {
+            "step": 3,
+            "location": "applyGoldenStandardFormat() line 2190-2228",
+            "process": "Convert Golden Standard objects[] back to variationImages Map",
+            "reconstruction": {
+              "imageData": {
+                "id": "obj.id",
+                "url": "obj.src",
+                "transform": {
+                  "left": "obj.left (RE-NESTED)",
+                  "top": "obj.top (RE-NESTED)",
+                  "scaleX": "obj.scaleX",
+                  "scaleY": "obj.scaleY",
+                  "angle": "obj.angle"
+                }
+              }
+            },
+            "calls": "restoreViewImage() line 2264"
+          },
+          {
+            "step": 4,
+            "location": "restoreViewImage() line 2264-2327",
+            "process": "Load fabric.Image.fromURL and apply transform",
+            "coordinate_application": "img.set({ ...imageData.transform }) line 2275",
+            "storage": "variationImages.set(key, imageData) line 2303"
+          }
+        ],
+
+        "view_switch_flow": [
+          {
+            "trigger": "View button click line 589-595",
+            "action": "this.currentView = viewId; this.loadTemplateView(viewId)"
+          },
+          {
+            "location": "loadTemplateView() line 681-715",
+            "step_1": "Load template background image",
+            "step_2": "Call renderTemplateView()",
+            "coordinate_impact": "NONE - only changes currentView state"
+          },
+          {
+            "location": "renderTemplateView() line 718-769",
+            "step_1": "fabricCanvas.clear() - DESTROYS all objects",
+            "step_2": "Create new template background with percentage-to-pixel conversion",
+            "step_3": "Create new safe zone rect with percentage-to-pixel conversion",
+            "step_4": "Call loadViewImage() line 768",
+            "coordinate_impact": "Template positioning recalculated, user images re-loaded from variationImages Map"
+          },
+          {
+            "location": "loadViewImage() line 1044-1077",
+            "step_1": "Get imagesArray from variationImages.get(key)",
+            "step_2": "For each imageData, fabric.Image.fromURL(imageData.url)",
+            "step_3": "Call configureAndLoadFabricImage(imageData, isDarkShirt)",
+            "coordinate_impact": "User image transforms applied from stored imageData.transform"
+          },
+          {
+            "location": "configureAndLoadFabricImage() line 1080-1149",
+            "step_1": "img.set({ ...imageData.transform }) line 1095 or 1120",
+            "step_2": "fabricCanvas.add(img)",
+            "step_3": "fabricCanvas.renderAll()",
+            "coordinate_impact": "CRITICAL - imageData.transform.left/top directly applied to fabricImage"
+          }
+        ],
+
+        "user_interaction_flow": [
+          {
+            "event": "User drags image",
+            "handler": "img.on('moving') line 1230",
+            "action": "updateToolbarPosition() - no coordinate update"
+          },
+          {
+            "event": "User finishes dragging/scaling/rotating",
+            "handler": "img.on('modified') line 1192",
+            "action": "updateImageTransform(img) line 1212",
+            "coordinate_update": "Lines 1248-1256 imageData.transform = { left: img.left, top: img.top, ... }"
+          }
+        ]
+      },
+
+      "coordinate_boundary_detection": {
+        "entry_points_to_system": [
+          {
+            "location": "addImageToGrid() click handler line 782",
+            "initial_coords": "img.set({ left: fabricCanvas.width/2, top: fabricCanvas.height/2 })",
+            "system": "Fabric Canvas Coordinates",
+            "storage": "storeViewImage() line 922 stores fabricImage.left/top"
+          },
+          {
+            "location": "restoreViewImage() line 2275",
+            "input": "imageData.transform from Golden Standard",
+            "conversion": "NONE - direct img.set(imageData.transform)",
+            "system": "Fabric Canvas Coordinates"
+          }
+        ],
+
+        "exit_points_from_system": [
+          {
+            "location": "collectDesignState() line 1991-1992",
+            "output": "left: imageData.transform.left, top: imageData.transform.top",
+            "format": "Golden Standard FLAT coordinates",
+            "destination": "Database JSON"
+          },
+          {
+            "location": "captureCanvasPreview() line 2410-2411",
+            "output": "left: imageData.transform.left * widthRatio, top: imageData.transform.top * heightRatio",
+            "format": "Scaled coordinates for preview canvas",
+            "destination": "Preview thumbnail"
+          }
+        ],
+
+        "transformation_points": [
+          {
+            "location": "renderTemplateView() percentage to pixel",
+            "lines": "722-723, 736-737, 742-743",
+            "input": "view.safeZone.left (percentage)",
+            "output": "absolute pixels",
+            "formula": "view.safeZone.left * fabricCanvas.width / 100",
+            "affects": "Template background only - NOT user images"
+          },
+          {
+            "location": "captureCanvasPreview() scaling",
+            "lines": "2410-2411",
+            "input": "imageData.transform.left/top",
+            "output": "Scaled coordinates",
+            "formula": "left * widthRatio, top * heightRatio",
+            "affects": "Preview thumbnail generation only"
+          }
+        ]
+      }
+    },
+
+    "potential_coordinate_mismatch_causes": {
+      "hypothesis_1_double_nesting": {
+        "scenario": "Legacy data with nested transform gets re-nested during load",
+        "location": "applyGoldenStandardFormat() line 2217",
+        "code": "transform: { left: obj.left, top: obj.top, ... }",
+        "issue": "If obj already has obj.transform.left, this creates transform.transform.left",
+        "likelihood": "LOW - Golden Standard validation prevents this",
+        "validation": "Lines 1924-1926 check for nested transform and error"
+      },
+
+      "hypothesis_2_view_switch_race": {
+        "scenario": "User switches view while loadViewImage() is running async fabric.Image.fromURL",
+        "sequence": [
+          "1. User on View A, loadViewImage() starts loading images",
+          "2. User clicks View B button",
+          "3. renderTemplateView() calls fabricCanvas.clear()",
+          "4. View A's fabric.Image.fromURL callbacks fire",
+          "5. Images added to canvas but currentView is now B",
+          "6. Coordinates stored under wrong view key"
+        ],
+        "location": "loadViewImage() line 1065 async callback",
+        "mitigation": "NONE DETECTED - no view context check in callback",
+        "likelihood": "MEDIUM - depends on user speed and network latency"
+      },
+
+      "hypothesis_3_percentage_misapplication": {
+        "scenario": "Template percentage coordinates applied to user images",
+        "check": "User images NEVER use percentage system",
+        "confirmed": "All user image coordinates are absolute pixels",
+        "likelihood": "ZERO - different code paths"
+      },
+
+      "hypothesis_4_origin_mismatch": {
+        "scenario": "Coordinates saved with center origin, loaded with corner origin",
+        "check": "All fabric.Image instances use originX/Y: 'center'",
+        "locations": [
+          "Line 795-796: addImageToGrid() sets center origin",
+          "Line 2276-2277: restoreViewImage() sets center origin",
+          "Line 1095, 1120: configureAndLoadFabricImage() preserves transform"
+        ],
+        "likelihood": "ZERO - consistent origin usage"
+      },
+
+      "hypothesis_5_canvas_resize_during_load": {
+        "scenario": "Canvas dimensions change between save and load",
+        "evidence": "initializeCanvas() line 355-360 sets canvas to container.offsetWidth/Height",
+        "issue": "If container size changes (responsive design, window resize), coordinates become invalid",
+        "mitigation": "NONE DETECTED - no coordinate scaling on resize",
+        "likelihood": "HIGH - responsive layouts will cause this"
+      },
+
+      "hypothesis_6_legacy_correction_bug": {
+        "scenario": "PHP backend applyLegacyDataCorrection() modifies coordinates",
+        "reference": "Recent commits mention legacy correction issues",
+        "commits": [
+          "3323092: FIX: View Wrapper Metadata Extraction in applyLegacyDataCorrection()",
+          "c72caca: FIX: Complete Metadata Propagation - Prevent Legacy Misclassification",
+          "dd8fc5e: FIX: Metadata Detection in View-Wrapped Format"
+        ],
+        "likelihood": "HIGH - backend coordinate modification is documented issue"
+      }
+    },
+
+    "race_conditions_detected": {
+      "race_1_designer_vs_loader": {
+        "participants": [
+          "designer.bundle.js init() method",
+          "design-loader.js waitForDesigner()"
+        ],
+        "conflict": "design-loader may access fabricCanvas before init() completes initializeCanvas()",
+        "current_mitigation": {
+          "method": "waitForFabricMultiMethod() with 15s timeout",
+          "checks": [
+            "window.fabric direct check",
+            "window.designerWidgetInstance.fabricCanvas",
+            "DOM canvas.__fabric"
+          ],
+          "polling_interval": "200ms"
+        },
+        "weakness": "No explicit wait for init() completion, only fabric availability",
+        "fix_suggestion": "Emit custom event after init() completes, listen in design-loader"
+      },
+
+      "race_2_view_switch_image_load": {
+        "participants": [
+          "loadViewImage() async fabric.Image.fromURL callbacks",
+          "renderTemplateView() fabricCanvas.clear()"
+        ],
+        "conflict": "View switch clears canvas while previous view's images still loading",
+        "current_mitigation": "NONE",
+        "evidence": "Line 1065 callback has no currentView context check",
+        "impact": "Images may be added to wrong view or lost entirely",
+        "fix_suggestion": "Capture currentView in closure, check before adding to canvas"
+      },
+
+      "race_3_rapid_variation_switch": {
+        "participants": [
+          "loadTemplate() async operations",
+          "User clicking variation buttons rapidly"
+        ],
+        "conflict": "Multiple template loads in flight simultaneously",
+        "current_mitigation": "Template loading overwrites state",
+        "potential_issue": "Last load to complete wins, not last clicked",
+        "fix_suggestion": "Request cancellation or request ID tracking"
+      },
+
+      "race_4_save_during_image_load": {
+        "participants": [
+          "collectDesignState() reading variationImages",
+          "loadViewImage() populating variationImages"
+        ],
+        "conflict": "User saves design while images still loading from previous design",
+        "current_mitigation": "NONE",
+        "impact": "Incomplete design data saved",
+        "fix_suggestion": "Loading state flag, disable save during load"
+      }
+    },
+
+    "module_interactions": {
+      "designer_to_fabric": {
+        "interaction": "DesignerWidget creates and manipulates fabric.Canvas",
+        "dependency": "window.fabric must be available before initializeCanvas()",
+        "coordinate_exchange": "Direct pixel coordinates, no transformation",
+        "critical_methods": [
+          "new fabric.Canvas() line 355",
+          "fabric.Image.fromURL() lines 702, 784, 1065, 2271",
+          "fabricCanvas.add() multiple locations",
+          "fabricCanvas.renderAll() multiple locations",
+          "fabricCanvas.clear() line 720"
+        ]
+      },
+
+      "designer_to_loader": {
+        "interaction": "design-loader.js consumes window.designerWidgetInstance",
+        "dependency": "designerWidgetInstance must be created before loader runs",
+        "coordinate_exchange": "Golden Standard format via applyDesignToCanvas()",
+        "data_flow": "loader normalizes → loader calls addImageToCanvas() → uses window.fabric directly",
+        "bypass": "Loader BYPASSES DesignerWidget and uses fabric.Canvas.getInstances() directly"
+      },
+
+      "designer_to_backend": {
+        "interaction": "AJAX save/load through WordPress admin-ajax.php",
+        "save_action": "save_design",
+        "load_action": "load_design (implied)",
+        "format": "Golden Standard JSON",
+        "coordinate_validation": "Backend PHP has applyLegacyDataCorrection() which may modify coordinates"
+      },
+
+      "singleton_controllers_to_designer": {
+        "interaction": "canvas-initialization-controller prevents double canvas creation",
+        "protection": "Enforces maxAttempts=1 for canvas initialization",
+        "coordinate_impact": "NONE - only prevents initialization errors"
+      }
+    },
+
+    "event_flow_analysis": {
+      "user_adds_image": {
+        "sequence": [
+          "1. User clicks image in grid (line 782)",
+          "2. fabric.Image.fromURL() loads image",
+          "3. Image scaled to fit safe zone",
+          "4. img.set({ left: canvas.width/2, top: canvas.height/2 })",
+          "5. storeViewImage(imageUrl, img) line 809",
+          "6. variationImages.get(key).push(imageData) line 951",
+          "7. If default variation, copy to other variations (lines 960-974)",
+          "8. loadViewImage() re-renders all images line 813",
+          "9. bindImageEvents(img) line 1167-1232"
+        ],
+        "coordinate_creation": "Step 4 - center of canvas",
+        "coordinate_storage": "Step 6 - variationImages Map"
+      },
+
+      "user_modifies_image": {
+        "sequence": [
+          "1. User drags/scales/rotates image",
+          "2. Fabric.js updates img.left, img.top, img.scaleX, etc.",
+          "3. img.on('modified') fires line 1192",
+          "4. updateImageTransform(img) called line 1212",
+          "5. Find imageData in variationImages.get(key)",
+          "6. Update imageData.transform = { left: img.left, top: img.top, ... } line 1248"
+        ],
+        "coordinate_update": "Step 6 - immediate sync to variationImages"
+      },
+
+      "user_switches_view": {
+        "sequence": [
+          "1. User clicks view button (line 589)",
+          "2. this.currentView = viewId",
+          "3. loadTemplateView(viewId) line 595",
+          "4. fabric.Image.fromURL(view.image_url) loads template",
+          "5. renderTemplateView(view, img) line 703",
+          "6. fabricCanvas.clear() - DESTROYS ALL OBJECTS line 720",
+          "7. Add template background and safe zone",
+          "8. loadViewImage() line 768",
+          "9. Get imagesArray for new view from variationImages",
+          "10. For each image, fabric.Image.fromURL() and configure",
+          "11. Add images back to canvas"
+        ],
+        "coordinate_preservation": "Step 9 - loaded from variationImages Map",
+        "risk_point": "Step 6-10 gap where async operations can interleave"
+      },
+
+      "user_saves_design": {
+        "sequence": [
+          "1. User clicks save button",
+          "2. collectDesignState() line 1959",
+          "3. Iterate all variationImages entries",
+          "4. For each image, create Golden Standard object with FLAT coordinates",
+          "5. Build state with objects[] and metadata",
+          "6. validateGoldenStandardFormat() line 1918",
+          "7. JSON.stringify(state)",
+          "8. AJAX POST to save_design action",
+          "9. Backend receives and stores"
+        ],
+        "coordinate_transformation": "Step 4 - nested transform → flat coordinates"
+      },
+
+      "user_loads_design": {
+        "sequence": [
+          "1. URL parameter design_id or auto-load data",
+          "2. loadDesign() or design-loader auto-trigger",
+          "3. AJAX GET design data",
+          "4. applyDesignState(design) line 2050",
+          "5. JSON.parse(design.design_data)",
+          "6. Check metadata.capture_version",
+          "7a. Golden Standard: applyGoldenStandardFormat() line 2156",
+          "7b. Legacy: loop and restoreViewImage()",
+          "8. loadTemplate(templateId)",
+          "9. For each object, restoreViewImage(variationId, viewId, imageData)",
+          "10. fabric.Image.fromURL(imageData.url)",
+          "11. img.set({ ...imageData.transform })",
+          "12. variationImages.set(key, imageData)",
+          "13. bindImageEvents(img)"
+        ],
+        "coordinate_transformation": "Step 11 - flat coordinates → applied to fabric.Image"
+      }
+    }
+  },
+
+  "critical_bugs_identified": {
+    "bug_1_view_switch_race": {
+      "severity": "HIGH",
+      "description": "View switch can clear canvas while previous view's images are still loading asynchronously",
+      "location": "loadViewImage() line 1065 async callback",
+      "reproduction": [
+        "1. Load design with images on View A",
+        "2. Quickly switch to View B before images finish loading",
+        "3. View A's images may appear on View B or disappear"
+      ],
+      "root_cause": "No currentView context check in fabric.Image.fromURL callback",
+      "coordinate_impact": "Images added to wrong view, coordinates stored under wrong key",
+      "fix": "Capture currentView in closure, compare before canvas.add()"
+    },
+
+    "bug_2_canvas_resize_coordinate_drift": {
+      "severity": "MEDIUM",
+      "description": "Absolute pixel coordinates become invalid when canvas dimensions change",
+      "location": "initializeCanvas() line 355",
+      "reproduction": [
+        "1. Save design on desktop (800x600 canvas)",
+        "2. Load design on mobile (400x300 canvas)",
+        "3. Images appear in wrong positions"
+      ],
+      "root_cause": "Coordinates stored as absolute pixels, not relative to canvas size",
+      "coordinate_impact": "All coordinates shift proportionally to canvas size change",
+      "fix": "Store coordinates as percentages or scale on load based on canvas dimensions"
+    },
+
+    "bug_3_backend_legacy_correction": {
+      "severity": "CRITICAL",
+      "description": "Backend applyLegacyDataCorrection() may modify coordinates during save/load",
+      "location": "PHP backend (referenced in recent commits)",
+      "evidence": "Multiple recent commits fixing metadata and coordinate issues in backend",
+      "coordinate_impact": "Backend may nest/unnest coordinates, causing corruption",
+      "fix": "Ensure backend respects metadata.capture_version and doesn't modify Golden Standard data"
+    },
+
+    "bug_4_no_save_loading_protection": {
+      "severity": "MEDIUM",
+      "description": "User can save design while images are still loading from previous design",
+      "location": "No loading state tracked",
+      "reproduction": [
+        "1. Load large design with many images",
+        "2. Immediately click save before images finish loading",
+        "3. Incomplete design data saved"
+      ],
+      "root_cause": "No loading flag, save action always enabled",
+      "coordinate_impact": "Missing images = missing coordinates in saved data",
+      "fix": "Track loading state, disable save button during load"
+    }
+  },
+
+  "recommendations": {
+    "immediate_fixes": [
+      {
+        "priority": 1,
+        "issue": "View switch race condition",
+        "solution": "Add currentView context check in loadViewImage() async callbacks",
+        "code_location": "Line 1065",
+        "implementation": "Capture const contextView = this.currentView at line 1044, check if (contextView === this.currentView) before canvas.add()"
+      },
+      {
+        "priority": 2,
+        "issue": "Backend coordinate modification",
+        "solution": "Audit PHP applyLegacyDataCorrection() to ensure it respects metadata.capture_version",
+        "code_location": "PHP backend",
+        "implementation": "If capture_version >= 3.0.0, skip legacy correction entirely"
+      },
+      {
+        "priority": 3,
+        "issue": "Canvas resize coordinate drift",
+        "solution": "Scale coordinates on load based on canvas dimension ratio",
+        "code_location": "restoreViewImage() line 2275",
+        "implementation": "Calculate widthRatio/heightRatio, multiply coordinates before img.set()"
+      }
+    ],
+
+    "architectural_improvements": [
+      {
+        "improvement": "Coordinate system unification",
+        "description": "Store coordinates as percentages internally, convert to pixels only for rendering",
+        "benefits": ["Resolution independent", "Responsive design support", "No drift on resize"],
+        "effort": "HIGH - requires refactoring entire coordinate system"
+      },
+      {
+        "improvement": "Request cancellation",
+        "description": "Cancel pending image loads when view/variation changes",
+        "benefits": ["Eliminates race conditions", "Faster view switching", "Lower memory usage"],
+        "effort": "MEDIUM - implement AbortController for fetch/Image loading"
+      },
+      {
+        "improvement": "Loading state management",
+        "description": "Centralized loading state with UI feedback",
+        "benefits": ["User awareness", "Prevent premature saves", "Better UX"],
+        "effort": "LOW - add loading flag and disable controls"
+      }
+    ],
+
+    "testing_scenarios": [
+      {
+        "scenario": "Rapid view switching",
+        "steps": [
+          "1. Load design with images on multiple views",
+          "2. Rapidly click through all view buttons",
+          "3. Verify each view shows correct images",
+          "4. Save and reload, verify coordinates preserved"
+        ],
+        "expected_bug": "Bug #1 - images appear on wrong views"
+      },
+      {
+        "scenario": "Responsive canvas",
+        "steps": [
+          "1. Save design on desktop browser (full width)",
+          "2. Resize browser to mobile width",
+          "3. Reload design",
+          "4. Verify image positions relative to safe zone"
+        ],
+        "expected_bug": "Bug #2 - coordinates drift with canvas size"
+      },
+      {
+        "scenario": "Save during load",
+        "steps": [
+          "1. Load large design with 10+ images",
+          "2. Immediately click save before load completes",
+          "3. Reload saved design",
+          "4. Count images - should match original"
+        ],
+        "expected_bug": "Bug #4 - incomplete design saved"
+      }
+    ]
+  },
+
+  "summary": {
+    "total_coordinate_systems": 4,
+    "total_transformation_points": 8,
+    "total_race_conditions": 4,
+    "total_critical_bugs": 4,
+    "coordinate_mismatch_root_cause": "Multiple transformation points combined with race conditions and backend legacy correction create opportunities for coordinate drift. The most likely causes are: (1) View switch race condition, (2) Canvas resize without coordinate scaling, (3) Backend coordinate modification during legacy correction.",
+    "highest_risk_area": "View switching with async image loading - no protection against race conditions",
+    "recommended_first_action": "Add currentView context check in loadViewImage() async callbacks to prevent race condition"
+  }
+}
