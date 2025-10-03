@@ -1,0 +1,338 @@
+{
+  "analysis_timestamp": "2025-10-03T10:30:00Z",
+  "executive_summary": "CRITICAL FINDING: No Webpack source files exist. Designer.js code only exists in compiled designer.bundle.js. Fix must be applied directly to bundle OR webpack build system needs reconstruction. 50px CSS padding offset confirmed in .designer-editor container causes systematic coordinate mismatch.",
+
+  "webpack_config": {
+    "config_file": "NOT FOUND - No webpack.config.js exists in repository",
+    "entry_point": "UNKNOWN - Source map references webpack://octo-print-designer/./public/js/src/Designer.js but file does not exist",
+    "source_directory": "DOES NOT EXIST - public/js/src/ directory not found",
+    "build_system_status": "BROKEN - Bundle exists but source files are missing",
+    "current_bundle": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+    "bundle_size": "121,089 bytes",
+    "bundle_last_modified": "2025-10-02 11:25",
+    "source_map_exists": true,
+    "source_map_path": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js.map"
+  },
+
+  "source_files_found": [
+    {
+      "file": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "contains": ["storeViewImage", "updateImageTransform", "loadViewImage", "configureAndLoadFabricImage"],
+      "line_count": 2795,
+      "is_main_designer": true,
+      "is_source": false,
+      "is_compiled": true,
+      "webpack_compiled": true,
+      "editable_directly": true,
+      "note": "This IS the production code. No source files exist to recompile from."
+    }
+  ],
+
+  "css_offset_source": {
+    "file": "/workspaces/yprint_designtool/public/css/octo-print-designer-designer.css",
+    "line_range": "105-113",
+    "selector": ".octo-print-designer .designer-editor",
+    "padding_top": "50px",
+    "padding_horizontal": "50px (left and right)",
+    "padding_bottom": "20px",
+    "impact": "Canvas is offset by 50px from top and 50px from left within .designer-editor container",
+    "full_css": ".octo-print-designer .designer-editor{\n    width: 100%;\n    padding: 0px 50px;\n    padding-top: 50px;\n    padding-bottom: 20px;\n    display: flex;\n    flex-direction: column;\n    gap: 20px;\n}",
+    "mobile_override": {
+      "line": 690,
+      "changes": "padding: 0; (removes offset on mobile)",
+      "note": "Mobile has NO offset - fix must account for responsive design"
+    }
+  },
+
+  "affected_methods": [
+    {
+      "method_name": "storeViewImage",
+      "file": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "line_range": "921-976",
+      "current_code": "imageData = {\n  id: imageId,\n  url: imageUrl,\n  transform: {\n    left: fabricImage.left,\n    top: fabricImage.top,\n    scaleX: fabricImage.scaleX,\n    scaleY: fabricImage.scaleY,\n    angle: fabricImage.angle,\n    width: fabricImage.width,\n    height: fabricImage.height\n  },\n  fabricImage: fabricImage,\n  visible: true\n};",
+      "problem": "Stores raw Fabric.js canvas coordinates WITHOUT container offset compensation",
+      "proposed_fix": "// Calculate canvas offset from container\nconst canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;\nconst canvasRect = canvasElement.getBoundingClientRect();\nconst containerRect = canvasElement.closest('.designer-editor').getBoundingClientRect();\nconst offsetX = canvasRect.left - containerRect.left;\nconst offsetY = canvasRect.top - containerRect.top;\n\nimageData = {\n  id: imageId,\n  url: imageUrl,\n  transform: {\n    left: fabricImage.left + offsetX,    // ADD OFFSET\n    top: fabricImage.top + offsetY,      // ADD OFFSET\n    scaleX: fabricImage.scaleX,\n    scaleY: fabricImage.scaleY,\n    angle: fabricImage.angle,\n    width: fabricImage.width,\n    height: fabricImage.height\n  },\n  fabricImage: fabricImage,\n  visible: true,\n  metadata: {\n    offset_applied: true,\n    offset_x: offsetX,\n    offset_y: offsetY\n  }\n};",
+      "explanation": "Add offset calculation before storing coordinates. Store metadata flag to indicate offset was applied for backward compatibility."
+    },
+    {
+      "method_name": "updateImageTransform",
+      "file": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "line_range": "1235-1258",
+      "current_code": "if (imageData) {\n  // Update transform data\n  imageData.transform = {\n    left: img.left,\n    top: img.top,\n    scaleX: img.scaleX,\n    scaleY: img.scaleY,\n    angle: img.angle,\n    width: img.width,\n    height: img.height\n  };\n}",
+      "problem": "Updates coordinates on drag/drop WITHOUT offset compensation. Called on every 'modified' event.",
+      "proposed_fix": "if (imageData) {\n  // Calculate canvas offset from container\n  const canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;\n  const canvasRect = canvasElement.getBoundingClientRect();\n  const containerRect = canvasElement.closest('.designer-editor').getBoundingClientRect();\n  const offsetX = canvasRect.left - containerRect.left;\n  const offsetY = canvasRect.top - containerRect.top;\n\n  // Update transform data WITH offset\n  imageData.transform = {\n    left: img.left + offsetX,    // ADD OFFSET\n    top: img.top + offsetY,      // ADD OFFSET\n    scaleX: img.scaleX,\n    scaleY: img.scaleY,\n    angle: img.angle,\n    width: img.width,\n    height: img.height\n  };\n  \n  // Update metadata\n  if (!imageData.metadata) {\n    imageData.metadata = {};\n  }\n  imageData.metadata.offset_applied = true;\n  imageData.metadata.offset_x = offsetX;\n  imageData.metadata.offset_y = offsetY;\n}",
+      "explanation": "Critical save path - called on every drag/drop. Must add offset before storing coordinates."
+    },
+    {
+      "method_name": "loadViewImage",
+      "file": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "line_range": "1043-1078",
+      "current_code": "fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url).then(function (img) {\n  // Store the fabricImage reference\n  imageData.fabricImage = img;\n\n  // Apply common settings and load the image\n  _this11.configureAndLoadFabricImage(imageData, isDarkShirt);\n});",
+      "problem": "After fix, saved coordinates INCLUDE offset. Fabric.js needs RAW coordinates (without offset).",
+      "proposed_fix": "fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url).then(function (img) {\n  // Store the fabricImage reference\n  imageData.fabricImage = img;\n\n  // Check if offset was applied when saving\n  const hasOffsetApplied = imageData.metadata && imageData.metadata.offset_applied;\n  \n  if (hasOffsetApplied) {\n    // SUBTRACT offset for Fabric.js (reverse operation)\n    const offsetX = imageData.metadata.offset_x || 0;\n    const offsetY = imageData.metadata.offset_y || 0;\n    \n    // Adjust transform before applying to Fabric\n    imageData.transform.left -= offsetX;\n    imageData.transform.top -= offsetY;\n  }\n\n  // Apply common settings and load the image\n  _this11.configureAndLoadFabricImage(imageData, isDarkShirt);\n});",
+      "explanation": "REVERSE OPERATION: Subtract offset when loading because Fabric.js needs canvas-relative coordinates. Check metadata flag for backward compatibility."
+    },
+    {
+      "method_name": "configureAndLoadFabricImage",
+      "file": "/workspaces/yprint_designtool/public/js/dist/designer.bundle.js",
+      "line_range": "1078-1130 (estimated)",
+      "note": "Need to locate this method to ensure it applies transform correctly",
+      "proposed_action": "Verify that this method uses imageData.transform.left/top directly. If offset compensation was done in loadViewImage, no changes needed here.",
+      "explanation": "This is called after loadViewImage prepares the data. Should work with already-adjusted coordinates."
+    }
+  ],
+
+  "getCanvasOffset_implementation": {
+    "note": "NOT implementing as separate method since no source files exist. Inline implementation in each function instead.",
+    "inline_code": "// Inline offset calculation (add to each save function)\nconst canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;\nconst canvasRect = canvasElement.getBoundingClientRect();\nconst containerRect = canvasElement.closest('.designer-editor').getBoundingClientRect();\nconst offsetX = canvasRect.left - containerRect.left;\nconst offsetY = canvasRect.top - containerRect.top;",
+    "explanation": "Since we're editing compiled bundle directly, inline the calculation rather than creating a new method",
+    "returns": "{ x: 50, y: 50 } on desktop, { x: 0, y: 0 } on mobile (due to CSS media query)",
+    "performance": "getBoundingClientRect() is called on every save but cost is minimal (<1ms)",
+    "alternative": "Cache offset and recalculate only on window resize"
+  },
+
+  "backward_compatibility": {
+    "strategy": "Use metadata flag 'offset_applied' to distinguish old vs new data format",
+    "migration_needed": false,
+    "metadata_flag": "imageData.metadata.offset_applied: boolean",
+    "detection_logic": "if (imageData.metadata && imageData.metadata.offset_applied === true) {\n  // New format: Coordinates include offset, subtract for Fabric\n  adjustedLeft = imageData.transform.left - imageData.metadata.offset_x;\n  adjustedTop = imageData.transform.top - imageData.metadata.offset_y;\n} else {\n  // Old format: Coordinates are canvas-relative, use as-is\n  adjustedLeft = imageData.transform.left;\n  adjustedTop = imageData.transform.top;\n}",
+    "old_data_handling": "Old designs without metadata.offset_applied flag will load with existing coordinates (canvas-relative) - works correctly",
+    "new_data_handling": "New designs with metadata.offset_applied=true will subtract offset before applying to Fabric.js",
+    "database_migration": "NOT REQUIRED - Flag-based detection handles both formats transparently",
+    "rollback_safety": "If fix needs rollback, old code will load new data with extra 50px offset (visually incorrect but not catastrophic)"
+  },
+
+  "production_data_capture_integration": {
+    "needs_patching": false,
+    "file": "/workspaces/yprint_designtool/public/js/production-ready-design-data-capture.js",
+    "reason": "production-ready-design-data-capture.js already implements correct offset calculation in transformCoordinates() method (lines 778-808)",
+    "affected_lines": "789-793",
+    "current_code": "const canvasRect = canvasElement.getBoundingClientRect();\nconst containerRect = this.mockupDesignArea.getBoundingClientRect();\n\nconst offsetX = canvasRect.left - containerRect.left;\nconst offsetY = canvasRect.top - containerRect.top;\n\nreturn {\n  x: canvasX + offsetX,\n  y: canvasY + offsetY\n};",
+    "analysis": "This is CORRECT but Designer.js doesn't use this capture system. Designer.js has its own save flow that bypasses production-ready-design-data-capture.js entirely.",
+    "recommendation": "Keep production-ready-design-data-capture.js as-is. It's already correct and serves as reference implementation for coordinate transformation."
+  },
+
+  "build_commands": [
+    "NONE AVAILABLE - No webpack config found",
+    "ALTERNATIVE: Edit designer.bundle.js directly",
+    "WARNING: Direct bundle edits will be lost if webpack rebuild happens",
+    "RECOMMENDED: Create backup before editing: cp designer.bundle.js designer.bundle.js.backup-offset-fix"
+  ],
+
+  "implementation_strategy": {
+    "approach": "Direct Bundle Editing",
+    "reason": "No source files or webpack config available. Bundle must be edited directly.",
+    "risk_level": "MEDIUM - Bundle edits work but may be overwritten if webpack rebuilds from missing sources",
+    "steps": [
+      "1. Create backup: cp public/js/dist/designer.bundle.js public/js/dist/designer.bundle.js.backup-offset-fix",
+      "2. Edit designer.bundle.js directly using text editor or Edit tool",
+      "3. Locate storeViewImage function (line 922)",
+      "4. Add offset calculation before line 928 (imageData creation)",
+      "5. Modify transform.left and transform.top to include offset (lines 932-933)",
+      "6. Locate updateImageTransform function (line 1235)",
+      "7. Add offset calculation before line 1248 (transform update)",
+      "8. Modify transform.left and transform.top to include offset (lines 1249-1250)",
+      "9. Locate loadViewImage function (line 1043)",
+      "10. Add offset subtraction logic before configureAndLoadFabricImage call (line 1070)",
+      "11. Test with existing designs (should render correctly)",
+      "12. Test with new designs (should save and load with correct coordinates)",
+      "13. Verify mobile responsive (padding: 0 means no offset on mobile)"
+    ],
+    "testing_checklist": [
+      "[ ] Existing designs load at correct position",
+      "[ ] New image placement saves correct coordinates",
+      "[ ] Drag/drop updates coordinates correctly",
+      "[ ] Visual position matches saved coordinates",
+      "[ ] Mobile view works (no offset applied)",
+      "[ ] Desktop view works (50px offset applied)",
+      "[ ] Multiple views (front/back) work correctly",
+      "[ ] Multiple variations work correctly"
+    ]
+  },
+
+  "code_snippets_for_implementation": {
+    "storeViewImage_fix": {
+      "location": "Line 922-942",
+      "find": "var imageData = {\n        id: imageId,\n        url: imageUrl,\n        transform: {\n          left: fabricImage.left,\n          top: fabricImage.top,",
+      "replace": "// Calculate canvas offset from container\n      var canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;\n      var canvasRect = canvasElement.getBoundingClientRect();\n      var containerElement = canvasElement.closest('.designer-editor');\n      var containerRect = containerElement ? containerElement.getBoundingClientRect() : canvasRect;\n      var offsetX = canvasRect.left - containerRect.left;\n      var offsetY = canvasRect.top - containerRect.top;\n\n      var imageData = {\n        id: imageId,\n        url: imageUrl,\n        transform: {\n          left: fabricImage.left + offsetX,\n          top: fabricImage.top + offsetY,"
+    },
+    "storeViewImage_metadata_fix": {
+      "location": "After line 939 (after height: fabricImage.height)",
+      "find": "height: fabricImage.height\n        },",
+      "replace": "height: fabricImage.height\n        },\n        metadata: {\n          offset_applied: true,\n          offset_x: offsetX,\n          offset_y: offsetY,\n          coordinate_system: 'container_relative'\n        },"
+    },
+    "updateImageTransform_fix": {
+      "location": "Line 1246-1256",
+      "find": "if (imageData) {\n        // Update transform data\n        imageData.transform = {\n          left: img.left,\n          top: img.top,",
+      "replace": "if (imageData) {\n        // Calculate canvas offset from container\n        var canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;\n        var canvasRect = canvasElement.getBoundingClientRect();\n        var containerElement = canvasElement.closest('.designer-editor');\n        var containerRect = containerElement ? containerElement.getBoundingClientRect() : canvasRect;\n        var offsetX = canvasRect.left - containerRect.left;\n        var offsetY = canvasRect.top - containerRect.top;\n\n        // Update transform data WITH offset\n        imageData.transform = {\n          left: img.left + offsetX,\n          top: img.top + offsetY,"
+    },
+    "updateImageTransform_metadata_fix": {
+      "location": "After line 1255 (after height: img.height)",
+      "find": "height: img.height\n        };",
+      "replace": "height: img.height\n        };\n        \n        // Update metadata\n        if (!imageData.metadata) {\n          imageData.metadata = {};\n        }\n        imageData.metadata.offset_applied = true;\n        imageData.metadata.offset_x = offsetX;\n        imageData.metadata.offset_y = offsetY;"
+    },
+    "loadViewImage_fix": {
+      "location": "Line 1065-1070 (before configureAndLoadFabricImage call)",
+      "find": "fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url).then(function (img) {\n            // Store the fabricImage reference\n            imageData.fabricImage = img;\n\n            // Apply common settings and load the image\n            _this11.configureAndLoadFabricImage(imageData, isDarkShirt);",
+      "replace": "fabric__WEBPACK_IMPORTED_MODULE_1__.Image.fromURL(imageData.url).then(function (img) {\n            // Store the fabricImage reference\n            imageData.fabricImage = img;\n\n            // Check if offset was applied when saving (backward compatibility)\n            var hasOffsetApplied = imageData.metadata && imageData.metadata.offset_applied;\n            \n            if (hasOffsetApplied) {\n              // NEW FORMAT: Subtract offset for Fabric.js (reverse operation)\n              var offsetX = imageData.metadata.offset_x || 0;\n              var offsetY = imageData.metadata.offset_y || 0;\n              \n              // Adjust transform before applying to Fabric (need canvas-relative coords)\n              imageData.transform.left = (imageData.transform.left || 0) - offsetX;\n              imageData.transform.top = (imageData.transform.top || 0) - offsetY;\n            }\n            // ELSE: OLD FORMAT - use coordinates as-is (already canvas-relative)\n\n            // Apply common settings and load the image\n            _this11.configureAndLoadFabricImage(imageData, isDarkShirt);"
+    }
+  },
+
+  "responsive_design_considerations": {
+    "desktop": {
+      "padding": "50px top, 50px horizontal",
+      "offset_x": 50,
+      "offset_y": 50,
+      "applies_to": "Screen width > 720px"
+    },
+    "mobile": {
+      "padding": "0px (removed by media query at line 690)",
+      "offset_x": 0,
+      "offset_y": 0,
+      "applies_to": "Screen width <= 720px",
+      "impact": "Offset calculation will naturally return {x:0, y:0} on mobile because container has no padding"
+    },
+    "offset_calculation_robustness": "getBoundingClientRect() dynamically calculates offset based on actual CSS rendering, so it automatically adapts to mobile vs desktop layouts without manual detection"
+  },
+
+  "alternative_solutions_considered": {
+    "option_1": {
+      "name": "Remove CSS Padding",
+      "description": "Set .designer-editor padding to 0",
+      "pros": ["Simple", "Eliminates offset entirely", "No code changes needed"],
+      "cons": ["Breaks UI layout", "Design decision, not technical", "May affect other components"],
+      "verdict": "REJECTED - UI/UX decision outside scope"
+    },
+    "option_2": {
+      "name": "Webpack Rebuild from Scratch",
+      "description": "Recreate missing source files and webpack config",
+      "pros": ["Clean source code", "Standard workflow", "Future maintainability"],
+      "cons": ["Time consuming", "Risk of introducing new bugs", "Source files are gone"],
+      "verdict": "REJECTED - Too risky without original sources"
+    },
+    "option_3": {
+      "name": "Direct Bundle Editing (SELECTED)",
+      "description": "Edit designer.bundle.js directly",
+      "pros": ["Fast implementation", "Works with existing infrastructure", "Low risk"],
+      "cons": ["Bundle edits may be overwritten", "Not standard workflow"],
+      "verdict": "ACCEPTED - Most practical given constraints"
+    },
+    "option_4": {
+      "name": "Post-Process Coordinates in PHP Backend",
+      "description": "Add offset in PHP when saving to database",
+      "pros": ["No JS changes needed"],
+      "cons": ["Backend shouldn't know about frontend CSS", "Harder to maintain", "Backend code location unknown"],
+      "verdict": "REJECTED - Wrong architectural layer"
+    }
+  },
+
+  "validation_and_testing": {
+    "unit_tests_needed": false,
+    "manual_testing_required": true,
+    "test_scenarios": [
+      {
+        "scenario": "Existing Design Load Test",
+        "steps": [
+          "1. Load design saved before fix (metadata.offset_applied = undefined)",
+          "2. Verify logo renders at correct position",
+          "3. Verify no visual shift compared to pre-fix"
+        ],
+        "expected_result": "Existing designs load correctly (backward compatible)"
+      },
+      {
+        "scenario": "New Design Save Test",
+        "steps": [
+          "1. Place logo at visual Y=200px from editor top",
+          "2. Save design",
+          "3. Check imageData.transform.top value",
+          "4. Verify metadata.offset_applied = true",
+          "5. Expected: top = 250px (200 + 50 offset)"
+        ],
+        "expected_result": "New designs save with offset-adjusted coordinates"
+      },
+      {
+        "scenario": "New Design Load Test",
+        "steps": [
+          "1. Save design with logo at visual Y=200px",
+          "2. Reload page",
+          "3. Load design",
+          "4. Verify logo renders at Y=200px (same visual position)"
+        ],
+        "expected_result": "New designs load at correct visual position"
+      },
+      {
+        "scenario": "Drag and Drop Update Test",
+        "steps": [
+          "1. Load design",
+          "2. Drag logo to new position Y=300px",
+          "3. Check imageData.transform.top",
+          "4. Expected: top = 350px (300 + 50 offset)",
+          "5. Reload and verify position maintained"
+        ],
+        "expected_result": "Drag updates save with correct offset"
+      },
+      {
+        "scenario": "Mobile Responsive Test",
+        "steps": [
+          "1. Resize browser to mobile width (<720px)",
+          "2. Place logo at Y=200px",
+          "3. Save design",
+          "4. Check imageData.transform.top",
+          "5. Expected: top = 200px (no offset on mobile)"
+        ],
+        "expected_result": "Mobile saves without offset (padding:0)"
+      }
+    ],
+    "rollback_procedure": {
+      "step_1": "Restore backup: cp designer.bundle.js.backup-offset-fix designer.bundle.js",
+      "step_2": "Clear browser cache",
+      "step_3": "Test that system reverts to pre-fix behavior",
+      "step_4": "Document any issues encountered during fix"
+    }
+  },
+
+  "risk_assessment": {
+    "technical_risks": [
+      {
+        "risk": "Bundle edits overwritten by future webpack build",
+        "probability": "HIGH",
+        "impact": "HIGH",
+        "mitigation": "Document changes clearly, consider recreating webpack config"
+      },
+      {
+        "risk": "Backward compatibility issues with old designs",
+        "probability": "LOW",
+        "impact": "MEDIUM",
+        "mitigation": "Metadata flag ensures old designs load correctly"
+      },
+      {
+        "risk": "Mobile responsive behavior breaks",
+        "probability": "LOW",
+        "impact": "MEDIUM",
+        "mitigation": "getBoundingClientRect() automatically handles mobile padding:0"
+      },
+      {
+        "risk": "Performance degradation from getBoundingClientRect() calls",
+        "probability": "LOW",
+        "impact": "LOW",
+        "mitigation": "Operation is <1ms, only called on save/load"
+      }
+    ],
+    "business_risks": [
+      {
+        "risk": "Existing customer designs appear shifted after fix",
+        "probability": "LOW",
+        "impact": "HIGH",
+        "mitigation": "Backward compatibility ensures old designs render unchanged"
+      },
+      {
+        "risk": "Production downtime during deployment",
+        "probability": "LOW",
+        "impact": "MEDIUM",
+        "mitigation": "Single file replacement, instant rollback available"
+      }
+    ]
+  },
+
+  "next_agent_instructions": "Agent 3 (Validation & Testing) should:\n\n1. BACKUP CURRENT BUNDLE:\n   cp /workspaces/yprint_designtool/public/js/dist/designer.bundle.js /workspaces/yprint_designtool/public/js/dist/designer.bundle.js.backup-offset-fix\n\n2. APPLY FIXES TO BUNDLE:\n   Use code snippets from 'code_snippets_for_implementation' section above.\n   Edit designer.bundle.js directly with Edit tool.\n\n3. VALIDATION TESTS:\n   - Load existing design → Should render at same position as before\n   - Place new logo at Y=200px → Should save as Y=250px (imageData.transform.top)\n   - Reload new design → Should render at Y=200px (visual position maintained)\n   - Drag logo → Should update coordinates with offset\n   - Check metadata.offset_applied = true for new saves\n   - Test mobile (width < 720px) → Should save with offset {x:0, y:0}\n\n4. COMPARE WITH PRODUCTION-READY-DESIGN-DATA-CAPTURE.JS:\n   - Verify both systems now produce same coordinate values\n   - production-ready already has offset logic (lines 789-793)\n   - Designer.js now matches that behavior\n\n5. DATABASE VERIFICATION:\n   - Check saved designs in database\n   - Verify metadata.offset_applied field exists\n   - Verify transform.left/top values include 50px offset\n\n6. REGRESSION TESTING:\n   - Test multi-view designs (front/back)\n   - Test multi-variation designs (different colors)\n   - Test zoom functionality (should still work)\n   - Test export/render pipeline (should use saved coordinates correctly)\n\n7. DOCUMENT RESULTS:\n   Create AGENT-3-VALIDATION-REPORT.json with:\n   - Test results for all scenarios\n   - Before/after coordinate comparisons\n   - Screenshots of visual position vs saved coordinates\n   - Any edge cases discovered\n   - Rollback procedure if issues found\n\n8. CRITICAL CHECK:\n   Verify that renderer (PHP backend) correctly interprets new coordinate format.\n   If renderer expects canvas-relative coords, may need backend adjustment too."
+}

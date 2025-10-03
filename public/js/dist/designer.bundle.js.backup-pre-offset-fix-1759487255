@@ -918,37 +918,6 @@ var DesignerWidget = /*#__PURE__*/function () {
       this.updateImagesGridLimit();
     }
   }, {
-    key: "getCanvasOffset",
-    value: function getCanvasOffset() {
-      try {
-        var canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;
-        if (!canvasElement) {
-          console.warn('🔧 OFFSET-FIX: Canvas element not found, returning zero offset');
-          return { x: 0, y: 0 };
-        }
-
-        var canvasRect = canvasElement.getBoundingClientRect();
-        var containerElement = canvasElement.closest('.designer-editor');
-
-        if (!containerElement) {
-          console.warn('🔧 OFFSET-FIX: .designer-editor container not found, returning zero offset');
-          return { x: 0, y: 0 };
-        }
-
-        var containerRect = containerElement.getBoundingClientRect();
-
-        var offsetX = canvasRect.left - containerRect.left;
-        var offsetY = canvasRect.top - containerRect.top;
-
-        console.log('🔧 OFFSET-FIX: Calculated offset', { offsetX: offsetX, offsetY: offsetY });
-
-        return { x: offsetX, y: offsetY };
-      } catch (error) {
-        console.error('🔧 OFFSET-FIX: Error calculating offset', error);
-        return { x: 0, y: 0 };
-      }
-    }
-  }, {
     key: "storeViewImage",
     value: function storeViewImage(imageUrl, fabricImage) {
       var _this9 = this;
@@ -956,16 +925,12 @@ var DesignerWidget = /*#__PURE__*/function () {
 
       // Create a unique ID for the image
       var imageId = "img_".concat(Date.now(), "_").concat(Math.floor(Math.random() * 1000));
-
-      // 🔧 OFFSET-FIX: Calculate and apply canvas offset (50px CSS padding)
-      var offset = this.getCanvasOffset();
-
       var imageData = {
         id: imageId,
         url: imageUrl,
         transform: {
-          left: fabricImage.left + offset.x,
-          top: fabricImage.top + offset.y,
+          left: fabricImage.left,
+          top: fabricImage.top,
           scaleX: fabricImage.scaleX,
           scaleY: fabricImage.scaleY,
           angle: fabricImage.angle,
@@ -973,14 +938,7 @@ var DesignerWidget = /*#__PURE__*/function () {
           height: fabricImage.height
         },
         fabricImage: fabricImage,
-        visible: true,
-        metadata: {
-          offset_applied: true,
-          offset_x: offset.x,
-          offset_y: offset.y,
-          offset_fix_version: '1.0.0',
-          offset_fix_timestamp: new Date().toISOString()
-        }
+        visible: true
       };
       var key = "".concat(this.currentVariation, "_").concat(this.currentView);
 
@@ -1108,48 +1066,11 @@ var DesignerWidget = /*#__PURE__*/function () {
             // Store the fabricImage reference
             imageData.fabricImage = img;
 
-            // 🔧 OFFSET-FIX: Backward-compatible offset handling
-            if (imageData && imageData.transform) {
-              // Check if this is a NEW design with offset already applied
-              if (imageData.metadata && imageData.metadata.offset_applied === true) {
-                console.log('🔧 OFFSET-FIX: Loading NEW design - subtracting offset', {
-                  offset_x: imageData.metadata.offset_x,
-                  offset_y: imageData.metadata.offset_y
-                });
-
-                // SUBTRACT offset for new designs (reverse of save operation)
-                imageData.transform.left -= (imageData.metadata.offset_x || 0);
-                imageData.transform.top -= (imageData.metadata.offset_y || 0);
-              } else {
-                // OLD design without offset metadata - use coordinates as-is
-                console.log('🔧 OFFSET-FIX: Loading OLD design - using coordinates as-is (backward compatible)');
-              }
-            }
-
             // Apply common settings and load the image
             _this11.configureAndLoadFabricImage(imageData, isDarkShirt);
           });
         } else if (imageData.fabricImage) {
           // We have a fabric instance already, just configure and add
-
-          // 🔧 OFFSET-FIX: Backward-compatible offset handling
-          if (imageData && imageData.transform) {
-            // Check if this is a NEW design with offset already applied
-            if (imageData.metadata && imageData.metadata.offset_applied === true) {
-              console.log('🔧 OFFSET-FIX: Loading NEW design - subtracting offset', {
-                offset_x: imageData.metadata.offset_x,
-                offset_y: imageData.metadata.offset_y
-              });
-
-              // SUBTRACT offset for new designs (reverse of save operation)
-              imageData.transform.left -= (imageData.metadata.offset_x || 0);
-              imageData.transform.top -= (imageData.metadata.offset_y || 0);
-            } else {
-              // OLD design without offset metadata - use coordinates as-is
-              console.log('🔧 OFFSET-FIX: Loading OLD design - using coordinates as-is (backward compatible)');
-            }
-          }
-
           _this11.configureAndLoadFabricImage(imageData, isDarkShirt);
         }
       });
@@ -1323,29 +1244,16 @@ var DesignerWidget = /*#__PURE__*/function () {
         return data.fabricImage === img || img.data && img.data.imageId === data.id;
       });
       if (imageData) {
-        // 🔧 OFFSET-FIX: Calculate and apply canvas offset
-        var offset = this.getCanvasOffset();
-
         // Update transform data
         imageData.transform = {
-          left: img.left + offset.x,
-          top: img.top + offset.y,
+          left: img.left,
+          top: img.top,
           scaleX: img.scaleX,
           scaleY: img.scaleY,
           angle: img.angle,
           width: img.width,
           height: img.height
         };
-
-        // 🔧 OFFSET-FIX: Update metadata flags
-        if (!imageData.metadata) {
-          imageData.metadata = {};
-        }
-        imageData.metadata.offset_applied = true;
-        imageData.metadata.offset_x = offset.x;
-        imageData.metadata.offset_y = offset.y;
-        imageData.metadata.offset_fix_version = '1.0.0';
-        imageData.metadata.offset_fix_timestamp = new Date().toISOString();
       }
     }
   }, {

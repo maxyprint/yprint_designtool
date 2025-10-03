@@ -1,0 +1,400 @@
+================================================================================
+PRODUCTION DEPLOYMENT CHECKLIST
+Canvas Offset Fix - 50px Coordinate Bug Resolution
+================================================================================
+
+Version: 1.0.0
+Date: 2025-10-03
+Agent: AGENT 7
+
+================================================================================
+PRE-DEPLOYMENT (Required before deployment)
+================================================================================
+
+BACKUPS
+-------
+[ ] Database backup completed and verified
+    File: _______________________________________________
+    Size: _______________________________________________
+
+[ ] Plugin files backup completed
+    File: _______________________________________________
+    Size: _______________________________________________
+
+[ ] JavaScript backup exists
+    File: designer.bundle.js.backup-pre-offset-fix-*
+    Verified: YES / NO
+
+[ ] PHP backup exists
+    File: class-octo-print-api-integration.php.backup-pre-offset-fix-*
+    Verified: YES / NO
+
+[ ] Backup restoration tested on staging
+    Result: PASS / FAIL
+
+TESTING
+-------
+[ ] Functional Test 1: Old Design Backward Compatibility - PASS / FAIL
+    Test designs: _________________________________________
+    Visual position: UNCHANGED / CHANGED
+
+[ ] Functional Test 2: New Design Save/Load Cycle - PASS / FAIL
+    Test design: __________________________________________
+    Metadata present: YES / NO
+    Visual position maintained: YES / NO
+
+[ ] Functional Test 8: End-to-End Workflow - PASS / FAIL
+    Test order: ___________________________________________
+    API payload correct: YES / NO
+
+[ ] Mobile responsive tested (viewport < 720px)
+    Result: PASS / FAIL
+
+[ ] API payload validation completed
+    Test orders: __________________________________________
+    Coordinates correct: YES / NO
+
+[ ] Performance baseline recorded
+    Designer load time: _______ ms
+    API generation time: _______ ms
+
+ENVIRONMENT
+-----------
+[ ] Staging matches production
+    PHP version: __________________________________________
+    WordPress version: ____________________________________
+    WooCommerce version: __________________________________
+
+[ ] PHP 7.4+ verified
+    Version: ______________________________________________
+
+[ ] OPcache configuration checked
+    Enabled: YES / NO
+
+[ ] Debug logging capability verified
+    WP_DEBUG_LOG: YES / NO
+    Log location: _________________________________________
+
+COMMUNICATION
+-------------
+[ ] Stakeholders notified (24h advance)
+    Date notified: ________________________________________
+
+[ ] Support team briefed
+    Briefing date: ________________________________________
+
+[ ] Rollback plan communicated
+    Team acknowledged: YES / NO
+
+[ ] On-call engineer identified
+    Name: _________________________________________________
+    Contact: ______________________________________________
+
+================================================================================
+DEPLOYMENT (Execute in order)
+================================================================================
+
+STEP 1: DEPLOY JAVASCRIPT BUNDLE
+---------------------------------
+[ ] SSH into production server
+    Time: _________________________________________________
+
+[ ] Navigate to plugin directory
+    Path verified: YES / NO
+
+[ ] Upload new designer.bundle.js
+    Method: SCP / FTP / RSYNC / OTHER: ___________________
+    Upload time: __________________________________________
+
+[ ] Verify file size (~122 KB)
+    Actual size: __________________________________________
+
+[ ] Verify OFFSET-FIX markers (expected: 13)
+    Count: grep -c "🔧 OFFSET-FIX" designer.bundle.js
+    Result: _______________________________________________
+
+[ ] Validate JavaScript syntax
+    Command: node -c designer.bundle.js
+    Result: PASS / FAIL
+
+[ ] Set correct permissions (644)
+    Completed: YES / NO
+
+[ ] Verify MD5 checksum matches staging
+    Staging MD5: __________________________________________
+    Production MD5: _______________________________________
+    Match: YES / NO
+
+STEP 2: DEPLOY PHP RENDERER
+----------------------------
+[ ] Upload new class-octo-print-api-integration.php
+    Method: SCP / FTP / RSYNC / OTHER: ___________________
+    Upload time: __________________________________________
+
+[ ] Verify file size (~116 KB)
+    Actual size: __________________________________________
+
+[ ] Verify OFFSET-FIX markers (expected: 5)
+    Count: grep -c "🔧 OFFSET-FIX" class-octo-print-api-integration.php
+    Result: _______________________________________________
+
+[ ] Validate PHP syntax
+    Command: php -l class-octo-print-api-integration.php
+    Result: PASS / FAIL
+
+[ ] Set correct permissions (644)
+    Completed: YES / NO
+
+[ ] Clear OPCache
+    Method: service php-fpm reload / wp cache flush / opcache_reset()
+    Result: SUCCESS / FAIL
+
+[ ] Verify MD5 checksum matches staging
+    Staging MD5: __________________________________________
+    Production MD5: _______________________________________
+    Match: YES / NO
+
+STEP 3: ENABLE MONITORING
+--------------------------
+[ ] Enable WordPress debug logging
+    WP_DEBUG_LOG: true
+    Verified: YES / NO
+
+[ ] Verify debug log writable
+    Path: _________________________________________________
+    Writable: YES / NO
+
+[ ] Start real-time log monitoring
+    Command: tail -f wp-content/debug.log | grep "OFFSET-FIX"
+    Started at: ___________________________________________
+
+STEP 4: SMOKE TESTS (CRITICAL - Do not skip)
+---------------------------------------------
+[ ] Test 1: Load OLD design
+    Design ID: ____________________________________________
+    Result: PASS / FAIL
+    Console log: "Loading OLD design - using coordinates as-is"
+    PHP log: "No offset metadata - using coordinates as-is"
+    Visual position: UNCHANGED / CHANGED
+
+[ ] Test 2: Save NEW design
+    Design name: __________________________________________
+    Result: PASS / FAIL
+    Console log: "Calculated offset { offsetX: 50, offsetY: 50 }"
+    Database metadata: PRESENT / MISSING
+    metadata.offset_applied: true / false / missing
+
+[ ] Test 3: Load NEW design (created in test 2)
+    Result: PASS / FAIL
+    Console log: "Loading NEW design - subtracting offset"
+    Visual position: SAME AS SAVED / DIFFERENT
+
+[ ] Test 4: API payload generation
+    Order ID: _____________________________________________
+    Result: PASS / FAIL
+    PHP log: "Applied coordinate offset correction"
+    Coordinates: CORRECT / INCORRECT
+
+STEP 5: VERIFICATION
+--------------------
+[ ] No JavaScript errors in browser console
+    Checked: YES / NO
+    Errors found: _________________________________________
+
+[ ] No PHP fatal errors in debug log
+    Checked: YES / NO
+    Errors found: _________________________________________
+
+[ ] OPcache cleared successfully
+    Verified: YES / NO
+
+[ ] Browser cache cleared (hard reload)
+    Completed: YES / NO
+
+================================================================================
+POST-DEPLOYMENT (Monitor for 24-48 hours)
+================================================================================
+
+FIRST 2 HOURS
+-------------
+[ ] Monitor debug logs every 30 minutes
+    Checks completed: __ / 4
+
+[ ] JavaScript errors count: __________
+    Acceptable: < 5 errors
+
+[ ] PHP errors count: __________
+    Acceptable: 0 fatal errors
+
+[ ] Customer support tickets: __________
+    Position-related: __________
+
+FIRST 24 HOURS
+--------------
+[ ] Error rate check
+    Baseline: _______% | Current: _______%
+    Acceptable: < 0.1% increase
+
+[ ] Performance check
+    Baseline: _______ ms | Current: _______ ms
+    Acceptable: < 10ms increase
+
+[ ] Customer complaints: __________
+    Position-related: __________
+
+[ ] API success rate: _________%
+    Acceptable: Same as baseline
+
+SPOT CHECKS
+-----------
+[ ] 10 new orders checked
+    Order IDs: ____________________________________________
+    All correct: YES / NO
+    Issues found: _________________________________________
+
+[ ] 10 old designs loaded
+    Design IDs: ___________________________________________
+    All correct: YES / NO
+    Issues found: _________________________________________
+
+LONG-TERM MONITORING (1-4 weeks)
+---------------------------------
+[ ] Weekly error rate review
+    Week 1: ______%
+    Week 2: ______%
+    Week 3: ______%
+    Week 4: ______%
+
+[ ] New designs metadata check
+    Sample size: __________
+    All have offset_applied: YES / NO
+
+[ ] Customer support trend
+    Tickets related to positioning: __________
+    Trend: DECREASING / STABLE / INCREASING
+
+================================================================================
+ROLLBACK PROCEDURE (Execute if critical issues occur)
+================================================================================
+
+WHEN TO ROLLBACK
+----------------
+Immediate rollback if:
+[ ] Old designs don't load correctly
+[ ] Critical JavaScript errors
+[ ] PHP fatal errors
+[ ] 10%+ error rate increase
+[ ] API payload incorrect for multiple orders
+[ ] Customer complaints about broken designer
+
+ROLLBACK STEPS
+--------------
+[ ] Stop accepting new orders (if severe)
+    Stopped at: ___________________________________________
+
+[ ] Restore JavaScript bundle
+    Command: cp designer.bundle.js.backup-pre-offset-fix-* designer.bundle.js
+    Completed at: _________________________________________
+
+[ ] Restore PHP renderer
+    Command: cp class-octo-print-api-integration.php.backup-pre-offset-fix-* class-octo-print-api-integration.php
+    Completed at: _________________________________________
+
+[ ] Clear OPCache
+    Method: _______________________________________________
+    Completed at: _________________________________________
+
+[ ] Clear CDN cache (if applicable)
+    Completed at: _________________________________________
+
+[ ] Force browser cache clear
+    Method: _______________________________________________
+
+[ ] Verify rollback successful
+    Old design test: PASS / FAIL
+    System stable: YES / NO
+
+[ ] Notify team of rollback
+    Notification sent at: _________________________________
+
+[ ] Document issues encountered
+    Issues: _______________________________________________
+    _______________________________________________________
+    _______________________________________________________
+
+[ ] Plan fixes and retry
+    Fix plan: _____________________________________________
+    _______________________________________________________
+    Estimated retry date: _________________________________
+
+ROLLBACK TIME
+-------------
+Started: ___________________________________________________
+Completed: _________________________________________________
+Total duration: ____________________________________________
+Target: < 10 minutes
+
+================================================================================
+SIGN-OFF
+================================================================================
+
+PRE-DEPLOYMENT APPROVAL
+-----------------------
+Prepared by: _______________________________________________
+Date: ______________________________________________________
+Signature: _________________________________________________
+
+Reviewed by: _______________________________________________
+Date: ______________________________________________________
+Signature: _________________________________________________
+
+Approved by: _______________________________________________
+Date: ______________________________________________________
+Signature: _________________________________________________
+
+DEPLOYMENT EXECUTION
+--------------------
+Deployed by: _______________________________________________
+Date: ______________________________________________________
+Time: ______________________________________________________
+Signature: _________________________________________________
+
+POST-DEPLOYMENT VERIFICATION
+-----------------------------
+Verified by: _______________________________________________
+Date: ______________________________________________________
+Time: ______________________________________________________
+Signature: _________________________________________________
+
+DEPLOYMENT STATUS
+-----------------
+Final Status: SUCCESS / ROLLBACK / PARTIAL
+
+Issues Encountered: ________________________________________
+___________________________________________________________
+___________________________________________________________
+
+Lessons Learned: ___________________________________________
+___________________________________________________________
+___________________________________________________________
+
+Next Steps: ________________________________________________
+___________________________________________________________
+___________________________________________________________
+
+================================================================================
+NOTES
+================================================================================
+
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+___________________________________________________________
+
+================================================================================
+END OF CHECKLIST
+================================================================================
