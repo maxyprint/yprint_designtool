@@ -926,6 +926,13 @@ var DesignerWidget = /*#__PURE__*/function () {
       // Create a unique ID for the image
       var imageId = "img_".concat(Date.now(), "_").concat(Math.floor(Math.random() * 1000));
 
+      // 🔧 FIX: Assign ID to fabricImage for consistent matching
+      if (!fabricImage.id) {
+        fabricImage.id = imageId;
+      } else {
+        imageId = fabricImage.id; // Use existing ID if present
+      }
+
       // 📐 SSOT v2.0: Store NATIVE Fabric.js coordinates (Single Source of Truth)
       // NO transformations, NO offsets, NO rounding - store AS-IS
       var imageData = {
@@ -1316,10 +1323,25 @@ var DesignerWidget = /*#__PURE__*/function () {
       var imagesArray = this.variationImages.get(key);
       if (!imagesArray) return;
 
-      // Find the image by reference or by ID
+      // Find the image by reference or by ID (now includes img.id check)
       var imageData = imagesArray.find(function (data) {
-        return data.fabricImage === img || img.data && img.data.imageId === data.id;
+        return data.fabricImage === img ||
+               (img.data && img.data.imageId === data.id) ||
+               (img.id && img.id === data.id);  // 🔧 FIX: Direct ID matching
       });
+
+      // 🔧 FIX: Error logging for debugging ID matching issues
+      if (!imageData) {
+        console.error('❌ BUG: Image not found in variationImages Map!', {
+          img_id: img.id,
+          img_data_imageId: img.data && img.data.imageId,
+          key: key,
+          available_ids: imagesArray.map(function(d) { return d.id; }),
+          img_object: img
+        });
+        return; // Fail loudly instead of silent failure
+      }
+
       if (imageData) {
         // 📐 SSOT v2.0: Update with NATIVE coordinates (no transformations)
         imageData.transform.left = img.left;
