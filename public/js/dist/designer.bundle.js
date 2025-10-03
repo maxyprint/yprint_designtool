@@ -918,37 +918,6 @@ var DesignerWidget = /*#__PURE__*/function () {
       this.updateImagesGridLimit();
     }
   }, {
-    key: "getCanvasOffset",
-    value: function getCanvasOffset() {
-      try {
-        var canvasElement = this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl;
-        if (!canvasElement) {
-          console.warn('🔧 OFFSET-FIX: Canvas element not found, returning zero offset');
-          return { x: 0, y: 0 };
-        }
-
-        var canvasRect = canvasElement.getBoundingClientRect();
-        var containerElement = canvasElement.parentNode; // .designer-canvas-container - OFFSET-FIX: Use direct parent (0px padding) instead of .designer-editor (50px padding)
-
-        if (!containerElement) {
-          console.warn('🔧 OFFSET-FIX: .designer-editor container not found, returning zero offset');
-          return { x: 0, y: 0 };
-        }
-
-        var containerRect = containerElement.getBoundingClientRect();
-
-        var offsetX = canvasRect.left - containerRect.left;
-        var offsetY = canvasRect.top - containerRect.top;
-
-        console.log('🔧 OFFSET-FIX: Calculated offset', { offsetX: offsetX, offsetY: offsetY });
-
-        return { x: offsetX, y: offsetY };
-      } catch (error) {
-        console.error('🔧 OFFSET-FIX: Error calculating offset', error);
-        return { x: 0, y: 0 };
-      }
-    }
-  }, {
     key: "storeViewImage",
     value: function storeViewImage(imageUrl, fabricImage) {
       var _this9 = this;
@@ -957,31 +926,43 @@ var DesignerWidget = /*#__PURE__*/function () {
       // Create a unique ID for the image
       var imageId = "img_".concat(Date.now(), "_").concat(Math.floor(Math.random() * 1000));
 
-      // 🔧 OFFSET-FIX: Calculate and apply canvas offset (50px CSS padding)
-      var offset = this.getCanvasOffset();
-
+      // 📐 SSOT v2.0: Store NATIVE Fabric.js coordinates (Single Source of Truth)
+      // NO transformations, NO offsets, NO rounding - store AS-IS
       var imageData = {
         id: imageId,
         url: imageUrl,
         transform: {
-          left: fabricImage.left + offset.x,
-          top: fabricImage.top + offset.y,
+          // COORDINATES: Use AS-IS (no offset, no rounding)
+          left: fabricImage.left,
+          top: fabricImage.top,
+          // DIMENSIONS: Native values
+          width: fabricImage.width,
+          height: fabricImage.height,
+          // TRANSFORMATIONS: Native values
           scaleX: fabricImage.scaleX,
           scaleY: fabricImage.scaleY,
-          angle: fabricImage.angle,
-          width: fabricImage.width,
-          height: fabricImage.height
+          angle: fabricImage.angle || 0,
+          // ORIGIN: Native values
+          originX: fabricImage.originX || 'center',
+          originY: fabricImage.originY || 'center'
         },
         fabricImage: fabricImage,
         visible: true,
         metadata: {
-          offset_applied: true,
-          offset_x: offset.x,
-          offset_y: offset.y,
-          offset_fix_version: '1.0.0',
-          offset_fix_timestamp: new Date().toISOString()
+          coordinate_system: 'fabric_native',
+          version: '2.0',
+          captured_at: new Date().toISOString()
         }
       };
+
+      console.log('📐 SSOT: Stored native Fabric.js coordinates', {
+        left: imageData.transform.left,
+        top: imageData.transform.top,
+        system: 'fabric_native',
+        decimals_left: (imageData.transform.left.toString().split('.')[1] || '').length,
+        decimals_top: (imageData.transform.top.toString().split('.')[1] || '').length
+      });
+
       var key = "".concat(this.currentVariation, "_").concat(this.currentView);
 
       // Initialize array if needed
@@ -1108,23 +1089,21 @@ var DesignerWidget = /*#__PURE__*/function () {
             // Store the fabricImage reference
             imageData.fabricImage = img;
 
-            // 🔧 OFFSET-FIX: Backward-compatible offset handling
-            if (imageData && imageData.transform) {
-              // Check if this is a NEW design with offset already applied
-              if (imageData.metadata && imageData.metadata.offset_applied === true) {
-                console.log('🔧 OFFSET-FIX: Loading NEW design - subtracting offset', {
-                  offset_x: imageData.metadata.offset_x,
-                  offset_y: imageData.metadata.offset_y
-                });
+            // SSOT Phase 3: Version detection and legacy warning
+            var coordinateSystem = imageData.metadata && imageData.metadata.coordinate_system || 'legacy';
+            var version = imageData.metadata && imageData.metadata.version || '1.0';
 
-                // SUBTRACT offset for new designs (reverse of save operation)
-                imageData.transform.left -= (imageData.metadata.offset_x || 0);
-                imageData.transform.top -= (imageData.metadata.offset_y || 0);
-              } else {
-                // OLD design without offset metadata - use coordinates as-is
-                console.log('🔧 OFFSET-FIX: Loading OLD design - using coordinates as-is (backward compatible)');
-              }
+            if (coordinateSystem === 'legacy' || parseFloat(version) < 2.0) {
+              console.warn('⚠️  SSOT: Loading legacy design (version ' + version + '). Coordinates may have historical offset inconsistencies.');
             }
+
+            // SSOT: Round-trip validation - coordinates used AS-IS from database
+            console.log('📐 SSOT: Loading image with database coordinates (no transformations)', {
+              stored_left: imageData.transform && imageData.transform.left,
+              stored_top: imageData.transform && imageData.transform.top,
+              system: coordinateSystem,
+              version: version
+            });
 
             // Apply common settings and load the image
             _this11.configureAndLoadFabricImage(imageData, isDarkShirt);
@@ -1132,23 +1111,21 @@ var DesignerWidget = /*#__PURE__*/function () {
         } else if (imageData.fabricImage) {
           // We have a fabric instance already, just configure and add
 
-          // 🔧 OFFSET-FIX: Backward-compatible offset handling
-          if (imageData && imageData.transform) {
-            // Check if this is a NEW design with offset already applied
-            if (imageData.metadata && imageData.metadata.offset_applied === true) {
-              console.log('🔧 OFFSET-FIX: Loading NEW design - subtracting offset', {
-                offset_x: imageData.metadata.offset_x,
-                offset_y: imageData.metadata.offset_y
-              });
+          // SSOT Phase 3: Version detection and legacy warning
+          var coordinateSystem = imageData.metadata && imageData.metadata.coordinate_system || 'legacy';
+          var version = imageData.metadata && imageData.metadata.version || '1.0';
 
-              // SUBTRACT offset for new designs (reverse of save operation)
-              imageData.transform.left -= (imageData.metadata.offset_x || 0);
-              imageData.transform.top -= (imageData.metadata.offset_y || 0);
-            } else {
-              // OLD design without offset metadata - use coordinates as-is
-              console.log('🔧 OFFSET-FIX: Loading OLD design - using coordinates as-is (backward compatible)');
-            }
+          if (coordinateSystem === 'legacy' || parseFloat(version) < 2.0) {
+            console.warn('⚠️  SSOT: Loading legacy design (version ' + version + '). Coordinates may have historical offset inconsistencies.');
           }
+
+          // SSOT: Round-trip validation - coordinates used AS-IS from database
+          console.log('📐 SSOT: Loading image with database coordinates (no transformations)', {
+            stored_left: imageData.transform && imageData.transform.left,
+            stored_top: imageData.transform && imageData.transform.top,
+            system: coordinateSystem,
+            version: version
+          });
 
           _this11.configureAndLoadFabricImage(imageData, isDarkShirt);
         }
@@ -1219,6 +1196,27 @@ var DesignerWidget = /*#__PURE__*/function () {
       // Add to canvas
       this.fabricCanvas.add(img);
       img.setCoords();
+
+      // SSOT: Round-trip validation - verify coordinates match database
+      if (imageData.transform) {
+        var storedLeft = imageData.transform.left;
+        var storedTop = imageData.transform.top;
+        var renderedLeft = img.left;
+        var renderedTop = img.top;
+        var matchLeft = storedLeft === renderedLeft;
+        var matchTop = storedTop === renderedTop;
+
+        console.log('📐 SSOT: Round-trip validation', {
+          stored: { left: storedLeft, top: storedTop },
+          rendered: { left: renderedLeft, top: renderedTop },
+          match: { left: matchLeft, top: matchTop },
+          status: (matchLeft && matchTop) ? '✓ PASS' : '✗ FAIL'
+        });
+
+        if (!matchLeft || !matchTop) {
+          console.error('❌ SSOT: Round-trip validation FAILED! Coordinates were transformed during load.');
+        }
+      }
 
       // Render canvas
       this.fabricCanvas.renderAll();
@@ -1323,29 +1321,31 @@ var DesignerWidget = /*#__PURE__*/function () {
         return data.fabricImage === img || img.data && img.data.imageId === data.id;
       });
       if (imageData) {
-        // 🔧 OFFSET-FIX: Calculate and apply canvas offset
-        var offset = this.getCanvasOffset();
+        // 📐 SSOT v2.0: Update with NATIVE coordinates (no transformations)
+        imageData.transform.left = img.left;
+        imageData.transform.top = img.top;
+        imageData.transform.scaleX = img.scaleX;
+        imageData.transform.scaleY = img.scaleY;
+        imageData.transform.angle = img.angle || 0;
+        imageData.transform.width = img.width;
+        imageData.transform.height = img.height;
+        imageData.transform.originX = img.originX || 'center';
+        imageData.transform.originY = img.originY || 'center';
 
-        // Update transform data
-        imageData.transform = {
-          left: img.left + offset.x,
-          top: img.top + offset.y,
-          scaleX: img.scaleX,
-          scaleY: img.scaleY,
-          angle: img.angle,
-          width: img.width,
-          height: img.height
-        };
-
-        // 🔧 OFFSET-FIX: Update metadata flags
+        // Update metadata
         if (!imageData.metadata) {
           imageData.metadata = {};
         }
-        imageData.metadata.offset_applied = true;
-        imageData.metadata.offset_x = offset.x;
-        imageData.metadata.offset_y = offset.y;
-        imageData.metadata.offset_fix_version = '1.0.0';
-        imageData.metadata.offset_fix_timestamp = new Date().toISOString();
+        imageData.metadata.coordinate_system = 'fabric_native';
+        imageData.metadata.version = '2.0';
+        imageData.metadata.updated_at = new Date().toISOString();
+
+        console.log('📐 SSOT: Updated native coordinates', {
+          left: img.left,
+          top: img.top,
+          decimals_left: (img.left.toString().split('.')[1] || '').length,
+          decimals_top: (img.top.toString().split('.')[1] || '').length
+        });
       }
     }
   }, {
@@ -2303,6 +2303,7 @@ setTimeout(function () {
                       case 6:
 
                         // Reconstruct imageData structure for restoreViewImage()
+                        // SSOT Phase 3: Preserve metadata for version detection
                         imageData = {
                           id: obj.id,
                           url: obj.src,
@@ -2312,6 +2313,11 @@ setTimeout(function () {
                             scaleX: obj.scaleX,
                             scaleY: obj.scaleY,
                             angle: obj.angle || 0
+                          },
+                          metadata: {
+                            coordinate_system: 'native_fabric',
+                            version: metadata.capture_version || '3.0.0',
+                            format: 'golden_standard'
                           }
                         };
 

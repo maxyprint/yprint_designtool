@@ -654,33 +654,6 @@ class Octo_Print_API_Integration {
         $left_px = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
         $top_px = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
 
-        // 🔧 OFFSET-FIX: Handle frontend canvas offset compensation (Issue #canvas-offset-50px)
-        // New designs (saved with designer.bundle.js offset fix) have metadata.offset_applied = true
-        // Old designs (before fix) have no metadata.offset_applied flag
-        // For new designs: Subtract offset to get true print coordinates
-        // For old designs: Use coordinates as-is (backward compatible)
-        if (isset($transform_data['metadata']['offset_applied']) && $transform_data['metadata']['offset_applied'] === true) {
-            $offset_x = floatval($transform_data['metadata']['offset_x'] ?? 0);
-            $offset_y = floatval($transform_data['metadata']['offset_y'] ?? 0);
-
-            // Subtract offset for new designs (reverse of frontend save operation)
-            $left_px -= $offset_x;
-            $top_px -= $offset_y;
-
-            error_log(sprintf(
-                '🔧 OFFSET-FIX: Applied coordinate offset correction - X: %.2f, Y: %.2f (Before: left=%.2f, top=%.2f | After: left=%.2f, top=%.2f)',
-                $offset_x,
-                $offset_y,
-                $left_px + $offset_x,
-                $top_px + $offset_y,
-                $left_px,
-                $top_px
-            ));
-        } else {
-            // Old design without offset metadata - use coordinates as-is
-            error_log('🔧 OFFSET-FIX: No offset metadata - using coordinates as-is (backward compatible)');
-        }
-
         // Enhanced precision conversion using PrecisionCalculator
         if ($this->precision_enabled && $template_id && $size) {
             $canvas_coords = array(
@@ -1044,15 +1017,6 @@ class Octo_Print_API_Integration {
         $left = isset($transform_data['left']) ? floatval($transform_data['left']) : 0;
         $top = isset($transform_data['top']) ? floatval($transform_data['top']) : 0;
         $width = isset($transform_data['width']) ? floatval($transform_data['width']) : 0;
-
-        // 🔧 OFFSET-FIX: Handle frontend canvas offset compensation
-        if (isset($transform_data['metadata']['offset_applied']) && $transform_data['metadata']['offset_applied'] === true) {
-            $offset_x = floatval($transform_data['metadata']['offset_x'] ?? 0);
-            $offset_y = floatval($transform_data['metadata']['offset_y'] ?? 0);
-            $left -= $offset_x;
-            $top -= $offset_y;
-            error_log(sprintf('🔧 OFFSET-FIX [Position Estimator]: Subtracted offset (%.2f, %.2f)', $offset_x, $offset_y));
-        }
 
         // Canvas dimensions estimation (adjust based on your template sizes)
         $canvas_width = 800; // Typical canvas width
