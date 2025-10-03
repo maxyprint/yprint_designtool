@@ -1,8 +1,15 @@
 /**
  * 🚨 EMERGENCY FABRIC.JS LOADER - Direct CDN Loading Solution
  *
+ * ⚠️ WARNING: This script is ONLY for ADMIN CONTEXT (WooCommerce admin preview)
+ * ⚠️ DO NOT load this in public/frontend context - causes double-loading conflicts!
+ *
  * CRITICAL PURPOSE: Load fabric.js directly from CDN to bypass webpack bundle issues
- * This script ensures fabric.js is available regardless of webpack configuration
+ * This script ensures fabric.js is available in admin preview regardless of webpack configuration
+ *
+ * CONTEXT:
+ * - ADMIN: Used in /admin/class-octo-print-designer-admin.php line 1023 (load_preview_only_scripts)
+ * - PUBLIC: DO NOT USE - causes "TypeError: Cannot read properties of undefined (reading 'extend')"
  */
 
 (function() {

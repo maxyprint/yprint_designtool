@@ -370,18 +370,14 @@
     } else {
         console.error('❌ WEBPACK PATCH: All strategies failed to expose DesignerWidget');
 
-                // Final diagnostic
-                console.log('🔍 FINAL DIAGNOSTIC:', {
-                    webpackRequire: !!window.__webpack_require__,
-                    webpackCache: window.__webpack_require__ ? Object.keys(window.__webpack_require__.cache || {}).length : 0,
-                    webpackModules: window.__webpack_require__ ? Object.keys(window.__webpack_require__.m || {}).length : 0,
-                    webpackChunk: !!window.webpackChunkocto_print_designer,
-                    chunkLength: window.webpackChunkocto_print_designer ? window.webpackChunkocto_print_designer.length : 0
-                });
-
-                clearInterval(retrySearch);
-            }
-        }, 200);
+        // Final diagnostic
+        console.log('🔍 FINAL DIAGNOSTIC:', {
+            webpackRequire: !!window.__webpack_require__,
+            webpackCache: window.__webpack_require__ ? Object.keys(window.__webpack_require__.cache || {}).length : 0,
+            webpackModules: window.__webpack_require__ ? Object.keys(window.__webpack_require__.m || {}).length : 0,
+            webpackChunk: !!window.webpackChunkocto_print_designer,
+            chunkLength: window.webpackChunkocto_print_designer ? window.webpackChunkocto_print_designer.length : 0
+        });
     }
 
     console.log('🚀 WEBPACK PATCH: Initialization complete');

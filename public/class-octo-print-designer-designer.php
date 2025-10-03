@@ -75,8 +75,21 @@ class Octo_Print_Designer_Designer {
         // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
         wp_enqueue_script('octo-print-designer-global-instance');
 
-        // 🏆 PERMANENT SAVE FIX: Enqueue permanent AJAX interceptor for save functionality
-        wp_enqueue_script('octo-print-designer-permanent-save-fix');
+        // 🏆 PERMANENT SAVE FIX: DEPRECATED - Replaced by save-during-load-protection.js
+        // wp_enqueue_script('octo-print-designer-permanent-save-fix');
+
+        // 🔧 NEW PRECISION FIXES: Enqueue coordinate precision improvements
+        // 📋 LOAD ORDER: These scripts load AFTER designer bundle (dependency chain):
+        // 1. octo-print-designer-designer (main bundle)
+        // 2. octo-print-designer-webpack-patch
+        // 3. octo-print-designer-global-exposer
+        // 4. octo-print-designer-global-instance
+        // 5. → view-switch-fix (prevents images on wrong view - race condition fix)
+        // 6. → canvas-resize-scaling (handles coordinate scaling on resize)
+        // 7. → save-protection (prevents saving during load - data integrity)
+        wp_enqueue_script('octo-print-designer-view-switch-fix');
+        wp_enqueue_script('octo-print-designer-canvas-resize-scaling');
+        wp_enqueue_script('octo-print-designer-save-protection');
 
         // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Enqueue race condition-free capture system
         wp_enqueue_script('octo-print-designer-production-capture');

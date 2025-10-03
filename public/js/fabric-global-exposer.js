@@ -109,40 +109,29 @@
             } else if (attempts >= maxAttempts) {
                 clearInterval(retryTimer);
                 console.error('❌ Fabric Global Exposer: Failed to expose Fabric.js after', maxAttempts, 'attempts');
+                console.error('❌ Fabric Global Exposer: CDN fallback disabled to prevent double-loading conflicts');
 
-                // Last resort: try to load Fabric.js from CDN
-                loadFabricFromCDN();
+                // CDN fallback DISABLED to prevent double-loading conflicts
+                // Fabric MUST be loaded from webpack bundle only
             }
         }, retryInterval);
     }
 
     /**
-     * Fallback: Load Fabric.js from CDN if webpack version fails
+     * DISABLED: CDN Fallback removed to prevent double-loading conflicts
+     *
+     * Previous implementation would load Fabric.js from CDN if webpack extraction failed,
+     * but this caused conflicts when both webpack and CDN versions loaded simultaneously.
+     *
+     * Fabric.js MUST be loaded from webpack bundle only via webpack-fabric-loader-optimized.js
      */
     function loadFabricFromCDN() {
-        console.log('🌐 Fabric Global Exposer: Loading Fabric.js from CDN as fallback');
+        console.error('❌ Fabric Global Exposer: CDN fallback is DISABLED');
+        console.error('❌ Webpack Fabric extraction failed - check webpack-fabric-loader-optimized.js');
+        console.error('❌ Ensure vendor.bundle.js contains fabric.js module');
 
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js';
-        script.crossOrigin = 'anonymous';
-
-        script.onload = function() {
-            console.log('✅ Fabric Global Exposer: Fabric.js loaded from CDN');
-            global.fabricGloballyExposed = true;
-            global.fabricLoadedFromCDN = true;
-
-            // Trigger custom event
-            const event = new CustomEvent('fabricGloballyExposed', {
-                detail: { fabric: global.fabric, loadedFromCDN: true }
-            });
-            document.dispatchEvent(event);
-        };
-
-        script.onerror = function() {
-            console.error('❌ Fabric Global Exposer: Failed to load Fabric.js from CDN');
-        };
-
-        document.head.appendChild(script);
+        // CDN loading DISABLED to prevent double-loading conflicts
+        // If you see this error, the webpack bundle is not properly configured
     }
 
     // Export status checker

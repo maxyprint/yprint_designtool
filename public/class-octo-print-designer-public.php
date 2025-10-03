@@ -171,10 +171,11 @@ class Octo_Print_Designer_Public {
         );
 
         // 🚨 DESIGN SAVE EMERGENCY FIX - Solves "Invalid input data" error
+        // NOTE: Removed 'octo-print-designer-emergency-fabric' dependency - was never registered and caused loading conflicts
         wp_register_script(
             'octo-print-designer-save-fix',
             OCTO_PRINT_DESIGNER_URL . 'design-save-emergency-fix.js',
-            ['jquery', 'octo-print-designer-emergency-fabric'],
+            ['jquery'], // Fixed: removed broken dependency that caused double-loading
             rand(),
             true
         );
@@ -296,11 +297,42 @@ class Octo_Print_Designer_Public {
         );
 
         // 🏆 PERMANENT SAVE FIX: Auto-adds missing template_id, name, and nonce fields to AJAX requests
+        // DEPRECATED: This script has been replaced by save-during-load-protection.js
+        // which provides more comprehensive save validation and protection
+        /*
         wp_register_script(
             'octo-print-designer-permanent-save-fix',
             OCTO_PRINT_DESIGNER_URL . 'public/js/permanent-save-fix.js',
             ['octo-print-designer-designer'], // Load after designer bundle
             $this->version . '-permanent-' . time(),
+            true
+        );
+        */
+
+        // 🔧 VIEW-SWITCH RACE CONDITION FIX: Prevents images appearing on wrong view
+        wp_register_script(
+            'octo-print-designer-view-switch-fix',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/view-switch-race-condition-fix.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '-view-switch-' . time(),
+            true
+        );
+
+        // 🔧 CANVAS-RESIZE COORDINATE SCALING: Handles dimension changes
+        wp_register_script(
+            'octo-print-designer-canvas-resize-scaling',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-resize-coordinate-scaling.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '-resize-scaling-' . time(),
+            true
+        );
+
+        // 🔧 SAVE-DURING-LOAD PROTECTION: Prevents saving incomplete data
+        wp_register_script(
+            'octo-print-designer-save-protection',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/save-during-load-protection.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '-save-protection-' . time(),
             true
         );
 
@@ -370,13 +402,16 @@ class Octo_Print_Designer_Public {
 
     /**
      * Add preload hints for critical fabric.js resources
+     *
+     * REMOVED: Emergency fabric loader preload hints to prevent double-loading conflicts
+     * Fabric.js is now loaded exclusively from webpack vendor.bundle.js
      */
     public function add_fabric_preload_hints() {
-        // Only add preload hints on designer pages
+        // Disabled - Emergency fabric loader removed to prevent conflicts
+        // Fabric.js is properly loaded from webpack bundle via webpack-fabric-loader-optimized.js
+
+        // Only add DNS prefetch for the plugin's own domain
         if (is_page() || (function_exists('is_woocommerce') && is_woocommerce())) {
-            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js" as="script" crossorigin="anonymous">' . "\n";
-            echo '<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" as="script" crossorigin="anonymous">' . "\n";
-            echo '<link rel="dns-prefetch" href="cdnjs.cloudflare.com">' . "\n";
             echo '<link rel="dns-prefetch" href="' . parse_url(OCTO_PRINT_DESIGNER_URL, PHP_URL_HOST) . '">' . "\n";
         }
     }

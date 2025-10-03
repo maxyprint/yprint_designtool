@@ -178,31 +178,30 @@
 
             if (elapsed > maxWait) {
                 clearInterval(checkInterval);
-                console.error('❌ OPTIMIZED FABRIC LOADER: Timeout - falling back to CDN');
-                fallbackToCDN();
+                console.error('❌ OPTIMIZED FABRIC LOADER: Timeout - webpack extraction failed');
+                console.error('❌ OPTIMIZED FABRIC LOADER: CDN fallback DISABLED to prevent double-loading');
+                console.error('❌ Check that vendor.bundle.js contains fabric.js module');
+                // CDN fallback DISABLED to prevent double-loading conflicts
             }
         }, 50); // Check every 50ms
     }
 
     /**
-     * Fallback to CDN if webpack extraction fails completely
+     * DISABLED: CDN Fallback removed to prevent double-loading conflicts
+     *
+     * Previous implementation would load Fabric.js from CDN if webpack extraction failed,
+     * but this caused "TypeError: Cannot read properties of undefined (reading 'extend')"
+     * when both webpack and CDN versions loaded simultaneously.
+     *
+     * Fabric.js MUST be loaded from webpack bundle only.
      */
     function fallbackToCDN() {
-        if (!window.fabric || !window.fabric.Canvas) {
-            console.log('🔄 OPTIMIZED FABRIC LOADER: Loading CDN fallback');
+        console.error('❌ OPTIMIZED FABRIC LOADER: CDN fallback is DISABLED');
+        console.error('❌ Webpack Fabric extraction failed completely');
+        console.error('❌ Ensure vendor.bundle.js is built correctly with fabric.js');
 
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js';
-            script.onload = () => {
-                console.log('✅ CDN fabric.js loaded as fallback');
-                dispatchReadyEvents();
-            };
-            script.onerror = () => {
-                console.error('❌ CDN fallback also failed');
-            };
-
-            document.head.appendChild(script);
-        }
+        // CDN loading DISABLED to prevent double-loading conflicts
+        // If you see this error, rebuild the webpack bundle with: npm run build
     }
 
     // Initialize immediately
