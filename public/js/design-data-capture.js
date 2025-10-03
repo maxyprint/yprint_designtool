@@ -159,11 +159,12 @@ class DesignDataCapture {
         const transformedCoords = this.transformCoordinates(obj.left, obj.top);
 
         // Basis-Element-Struktur
+        // PRÄZISIONS-FIX: Preserve sub-pixel precision (2 decimal places = 0.01px accuracy)
         const baseElement = {
-            x: Math.round(transformedCoords.x),
-            y: Math.round(transformedCoords.y),
-            width: Math.round(obj.width * obj.scaleX),
-            height: Math.round(obj.height * obj.scaleY),
+            x: parseFloat(transformedCoords.x.toFixed(2)),
+            y: parseFloat(transformedCoords.y.toFixed(2)),
+            width: parseFloat((obj.width * obj.scaleX).toFixed(2)),
+            height: parseFloat((obj.height * obj.scaleY).toFixed(2)),
             scaleX: obj.scaleX,
             scaleY: obj.scaleY,
             angle: obj.angle

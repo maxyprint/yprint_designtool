@@ -307,11 +307,12 @@ class ComprehensiveDesignDataCapture {
         const coords = this.transformCoordinates(obj.left || 0, obj.top || 0);
 
         // Base element properties
+        // PRÄZISIONS-FIX: Preserve sub-pixel precision (2 decimal places = 0.01px accuracy)
         const baseElement = {
-            x: Math.round(coords.x),
-            y: Math.round(coords.y),
-            width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
-            height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
+            x: parseFloat(coords.x.toFixed(2)),
+            y: parseFloat(coords.y.toFixed(2)),
+            width: parseFloat(((obj.width || 0) * (obj.scaleX || 1)).toFixed(2)),
+            height: parseFloat(((obj.height || 0) * (obj.scaleY || 1)).toFixed(2)),
             scaleX: obj.scaleX || 1,
             scaleY: obj.scaleY || 1,
             angle: obj.angle || 0
