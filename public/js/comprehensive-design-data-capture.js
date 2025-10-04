@@ -303,14 +303,14 @@ class ComprehensiveDesignDataCapture {
     transformObjectToElement(obj, index) {
         if (!obj) return null;
 
-        // Get transformed coordinates relative to mockup_design_area
-        const coords = this.transformCoordinates(obj.left || 0, obj.top || 0);
+        // 🔧 FIX: Use native Fabric.js coordinates (SSOT v2.0 - no transformation)
+        // Removed transformCoordinates() to eliminate 20-50px DOM-offset discrepancy
 
         // Base element properties
         // PRÄZISIONS-FIX: Preserve sub-pixel precision (2 decimal places = 0.01px accuracy)
         const baseElement = {
-            x: parseFloat(coords.x.toFixed(2)),
-            y: parseFloat(coords.y.toFixed(2)),
+            x: parseFloat((obj.left || 0).toFixed(2)),
+            y: parseFloat((obj.top || 0).toFixed(2)),
             width: parseFloat(((obj.width || 0) * (obj.scaleX || 1)).toFixed(2)),
             height: parseFloat(((obj.height || 0) * (obj.scaleY || 1)).toFixed(2)),
             scaleX: obj.scaleX || 1,

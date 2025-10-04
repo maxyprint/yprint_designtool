@@ -676,14 +676,15 @@ class OptimizedDesignDataCapture {
      * Process individual canvas object
      */
     processCanvasObject(obj, index) {
-        // Transform coordinates relative to mockup design area
-        const coords = this.transformCoordinates(obj.left || 0, obj.top || 0);
+        // 🔧 FIX: Use native Fabric.js coordinates (SSOT v2.0 - no transformation)
+        // Removed transformCoordinates() to eliminate 20-50px DOM-offset discrepancy
+        // Database and preview now use same coordinate system (canvas-relative)
 
         // Base properties
         // PRÄZISIONS-FIX: Preserve sub-pixel precision (2 decimal places = 0.01px accuracy)
         const baseElement = {
-            x: parseFloat(coords.x.toFixed(2)),
-            y: parseFloat(coords.y.toFixed(2)),
+            x: parseFloat((obj.left || 0).toFixed(2)),
+            y: parseFloat((obj.top || 0).toFixed(2)),
             width: parseFloat(((obj.width || 0) * (obj.scaleX || 1)).toFixed(2)),
             height: parseFloat(((obj.height || 0) * (obj.scaleY || 1)).toFixed(2)),
             scaleX: Number((obj.scaleX || 1).toFixed(3)),

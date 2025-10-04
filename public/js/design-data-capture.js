@@ -155,14 +155,14 @@ class DesignDataCapture {
     transformObjectToElement(obj) {
         if (!obj) return null;
 
-        // Koordinaten-Transformation: Canvas → mockup_design_area
-        const transformedCoords = this.transformCoordinates(obj.left, obj.top);
+        // 🔧 FIX: Use native Fabric.js coordinates (SSOT v2.0 - no transformation)
+        // Removed transformCoordinates() to eliminate 20-50px DOM-offset discrepancy
 
         // Basis-Element-Struktur
         // PRÄZISIONS-FIX: Preserve sub-pixel precision (2 decimal places = 0.01px accuracy)
         const baseElement = {
-            x: parseFloat(transformedCoords.x.toFixed(2)),
-            y: parseFloat(transformedCoords.y.toFixed(2)),
+            x: parseFloat((obj.left || 0).toFixed(2)),
+            y: parseFloat((obj.top || 0).toFixed(2)),
             width: parseFloat((obj.width * obj.scaleX).toFixed(2)),
             height: parseFloat((obj.height * obj.scaleY).toFixed(2)),
             scaleX: obj.scaleX,
