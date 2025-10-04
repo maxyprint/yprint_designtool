@@ -681,6 +681,22 @@ class AdminCanvasRenderer {
             return;
         }
 
+        // 🎯 FIX: Golden Standard v3.0+ has native Fabric.js coordinates (NO offset compensation needed)
+        const captureVersion = designData.metadata?.capture_version;
+        const isGoldenStandard = captureVersion && parseFloat(captureVersion) >= 3.0;
+
+        if (isGoldenStandard) {
+            this.designerOffset.x = 0;
+            this.designerOffset.y = 0;
+            this.designerOffset.detected = false;
+            this.designerOffset.source = 'golden_standard_v3_native';
+            console.log('✅ OFFSET BUG FIX: Golden Standard v3.0+ detected - using native coordinates (NO offset)', {
+                capture_version: captureVersion,
+                reason: 'Modern data uses Fabric.js native coordinates without container offset'
+            });
+            return;
+        }
+
         // 🎯 SCENARIO A: Skip offset extraction for legacy data (already corrected)
         // Detection logic must match classifyDataFormat() to ensure consistency
         const isLegacyDbFormat = designData.metadata?.source === 'db_processed_views';
@@ -703,15 +719,17 @@ class AdminCanvasRenderer {
         }
 
         // Strategy 1: Check for explicit offset metadata (future-proof)
-        if (designData.metadata && designData.metadata.designer_offset) {
+        if (designData.metadata && designData.metadata.designer_offset !== undefined) {
             this.designerOffset.x = parseFloat(designData.metadata.designer_offset.x || 0);
             this.designerOffset.y = parseFloat(designData.metadata.designer_offset.y || 0);
-            this.designerOffset.detected = true;
+            this.designerOffset.detected = this.designerOffset.x !== 0 || this.designerOffset.y !== 0;
             this.designerOffset.source = 'metadata';
 
-            // 🎯 AGENT 1 MUTEX: Track offset application
-            this.correctionStrategy.offsetApplied = true;
-            this.correctionStrategy.active = 'modern_metadata';
+            // 🎯 AGENT 1 MUTEX: Track offset application (only if non-zero)
+            if (this.designerOffset.detected) {
+                this.correctionStrategy.offsetApplied = true;
+                this.correctionStrategy.active = 'modern_metadata';
+            }
 
             console.log('🎯 HIVE MIND: Designer offset extracted from metadata:', this.designerOffset);
             return;
@@ -1897,21 +1915,33 @@ class AdminCanvasRenderer {
             let position;
             if (this.coordinatePreservation.noTransformMode) {
                 // Stage 2: After offset compensation
-                let x = left - this.designerOffset.x;
-                let y = top - this.designerOffset.y;
+                // 🎯 OFFSET BUG FIX: Only apply offset compensation if actually detected
+                let x = left;
+                let y = top;
 
-                if (auditTrail && this.designerOffset.detected) {
-                    auditTrail.recordTransformation(
-                        'Offset Compensation',
-                        { x: left, y: top },
-                        { x, y },
-                        'designer_offset'
-                    );
-                } else if (auditTrail) {
-                    auditTrail.record('Offset Skip', {
-                        coordinates: { x, y },
-                        metadata: { reason: 'No designer offset detected' }
-                    });
+                if (this.designerOffset.detected && (this.designerOffset.x !== 0 || this.designerOffset.y !== 0)) {
+                    x = left - this.designerOffset.x;
+                    y = top - this.designerOffset.y;
+
+                    if (auditTrail) {
+                        auditTrail.recordTransformation(
+                            'Offset Compensation',
+                            { x: left, y: top },
+                            { x, y },
+                            'designer_offset'
+                        );
+                    }
+                } else {
+                    if (auditTrail) {
+                        auditTrail.record('Offset Skip', {
+                            coordinates: { x, y },
+                            metadata: {
+                                reason: this.designerOffset.source === 'golden_standard_v3_native'
+                                    ? 'Golden Standard v3.0+ uses native coordinates'
+                                    : 'No designer offset detected'
+                            }
+                        });
+                    }
                 }
 
                 // Stage 3: Apply canvas dimension scaling
