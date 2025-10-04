@@ -131,12 +131,14 @@ class UserActionLogger {
     }
 
     extractElementData(fabricObject) {
+        // 🔧 FIX: Preserve sub-pixel precision (2 decimals = 0.01px accuracy)
+        // Removed Math.round() to maintain coordinate precision in analytics logs
         const baseProperties = {
-            x: Math.round(fabricObject.left - this.mockupOffset.x),
-            y: Math.round(fabricObject.top - this.mockupOffset.y),
-            width: Math.round(fabricObject.width * fabricObject.scaleX),
-            height: Math.round(fabricObject.height * fabricObject.scaleY),
-            angle: Math.round(fabricObject.angle || 0)
+            x: parseFloat(((fabricObject.left - this.mockupOffset.x) || 0).toFixed(2)),
+            y: parseFloat(((fabricObject.top - this.mockupOffset.y) || 0).toFixed(2)),
+            width: parseFloat(((fabricObject.width * fabricObject.scaleX) || 0).toFixed(2)),
+            height: parseFloat(((fabricObject.height * fabricObject.scaleY) || 0).toFixed(2)),
+            angle: parseFloat(((fabricObject.angle || 0)).toFixed(2))
         };
 
         const elementData = {
