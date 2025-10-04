@@ -143,8 +143,14 @@ class PointToPointSelector {
         if (!this.selectedMeasurementKey || this.currentMode !== 'select') return;
 
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+
+        // 🎯 FIX: Kompensation für Bild-Zentrierung (Image-Offset Bug)
+        if (this.imageScaling) {
+            x = x - this.imageScaling.offsetX;
+            y = y - this.imageScaling.offsetY;
+        }
 
         this.points.push({ x, y });
 
@@ -159,8 +165,14 @@ class PointToPointSelector {
     onMouseMove(e) {
         if (this.points.length === 1 && this.selectedMeasurementKey) {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+
+            // 🎯 FIX: Kompensation für Bild-Zentrierung (Image-Offset Bug)
+            if (this.imageScaling) {
+                x = x - this.imageScaling.offsetX;
+                y = y - this.imageScaling.offsetY;
+            }
 
             this.redrawCanvas();
             this.drawPreviewLine(this.points[0], { x, y });
