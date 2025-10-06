@@ -84,6 +84,9 @@ class Octo_Print_Designer_Designer {
         // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Enqueue race condition-free capture system
         wp_enqueue_script('octo-print-designer-production-capture');
 
+        // 🔍 SAFEZONE COORDINATE VALIDATOR: Enqueue SafeZone validation fix
+        wp_enqueue_script('octo-print-designer-safezone-validator');
+
         // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system (LEGACY)
         // wp_enqueue_script('octo-print-designer-data-capture');
 

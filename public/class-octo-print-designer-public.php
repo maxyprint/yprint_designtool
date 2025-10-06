@@ -197,6 +197,15 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🔍 SAFEZONE COORDINATE VALIDATOR - Fixes coordinates capture bug causing SafeZone warnings
+        wp_register_script(
+            'octo-print-designer-safezone-validator',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/safezone-coordinate-validator.js',
+            ['octo-print-designer-enhanced-json'], // Load after coordinate system to patch it
+            $this->version . '.safezone-fix-v1',
+            true
+        );
+
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
