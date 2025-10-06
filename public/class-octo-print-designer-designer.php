@@ -69,6 +69,9 @@ class Octo_Print_Designer_Designer {
         // 🚨 WEBPACK DESIGNER PATCH: Enqueue aggressive webpack intervention
         wp_enqueue_script('octo-print-designer-webpack-patch');
 
+        // 🔧 FABRIC CANVAS ELEMENT FIX: Enqueue Safari toCanvasElement bug fix
+        wp_enqueue_script('octo-print-designer-fabric-canvas-fix');
+
         // 🎯 DESIGNER GLOBAL EXPOSER: Enqueue DesignerWidget class exposure
         wp_enqueue_script('octo-print-designer-global-exposer');
 

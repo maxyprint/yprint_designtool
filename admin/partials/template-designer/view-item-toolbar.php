@@ -8,9 +8,9 @@
             <span class="dashicons dashicons-marker"></span>
             <?php esc_html_e('Edit Safe Zone', 'octo-print-designer'); ?>
         </button>
-        <button type="button" class="button mode-select" data-mode="referenceline">
-            <span class="dashicons dashicons-grid-view"></span>
-            <?php esc_html_e('Edit Reference Line', 'octo-print-designer'); ?>
+        <button type="button" class="button mode-select measurement-definition-mode" data-mode="measurement">
+            <span class="dashicons dashicons-admin-tools"></span>
+            <?php esc_html_e('Define Measurement', 'octo-print-designer'); ?>
         </button>
     </div>
     <div class="toolbar-group">
@@ -36,7 +36,100 @@
 
 </div>
 
-<!-- Reference Line Selection Modal -->
+<!-- 🎯 AGENT 1: Enhanced Measurement Definition Interface -->
+<div id="measurement-definition-panel" class="measurement-panel" style="display: none;">
+    <div class="measurement-panel-header">
+        <h3>
+            <span class="dashicons dashicons-admin-tools"></span>
+            <?php esc_html_e('Define Measurement', 'octo-print-designer'); ?>
+        </h3>
+        <button type="button" class="measurement-panel-close">
+            <span class="dashicons dashicons-no"></span>
+        </button>
+    </div>
+
+    <div class="measurement-panel-body">
+        <!-- Step 1: Measurement Type Selection -->
+        <div class="measurement-step active" data-step="1">
+            <h4><?php esc_html_e('Step 1: Select Measurement Type', 'octo-print-designer'); ?></h4>
+            <div class="measurement-type-selector">
+                <select id="measurement-type-dropdown" class="measurement-dropdown">
+                    <option value=""><?php esc_html_e('Select measurement type...', 'octo-print-designer'); ?></option>
+                    <!-- Dynamically populated from database -->
+                </select>
+            </div>
+
+            <!-- Real-time measurement info display -->
+            <div class="measurement-info" style="display: none;">
+                <div class="measurement-details">
+                    <div class="measurement-label"></div>
+                    <div class="measurement-description"></div>
+                    <div class="measurement-target-value">
+                        <strong><?php esc_html_e('Target Value:', 'octo-print-designer'); ?></strong>
+                        <span class="target-value"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Point Selection -->
+        <div class="measurement-step" data-step="2">
+            <h4><?php esc_html_e('Step 2: Select Two Points', 'octo-print-designer'); ?></h4>
+            <div class="point-selection-guide">
+                <p class="selection-instruction"><?php esc_html_e('Click two points on the template image to define your measurement', 'octo-print-designer'); ?></p>
+                <div class="selection-status">
+                    <div class="point-status">
+                        <span class="point-indicator point-1">1</span>
+                        <span class="point-label"><?php esc_html_e('First Point', 'octo-print-designer'); ?></span>
+                        <span class="point-coords"></span>
+                    </div>
+                    <div class="point-status">
+                        <span class="point-indicator point-2">2</span>
+                        <span class="point-label"><?php esc_html_e('Second Point', 'octo-print-designer'); ?></span>
+                        <span class="point-coords"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Validation & Save -->
+        <div class="measurement-step" data-step="3">
+            <h4><?php esc_html_e('Step 3: Validation', 'octo-print-designer'); ?></h4>
+            <div class="measurement-validation">
+                <div class="validation-results">
+                    <div class="measured-length">
+                        <strong><?php esc_html_e('Measured Length:', 'octo-print-designer'); ?></strong>
+                        <span class="measured-value"></span>
+                    </div>
+                    <div class="accuracy-feedback">
+                        <strong><?php esc_html_e('Accuracy:', 'octo-print-designer'); ?></strong>
+                        <span class="accuracy-percentage"></span>
+                        <span class="accuracy-status"></span>
+                    </div>
+                    <div class="validation-message"></div>
+                </div>
+
+                <div class="measurement-actions">
+                    <button type="button" class="button button-secondary measurement-cancel">
+                        <?php esc_html_e('Cancel', 'octo-print-designer'); ?>
+                    </button>
+                    <button type="button" class="button button-primary measurement-save">
+                        <?php esc_html_e('Save Measurement', 'octo-print-designer'); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="measurement-progress">
+        <div class="progress-step active" data-step="1"><?php esc_html_e('Select Type', 'octo-print-designer'); ?></div>
+        <div class="progress-step" data-step="2"><?php esc_html_e('Select Points', 'octo-print-designer'); ?></div>
+        <div class="progress-step" data-step="3"><?php esc_html_e('Validate', 'octo-print-designer'); ?></div>
+    </div>
+</div>
+
+<!-- 🔄 Legacy Reference Line Modal (Backward Compatibility) -->
 <div id="reference-line-modal" class="octo-modal" style="display: none;">
     <div class="octo-modal-content">
         <div class="octo-modal-header">

@@ -157,11 +157,20 @@ class Octo_Print_Designer_Admin {
             true
         );
 
+        // Phase 4.5: Fabric Canvas Element Fix (Safari toCanvasElement bug fix)
+        wp_enqueue_script(
+            'octo-fabric-canvas-element-fix',
+            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-canvas-element-fix.js',
+            ['octo-fabric-global-exposure'], // After fabric is globally available
+            $this->version . '.canvas-fix-v1',
+            true
+        );
+
         // Phase 5: Canvas Hook (Now Singleton-Aware + jQuery-Free)
         wp_enqueue_script(
             'octo-template-editor-canvas-hook',
             OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-fabric-global-exposure', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency
+            ['octo-fabric-canvas-element-fix', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency, added canvas fix
             $this->version . '.5-jquery-free',
             true
         );
@@ -238,6 +247,63 @@ class Octo_Print_Designer_Admin {
             );
         }
 
+        // 🎯 ISSUE #22: Two-Point Measurement Interface System (Hive-Mind Implementation)
+        if ($is_template_page) {
+            // Agent 2: Smart JavaScript Selection Logic
+            wp_enqueue_script(
+                'octo-measurement-definition-system',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/measurement-definition-system.js',
+                ['octo-fabric-global-exposure', 'jquery'],
+                $this->version . '.issue22-agent2',
+                true
+            );
+
+            // Agent 3: Database Integration System
+            wp_enqueue_script(
+                'octo-measurement-database-integration',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/measurement-database-integration.js',
+                ['octo-measurement-definition-system', 'jquery'],
+                $this->version . '.issue22-agent3',
+                true
+            );
+
+            // Agent 4: Real-time Validation Engine
+            wp_enqueue_script(
+                'octo-measurement-validation-engine',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/measurement-validation-engine.js',
+                ['octo-measurement-database-integration', 'jquery'],
+                $this->version . '.issue22-agent4',
+                true
+            );
+
+            // Agent 6: Future-Proofing Dynamic Support
+            wp_enqueue_script(
+                'octo-measurement-future-proofing-system',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/measurement-future-proofing-system.js',
+                ['octo-measurement-validation-engine', 'jquery'],
+                $this->version . '.issue22-agent6',
+                true
+            );
+
+            // Agent 7: Integration Coordinator - Master System Integration
+            wp_enqueue_script(
+                'octo-measurement-system-integration',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/measurement-system-integration.js',
+                ['octo-measurement-future-proofing-system', 'jquery'],
+                $this->version . '.issue22-agent7',
+                true
+            );
+
+            // Agent 7: Final System Validator - Quality Assurance
+            wp_enqueue_script(
+                'octo-issue22-system-validator',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/issue22-system-validator.js',
+                ['octo-measurement-system-integration'], // Load after all components
+                $this->version . '.issue22-validator',
+                true
+            );
+        }
+
         // 🧪 Load test suite in development mode (WP_DEBUG enabled)
         if (defined('WP_DEBUG') && WP_DEBUG) {
             wp_enqueue_script(
@@ -290,6 +356,14 @@ class Octo_Print_Designer_Admin {
             plugin_dir_url(__FILE__) . 'css/measurement-table-styling.css',
             ['octo-print-designer-admin-ui-enhancement'],
             $this->version . '.measurement'
+        );
+
+        // 🎯 ISSUE #22: Agent 5 - Measurement Definition Interface Styling
+        wp_enqueue_style(
+            'octo-measurement-definition-interface',
+            plugin_dir_url(__FILE__) . 'css/measurement-definition-interface.css',
+            ['octo-measurement-table-styling'],
+            $this->version . '.issue22-agent5'
         );
     }
 

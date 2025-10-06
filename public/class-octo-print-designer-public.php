@@ -223,11 +223,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🔧 FABRIC CANVAS ELEMENT FIX: Safari toCanvasElement bug fix
+        wp_register_script(
+            'octo-print-designer-fabric-canvas-fix',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-element-fix.js',
+            ['octo-print-designer-fabric-global-exposer'], // Load after fabric is globally available
+            $this->version . '.canvas-fix-v1',
+            true
+        );
+
         // 🎯 DESIGNER GLOBAL EXPOSER: Exposes DesignerWidget class globally from webpack bundle
         wp_register_script(
             'octo-print-designer-global-exposer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/designer-global-exposer.js',
-            ['octo-print-designer-fabric-global-exposer'], // Load after fabric exposer
+            ['octo-print-designer-fabric-canvas-fix'], // Load after fabric canvas fix
             rand(),
             true
         );
