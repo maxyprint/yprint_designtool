@@ -88,42 +88,47 @@ class Octo_Print_Designer_Public {
 	 */
 	public function enqueue_scripts() {
 
-        // 🔍 COMPREHENSIVE DEBUG SYSTEM: Complete console debugging suite for fabric.js loading analysis
-        // Phase 0.1: Race Condition Analyzer - Precision timing measurements
-        wp_register_script(
-            'octo-race-condition-analyzer',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/race-condition-analyzer.js',
-            [], // Load first for timing accuracy
-            $this->version . '.debug-race-v1',
-            false // Load in head for early monitoring
-        );
+        // 🚀 PRODUCTION-OPTIMIZED DEBUG SYSTEM: Conditional loading for performance
+        // Only load debug scripts in development/debug mode to eliminate production bloat
+        if (WP_DEBUG || (defined('OCTO_DEBUG_MODE') && OCTO_DEBUG_MODE) || (isset($_GET['debug']) && $_GET['debug'] === '1')) {
 
-        // Phase 0.2: Fabric Debug Console - Comprehensive loading analysis
-        wp_register_script(
-            'octo-fabric-debug-console',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-debug-console.js',
-            ['octo-race-condition-analyzer'], // After race condition analyzer
-            $this->version . '.debug-console-v1',
-            false // Load in head for early monitoring
-        );
+            // 🔧 ESSENTIAL DEBUG ONLY: Reduced to 2 critical scripts for minimal impact
+            // Phase 0.1: Core Debug Console - Essential debugging only
+            wp_register_script(
+                'octo-fabric-debug-console',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-debug-console.js',
+                [], // Standalone for minimal dependencies
+                $this->version . '.debug-console-dev',
+                true // Load in footer, non-blocking
+            );
 
-        // Phase 0.3: Webpack Bundle Inspector - Deep bundle analysis
-        wp_register_script(
-            'octo-webpack-bundle-inspector',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-bundle-inspector.js',
-            ['octo-fabric-debug-console'], // After debug console
-            $this->version . '.debug-inspector-v1',
-            false // Load in head for early monitoring
-        );
+            // Phase 0.2: Performance Monitor - Lightweight monitoring only
+            wp_register_script(
+                'octo-fabric-performance-monitor',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-loading-timeline-tracker.js',
+                ['octo-fabric-debug-console'], // Single dependency chain
+                $this->version . '.debug-monitor-dev',
+                true // Load in footer, non-blocking
+            );
 
-        // Phase 0.4: Timeline Tracker - Visual loading sequence analysis
-        wp_register_script(
-            'octo-fabric-timeline-tracker',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-loading-timeline-tracker.js',
-            ['octo-webpack-bundle-inspector'], // After bundle inspector
-            $this->version . '.debug-timeline-v1',
-            false // Load in head for early monitoring
-        );
+            // 📊 DEBUG MODE INDICATOR
+            wp_add_inline_script('octo-fabric-debug-console', '
+                console.warn("🔧 DEBUG MODE ACTIVE: Performance debug scripts loaded");
+                console.log("Debug environment:", {
+                    WP_DEBUG: ' . (WP_DEBUG ? 'true' : 'false') . ',
+                    OCTO_DEBUG_MODE: ' . (defined('OCTO_DEBUG_MODE') && OCTO_DEBUG_MODE ? 'true' : 'false') . ',
+                    debug_param: ' . (isset($_GET['debug']) && $_GET['debug'] === '1' ? 'true' : 'false') . '
+                });
+            ', 'before');
+
+        } else {
+            // 🚀 PRODUCTION MODE: Zero debug scripts for maximum performance
+            wp_add_inline_script('octo-print-designer-designer', '
+                console.log("🚀 PRODUCTION MODE: Debug scripts disabled for optimal performance");
+                console.log("📊 PERFORMANCE OPTIMIZATION: 4+ debug scripts eliminated from head loading");
+                console.log("⚡ SPEED IMPROVEMENT: Non-blocking script architecture enabled");
+            ', 'before');
+        }
 
         // 🎯 STAGED LOADING ARCHITECTURE: Stage 1 - Webpack Readiness Detection
         wp_register_script(
@@ -137,8 +142,8 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-vendor',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
-            ['octo-fabric-timeline-tracker', 'octo-webpack-readiness-detector'], // After debug system and webpack detector
-            $this->version . '.vendor-monitored',
+            ['octo-webpack-readiness-detector'], // Only essential webpack detector, no debug dependencies
+            $this->version . '.vendor-production-optimized',
             true
         );
         
@@ -419,18 +424,12 @@ class Octo_Print_Designer_Public {
             'dpi' => Octo_Print_Designer_Settings::get_dpi()
         ]);
 
-        // 🎯 STAGED LOADING ARCHITECTURE: Enqueue scripts in proper order
+        // 🎯 PRODUCTION-OPTIMIZED STAGED LOADING: Environment-aware script loading
         $staged_loading_scripts = [
-            // Stage 0: Debug & Monitoring (HEAD)
-            'octo-race-condition-analyzer',
-            'octo-fabric-debug-console',
-            'octo-webpack-bundle-inspector',
-            'octo-fabric-loading-timeline-tracker',
-
-            // Stage 1: Webpack Foundation
+            // Stage 1: Webpack Foundation (ESSENTIAL)
             'octo-webpack-readiness-detector',   // Load first in HEAD
 
-            // Stage 2: Core Bundles & Fabric Foundation (FOOTER)
+            // Stage 2: Core Bundles & Fabric Foundation (ESSENTIAL)
             'octo-print-designer-vendor',        // webpack chunks
             'octo-fabric-readiness-detector',    // fabric extraction
             'octo-webpack-fabric-extractor',     // legacy extractor
@@ -438,20 +437,32 @@ class Octo_Print_Designer_Public {
             'octo-canvas-initialization-controller-public',
             'octo-script-load-coordinator-public',
 
-            // Stage 3: Designer Foundation (FOOTER)
+            // Stage 3: Designer Foundation (ESSENTIAL)
             'octo-print-designer-designer',      // designer bundle
             'octo-designer-readiness-detector',  // designer detection
             'octo-staged-script-coordinator',    // coordinator
 
-            // Stage 4: Event-driven dependent scripts (FOOTER)
+            // Stage 4: Event-driven dependent scripts (ESSENTIAL)
             'octo-print-designer-optimized-capture',      // data capture
             'octo-print-designer-permanent-save-fix',     // save fixes
             'octo-print-designer-enhanced-json',          // coordinate system
             'octo-print-designer-safezone-validator',     // validation
         ];
 
+        // 🔧 CONDITIONAL DEBUG SCRIPTS: Only add to staging when in debug mode
+        if (WP_DEBUG || (defined('OCTO_DEBUG_MODE') && OCTO_DEBUG_MODE) || (isset($_GET['debug']) && $_GET['debug'] === '1')) {
+            // Add debug scripts to beginning of array for early loading in debug mode
+            array_unshift($staged_loading_scripts,
+                'octo-fabric-debug-console',        // Essential debug console
+                'octo-fabric-performance-monitor'   // Performance monitoring
+            );
+        }
+
+        // 🚀 PERFORMANCE-OPTIMIZED ENQUEUEING: Load only registered scripts
         foreach ($staged_loading_scripts as $script_handle) {
-            wp_enqueue_script($script_handle);
+            if (wp_script_is($script_handle, 'registered')) {
+                wp_enqueue_script($script_handle);
+            }
         }
 
 	}

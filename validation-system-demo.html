@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Flow Validation System - Live Demo</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section {
+            border: 1px solid #333;
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border-radius: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .status.success { background: #003300; border-left: 4px solid #00ff00; }
+        .status.warning { background: #333300; border-left: 4px solid #ffff00; }
+        .status.error { background: #330000; border-left: 4px solid #ff0000; }
+        .status.info { background: #000033; border-left: 4px solid #0088ff; }
+
+        button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #444; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .console {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Claude Flow Validation System - Live Demo</h1>
+
+        <div class="section">
+            <h2>🔒 System Status</h2>
+            <div id="systemStatus" class="status info">
+                Initializing validation system...
+            </div>
+
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value" id="systemReadiness">--</div>
+                    <div class="metric-label">System Readiness</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="trustScore">--</div>
+                    <div class="metric-label">Average Trust Score</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="validatedCalls">--</div>
+                    <div class="metric-label">Validated Calls</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="confidence">--</div>
+                    <div class="metric-label">Validation Confidence</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Race Condition Problem Demo</h2>
+            <p>Demonstriert das automatische Validierungssystem für das Race Condition Problem</p>
+
+            <button onclick="demo.defineProblem()">1. Define Problem</button>
+            <button onclick="demo.simulateAgentCall()">2. Simulate Agent Call</button>
+            <button onclick="demo.validateSolution()">3. Validate Solution</button>
+            <button onclick="demo.generateReport()">4. Generate Report</button>
+
+            <div id="demoStatus" class="status info">
+                Bereit für Demo - klicken Sie die Buttons in der Reihenfolge
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧠 Self-Monitoring Dashboard</h2>
+            <div id="selfMonitoringStatus" class="status info">
+                Warte auf Self-Monitoring Daten...
+            </div>
+
+            <button onclick="demo.forceSelfAssessment()">Force Self-Assessment</button>
+            <button onclick="demo.activateSkepticalMode()">Activate Skeptical Mode</button>
+            <button onclick="demo.checkBehaviorConcerns()">Check Behavior Concerns</button>
+        </div>
+
+        <div class="section">
+            <h2>📊 Live Console Output</h2>
+            <div id="console" class="console"></div>
+        </div>
+
+        <div class="section">
+            <h2>⚠️ Validation Warnings</h2>
+            <div id="warnings"></div>
+        </div>
+    </div>
+
+    <!-- Load Validation System -->
+    <script src="claude-flow-validation-system.js"></script>
+    <script src="race-condition-validation-test.js"></script>
+    <script src="automatic-validation-hooks.js"></script>
+    <script src="claude-self-monitoring.js"></script>
+    <script src="real-system-validators.js"></script>
+    <script src="master-validation-system.js"></script>
+
+    <script>
+        class ValidationSystemDemo {
+            constructor() {
+                this.consoleElement = document.getElementById('console');
+                this.currentProblem = null;
+                this.demoStep = 0;
+
+                this.setupConsoleCapture();
+                this.initializeDemo();
+            }
+
+            setupConsoleCapture() {
+                // Capture console output
+                const originalLog = console.log;
+                const originalError = console.error;
+                const originalWarn = console.warn;
+
+                console.log = (...args) => {
+                    this.addToConsole('LOG', args.join(' '));
+                    originalLog.apply(console, args);
+                };
+
+                console.error = (...args) => {
+                    this.addToConsole('ERROR', args.join(' '));
+                    originalError.apply(console, args);
+                };
+
+                console.warn = (...args) => {
+                    this.addToConsole('WARN', args.join(' '));
+                    originalWarn.apply(console, args);
+                };
+            }
+
+            addToConsole(type, message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const prefix = `[${timestamp}] ${type}:`;
+
+                this.consoleElement.textContent += `${prefix} ${message}\n`;
+                this.consoleElement.scrollTop = this.consoleElement.scrollHeight;
+            }
+
+            async initializeDemo() {
+                this.updateStatus('Initializing validation system...');
+
+                // Warte bis Master System geladen ist
+                let attempts = 0;
+                while (!window.masterValidationSystem && attempts < 10) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+
+                if (window.masterValidationSystem) {
+                    this.updateStatus('✅ Validation system fully loaded and operational', 'success');
+                } else {
+                    this.updateStatus('❌ Failed to load validation system', 'error');
+                }
+
+                // Start periodic updates
+                this.startPeriodicUpdates();
+            }
+
+            updateStatus(message, type = 'info') {
+                const statusElement = document.getElementById('systemStatus');
+                statusElement.textContent = message;
+                statusElement.className = `status ${type}`;
+            }
+
+            updateDemoStatus(message, type = 'info') {
+                const statusElement = document.getElementById('demoStatus');
+                statusElement.textContent = message;
+                statusElement.className = `status ${type}`;
+            }
+
+            startPeriodicUpdates() {
+                setInterval(() => {
+                    this.updateMetrics();
+                    this.updateSelfMonitoring();
+                    this.checkForWarnings();
+                }, 2000);
+            }
+
+            updateMetrics() {
+                if (!window.masterValidationSystem) return;
+
+                try {
+                    const status = window.masterValidationSystem.getSystemStatus();
+                    const history = window.masterValidationSystem.getValidationHistory();
+
+                    document.getElementById('systemReadiness').textContent =
+                        status.masterSystemActive ? 'READY' : 'NOT READY';
+
+                    document.getElementById('trustScore').textContent =
+                        history.averageConfidence + '%';
+
+                    document.getElementById('validatedCalls').textContent =
+                        history.totalCalls.toString();
+
+                    document.getElementById('confidence').textContent =
+                        history.averageConfidence + '%';
+
+                } catch (error) {
+                    console.error('Error updating metrics:', error);
+                }
+            }
+
+            updateSelfMonitoring() {
+                if (!window.claudeSelfMonitoring) return;
+
+                try {
+                    const report = window.claudeSelfMonitoring.getSelfMonitoringReport();
+
+                    let statusText = `Self-Awareness Score: ${report.currentSelfAwarenessScore}%\n`;
+                    statusText += `Behavior Concerns: ${report.behaviorConcerns.length}\n`;
+                    statusText += `Monitoring Active: ${report.monitoringActive ? 'YES' : 'NO'}`;
+
+                    const statusElement = document.getElementById('selfMonitoringStatus');
+                    statusElement.textContent = statusText;
+
+                    if (report.currentSelfAwarenessScore < 70) {
+                        statusElement.className = 'status warning';
+                    } else {
+                        statusElement.className = 'status success';
+                    }
+
+                } catch (error) {
+                    console.error('Error updating self-monitoring:', error);
+                }
+            }
+
+            checkForWarnings() {
+                const warningsElement = document.getElementById('warnings');
+                const warnings = [];
+
+                // Check for validation system warnings
+                if (window.automaticValidationHooks) {
+                    const report = window.automaticValidationHooks.getValidationReport();
+
+                    if (report.suspiciousCallsDetected > 0) {
+                        warnings.push(`⚠️ ${report.suspiciousCallsDetected} suspicious agent calls detected`);
+                    }
+
+                    if (report.averageConfidence < 50) {
+                        warnings.push(`⚠️ Low validation confidence: ${report.averageConfidence}%`);
+                    }
+                }
+
+                // Check for self-monitoring warnings
+                if (window.claudeSelfMonitoring) {
+                    const report = window.claudeSelfMonitoring.getSelfMonitoringReport();
+
+                    if (report.behaviorConcerns.length > 0) {
+                        warnings.push(`🧠 ${report.behaviorConcerns.length} behavior concerns detected`);
+                    }
+                }
+
+                // Display warnings
+                if (warnings.length > 0) {
+                    warningsElement.innerHTML = warnings.map(warning =>
+                        `<div class="status warning">${warning}</div>`
+                    ).join('');
+                } else {
+                    warningsElement.innerHTML = '<div class="status success">✅ No validation warnings</div>';
+                }
+            }
+
+            // DEMO METHODS
+
+            defineProblem() {
+                if (!window.masterValidationSystem) {
+                    this.updateDemoStatus('❌ Master validation system not ready', 'error');
+                    return;
+                }
+
+                this.currentProblem = window.masterValidationSystem.defineProblem({
+                    id: 'race_condition_demo',
+                    description: 'Race Condition zwischen Auto-Init Scripts und Event-System',
+                    successCriteria: [
+                        { name: "No Auto-Initialization", method: "code_analysis" },
+                        { name: "Event-Based Initialization", method: "code_analysis" },
+                        { name: "No Race Condition Logs", method: "runtime_analysis" }
+                    ]
+                });
+
+                this.updateDemoStatus('✅ Problem defined: ' + this.currentProblem.description, 'success');
+                this.demoStep = 1;
+            }
+
+            async simulateAgentCall() {
+                if (this.demoStep < 1) {
+                    this.updateDemoStatus('❌ Please define problem first', 'error');
+                    return;
+                }
+
+                this.updateDemoStatus('🤖 Simulating agent call with validation...', 'info');
+
+                try {
+                    // Simulate a mock agent call that should trigger validation
+                    const mockTask = {
+                        task: "Analyze public/js/optimized-design-data-capture.js and count exactly how many Auto-initializing patterns exist",
+                        expectedOutput: "concrete number of patterns found",
+                        criticalityLevel: "high"
+                    };
+
+                    const validation = await window.masterValidationSystem.validateAgentCall('demo_agent', mockTask);
+
+                    if (validation.passed) {
+                        this.updateDemoStatus('✅ Agent call validation passed', 'success');
+                    } else {
+                        this.updateDemoStatus('⚠️ Agent call validation failed: ' + validation.reason, 'warning');
+                    }
+
+                    this.demoStep = 2;
+
+                } catch (error) {
+                    this.updateDemoStatus('❌ Agent call simulation failed: ' + error.message, 'error');
+                }
+            }
+
+            async validateSolution() {
+                if (this.demoStep < 2) {
+                    this.updateDemoStatus('❌ Please simulate agent call first', 'error');
+                    return;
+                }
+
+                this.updateDemoStatus('🔬 Validating problem resolution...', 'info');
+
+                try {
+                    const resolution = await window.masterValidationSystem.validateProblemResolution(this.currentProblem.id);
+
+                    if (resolution.solved) {
+                        this.updateDemoStatus(`✅ Problem solved! Confidence: ${resolution.confidence}%`, 'success');
+                    } else {
+                        this.updateDemoStatus(`❌ Problem not solved. Confidence: ${resolution.confidence}%`, 'warning');
+                    }
+
+                    this.demoStep = 3;
+
+                } catch (error) {
+                    this.updateDemoStatus('❌ Solution validation failed: ' + error.message, 'error');
+                }
+            }
+
+            generateReport() {
+                if (this.demoStep < 3) {
+                    this.updateDemoStatus('❌ Please complete previous steps first', 'error');
+                    return;
+                }
+
+                const report = window.masterValidationSystem.generateComprehensiveReport();
+
+                this.updateDemoStatus('📊 Comprehensive report generated - check console', 'success');
+
+                console.log('📊 COMPREHENSIVE VALIDATION REPORT:', JSON.stringify(report, null, 2));
+            }
+
+            // SELF-MONITORING METHODS
+
+            forceSelfAssessment() {
+                if (!window.claudeSelfMonitoring) {
+                    alert('Self-monitoring system not available');
+                    return;
+                }
+
+                const assessment = window.claudeSelfMonitoring.forceSelfAssessment();
+                console.log('🧠 FORCED SELF-ASSESSMENT COMPLETE:', assessment);
+            }
+
+            activateSkepticalMode() {
+                if (window.masterValidationSystem) {
+                    window.masterValidationSystem.activateEmergencySkepticalMode();
+                }
+            }
+
+            checkBehaviorConcerns() {
+                if (!window.claudeSelfMonitoring) {
+                    alert('Self-monitoring system not available');
+                    return;
+                }
+
+                const report = window.claudeSelfMonitoring.getSelfMonitoringReport();
+
+                if (report.behaviorConcerns.length > 0) {
+                    console.log('🧠 BEHAVIOR CONCERNS DETECTED:', report.behaviorConcerns);
+                } else {
+                    console.log('🧠 NO BEHAVIOR CONCERNS - All systems nominal');
+                }
+            }
+        }
+
+        // Initialize demo when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.demo = new ValidationSystemDemo();
+        });
+    </script>
+</body>
+</html>

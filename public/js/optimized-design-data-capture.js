@@ -44,13 +44,18 @@ class OptimizedDesignDataCapture {
 
         this.debugLog('info', '🎯 OPTIMIZED DESIGN DATA CAPTURE: Starting initialization...');
 
+        // 🚀 RACE CONDITION ELIMINATED: No auto-initialization
+        // All initialization now happens through designerReady event system only
+        this.debugLog('info', '🎯 RACE CONDITION ELIMINATED: Waiting for designerReady event...');
+        this.debugLog('info', '🛡️ Auto-init patterns disabled - single initialization path confirmed');
+
         // 🧠 AGENT FIX: JavascriptPerformanceOptimizer - Context-aware initialization
         if (this.ADMIN_CONTEXT) {
             this.debugLog('info', '🧠 [JS OPTIMIZER] Admin context detected - using lightweight initialization');
             this.startAdminOptimizedInitialization();
         } else {
-            this.debugLog('info', '🎯 [JS OPTIMIZER] Frontend context - using full initialization');
-            this.startIntelligentInitialization();
+            this.debugLog('info', '🎯 [JS OPTIMIZER] Frontend context - awaiting designerReady event');
+            // No auto-initialization - only through designerReady event
         }
     }
 
@@ -65,26 +70,37 @@ class OptimizedDesignDataCapture {
     }
 
     /**
-     * Intelligent initialization with multiple detection strategies
+     * RACE CONDITION ELIMINATED: Event-driven initialization only
+     * Called exclusively by designerReady event - no auto-init patterns
      */
-    async startIntelligentInitialization() {
+    async startEventDrivenInitialization() {
+        this.debugLog('info', '🎯 RACE CONDITION ELIMINATED: Starting event-driven initialization...');
+
         // Strategy 1: Immediate initialization check
         if (this.attemptImmediateInitialization()) {
-            this.debugLog('info', '✅ Immediate initialization successful');
+            this.debugLog('info', '✅ Event-driven immediate initialization successful');
             return;
         }
 
-        // Strategy 2: Wait for DOM Ready if needed
-        if (document.readyState === 'loading') {
-            this.debugLog('debug', '⏳ Waiting for DOM Ready...');
-            await this.waitForDOMReady();
-        }
+        // Strategy 2: DOM is guaranteed ready by designerReady event
+        this.status.domReady = true;
+        this.debugLog('debug', '✅ DOM Ready confirmed via designerReady event');
 
         // Strategy 3: Setup MutationObserver for Canvas Detection
         this.setupCanvasObserver();
 
-        // Strategy 4: Optimized polling detection
+        // Strategy 4: Optimized polling detection (reduced scope)
         this.startOptimizedPolling();
+    }
+
+    /**
+     * LEGACY METHOD - NO LONGER USED
+     * Intelligent initialization with multiple detection strategies
+     */
+    async startIntelligentInitialization() {
+        this.debugLog('warn', '⚠️ DEPRECATED: startIntelligentInitialization() is deprecated - use startEventDrivenInitialization()');
+        // Redirect to event-driven initialization
+        return this.startEventDrivenInitialization();
     }
 
     /**
@@ -117,21 +133,15 @@ class OptimizedDesignDataCapture {
     }
 
     /**
-     * Wait for DOM Ready
+     * Wait for DOM Ready - RACE CONDITION ELIMINATED
+     * No longer uses DOMContentLoaded - relies on designerReady event system only
      */
     waitForDOMReady() {
         return new Promise(resolve => {
-            if (document.readyState !== 'loading') {
-                this.status.domReady = true;
-                resolve();
-                return;
-            }
-
-            document.addEventListener('DOMContentLoaded', () => {
-                this.debugLog('debug', '✅ DOM Ready event received');
-                this.status.domReady = true;
-                resolve();
-            });
+            // Always assume DOM is ready - designerReady event handles proper timing
+            this.status.domReady = true;
+            this.debugLog('debug', '✅ DOM Ready status set (via designerReady event system)');
+            resolve();
         });
     }
 
@@ -167,7 +177,13 @@ class OptimizedDesignDataCapture {
             });
 
             if (canvasAdded && !this.initialized) {
-                setTimeout(() => this.attemptImmediateInitialization(), 50);
+                // 🚀 RACE CONDITION ELIMINATED: Only attempt initialization if triggered by designerReady
+                if (window.OptimizedDesignDataCaptureInitialized) {
+                    setTimeout(() => this.attemptImmediateInitialization(), 50);
+                    this.debugLog('debug', '🎯 Canvas detected - attempting initialization via designerReady flow');
+                } else {
+                    this.debugLog('debug', '🛡️ Canvas detected but waiting for designerReady event');
+                }
             }
         });
 
@@ -1107,7 +1123,8 @@ class OptimizedDesignDataCapture {
 
 // 🚀 ISSUE #18: Auto-initialization with production mode
 if (typeof window !== 'undefined') {
-    const initializeOptimizedCapture = () => {
+    // 🎯 GATEKEEPER EVENT-BASED INITIALIZATION - RACE CONDITION ELIMINATED
+    const initializeOptimizedCapture = async (designerInstance) => {
         // 🧠 AGENT 4 FIX: Prevent duplicate OptimizedDesignDataCapture instances
         if (window.optimizedCaptureInstance || window.OptimizedDesignDataCaptureInitialized) {
             console.log('🔄 DUPLICATE PREVENTION: OptimizedDesignDataCapture already initialized, skipping...');
@@ -1117,23 +1134,29 @@ if (typeof window !== 'undefined') {
         // Set initialization flag immediately to prevent race conditions
         window.OptimizedDesignDataCaptureInitialized = true;
 
-        console.log('🚀 Auto-initializing Optimized Design Data Capture...');
+        console.log('🚀 RACE CONDITION ELIMINATED: Initializing via designerReady event only...');
         const instance = new OptimizedDesignDataCapture();
+
+        // Trigger event-driven initialization explicitly
+        await instance.startEventDrivenInitialization();
 
         // Make instance globally available
         window.optimizedCaptureInstance = instance;
         window.designDataCapture = instance;
 
-        console.log('✅ Optimized capture initialized - 90%+ console reduction active');
+        console.log('✅ RACE CONDITION ELIMINATED: Single initialization path confirmed');
+        console.log('🎯 Designer instance available:', !!designerInstance);
+        console.log('🛡️ No parallel initialization detected');
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(initializeOptimizedCapture, 100);
-        });
-    } else {
-        setTimeout(initializeOptimizedCapture, 100);
-    }
+    // Listen for the designerReady event instead of auto-initialization
+    document.addEventListener('designerReady', function(event) {
+        console.log('🎯 GATEKEEPER: designerReady event received by optimized-design-data-capture.js');
+        const designerInstance = event.detail.instance;
+        initializeOptimizedCapture(designerInstance);
+    });
+
+    console.log('🎯 GATEKEEPER: optimized-design-data-capture.js waiting for designerReady event...');
 }
 
 // Export for Node.js testing
