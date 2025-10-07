@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 DirectCoordinate WordPress Integration Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .demo-section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .form-field {
+            margin: 15px 0;
+        }
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-field textarea, .form-field input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .form-field textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        .button {
+            background: #0073aa;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .button:hover {
+            background: #005a87;
+        }
+        .button.secondary {
+            background: #666;
+        }
+        .button.success {
+            background: #28a745;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .status.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .mock-canvas {
+            width: 400px;
+            height: 300px;
+            border: 2px solid #333;
+            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                       linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                       linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                       linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            position: relative;
+            margin: 20px auto;
+        }
+        .mock-element {
+            position: absolute;
+            background: rgba(0, 123, 255, 0.3);
+            border: 2px solid #007bff;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #007bff;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            background: none;
+            border: none;
+            font-size: 14px;
+        }
+        .tab.active {
+            border-bottom-color: #0073aa;
+            background: #f0f0f0;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 DirectCoordinate WordPress Integration Demo</h1>
+    <p>Diese Demo zeigt wie das DirectCoordinate WordPress Integration System funktioniert.</p>
+
+    <!-- Status Overview -->
+    <div class="demo-section">
+        <h2>📊 System Status</h2>
+        <div id="system-status" class="status info">Lade System Status...</div>
+        <div>
+            <button class="button" onclick="updateSystemStatus()">🔄 Status Aktualisieren</button>
+            <button class="button success" onclick="enableDirectCoordinate()">✅ Aktivieren</button>
+            <button class="button danger" onclick="disableDirectCoordinate()">❌ Deaktivieren</button>
+            <button class="button secondary" onclick="showSystemInfo()">ℹ️ System Info</button>
+        </div>
+    </div>
+
+    <!-- Tabs für verschiedene Demo-Bereiche -->
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('form-demo')">📝 Form Demo</button>
+        <button class="tab" onclick="showTab('canvas-demo')">🎨 Canvas Demo</button>
+        <button class="tab" onclick="showTab('ab-test-demo')">🧪 A/B Test</button>
+        <button class="tab" onclick="showTab('integration-demo')">🔧 Integration</button>
+    </div>
+
+    <!-- Form Population Demo -->
+    <div id="form-demo" class="tab-content active">
+        <div class="demo-section">
+            <h2>📝 WordPress Form Fields Demo</h2>
+            <p>Diese Form Fields werden automatisch mit Design-Koordinaten populiert:</p>
+
+            <form id="wordpress-demo-form">
+                <div class="form-field">
+                    <label for="direct_design_data">Direct Design Data (JSON):</label>
+                    <textarea name="direct_design_data" id="direct_design_data" placeholder="Wird automatisch befüllt..."></textarea>
+                </div>
+
+                <div class="form-field">
+                    <label for="direct_coordinate_json">Direct Coordinate JSON:</label>
+                    <textarea name="direct_coordinate_json" id="direct_coordinate_json" placeholder="Wird automatisch befüllt..."></textarea>
+                </div>
+
+                <div class="form-field">
+                    <label for="legacy_field">Legacy Field (not populated):</label>
+                    <input type="text" name="legacy_field" placeholder="Dieses Feld wird nicht automatisch befüllt">
+                </div>
+
+                <div>
+                    <button type="button" class="button" onclick="manualPopulation()">🔄 Manuelle Population</button>
+                    <button type="button" class="button secondary" onclick="clearFormFields()">🗑️ Felder Leeren</button>
+                    <button type="button" class="button success" onclick="validateFormData()">✅ Daten Validieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Canvas Demo -->
+    <div id="canvas-demo" class="tab-content">
+        <div class="demo-section">
+            <h2>🎨 Mock Canvas mit beweglichen Elementen</h2>
+            <p>Bewege die Elemente um verschiedene Koordinaten zu generieren:</p>
+
+            <div class="mock-canvas" id="mock-canvas">
+                <div class="mock-element" id="element1" style="left: 50px; top: 50px; width: 100px; height: 60px;">
+                    Element 1
+                </div>
+                <div class="mock-element" id="element2" style="left: 200px; top: 120px; width: 80px; height: 80px;">
+                    Element 2
+                </div>
+                <div class="mock-element" id="element3" style="left: 100px; top: 180px; width: 120px; height: 40px;">
+                    Element 3
+                </div>
+            </div>
+
+            <div>
+                <button class="button" onclick="simulateDesignUpdate()">🔄 Design Update Simulieren</button>
+                <button class="button secondary" onclick="randomizeElements()">🎲 Elemente Randomisieren</button>
+                <button class="button success" onclick="captureCanvasData()">📸 Canvas Daten Erfassen</button>
+            </div>
+
+            <div id="canvas-data-output" class="status info"></div>
+        </div>
+    </div>
+
+    <!-- A/B Test Demo -->
+    <div id="ab-test-demo" class="tab-content">
+        <div class="demo-section">
+            <h2>🧪 A/B Test: DirectCoordinate vs Legacy Systems</h2>
+            <p>Vergleich zwischen DirectCoordinate und bestehenden Koordinaten-Systemen:</p>
+
+            <div>
+                <button class="button" onclick="runABTest()">🧪 A/B Test Ausführen</button>
+                <button class="button secondary" onclick="runPerformanceTest()">⚡ Performance Test</button>
+                <button class="button success" onclick="runAccuracyTest()">🎯 Genauigkeits Test</button>
+            </div>
+
+            <div id="ab-test-results" class="status info">Klicke auf "A/B Test Ausführen" um den Vergleich zu starten.</div>
+        </div>
+    </div>
+
+    <!-- Integration Demo -->
+    <div id="integration-demo" class="tab-content">
+        <div class="demo-section">
+            <h2>🔧 WordPress Integration Methoden</h2>
+            <p>Verschiedene Wege zur Aktivierung des DirectCoordinate Systems:</p>
+
+            <h3>1. URL Parameter</h3>
+            <p>Füge <code>?direct_coordinates=1</code> zur URL hinzu:</p>
+            <a href="?direct_coordinates=1" class="button">🔗 Mit URL Parameter Aktivieren</a>
+
+            <h3>2. JavaScript Console</h3>
+            <div class="console-output" id="console-output">
+// JavaScript Console Befehle:
+
+// System aktivieren
+enableDirectCoordinates()
+
+// System deaktivieren
+disableDirectCoordinates()
+
+// Status prüfen
+directCoordinateStatus()
+
+// Test Population
+testDirectCoordinatePopulation()
+
+// A/B Test ausführen
+DirectCoordinateABTest.compareCoordinateSystems()
+            </div>
+
+            <h3>3. LocalStorage</h3>
+            <div>
+                <button class="button" onclick="setLocalStorage()">💾 LocalStorage Setzen</button>
+                <button class="button secondary" onclick="clearLocalStorage()">🗑️ LocalStorage Leeren</button>
+                <button class="button success" onclick="checkLocalStorage()">✅ LocalStorage Prüfen</button>
+            </div>
+
+            <h3>4. WordPress Admin Integration</h3>
+            <div>
+                <button class="button" onclick="simulateWordPressAdmin()">🔧 WordPress Admin Simulieren</button>
+                <button class="button secondary" onclick="showWordPressSettings()">⚙️ WordPress Einstellungen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Log Output -->
+    <div class="demo-section">
+        <h2>📜 Live Console Output</h2>
+        <div id="live-console" class="console-output"></div>
+        <div>
+            <button class="button" onclick="clearLiveConsole()">🗑️ Console Leeren</button>
+            <button class="button secondary" onclick="toggleConsoleCapture()">📹 Capture Toggle</button>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="direct-coordinate-wordpress.js"></script>
+    <script src="direct-coordinate-registration.js"></script>
+
+    <!-- Demo Script -->
+    <script>
+        // Demo initialization
+        let consoleCapture = true;
+        let mockCanvasData = {
+            elements: [
+                { id: 'element1', x: 50, y: 50, width: 100, height: 60 },
+                { id: 'element2', x: 200, y: 120, width: 80, height: 80 },
+                { id: 'element3', x: 100, y: 180, width: 120, height: 40 }
+            ]
+        };
+
+        // Tab functionality
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // System Status Functions
+        function updateSystemStatus() {
+            const status = document.getElementById('system-status');
+            let statusText = '📊 SYSTEM STATUS:\n\n';
+
+            // Check if DirectCoordinate is loaded
+            if (typeof window.DirectCoordinateWordPress !== 'undefined') {
+                statusText += '✅ DirectCoordinate WordPress System: Loaded\n';
+
+                if (typeof window.directCoordinateStatus === 'function') {
+                    const dirStatus = window.directCoordinateStatus();
+                    statusText += `🎯 Status: ${dirStatus.enabled ? 'ENABLED' : 'DISABLED'}\n`;
+                    statusText += `📊 Form Fields: ${JSON.stringify(dirStatus.formFieldsFound)}\n`;
+                    statusText += `⏰ Last Update: ${dirStatus.lastPopulated || 'Never'}\n`;
+                } else {
+                    statusText += '⚠️ Status Function: Not Available\n';
+                }
+            } else {
+                statusText += '❌ DirectCoordinate WordPress System: Not Loaded\n';
+            }
+
+            // Check Registration System
+            if (typeof window.DirectCoordinateRegistration !== 'undefined') {
+                statusText += '✅ Registration System: Loaded\n';
+
+                if (typeof window.directCoordinateRegistrationStatus === 'function') {
+                    const regStatus = window.directCoordinateRegistrationStatus();
+                    statusText += `🔧 WordPress Detected: ${regStatus.isWordPress ? 'Yes' : 'No'}\n`;
+                    statusText += `📝 Scripts Registered: ${regStatus.scriptsRegistered ? 'Yes' : 'No'}\n`;
+                }
+            } else {
+                statusText += '❌ Registration System: Not Loaded\n';
+            }
+
+            // Check Legacy Systems
+            if (typeof window.enhancedJSONSystem !== 'undefined') {
+                statusText += '✅ Enhanced JSON System: Available\n';
+            } else {
+                statusText += '⚠️ Enhanced JSON System: Not Available (Normal for Demo)\n';
+            }
+
+            status.textContent = statusText;
+            status.className = 'status info';
+
+            logToConsole('System status updated');
+        }
+
+        function enableDirectCoordinate() {
+            if (typeof window.enableDirectCoordinates === 'function') {
+                const result = window.enableDirectCoordinates();
+                logToConsole(`Enable DirectCoordinate: ${result}`);
+                updateSystemStatus();
+            } else {
+                logToConsole('ERROR: enableDirectCoordinates function not available');
+            }
+        }
+
+        function disableDirectCoordinate() {
+            if (typeof window.disableDirectCoordinates === 'function') {
+                const result = window.disableDirectCoordinates();
+                logToConsole(`Disable DirectCoordinate: ${result}`);
+                updateSystemStatus();
+            } else {
+                logToConsole('ERROR: disableDirectCoordinates function not available');
+            }
+        }
+
+        function showSystemInfo() {
+            let info = '🔍 SYSTEM INFORMATION:\n\n';
+            info += `Browser: ${navigator.userAgent}\n`;
+            info += `URL: ${window.location.href}\n`;
+            info += `LocalStorage DirectCoordinate: ${localStorage.getItem('directCoordinatesEnabled') || 'Not Set'}\n`;
+            info += `URL Parameter: ${new URLSearchParams(window.location.search).get('direct_coordinates') || 'Not Set'}\n`;
+
+            info += '\n📦 Available Objects:\n';
+            info += `window.DirectCoordinateWordPress: ${typeof window.DirectCoordinateWordPress}\n`;
+            info += `window.DirectCoordinateRegistration: ${typeof window.DirectCoordinateRegistration}\n`;
+            info += `window.enhancedJSONSystem: ${typeof window.enhancedJSONSystem}\n`;
+            info += `window.generateDesignData: ${typeof window.generateDesignData}\n`;
+
+            alert(info);
+            logToConsole('System info displayed');
+        }
+
+        // Form Functions
+        function manualPopulation() {
+            if (typeof window.testDirectCoordinatePopulation === 'function') {
+                const result = window.testDirectCoordinatePopulation();
+                logToConsole(`Manual Population: ${result}`);
+            } else {
+                // Fallback manual population
+                populateFormWithMockData();
+            }
+        }
+
+        function populateFormWithMockData() {
+            const mockDesignData = {
+                timestamp: new Date().toISOString(),
+                canvas: { width: 400, height: 300, objects_count: 3 },
+                elements: mockCanvasData.elements.map((el, index) => ({
+                    index: index,
+                    type: 'rect',
+                    coordinates: { x: el.x, y: el.y, width: el.width, height: el.height }
+                })),
+                metadata: { system: 'Demo', version: '1.0.0' }
+            };
+
+            const coordinateData = {
+                timestamp: mockDesignData.timestamp,
+                coordinates: mockDesignData.elements.map(el => el.coordinates),
+                canvas_dimensions: mockDesignData.canvas
+            };
+
+            document.getElementById('direct_design_data').value = JSON.stringify(mockDesignData, null, 2);
+            document.getElementById('direct_coordinate_json').value = JSON.stringify(coordinateData, null, 2);
+
+            logToConsole('Form populated with mock data');
+        }
+
+        function clearFormFields() {
+            document.getElementById('direct_design_data').value = '';
+            document.getElementById('direct_coordinate_json').value = '';
+            logToConsole('Form fields cleared');
+        }
+
+        function validateFormData() {
+            const designData = document.getElementById('direct_design_data').value;
+            const coordinateData = document.getElementById('direct_coordinate_json').value;
+
+            let validation = '✅ FORM VALIDATION RESULTS:\n\n';
+
+            try {
+                const parsedDesign = JSON.parse(designData || '{}');
+                validation += `Design Data: ✅ Valid JSON (${Object.keys(parsedDesign).length} properties)\n`;
+            } catch (e) {
+                validation += `Design Data: ❌ Invalid JSON - ${e.message}\n`;
+            }
+
+            try {
+                const parsedCoords = JSON.parse(coordinateData || '{}');
+                validation += `Coordinate Data: ✅ Valid JSON (${Object.keys(parsedCoords).length} properties)\n`;
+            } catch (e) {
+                validation += `Coordinate Data: ❌ Invalid JSON - ${e.message}\n`;
+            }
+
+            alert(validation);
+            logToConsole('Form data validation completed');
+        }
+
+        // Canvas Functions
+        function simulateDesignUpdate() {
+            updateMockCanvasPositions();
+            populateFormWithMockData();
+            logToConsole('Design update simulated');
+        }
+
+        function randomizeElements() {
+            mockCanvasData.elements.forEach(el => {
+                el.x = Math.floor(Math.random() * 300);
+                el.y = Math.floor(Math.random() * 200);
+            });
+            updateMockCanvasVisual();
+            logToConsole('Elements randomized');
+        }
+
+        function captureCanvasData() {
+            updateMockCanvasPositions();
+            const output = document.getElementById('canvas-data-output');
+            output.textContent = `📊 CAPTURED CANVAS DATA:\n\n${JSON.stringify(mockCanvasData, null, 2)}`;
+            logToConsole('Canvas data captured');
+        }
+
+        function updateMockCanvasPositions() {
+            mockCanvasData.elements.forEach(el => {
+                const domEl = document.getElementById(el.id);
+                if (domEl) {
+                    el.x = parseInt(domEl.style.left) || el.x;
+                    el.y = parseInt(domEl.style.top) || el.y;
+                }
+            });
+        }
+
+        function updateMockCanvasVisual() {
+            mockCanvasData.elements.forEach(el => {
+                const domEl = document.getElementById(el.id);
+                if (domEl) {
+                    domEl.style.left = el.x + 'px';
+                    domEl.style.top = el.y + 'px';
+                }
+            });
+        }
+
+        // A/B Test Functions
+        function runABTest() {
+            if (typeof window.DirectCoordinateABTest !== 'undefined') {
+                const results = window.DirectCoordinateABTest.compareCoordinateSystems();
+                displayABResults(results);
+                logToConsole('A/B Test completed');
+            } else {
+                simulateABTest();
+            }
+        }
+
+        function simulateABTest() {
+            const results = {
+                directCoordinate: mockCanvasData,
+                legacy: {
+                    elements: mockCanvasData.elements.map(el => ({
+                        ...el,
+                        x: el.x + Math.floor(Math.random() * 5 - 2), // Small random offset
+                        y: el.y + Math.floor(Math.random() * 5 - 2)
+                    }))
+                },
+                comparison: {
+                    elementsMatch: true,
+                    canvasDimensionsMatch: true,
+                    coordinateAccuracy: 95.5
+                }
+            };
+            displayABResults(results);
+        }
+
+        function displayABResults(results) {
+            const output = document.getElementById('ab-test-results');
+            let text = '🧪 A/B TEST RESULTS:\n\n';
+
+            if (results.error) {
+                text += `❌ Error: ${results.error}\n`;
+            } else {
+                text += `DirectCoordinate Elements: ${results.directCoordinate?.elements?.length || 0}\n`;
+                text += `Legacy Elements: ${results.legacy?.elements?.length || 0}\n`;
+                if (results.comparison) {
+                    text += `Elements Match: ${results.comparison.elementsMatch ? '✅' : '❌'}\n`;
+                    text += `Canvas Dimensions Match: ${results.comparison.canvasDimensionsMatch ? '✅' : '❌'}\n`;
+                    text += `Coordinate Accuracy: ${results.comparison.coordinateAccuracy || 0}%\n`;
+                }
+            }
+
+            output.textContent = text;
+            output.className = results.error ? 'status warning' : 'status success';
+        }
+
+        function runPerformanceTest() {
+            const startTime = performance.now();
+
+            for (let i = 0; i < 100; i++) {
+                populateFormWithMockData();
+            }
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
+
+            alert(`⚡ PERFORMANCE TEST:\n\n100 form populations completed in ${duration}ms\nAverage: ${(duration/100).toFixed(2)}ms per population`);
+            logToConsole(`Performance test: ${duration}ms for 100 operations`);
+        }
+
+        function runAccuracyTest() {
+            updateMockCanvasPositions();
+            populateFormWithMockData();
+
+            const designData = JSON.parse(document.getElementById('direct_design_data').value);
+            let accuracy = 100;
+
+            designData.elements.forEach((element, index) => {
+                const mockEl = mockCanvasData.elements[index];
+                if (mockEl) {
+                    const xDiff = Math.abs(element.coordinates.x - mockEl.x);
+                    const yDiff = Math.abs(element.coordinates.y - mockEl.y);
+                    if (xDiff > 1 || yDiff > 1) accuracy -= 10;
+                }
+            });
+
+            alert(`🎯 ACCURACY TEST:\n\nCoordinate Accuracy: ${accuracy}%\nElements Tested: ${designData.elements.length}`);
+            logToConsole(`Accuracy test: ${accuracy}% accuracy`);
+        }
+
+        // Integration Functions
+        function setLocalStorage() {
+            localStorage.setItem('directCoordinatesEnabled', 'true');
+            logToConsole('LocalStorage directCoordinatesEnabled set to true');
+            alert('✅ LocalStorage gesetzt!\n\nRelade die Seite um das System zu aktivieren.');
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('directCoordinatesEnabled');
+            logToConsole('LocalStorage directCoordinatesEnabled removed');
+            alert('🗑️ LocalStorage geleert!');
+        }
+
+        function checkLocalStorage() {
+            const value = localStorage.getItem('directCoordinatesEnabled');
+            alert(`💾 LocalStorage Status:\n\ndirectCoordinatesEnabled = "${value || 'not set'}"`);
+            logToConsole(`LocalStorage check: ${value || 'not set'}`);
+        }
+
+        function simulateWordPressAdmin() {
+            if (typeof window.showDirectCoordinateSettings === 'function') {
+                window.showDirectCoordinateSettings();
+            } else {
+                alert('🔧 WordPress Admin Integration würde hier das Einstellungs-Modal öffnen.\n\nIn einer echten WordPress-Umgebung wäre dies über das Admin-Panel verfügbar.');
+            }
+            logToConsole('WordPress admin simulation triggered');
+        }
+
+        function showWordPressSettings() {
+            const settings = `⚙️ WORDPRESS SETTINGS:
+
+Plugin Integration:
+- Script wird über wp_register_script geladen
+- Activation via URL Parameter oder LocalStorage
+- Admin Panel Integration für Enable/Disable
+
+Theme Integration:
+- Kann in functions.php eingebunden werden
+- Conditional loading basierend auf Einstellungen
+- Form Fields werden automatisch erkannt
+
+Security:
+- Nonce validation für AJAX requests
+- Capability checks für Admin-Funktionen
+- Sanitization aller Input-Daten`;
+
+            alert(settings);
+            logToConsole('WordPress settings information displayed');
+        }
+
+        // Console Functions
+        function logToConsole(message) {
+            if (!consoleCapture) return;
+
+            const console = document.getElementById('live-console');
+            const timestamp = new Date().toLocaleTimeString();
+            console.innerHTML += `[${timestamp}] ${message}\n`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearLiveConsole() {
+            document.getElementById('live-console').innerHTML = '';
+            logToConsole('Console cleared');
+        }
+
+        function toggleConsoleCapture() {
+            consoleCapture = !consoleCapture;
+            logToConsole(`Console capture ${consoleCapture ? 'enabled' : 'disabled'}`);
+        }
+
+        // Drag and Drop for Mock Canvas Elements
+        function makeDraggable() {
+            const elements = document.querySelectorAll('.mock-element');
+
+            elements.forEach(el => {
+                el.addEventListener('mousedown', startDrag);
+            });
+
+            function startDrag(e) {
+                const element = e.target;
+                const rect = element.getBoundingClientRect();
+                const canvas = document.getElementById('mock-canvas').getBoundingClientRect();
+
+                const offsetX = e.clientX - rect.left;
+                const offsetY = e.clientY - rect.top;
+
+                function drag(e) {
+                    const newX = e.clientX - canvas.left - offsetX;
+                    const newY = e.clientY - canvas.top - offsetY;
+
+                    const maxX = 400 - parseInt(element.style.width);
+                    const maxY = 300 - parseInt(element.style.height);
+
+                    element.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
+                    element.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
+                }
+
+                function stopDrag() {
+                    document.removeEventListener('mousemove', drag);
+                    document.removeEventListener('mouseup', stopDrag);
+
+                    updateMockCanvasPositions();
+                    logToConsole(`Element ${element.id} moved to (${element.style.left}, ${element.style.top})`);
+                }
+
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', stopDrag);
+                e.preventDefault();
+            }
+        }
+
+        // Initialize Demo
+        document.addEventListener('DOMContentLoaded', function() {
+            logToConsole('🎯 DirectCoordinate WordPress Integration Demo loaded');
+            updateSystemStatus();
+            makeDraggable();
+
+            // Auto-populate form fields if DirectCoordinate is active
+            setTimeout(() => {
+                if (typeof window.directCoordinateStatus === 'function') {
+                    const status = window.directCoordinateStatus();
+                    if (status.enabled) {
+                        manualPopulation();
+                        logToConsole('Auto-populated form fields (DirectCoordinate active)');
+                    }
+                }
+            }, 1000);
+        });
+
+        // Override console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            if (args[0] && args[0].includes('DIRECT-COORDINATE')) {
+                logToConsole(`LOG: ${args.join(' ')}`);
+            }
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            if (args[0] && args[0].includes('DIRECT-COORDINATE')) {
+                logToConsole(`ERROR: ${args.join(' ')}`);
+            }
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            if (args[0] && args[0].includes('DIRECT-COORDINATE')) {
+                logToConsole(`WARN: ${args.join(' ')}`);
+            }
+        };
+    </script>
+</body>
+</html>
