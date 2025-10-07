@@ -125,20 +125,37 @@ class Octo_Print_Designer_Public {
             false // Load in head for early monitoring
         );
 
+        // 🎯 STAGED LOADING ARCHITECTURE: Stage 1 - Webpack Readiness Detection
+        wp_register_script(
+            'octo-webpack-readiness-detector',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-readiness-detector.js',
+            [], // Load first, no dependencies
+            $this->version . '.webpack-ready-v1',
+            false // Load in head for early detection
+        );
+
         wp_register_script(
             'octo-print-designer-vendor',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/vendor.bundle.js',
-            ['octo-fabric-timeline-tracker'], // After complete debug system
+            ['octo-fabric-timeline-tracker', 'octo-webpack-readiness-detector'], // After debug system and webpack detector
             $this->version . '.vendor-monitored',
             true
         );
         
-        // 🎯 ARTEFAKT-GESTEUERTES SYSTEM: Proactive Webpack Fabric Extraction
-        // Phase 1: Immediate Fabric Extraction from Webpack Bundle
+        // 🎯 STAGED LOADING ARCHITECTURE: Stage 2 - Fabric Readiness Detection
+        wp_register_script(
+            'octo-fabric-readiness-detector',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-readiness-detector.js',
+            ['octo-print-designer-vendor'], // Load after vendor bundle
+            $this->version . '.fabric-ready-v1',
+            true
+        );
+
+        // 🎯 LEGACY WEBPACK FABRIC EXTRACTOR (Replaced by fabric-readiness-detector)
         wp_register_script(
             'octo-webpack-fabric-extractor',
             OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-extractor.js',
-            ['octo-print-designer-vendor'], // Load immediately after vendor bundle
+            ['octo-fabric-readiness-detector'], // Load after new detector
             $this->version . '.extractor-v2',
             true
         );
@@ -209,8 +226,26 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-fabric-timeline-tracker', 'octo-print-designer-vendor', 'octo-webpack-fabric-extractor', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // 🔍 DEBUG: Complete debug system integration
-            $this->version . '.designer-full-debug-' . time(), // Updated version identifier
+            ['octo-fabric-readiness-detector', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // Streamlined dependencies with fabric readiness
+            $this->version . '.designer-staged-' . time(), // Updated version identifier
+            true
+        );
+
+        // 🎯 STAGED LOADING ARCHITECTURE: Stage 3 - Designer Readiness Detection
+        wp_register_script(
+            'octo-designer-readiness-detector',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/designer-readiness-detector.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            $this->version . '.designer-ready-v1',
+            true
+        );
+
+        // 🎯 STAGED SCRIPT COORDINATOR: Event-based script loading
+        wp_register_script(
+            'octo-staged-script-coordinator',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/staged-script-coordinator.js',
+            ['octo-designer-readiness-detector'], // Load after designer detector
+            $this->version . '.coordinator-v1',
             true
         );
 
@@ -268,12 +303,12 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🚀 ISSUE #18 FIX: OPTIMIZED DESIGN DATA CAPTURE (Console Spam Eliminated)
+        // 🚀 OPTIMIZED DESIGN DATA CAPTURE - Now event-driven (no immediate execution)
         wp_register_script(
             'octo-print-designer-optimized-capture',
             OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
-            ['octo-print-designer-designer'], // Load after designer bundle
-            $this->version . '-issue18-' . time(), // Version-based cache busting
+            ['octo-staged-script-coordinator'], // Load after coordinator for event-based init
+            $this->version . '-staged-' . time(), // Version-based cache busting
             true
         );
 
@@ -313,12 +348,12 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🏆 PERMANENT SAVE FIX: Auto-adds missing template_id, name, and nonce fields to AJAX requests
+        // 🏆 PERMANENT SAVE FIX - Now event-driven (no immediate execution)
         wp_register_script(
             'octo-print-designer-permanent-save-fix',
             OCTO_PRINT_DESIGNER_URL . 'public/js/permanent-save-fix.js',
-            ['octo-print-designer-designer'], // Load after designer bundle
-            $this->version . '-permanent-' . time(),
+            ['octo-staged-script-coordinator'], // Load after coordinator for event-based init
+            $this->version . '-staged-save-' . time(),
             true
         );
 
@@ -383,6 +418,41 @@ class Octo_Print_Designer_Public {
             'pluginUrl' => OCTO_PRINT_DESIGNER_URL,
             'dpi' => Octo_Print_Designer_Settings::get_dpi()
         ]);
+
+        // 🎯 STAGED LOADING ARCHITECTURE: Enqueue scripts in proper order
+        $staged_loading_scripts = [
+            // Stage 0: Debug & Monitoring (HEAD)
+            'octo-race-condition-analyzer',
+            'octo-fabric-debug-console',
+            'octo-webpack-bundle-inspector',
+            'octo-fabric-loading-timeline-tracker',
+
+            // Stage 1: Webpack Foundation
+            'octo-webpack-readiness-detector',   // Load first in HEAD
+
+            // Stage 2: Core Bundles & Fabric Foundation (FOOTER)
+            'octo-print-designer-vendor',        // webpack chunks
+            'octo-fabric-readiness-detector',    // fabric extraction
+            'octo-webpack-fabric-extractor',     // legacy extractor
+            'octo-fabric-canvas-singleton-public', // canvas singleton
+            'octo-canvas-initialization-controller-public',
+            'octo-script-load-coordinator-public',
+
+            // Stage 3: Designer Foundation (FOOTER)
+            'octo-print-designer-designer',      // designer bundle
+            'octo-designer-readiness-detector',  // designer detection
+            'octo-staged-script-coordinator',    // coordinator
+
+            // Stage 4: Event-driven dependent scripts (FOOTER)
+            'octo-print-designer-optimized-capture',      // data capture
+            'octo-print-designer-permanent-save-fix',     // save fixes
+            'octo-print-designer-enhanced-json',          // coordinate system
+            'octo-print-designer-safezone-validator',     // validation
+        ];
+
+        foreach ($staged_loading_scripts as $script_handle) {
+            wp_enqueue_script($script_handle);
+        }
 
 	}
 
