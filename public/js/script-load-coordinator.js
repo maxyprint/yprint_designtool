@@ -30,6 +30,7 @@
                 'fabric-global-exposer.js',
                 'emergency-fabric-loader.js',
                 'fabric-canvas-singleton.js',
+                'canvas-creation-blocker.js',
                 'canvas-initialization-controller.js'
             ];
 
@@ -52,6 +53,9 @@
 
                 // Phase 2: Initialize fabric exposure and singleton wrapper
                 await this.initializeFabricSystems();
+
+                // Phase 2.5: 🚨 VALIDATE CANVAS CREATION BLOCKER
+                await this.validateCanvasBlocker();
 
                 // Phase 3: Initialize canvas controller
                 await this.initializeCanvasController();
@@ -162,6 +166,34 @@
                 };
 
                 checkWrapper();
+            });
+        }
+
+        /**
+         * 🚨 HARD-LOCK VALIDATION: Check Canvas Creation Blocker
+         */
+        async validateCanvasBlocker() {
+            console.log('🚫 SCRIPT COORDINATOR: Phase 2.5 - Validating Canvas Creation Blocker');
+
+            return new Promise((resolve) => {
+                const checkBlocker = () => {
+                    // Check if blocker is active
+                    if (typeof global.getCanvasHardLockStatus === 'function') {
+                        const status = global.getCanvasHardLockStatus();
+                        console.log('✅ SCRIPT COORDINATOR: Canvas Creation Blocker active:', status);
+
+                        // Verify HARD-LOCK globals exist
+                        if (typeof global.__FABRIC_CANVAS_LOCKED__ !== 'undefined') {
+                            console.log('✅ SCRIPT COORDINATOR: HARD-LOCK mechanism confirmed');
+                            resolve();
+                            return;
+                        }
+                    }
+
+                    setTimeout(checkBlocker, 50);
+                };
+
+                checkBlocker();
             });
         }
 

@@ -10,6 +10,13 @@
 
     console.log('🔧 FABRIC SINGLETON: Initializing fabric.js Canvas singleton wrapper');
 
+    // 🚨 HARD-LOCK MECHANISM: Global Canvas Creation Prevention
+    if (!global.__FABRIC_CANVAS_LOCKED__) {
+        global.__FABRIC_CANVAS_LOCKED__ = false;
+        global.__FABRIC_CANVAS_LOCK_COUNT__ = 0;
+        console.log('🔒 FABRIC SINGLETON: HARD-LOCK mechanism initialized');
+    }
+
     // Wait for fabric.js to be available
     function initializeFabricSingleton() {
         if (!global.fabric || typeof global.fabric.Canvas !== 'function') {
@@ -40,6 +47,14 @@
         // Singleton wrapper function
         function SingletonCanvas(canvasId, options = {}) {
             console.log('🎯 FABRIC SINGLETON: Canvas constructor called for:', canvasId);
+
+            // 🚨 HARD-LOCK CHECK: Prevent canvas creation if locked
+            if (global.__FABRIC_CANVAS_LOCKED__) {
+                global.__FABRIC_CANVAS_LOCK_COUNT__++;
+                console.error('🚫 FABRIC SINGLETON: HARD-LOCK ACTIVE - Canvas creation blocked!',
+                             'Attempt:', global.__FABRIC_CANVAS_LOCK_COUNT__);
+                throw new Error('HARD-LOCK: Canvas creation is currently locked to prevent double-initialization');
+            }
 
             // Handle different parameter formats
             let elementId;
@@ -88,6 +103,10 @@
             // Create new instance only if none exists
             console.log('🎯 FABRIC SINGLETON: Creating new fabric Canvas for:', elementId);
 
+            // 🚨 ACTIVATE HARD-LOCK during canvas creation
+            global.__FABRIC_CANVAS_LOCKED__ = true;
+            console.log('🔒 FABRIC SINGLETON: HARD-LOCK ACTIVATED during canvas creation');
+
             try {
                 // Call original constructor
                 const newInstance = new OriginalCanvas(canvasId, options);
@@ -103,10 +122,16 @@
                     }
                 }
 
+                // 🚨 DEACTIVATE HARD-LOCK after successful creation
+                global.__FABRIC_CANVAS_LOCKED__ = false;
+                console.log('🔓 FABRIC SINGLETON: HARD-LOCK DEACTIVATED after successful creation');
                 console.log('✅ FABRIC SINGLETON: New fabric Canvas created and registered:', elementId);
                 return newInstance;
 
             } catch (error) {
+                // 🚨 DEACTIVATE HARD-LOCK on error
+                global.__FABRIC_CANVAS_LOCKED__ = false;
+                console.log('🔓 FABRIC SINGLETON: HARD-LOCK DEACTIVATED due to error');
                 console.error('❌ FABRIC SINGLETON: Error creating fabric Canvas:', error);
 
                 // Check if error is about existing initialization
@@ -161,6 +186,29 @@
                 }
             });
             canvasInstances.clear();
+
+            // 🚨 RESET HARD-LOCK after clearing instances
+            global.__FABRIC_CANVAS_LOCKED__ = false;
+            global.__FABRIC_CANVAS_LOCK_COUNT__ = 0;
+            console.log('🔓 FABRIC SINGLETON: HARD-LOCK RESET after clearing instances');
+        };
+
+        // 🚨 NEW: Hard-lock control methods
+        SingletonCanvas.activateHardLock = function() {
+            global.__FABRIC_CANVAS_LOCKED__ = true;
+            console.log('🔒 FABRIC SINGLETON: HARD-LOCK MANUALLY ACTIVATED');
+        };
+
+        SingletonCanvas.deactivateHardLock = function() {
+            global.__FABRIC_CANVAS_LOCKED__ = false;
+            console.log('🔓 FABRIC SINGLETON: HARD-LOCK MANUALLY DEACTIVATED');
+        };
+
+        SingletonCanvas.getHardLockStatus = function() {
+            return {
+                locked: global.__FABRIC_CANVAS_LOCKED__,
+                attempts: global.__FABRIC_CANVAS_LOCK_COUNT__
+            };
         };
 
         // Mark as wrapped

@@ -228,10 +228,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🚨 HARD-LOCK: Canvas Creation Blocker (PRIORITY 1)
+        // CRITICAL: Must load before designer.bundle.js to prevent double Canvas initialization
+        wp_register_script(
+            'octo-canvas-creation-blocker',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-creation-blocker.js',
+            ['octo-fabric-canvas-singleton-public'], // After singleton is ready
+            $this->version . '.canvas-blocker-v1',
+            true
+        );
+
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-fabric-readiness-detector', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // Streamlined dependencies with fabric readiness
+            ['octo-canvas-creation-blocker', 'octo-fabric-readiness-detector', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // Added canvas-creation-blocker as first dependency
             $this->version . '.designer-staged-' . time(), // Updated version identifier
             true
         );
