@@ -409,10 +409,19 @@ class OptimizedDesignDataCapture {
         ];
 
         let attachedButtons = 0;
+        let skippedButtons = 0;
 
         buttonSelectors.forEach(selector => {
             const buttons = document.querySelectorAll(selector);
             buttons.forEach(button => {
+                // 🔒 SECURITY: Button event deduplication
+                if (button.dataset.designCaptureAttached) {
+                    skippedButtons++;
+                    this.debugLog('debug', '🛡️ Button already attached - skipping to prevent duplicate events');
+                    return; // Skip already attached buttons
+                }
+                button.dataset.designCaptureAttached = 'true';
+
                 button.addEventListener('click', () => {
                     this.debugLog('info', '🎯 Save/Cart button clicked - generating design data...');
                     const designData = this.generateDesignData();
@@ -427,7 +436,7 @@ class OptimizedDesignDataCapture {
             });
         });
 
-        this.debugLog('info', `🔗 Total buttons attached: ${attachedButtons}`);
+        this.debugLog('info', `🔗 Total buttons attached: ${attachedButtons}, skipped: ${skippedButtons}`);
     }
 
     /**
@@ -1148,6 +1157,13 @@ if (typeof window !== 'undefined') {
         console.log('🎯 Designer instance available:', !!designerInstance);
         console.log('🛡️ No parallel initialization detected');
     };
+
+    // 🔒 SECURITY: designerReady event deduplication
+    if (window.designerReadyListenerAttached) {
+        console.log('🛡️ SECURITY: designerReady listener already attached - preventing duplicate');
+        return;
+    }
+    window.designerReadyListenerAttached = true;
 
     // Listen for the designerReady event instead of auto-initialization
     document.addEventListener('designerReady', function(event) {
