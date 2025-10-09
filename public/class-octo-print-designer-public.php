@@ -155,7 +155,7 @@ class Octo_Print_Designer_Public {
             };
 
             console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
-        ', 'before');
+        ', 'after');
 
         // 🎯 STAGED LOADING ARCHITECTURE: Stage 1 - Webpack Readiness Detection
         wp_register_script(
