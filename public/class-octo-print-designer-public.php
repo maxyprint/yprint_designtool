@@ -130,6 +130,33 @@ class Octo_Print_Designer_Public {
             ', 'before');
         }
 
+        // 🎯 CRITICAL FIX: Add logCoordinateSystemOutput function to frontend
+        // This function was missing from frontend, causing coordinate systems to fail their logging
+        wp_add_inline_script('octo-print-designer-designer', '
+            // Global logging function for coordinate systems (frontend version)
+            window.logCoordinateSystemOutput = function(systemName, data) {
+                console.log("%c--- 📊 Koordinaten-System: " + systemName + " ---", "background: #0073aa; color: white; font-weight: bold; padding: 2px 5px;");
+                if (data) {
+                    console.log(data);
+
+                    // Data validation for coordinate system comparison
+                    if (data.elements && Array.isArray(data.elements)) {
+                        console.log("✅ Element Count:", data.elements.length);
+                        if (data.elements.length > 0) {
+                            console.log("📍 Sample Element:", data.elements[0]);
+                        }
+                    } else {
+                        console.warn("⚠️ Keine Element-Array gefunden in:", systemName);
+                    }
+                } else {
+                    console.warn("❌ Keine Daten generiert von:", systemName);
+                }
+                console.log("--- Ende " + systemName + " ---");
+            };
+
+            console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
+        ', 'before');
+
         // 🎯 STAGED LOADING ARCHITECTURE: Stage 1 - Webpack Readiness Detection
         wp_register_script(
             'octo-webpack-readiness-detector',
@@ -462,7 +489,9 @@ class Octo_Print_Designer_Public {
             'octo-staged-script-coordinator',    // coordinator
 
             // Stage 4: Event-driven dependent scripts (ESSENTIAL)
-            'octo-print-designer-optimized-capture',      // data capture
+            'octo-print-designer-optimized-capture',      // data capture (1/3)
+            'octo-print-designer-yprint-capture',         // THADDÄUS FIX: yprint coordinate system (2/3)
+            'octo-print-designer-production-capture',     // THADDÄUS FIX: production coordinate system (3/3)
             'octo-print-designer-permanent-save-fix',     // save fixes
             'octo-print-designer-enhanced-json',          // coordinate system
             'octo-print-designer-safezone-validator',     // validation
