@@ -79,6 +79,96 @@ class Octo_Print_Designer_Admin {
             console.log('--- Ende ' + systemName + ' ---');
         };
 
+        // 🚨 EMERGENCY COORDINATE TESTING FUNCTIONS
+        window.forceCoordinateSystemTest = function() {
+            console.log('🚨 [FORCE TEST] Force-triggering all coordinate systems...');
+
+            // Force trigger designerReady event
+            const mockDesigner = {
+                fabricCanvas: window.canvas || window.fabricCanvas,
+                canvas: window.canvas || window.fabricCanvas
+            };
+
+            const event = new CustomEvent('designerReady', {
+                detail: { instance: mockDesigner }
+            });
+            document.dispatchEvent(event);
+            console.log('📢 [FORCE TEST] designerReady event dispatched');
+
+            // Wait and then manually call coordinate systems
+            setTimeout(() => {
+                console.log('⏰ [FORCE TEST] Executing coordinate systems manually...');
+
+                // Test YPrint Capture
+                if (window.YPrintTools && window.YPrintTools.CoordinateCapture) {
+                    try {
+                        console.log('🎯 [FORCE TEST] Testing YPrint Coordinate Capture...');
+                        const yprintResult = window.YPrintTools.CoordinateCapture.generateDesignData();
+                        console.log('✅ [FORCE TEST] YPrint result:', yprintResult);
+                    } catch (error) {
+                        console.error('❌ [FORCE TEST] YPrint error:', error);
+                    }
+                }
+
+                // Test Production Ready
+                if (window.ProductionReadyDesignDataCapture) {
+                    try {
+                        console.log('📊 [FORCE TEST] Testing Production Ready...');
+                        const prodResult = window.ProductionReadyDesignDataCapture.generateDesignData();
+                        console.log('✅ [FORCE TEST] Production Ready result:', prodResult);
+                    } catch (error) {
+                        console.error('❌ [FORCE TEST] Production Ready error:', error);
+                    }
+                }
+
+                // Test Optimized
+                if (window.OptimizedDesignDataCapture) {
+                    try {
+                        console.log('⚡ [FORCE TEST] Testing Optimized...');
+                        const optResult = window.OptimizedDesignDataCapture.generateDesignData();
+                        console.log('✅ [FORCE TEST] Optimized result:', optResult);
+                    } catch (error) {
+                        console.error('❌ [FORCE TEST] Optimized error:', error);
+                    }
+                }
+
+                // Test main generateDesignData function
+                if (typeof window.generateDesignData === 'function') {
+                    try {
+                        console.log('🔧 [FORCE TEST] Testing main generateDesignData...');
+                        const mainResult = window.generateDesignData();
+                        console.log('✅ [FORCE TEST] Main generateDesignData result:', mainResult);
+                    } catch (error) {
+                        console.error('❌ [FORCE TEST] Main generateDesignData error:', error);
+                    }
+                }
+
+                console.log('🏁 [FORCE TEST] Force testing complete');
+            }, 2000);
+        };
+
+        window.debugCoordinateSystems = function() {
+            console.log('🔍 [DEBUG] Coordinate System Status Check:');
+            console.log('📊 YPrintTools.CoordinateCapture:', !!window.YPrintTools?.CoordinateCapture);
+            console.log('📊 ProductionReadyDesignDataCapture:', !!window.ProductionReadyDesignDataCapture);
+            console.log('📊 OptimizedDesignDataCapture:', !!window.OptimizedDesignDataCapture);
+            console.log('📊 generateDesignData function:', typeof window.generateDesignData);
+            console.log('📊 logCoordinateSystemOutput function:', typeof window.logCoordinateSystemOutput);
+            console.log('📊 designerWidgetInstance:', !!window.designerWidgetInstance);
+            console.log('📊 Canvas available:', !!(window.canvas || window.fabricCanvas));
+
+            if (window.YPrintTools?.CoordinateCapture) {
+                console.log('🎯 YPrint Status:', window.YPrintTools.CoordinateCapture.getStatus());
+            }
+        };
+
+        // Auto-run debug on page load
+        setTimeout(() => {
+            console.log('🚀 [AUTO DEBUG] Running coordinate system debug...');
+            window.debugCoordinateSystems();
+            console.log('💡 [TIP] Use forceCoordinateSystemTest() to manually trigger all systems');
+        }, 3000);
+
         console.log('🏗️ [PHASE 1] Koordinaten-System Diagnose Logging aktiviert');
         </script>";
 

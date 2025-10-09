@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Debug Coordinate Execution</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Coordinate Execution Test</h1>
+
+    <div class="debug-section">
+        <h3>Step 1: Check Function Availability</h3>
+        <button onclick="checkFunctions()">🔍 Check Functions</button>
+        <div id="function-results"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Step 2: Manual Function Execution</h3>
+        <button onclick="executeGenerateDesignData()">🚀 Execute generateDesignData()</button>
+        <button onclick="executeYPrintCapture()">🎯 Execute YPrint Capture</button>
+        <button onclick="executeProductionReady()">📊 Execute Production Ready</button>
+        <button onclick="executeOptimized()">⚡ Execute Optimized</button>
+        <div id="execution-results"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Step 3: Event Triggering</h3>
+        <button onclick="triggerDesignerReady()">📢 Trigger designerReady Event</button>
+        <button onclick="triggerCanvasCreated()">🎨 Trigger Canvas Created</button>
+        <div id="event-results"></div>
+    </div>
+
+    <script>
+        console.log('🔍 [DEBUG] Debug Coordinate Execution Test initialized');
+
+        function logResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">${message}</div>`;
+            console.log(message);
+        }
+
+        function checkFunctions() {
+            logResult('function-results', '🔍 Checking function availability...', 'info');
+
+            // Check main generateDesignData function
+            const hasGenerateDesignData = typeof window.generateDesignData === 'function';
+            logResult('function-results',
+                `generateDesignData: ${hasGenerateDesignData ? '✅ Available' : '❌ Missing'}`,
+                hasGenerateDesignData ? 'success' : 'error'
+            );
+
+            // Check coordinate capture systems
+            const hasYPrintTools = window.YPrintTools && window.YPrintTools.CoordinateCapture;
+            logResult('function-results',
+                `YPrintTools.CoordinateCapture: ${hasYPrintTools ? '✅ Available' : '❌ Missing'}`,
+                hasYPrintTools ? 'success' : 'error'
+            );
+
+            // Check logging function
+            const hasLogFunction = typeof window.logCoordinateSystemOutput === 'function';
+            logResult('function-results',
+                `logCoordinateSystemOutput: ${hasLogFunction ? '✅ Available' : '❌ Missing'}`,
+                hasLogFunction ? 'success' : 'error'
+            );
+
+            // Check global variables
+            const hasDesignerInstance = window.designerWidgetInstance;
+            logResult('function-results',
+                `designerWidgetInstance: ${hasDesignerInstance ? '✅ Available' : '❌ Missing'}`,
+                hasDesignerInstance ? 'success' : 'error'
+            );
+
+            const hasCanvas = window.canvas || window.fabricCanvas;
+            logResult('function-results',
+                `Canvas: ${hasCanvas ? '✅ Available' : '❌ Missing'}`,
+                hasCanvas ? 'success' : 'error'
+            );
+        }
+
+        function executeGenerateDesignData() {
+            logResult('execution-results', '🚀 Executing generateDesignData()...', 'info');
+
+            if (typeof window.generateDesignData === 'function') {
+                try {
+                    const result = window.generateDesignData();
+                    logResult('execution-results', '✅ generateDesignData() executed successfully', 'success');
+                    console.log('📊 [DEBUG] generateDesignData result:', result);
+                } catch (error) {
+                    logResult('execution-results', `❌ generateDesignData() error: ${error.message}`, 'error');
+                    console.error('❌ [DEBUG] generateDesignData error:', error);
+                }
+            } else {
+                logResult('execution-results', '❌ generateDesignData() not available', 'error');
+            }
+        }
+
+        function executeYPrintCapture() {
+            logResult('execution-results', '🎯 Executing YPrint Capture...', 'info');
+
+            if (window.YPrintTools && window.YPrintTools.CoordinateCapture) {
+                try {
+                    const result = window.YPrintTools.CoordinateCapture.generateDesignData();
+                    logResult('execution-results', '✅ YPrint Capture executed successfully', 'success');
+                    console.log('🎯 [DEBUG] YPrint result:', result);
+                } catch (error) {
+                    logResult('execution-results', `❌ YPrint Capture error: ${error.message}`, 'error');
+                    console.error('❌ [DEBUG] YPrint error:', error);
+                }
+            } else {
+                logResult('execution-results', '❌ YPrint Capture not available', 'error');
+            }
+        }
+
+        function executeProductionReady() {
+            logResult('execution-results', '📊 Executing Production Ready...', 'info');
+
+            if (window.ProductionReadyDesignDataCapture) {
+                try {
+                    const result = window.ProductionReadyDesignDataCapture.generateDesignData();
+                    logResult('execution-results', '✅ Production Ready executed successfully', 'success');
+                    console.log('📊 [DEBUG] Production Ready result:', result);
+                } catch (error) {
+                    logResult('execution-results', `❌ Production Ready error: ${error.message}`, 'error');
+                    console.error('❌ [DEBUG] Production Ready error:', error);
+                }
+            } else {
+                logResult('execution-results', '❌ Production Ready not available', 'error');
+            }
+        }
+
+        function executeOptimized() {
+            logResult('execution-results', '⚡ Executing Optimized...', 'info');
+
+            if (window.OptimizedDesignDataCapture) {
+                try {
+                    const result = window.OptimizedDesignDataCapture.generateDesignData();
+                    logResult('execution-results', '✅ Optimized executed successfully', 'success');
+                    console.log('⚡ [DEBUG] Optimized result:', result);
+                } catch (error) {
+                    logResult('execution-results', `❌ Optimized error: ${error.message}`, 'error');
+                    console.error('❌ [DEBUG] Optimized error:', error);
+                }
+            } else {
+                logResult('execution-results', '❌ Optimized not available', 'error');
+            }
+        }
+
+        function triggerDesignerReady() {
+            logResult('event-results', '📢 Triggering designerReady event...', 'info');
+
+            const event = new CustomEvent('designerReady', {
+                detail: {
+                    instance: window.designerWidgetInstance || {
+                        fabricCanvas: window.canvas || window.fabricCanvas,
+                        canvas: window.canvas || window.fabricCanvas
+                    }
+                }
+            });
+
+            document.dispatchEvent(event);
+            logResult('event-results', '✅ designerReady event dispatched', 'success');
+        }
+
+        function triggerCanvasCreated() {
+            logResult('event-results', '🎨 Triggering canvas created event...', 'info');
+
+            const event = new CustomEvent('canvasCreated', {
+                detail: {
+                    canvas: window.canvas || window.fabricCanvas
+                }
+            });
+
+            document.dispatchEvent(event);
+            logResult('event-results', '✅ canvasCreated event dispatched', 'success');
+        }
+
+        // Auto-run function check on load
+        setTimeout(() => {
+            checkFunctions();
+        }, 1000);
+    </script>
+</body>
+</html>
