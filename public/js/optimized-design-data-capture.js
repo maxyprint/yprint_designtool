@@ -480,7 +480,16 @@ class OptimizedDesignDataCapture {
             if (this.attemptImmediateInitialization()) {
                 this.debugLog('info', '✅ Emergency initialization successful');
             } else {
-                return this.createErrorResponse('System not initialized');
+                const errorResponse = this.createErrorResponse('System not initialized');
+                // 🏗️ PHASE 1: DIAGNOSE LOGGING
+                try {
+                    if (typeof window.logCoordinateSystemOutput === 'function') {
+                        window.logCoordinateSystemOutput('optimized-design-data-capture.js', errorResponse);
+                    }
+                } catch (e) {
+                    console.warn('🏗️ PHASE 1: Logging failed for optimized-design-data-capture.js:', e.message);
+                }
+                return errorResponse;
             }
         }
 
@@ -541,11 +550,31 @@ class OptimizedDesignDataCapture {
             this.debugLog('debug', 'Elements captured:', designData.elements.length);
             this.debugLog('debug', 'Action type:', designData.action);
 
+            // 🏗️ PHASE 1: DIAGNOSE LOGGING - ERFOLGREICHE KOORDINATEN-ERFASSUNG
+            try {
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('optimized-design-data-capture.js', designData);
+                }
+            } catch (e) {
+                console.warn('🏗️ PHASE 1: Logging failed for optimized-design-data-capture.js:', e.message);
+            }
+
             return designData;
 
         } catch (error) {
             this.debugLog('error', '❌ Error generating design data:', error);
-            return this.createErrorResponse(error.message, error.stack);
+            const errorResponse = this.createErrorResponse(error.message, error.stack);
+
+            // 🏗️ PHASE 1: DIAGNOSE LOGGING - FEHLER-FALL
+            try {
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('optimized-design-data-capture.js', errorResponse);
+                }
+            } catch (e) {
+                console.warn('🏗️ PHASE 1: Logging failed for optimized-design-data-capture.js:', e.message);
+            }
+
+            return errorResponse;
         }
     }
 

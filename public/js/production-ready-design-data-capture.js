@@ -502,6 +502,16 @@ class ProductionReadyDesignDataCapture {
                     }
                 };
                 console.error('❌ Error data:', errorData);
+
+                // 🏗️ PHASE 1: DIAGNOSE LOGGING
+                try {
+                    if (typeof window.logCoordinateSystemOutput === 'function') {
+                        window.logCoordinateSystemOutput('production-ready-design-data-capture.js', errorData);
+                    }
+                } catch (e) {
+                    console.warn('🏗️ PHASE 1: Logging failed for production-ready-design-data-capture.js:', e.message);
+                }
+
                 return errorData;
             }
         }
@@ -556,11 +566,20 @@ class ProductionReadyDesignDataCapture {
             });
             console.log('🎭 Element types:', elementTypes);
 
+            // 🏗️ PHASE 1: DIAGNOSE LOGGING - ERFOLGREICHE KOORDINATEN-ERFASSUNG
+            try {
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('production-ready-design-data-capture.js', designData);
+                }
+            } catch (e) {
+                console.warn('🏗️ PHASE 1: Logging failed for production-ready-design-data-capture.js:', e.message);
+            }
+
             return designData;
 
         } catch (error) {
             console.error('❌ Error generating design data:', error);
-            return {
+            const errorResponse = {
                 error: error.message,
                 template_view_id: 'error',
                 designed_on_area_px: { width: 0, height: 0 },
@@ -568,6 +587,17 @@ class ProductionReadyDesignDataCapture {
                 timestamp: new Date().toISOString(),
                 stack: error.stack
             };
+
+            // 🏗️ PHASE 1: DIAGNOSE LOGGING - FEHLER-FALL
+            try {
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('production-ready-design-data-capture.js', errorResponse);
+                }
+            } catch (e) {
+                console.warn('🏗️ PHASE 1: Logging failed for production-ready-design-data-capture.js:', e.message);
+            }
+
+            return errorResponse;
         }
     }
 

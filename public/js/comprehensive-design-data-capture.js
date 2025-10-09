@@ -141,12 +141,23 @@ class ComprehensiveDesignDataCapture {
 
         if (this.fabricCanvases.length === 0) {
             console.error('❌ No fabric canvases available');
-            return {
+            const errorResponse = {
                 error: 'No fabric canvases found',
                 template_view_id: 'none',
                 designed_on_area_px: { width: 0, height: 0 },
                 elements: []
             };
+
+            // 🏗️ PHASE 1: DIAGNOSE LOGGING
+            try {
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('comprehensive-design-data-capture.js', errorResponse);
+                }
+            } catch (e) {
+                console.warn('🏗️ PHASE 1: Logging failed for comprehensive-design-data-capture.js:', e.message);
+            }
+
+            return errorResponse;
         }
 
         // Use the primary designer canvas (first available or explicitly marked)
@@ -172,6 +183,15 @@ class ComprehensiveDesignDataCapture {
             elementTypes[el.type] = (elementTypes[el.type] || 0) + 1;
         });
         console.log('🎭 Element types:', elementTypes);
+
+        // 🏗️ PHASE 1: DIAGNOSE LOGGING - ERFOLGREICHE KOORDINATEN-ERFASSUNG
+        try {
+            if (typeof window.logCoordinateSystemOutput === 'function') {
+                window.logCoordinateSystemOutput('comprehensive-design-data-capture.js', designData);
+            }
+        } catch (e) {
+            console.warn('🏗️ PHASE 1: Logging failed for comprehensive-design-data-capture.js:', e.message);
+        }
 
         return designData;
     }

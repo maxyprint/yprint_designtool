@@ -55,6 +55,35 @@ class Octo_Print_Designer_Admin {
         $admin_context = $this->detect_admin_context($hook);
 
         // 🔍 DEBUG: Enhanced logging with context detection
+        // 🏗️ PHASE 1: GLOBALE SICHERE LOGGING-FUNKTION FÜR KOORDINATEN-SYSTEM DIAGNOSE
+        $diagnostic_script = "
+        <script>
+        // Globale, sichere Logging-Funktion für Koordinaten-System Bake-Off
+        window.logCoordinateSystemOutput = function(systemName, data) {
+            console.log('%c--- 📊 Koordinaten-System: ' + systemName + ' ---', 'background: #0073aa; color: white; font-weight: bold; padding: 2px 5px;');
+            if (data) {
+                console.log(data);
+
+                // Zusätzliche Datenvalidierung für den Bake-Off
+                if (data.elements && Array.isArray(data.elements)) {
+                    console.log('✅ Element Count:', data.elements.length);
+                    if (data.elements.length > 0) {
+                        console.log('📍 Sample Element:', data.elements[0]);
+                    }
+                } else {
+                    console.warn('⚠️ Keine Element-Array gefunden in:', systemName);
+                }
+            } else {
+                console.warn('❌ Keine Daten generiert von:', systemName);
+            }
+            console.log('--- Ende ' + systemName + ' ---');
+        };
+
+        console.log('🏗️ [PHASE 1] Koordinaten-System Diagnose Logging aktiviert');
+        </script>";
+
+        echo $diagnostic_script;
+
         $debug_script = "
         <script>
         console.log('🧠 [ADMIN OPTIMIZER] Hook: " . esc_js($hook) . "');
