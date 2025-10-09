@@ -2264,6 +2264,19 @@ private function build_print_provider_email_content($order, $design_items, $note
      * AJAX handler to refresh print data from database
      */
     public function ajax_refresh_print_data() {
+        // 🎯 7-AGENT FIX: CORS headers for admin-ajax.php (Safari compatibility)
+        // Agent 3 identified missing CORS headers compared to ajax_load_design_preview()
+        header('Access-Control-Allow-Origin: ' . get_site_url());
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit();
+        }
+
         // Security check
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
             wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));

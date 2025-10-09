@@ -1135,12 +1135,19 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // DUPLICATE REMOVED: optimized-design-data-capture.js already loaded via WooCommerce context check
-        // This script is already enqueued in the main enqueue_scripts method at line 207
-        // with handle 'octo-admin-optimized-capture' when is_woocommerce_order_edit_page() is true
+        // 🎯 7-AGENT FIX: Optimized Design Data Capture for WooCommerce Admin
+        // CRITICAL: This script provides generateDesignData() function required by "Designdaten laden" button
+        // Agent Analysis: Script was referenced but NEVER enqueued, causing wp_localize_script() to fail silently
+        wp_enqueue_script(
+            'octo-admin-optimized-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
+            ['octo-emergency-fabric-loader'], // Load after Fabric.js is available
+            $this->version . '.wc-admin-capture',
+            true
+        );
 
         // Admin context flag - AGENT 2 FIX: Allow selective canvas detection
-        // Updated to use the existing script handle from main enqueue method
+        // Now properly localizes the ENQUEUED script above
         wp_localize_script('octo-admin-optimized-capture', 'octoAdminContext', [
             'context' => 'woocommerce_admin',
             'skip_canvas_polling' => false, // CRITICAL: Enable canvas detection for template editor
