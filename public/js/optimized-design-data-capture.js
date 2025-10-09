@@ -1160,7 +1160,8 @@ class OptimizedDesignDataCapture {
 }
 
 // 🚀 ISSUE #18: Auto-initialization with production mode
-if (typeof window !== 'undefined') {
+(function() {
+    if (typeof window !== 'undefined') {
     // 🎯 GATEKEEPER EVENT-BASED INITIALIZATION - RACE CONDITION ELIMINATED
     const initializeOptimizedCapture = async (designerInstance) => {
         // 🧠 AGENT 4 FIX: Prevent duplicate OptimizedDesignDataCapture instances
@@ -1202,7 +1203,8 @@ if (typeof window !== 'undefined') {
     });
 
     console.log('🎯 GATEKEEPER: optimized-design-data-capture.js waiting for designerReady event...');
-}
+    }
+})();
 
 // Export for Node.js testing
 if (typeof module !== 'undefined' && module.exports) {
