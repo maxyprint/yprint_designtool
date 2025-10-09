@@ -40,6 +40,13 @@ var DesignerWidget = /*#__PURE__*/function () {
     var _window$octoPrintDesi,
       _this = this;
     _classCallCheck(this, DesignerWidget);
+
+    // 🛡️ SINGLETON GUARD: Prevent multiple DesignerWidget instances
+    if (window.designerWidgetInstance) {
+      console.log('🛡️ SINGLETON PROTECTION: DesignerWidget already exists, returning existing instance');
+      return window.designerWidgetInstance;
+    }
+
     this.container = document.querySelector('.octo-print-designer');
     if (!this.container) return;
     this.currentDesignId = null;
@@ -63,6 +70,11 @@ var DesignerWidget = /*#__PURE__*/function () {
     this.storeModalElements();
     this.setupModalEvents();
     this.toastManager = new _ToastManager__WEBPACK_IMPORTED_MODULE_0__.ToastManager(this.toastContainer);
+
+    // 🛡️ SINGLETON REGISTRATION: Register this instance immediately to prevent duplicates
+    window.designerWidgetInstance = this;
+    console.log('🛡️ SINGLETON: DesignerWidget instance registered successfully');
+
     this.init();
   }
   return _createClass(DesignerWidget, [{
@@ -2357,10 +2369,10 @@ setTimeout(function () {
   }]);
 }();
 
-// Initialize the designer widget when DOM is ready
-document.addEventListener('DOMContentLoaded', function () {
-  new DesignerWidget();
-});
+// ❌ REDUNDANT INITIALIZATION REMOVED: Handled by Gatekeeper system
+// document.addEventListener('DOMContentLoaded', function () {
+//   new DesignerWidget();
+// });
 
 /***/ })
 

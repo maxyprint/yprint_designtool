@@ -1030,17 +1030,13 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Design data capture (lightweight version)
-        wp_enqueue_script(
-            'octo-admin-design-capture',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
-            ['octo-emergency-fabric-loader'],
-            $this->version . '-admin',
-            true
-        );
+        // DUPLICATE REMOVED: optimized-design-data-capture.js already loaded via WooCommerce context check
+        // This script is already enqueued in the main enqueue_scripts method at line 207
+        // with handle 'octo-admin-optimized-capture' when is_woocommerce_order_edit_page() is true
 
         // Admin context flag - AGENT 2 FIX: Allow selective canvas detection
-        wp_localize_script('octo-admin-design-capture', 'octoAdminContext', [
+        // Updated to use the existing script handle from main enqueue method
+        wp_localize_script('octo-admin-optimized-capture', 'octoAdminContext', [
             'context' => 'woocommerce_admin',
             'skip_canvas_polling' => false, // CRITICAL: Enable canvas detection for template editor
             'enable_selective_detection' => true, // Allow canvas detection only when needed
