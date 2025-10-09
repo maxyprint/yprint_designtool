@@ -245,6 +245,11 @@
                 this.log('📐 [YPRINT] Canvas dimensions:', designData.designed_on_area_px.width + 'x' + designData.designed_on_area_px.height);
                 this.log('🎨 [YPRINT] Elements processed:', elements.length);
 
+                // 🎯 TEMPORARY: Logging for final comparison test
+                if (typeof window.logCoordinateSystemOutput === 'function') {
+                    window.logCoordinateSystemOutput('yprint-coordinate-capture.js (NEU)', designData);
+                }
+
                 return designData;
 
             } catch (error) {

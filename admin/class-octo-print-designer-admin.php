@@ -247,6 +247,16 @@ class Octo_Print_Designer_Admin {
                 true
             );
 
+            // 🎯 FINAL COMPARISON TEST: YPrint Coordinate Capture System
+            // Load new unified system parallel to old systems for direct comparison
+            wp_enqueue_script(
+                'yprint-coordinate-capture',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-coordinate-capture.js',
+                ['octo-admin-enhanced-json'], // Load after other systems
+                $this->version . '-yprint-final-test',
+                true
+            );
+
             // 🎨 AGENT 3: WooCommerce Admin Canvas Rendering System
             // Phase 1: Admin Canvas Renderer (Pure Vanilla JS, no dependencies)
             wp_enqueue_script(
