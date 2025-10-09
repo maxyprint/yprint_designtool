@@ -473,7 +473,10 @@ class Octo_Print_Designer_Public {
 
         // ✅ THADDÄUS TIMING FIX: wp_add_inline_script calls AFTER script enqueueing
         // WordPress requires inline scripts to be added AFTER wp_enqueue_script
-        if (wp_script_is('octo-print-designer-designer', 'enqueued')) {
+        // 🚨 THADDÄUS EMERGENCY: Always ensure THADDÄUS function loads regardless of enqueue status
+        $designer_script_enqueued = wp_script_is('octo-print-designer-designer', 'enqueued');
+
+        if ($designer_script_enqueued || true) { // Force execution for THADDÄUS diagnosis
 
             // 🚀 PRODUCTION MODE: Zero debug scripts for maximum performance
             if (!WP_DEBUG) {
@@ -508,6 +511,11 @@ class Octo_Print_Designer_Public {
                 };
 
                 console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
+
+                // 🚨 THADDÄUS EMERGENCY: Ensure script runs even if designer script fails to enqueue
+                if (!' . ($designer_script_enqueued ? 'true' : 'false') . ') {
+                    console.warn("🚨 THADDÄUS WARNING: Designer script not enqueued - THADDÄUS function loaded via fallback");
+                }
             ', 'after');
 
             // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked

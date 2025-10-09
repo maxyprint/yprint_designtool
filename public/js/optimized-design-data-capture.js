@@ -1139,6 +1139,34 @@ class OptimizedDesignDataCapture {
     }
 
     /**
+     * 🚨 THADDÄUS EMERGENCY: Force canvas detection retry
+     */
+    forceCanvasDetection() {
+        console.log('🚨 THADDÄUS EMERGENCY: Force canvas detection started');
+
+        // Check for canvas elements again
+        const canvases = document.querySelectorAll('canvas');
+        console.log(`🔍 THADDÄUS: Found ${canvases.length} canvas elements`);
+
+        // Check for fabric
+        console.log('🔍 THADDÄUS: Fabric available:', typeof window.fabric !== 'undefined');
+        console.log('🔍 THADDÄUS: fabricCanvas available:', !!window.fabricCanvas);
+
+        // Check for designer instance
+        console.log('🔍 THADDÄUS: designerWidgetInstance available:', !!window.designerWidgetInstance);
+
+        // Force attempt initialization
+        if (canvases.length > 0 && typeof window.fabric !== 'undefined') {
+            console.log('🚨 THADDÄUS: Conditions met - forcing immediate initialization');
+            this.initialized = false; // Reset to allow re-initialization
+            this.retryCount = 0;       // Reset retry count
+            return this.attemptImmediateInitialization();
+        }
+
+        return false;
+    }
+
+    /**
      * 🧠 AGENT METHOD: JavascriptPerformanceOptimizer - Generate design data for admin
      */
     generateDesignDataForAdmin() {
@@ -1176,6 +1204,12 @@ class OptimizedDesignDataCapture {
         console.log('🚀 RACE CONDITION ELIMINATED: Initializing via designerReady event only...');
         const instance = new OptimizedDesignDataCapture();
 
+        // 🚨 THADDÄUS EMERGENCY: Force canvas detection before initialization
+        console.log('🚨 THADDÄUS: Forcing canvas detection before initialization');
+        setTimeout(() => {
+            instance.forceCanvasDetection();
+        }, 50);
+
         // Trigger event-driven initialization explicitly
         await instance.startEventDrivenInitialization();
 
@@ -1191,6 +1225,15 @@ class OptimizedDesignDataCapture {
     // 🔒 SECURITY: designerReady event deduplication
     if (window.designerReadyListenerAttached) {
         console.log('🛡️ SECURITY: designerReady listener already attached - preventing duplicate');
+        // 🚨 THADDÄUS EMERGENCY: But still try emergency initialization if not initialized
+        if (!window.OptimizedDesignDataCaptureInitialized && !window.optimizedCaptureInstance) {
+            console.log('🚨 THADDÄUS: Event listener exists but system not initialized - emergency bypass');
+            setTimeout(() => {
+                const emergencyInstance = new OptimizedDesignDataCapture();
+                emergencyInstance.forceCanvasDetection();
+                window.optimizedCaptureInstance = emergencyInstance;
+            }, 100);
+        }
         return;
     }
     window.designerReadyListenerAttached = true;
