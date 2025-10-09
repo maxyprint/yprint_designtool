@@ -285,38 +285,41 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // Phase 5: Canvas Hook (Now Singleton-Aware + jQuery-Free)
-        wp_enqueue_script(
-            'octo-template-editor-canvas-hook',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-            ['octo-fabric-canvas-element-fix', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency, added canvas fix
-            $this->version . '.5-jquery-free',
-            true
-        );
+        // 🎯 FIX: Canvas detection scripts only needed in template editor context
+        if ($is_template_page) {
+            // Phase 5: Canvas Hook (Now Singleton-Aware + jQuery-Free)
+            wp_enqueue_script(
+                'octo-template-editor-canvas-hook',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
+                ['octo-fabric-canvas-element-fix', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency, added canvas fix
+                $this->version . '.5-jquery-free',
+                true
+            );
 
-        wp_enqueue_script(
-            'octo-reference-line-system',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
-            ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
-            $this->version . '.5',
-            true
-        );
+            wp_enqueue_script(
+                'octo-reference-line-system',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
+                ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
+                $this->version . '.5',
+                true
+            );
 
-        wp_enqueue_script(
-            'octo-canvas-detection-test',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-detection-test.js',
-            ['octo-reference-line-system', 'jquery'],
-            $this->version . '.1',
-            true
-        );
+            wp_enqueue_script(
+                'octo-canvas-detection-test',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-detection-test.js',
+                ['octo-reference-line-system', 'jquery'],
+                $this->version . '.1',
+                true
+            );
 
-        wp_enqueue_script(
-            'octo-canvas-meta-fields-sync',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-fields-sync.js',
-            ['octo-reference-line-system', 'octo-template-editor-canvas-hook', 'jquery'],
-            $this->version . '.1',
-            true
-        );
+            wp_enqueue_script(
+                'octo-canvas-meta-fields-sync',
+                OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-fields-sync.js',
+                ['octo-reference-line-system', 'octo-template-editor-canvas-hook', 'jquery'],
+                $this->version . '.1',
+                true
+            );
+        }
 
         // 🎨 WooCommerce Admin Preview System (Display-Only - No Coordinate Capture)
         if ($this->is_woocommerce_order_edit_page($hook)) {
@@ -406,8 +409,8 @@ class Octo_Print_Designer_Admin {
             );
         }
 
-        // 🧪 Load test suite in development mode (WP_DEBUG enabled)
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        // 🧪 Load test suite in development mode (WP_DEBUG enabled, template editor only)
+        if (defined('WP_DEBUG') && WP_DEBUG && $is_template_page) {
             wp_enqueue_script(
                 'octo-canvas-meta-sync-tests',
                 OCTO_PRINT_DESIGNER_URL . 'admin/js/canvas-meta-sync-test.js',
