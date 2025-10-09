@@ -327,13 +327,22 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Race Condition-freie Implementierung (DEPRECATED - replaced by optimized version)
+        // 🎯 YPRINT COORDINATE CAPTURE: New coordinate system for comparison
+        wp_register_script(
+            'octo-print-designer-yprint-capture',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-coordinate-capture.js',
+            ['octo-print-designer-designer'], // Load after designer bundle
+            rand(),
+            true
+        );
+
+        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Race Condition-freie Implementierung (ENABLED FOR COMPARISON)
         wp_register_script(
             'octo-print-designer-production-capture',
             OCTO_PRINT_DESIGNER_URL . 'public/js/production-ready-design-data-capture.js',
             ['octo-print-designer-designer'], // Load after designer bundle
             rand(),
-            false // Disabled - replaced by optimized version
+            true // Enabled for coordinate comparison
         );
 
         // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Advanced system that bypasses DesignerWidget exposure issues (DEPRECATED)
