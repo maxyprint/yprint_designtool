@@ -483,8 +483,13 @@ class Octo_Print_Designer_Public {
             'octo-canvas-initialization-controller-public',
             'octo-script-load-coordinator-public',
 
+            // Stage 2.5: Pre-Designer Dependencies (THADDÄUS FIX)
+            'octo-canvas-creation-blocker',                    // Must load before designer bundle
+            'octo-print-designer-products-listing-common',    // Common bundle dependency
+            'octo-print-designer-stripe-service',             // Service dependency
+
             // Stage 3: Designer Foundation (ESSENTIAL)
-            'octo-print-designer-designer',      // designer bundle
+            'octo-print-designer-designer',      // designer bundle (includes THADDÄUS fix inline script)
             'octo-designer-readiness-detector',  // designer detection
             'octo-staged-script-coordinator',    // coordinator
 
