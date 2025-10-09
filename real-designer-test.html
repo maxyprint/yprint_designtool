@@ -115,6 +115,7 @@
             <button class="test-btn" onclick="initializeRealDesigner()">🚀 Initialize Real Designer</button>
             <button class="test-btn" onclick="loadTemplates()">📋 Load Templates</button>
             <button class="test-btn" onclick="testDesignCapture()">🎯 Test Design Capture</button>
+            <button class="test-btn" onclick="activateCoordinateComparison()" style="background: #ff6b35;">🎯 YPrint vs Legacy Test</button>
             <button class="test-btn success" onclick="simulateWordPressSave()">💾 WordPress Save</button>
             <button class="test-btn danger" onclick="clearDesigner()">🗑️ Clear Designer</button>
         </div>
@@ -235,6 +236,7 @@
     <!-- Design Data Capture System -->
     <script src="public/js/production-ready-design-data-capture.js"></script>
     <script src="public/js/design-data-capture.js"></script>
+    <script src="public/js/direct-coordinate-tester.js"></script>
 
     <script>
         let realDesigner = null;
@@ -318,20 +320,18 @@
                 </div>
             `;
 
-            // ⚠️ DEACTIVATED: Canvas creation causes production conflicts
+            // 🎯 AGENT 3: CANVAS REAKTIVIERT FÜR KOORDINATEN-VERGLEICHSTEST
             try {
-                console.log('⚠️ CANVAS CREATION DEACTIVATED to prevent production conflicts');
+                console.log('🎯 CANVAS CREATION REACTIVATED for coordinate comparison testing');
 
-                // DEACTIVATED: Original canvas creation
-                // const canvas = new fabric.Canvas('octo-print-designer-canvas', {
-                //     width: 600,
-                //     height: 400,
-                //     backgroundColor: '#ffffff'
-                // });
+                // REACTIVATED: Canvas creation for coordinate testing
+                const canvas = new fabric.Canvas('octo-print-designer-canvas', {
+                    width: 600,
+                    height: 400,
+                    backgroundColor: '#ffffff'
+                });
 
-                // Alternative: Check if production canvas exists
-                const canvasElement = document.getElementById('octo-print-designer-canvas');
-                const canvas = canvasElement?.__fabric || null;
+                console.log('✅ Canvas created successfully for coordinate testing');
 
                 // Create mock DesignerWidget instance
                 realDesigner = {
@@ -370,7 +370,11 @@
                 // Auto-add some test content
                 setTimeout(() => {
                     addImageToDesigner();
-                    setTimeout(() => addTextToDesigner(), 500);
+                    setTimeout(() => {
+                        addTextToDesigner();
+                        // 🎯 AGENT 3: Activate coordinate comparison after content is added
+                        setTimeout(() => activateCoordinateComparison(), 1000);
+                    }, 500);
                 }, 1000);
 
             } catch (error) {
@@ -567,6 +571,123 @@
             // Initialize status checking
             updateSystemStatus();
         });
+
+        // 🎯 AGENT 3: KOORDINATENVERGLEICH AKTIVIERUNG
+        function activateCoordinateComparison() {
+            console.log('🎯 ACTIVATING COORDINATE COMPARISON TEST...');
+
+            // Check if DirectCoordinateTester is available
+            if (typeof window.DirectCoordinateTester === 'undefined') {
+                console.log('📥 Loading DirectCoordinateTester...');
+                // DirectCoordinateTester should be available from direct-coordinate-tester.js
+                window.coordinateTester = new window.DirectCoordinateTester();
+            }
+
+            if (window.coordinateTester) {
+                console.log('🧪 Starting YPrint vs Legacy coordinate comparison...');
+
+                // Run comprehensive coordinate comparison
+                const accuracyResults = window.coordinateTester.compareSystemsAccuracy();
+                console.log('📊 ACCURACY COMPARISON RESULTS:', accuracyResults);
+
+                const performanceResults = window.coordinateTester.measurePerformance();
+                console.log('⚡ PERFORMANCE COMPARISON RESULTS:', performanceResults);
+
+                const consistencyResults = window.coordinateTester.validateConsistency();
+                console.log('🔍 CONSISTENCY VALIDATION RESULTS:', consistencyResults);
+
+                const finalReport = window.coordinateTester.generateReport();
+                console.log('📋 FINAL COORDINATE COMPARISON REPORT:', finalReport);
+
+                // Visual overlay for coordinate differences
+                const overlay = window.coordinateTester.visualizeCoordinates();
+                console.log('🎨 Visual coordinate overlay created');
+
+                // Add comparison results to page
+                addCoordinateComparisonToPage(finalReport);
+
+            } else {
+                console.error('❌ DirectCoordinateTester not available');
+                // Fallback: Manual coordinate extraction
+                performManualCoordinateComparison();
+            }
+        }
+
+        function addCoordinateComparisonToPage(report) {
+            const container = document.getElementById('system-status');
+            if (container) {
+                const comparisonDiv = document.createElement('div');
+                comparisonDiv.innerHTML = `
+                    <h3>🎯 COORDINATE COMPARISON RESULTS</h3>
+                    <div><strong>Systems Discovered:</strong> ${report.summary.systemsDiscovered}</div>
+                    <div><strong>Overall Assessment:</strong> ${report.summary.overallAssessment}</div>
+                    <div><strong>Accuracy Tests:</strong> ${report.summary.testsCompleted.accuracy}</div>
+                    <div><strong>Performance Tests:</strong> ${report.summary.testsCompleted.performance}</div>
+                    <div><strong>Consistency Tests:</strong> ${report.summary.testsCompleted.consistency}</div>
+                    <hr>
+                    <h4>Recommendations:</h4>
+                    ${report.recommendations.map(rec => `<div>• ${rec.message}</div>`).join('')}
+                `;
+                comparisonDiv.style.cssText = 'border: 2px solid #007bff; padding: 15px; margin: 10px 0; background: #f8f9fa;';
+                container.appendChild(comparisonDiv);
+            }
+        }
+
+        function performManualCoordinateComparison() {
+            console.log('🔧 Performing manual coordinate comparison...');
+
+            if (realDesigner && realDesigner.fabricCanvas) {
+                const canvas = realDesigner.fabricCanvas;
+                const objects = canvas.getObjects();
+
+                console.log('📊 MANUAL COORDINATE EXTRACTION:');
+                console.log('Canvas Size:', { width: canvas.width, height: canvas.height });
+                console.log('Objects Count:', objects.length);
+
+                objects.forEach((obj, index) => {
+                    console.log(`Object ${index}:`, {
+                        type: obj.type,
+                        left: obj.left,
+                        top: obj.top,
+                        width: obj.width,
+                        height: obj.height,
+                        scaleX: obj.scaleX,
+                        scaleY: obj.scaleY,
+                        angle: obj.angle
+                    });
+                });
+
+                // YPrint coordinate extraction (enhanced)
+                const yprintCoords = objects.map((obj, index) => ({
+                    index,
+                    yprint: {
+                        left: obj.left,
+                        top: obj.top,
+                        scaledWidth: obj.width * (obj.scaleX || 1),
+                        scaledHeight: obj.height * (obj.scaleY || 1)
+                    },
+                    legacy: {
+                        x: obj.left,
+                        y: obj.top,
+                        w: obj.width,
+                        h: obj.height
+                    }
+                }));
+
+                console.log('🎯 YPRINT vs LEGACY COORDINATE COMPARISON:', yprintCoords);
+
+                // Calculate differences
+                yprintCoords.forEach(coord => {
+                    const widthDiff = Math.abs(coord.yprint.scaledWidth - coord.legacy.w);
+                    const heightDiff = Math.abs(coord.yprint.scaledHeight - coord.legacy.h);
+                    console.log(`Object ${coord.index} Differences:`, {
+                        widthDiff,
+                        heightDiff,
+                        significant: widthDiff > 1 || heightDiff > 1
+                    });
+                });
+            }
+        }
 
         // Custom styling for designer elements
         const style = document.createElement('style');
