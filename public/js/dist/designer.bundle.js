@@ -875,6 +875,7 @@ var DesignerWidget = /*#__PURE__*/function () {
           });
           if (addedImageData && addedImageData.fabricImage) {
             _this8.fabricCanvas.setActiveObject(addedImageData.fabricImage);
+            addedImageData.fabricImage.setCoords(); // FIX: Re-initialize oCoords after setActiveObject (setActiveObject invalidates oCoords)
             _this8.fabricCanvas.renderAll();
           }
         });

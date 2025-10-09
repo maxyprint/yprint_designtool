@@ -318,35 +318,8 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // 🎯 ADMIN CONTEXT FIX: Design Data Capture System Integration
-        // CRITICAL: Enable generateDesignData() function in WordPress admin context
+        // 🎨 WooCommerce Admin Preview System (Display-Only - No Coordinate Capture)
         if ($this->is_woocommerce_order_edit_page($hook)) {
-            wp_enqueue_script(
-                'octo-admin-optimized-capture',
-                OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
-                ['octo-fabric-global-exposure'], // REMOVED jQuery dependency + reduced race conditions
-                $this->version . '-race-condition-fix',
-                true
-            );
-
-            wp_enqueue_script(
-                'octo-admin-enhanced-json',
-                OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-json-coordinate-system.js',
-                ['octo-admin-optimized-capture'], // REMOVED jQuery dependency
-                $this->version . '-jquery-free-json',
-                true
-            );
-
-            // 🎯 FINAL COMPARISON TEST: YPrint Coordinate Capture System
-            // Load new unified system parallel to old systems for direct comparison
-            wp_enqueue_script(
-                'yprint-coordinate-capture',
-                OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-coordinate-capture.js',
-                ['octo-admin-enhanced-json'], // Load after other systems
-                $this->version . '-yprint-final-test',
-                true
-            );
-
             // 🎨 AGENT 3: WooCommerce Admin Canvas Rendering System
             // Phase 1: Admin Canvas Renderer (Pure Vanilla JS, no dependencies)
             wp_enqueue_script(
