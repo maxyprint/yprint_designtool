@@ -123,39 +123,12 @@ class Octo_Print_Designer_Public {
 
         } else {
             // 🚀 PRODUCTION MODE: Zero debug scripts for maximum performance
-            wp_add_inline_script('octo-print-designer-designer', '
-                console.log("🚀 PRODUCTION MODE: Debug scripts disabled for optimal performance");
-                console.log("📊 PERFORMANCE OPTIMIZATION: 4+ debug scripts eliminated from head loading");
-                console.log("⚡ SPEED IMPROVEMENT: Non-blocking script architecture enabled");
-            ', 'before');
+            // 🔧 TIMING FIX: wp_add_inline_script moved after script enqueueing (Line 520+)
         }
 
         // 🎯 CRITICAL FIX: Add logCoordinateSystemOutput function to frontend
         // This function was missing from frontend, causing coordinate systems to fail their logging
-        wp_add_inline_script('octo-print-designer-designer', '
-            // Global logging function for coordinate systems (frontend version)
-            window.logCoordinateSystemOutput = function(systemName, data) {
-                console.log("%c--- 📊 Koordinaten-System: " + systemName + " ---", "background: #0073aa; color: white; font-weight: bold; padding: 2px 5px;");
-                if (data) {
-                    console.log(data);
-
-                    // Data validation for coordinate system comparison
-                    if (data.elements && Array.isArray(data.elements)) {
-                        console.log("✅ Element Count:", data.elements.length);
-                        if (data.elements.length > 0) {
-                            console.log("📍 Sample Element:", data.elements[0]);
-                        }
-                    } else {
-                        console.warn("⚠️ Keine Element-Array gefunden in:", systemName);
-                    }
-                } else {
-                    console.warn("❌ Keine Daten generiert von:", systemName);
-                }
-                console.log("--- Ende " + systemName + " ---");
-            };
-
-            console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
-        ', 'after');
+        // 🔧 TIMING FIX: wp_add_inline_script moved after script enqueueing (Line 520+)
 
         // 🎯 STAGED LOADING ARCHITECTURE: Stage 1 - Webpack Readiness Detection
         wp_register_script(
@@ -409,27 +382,7 @@ class Octo_Print_Designer_Public {
         );
 
         // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
-        wp_add_inline_script('octo-print-designer-designer', '
-            // Verify emergency fabric loader worked
-            (function() {
-                console.log("🔍 EMERGENCY FABRIC VERIFICATION: Checking if fabric is available");
-
-                if (typeof window.fabric !== "undefined" && window.fabric.Canvas) {
-                    console.log("✅ EMERGENCY FABRIC VERIFICATION: window.fabric verified available");
-                    console.log("Fabric details:", {
-                        hasCanvas: typeof window.fabric.Canvas !== "undefined",
-                        hasImage: typeof window.fabric.Image !== "undefined",
-                        source: window.emergencyFabricLoaded ? "emergency-loader" : "unknown"
-                    });
-                } else {
-                    console.error("❌ EMERGENCY FABRIC VERIFICATION: window.fabric still not available");
-                    console.error("Emergency loader status:", {
-                        emergencyActive: window.emergencyFabricLoaderActive || false,
-                        emergencyLoaded: window.emergencyFabricLoaded || false
-                    });
-                }
-            })();
-        ', 'after');
+        // 🔧 TIMING FIX: wp_add_inline_script moved after script enqueueing (Line 520+)
         
         wp_localize_script('octo-print-designer-designer', 'octoPrintDesigner', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -516,6 +469,69 @@ class Octo_Print_Designer_Public {
             if (wp_script_is($script_handle, 'registered')) {
                 wp_enqueue_script($script_handle);
             }
+        }
+
+        // ✅ THADDÄUS TIMING FIX: wp_add_inline_script calls AFTER script enqueueing
+        // WordPress requires inline scripts to be added AFTER wp_enqueue_script
+        if (wp_script_is('octo-print-designer-designer', 'enqueued')) {
+
+            // 🚀 PRODUCTION MODE: Zero debug scripts for maximum performance
+            if (!WP_DEBUG) {
+                wp_add_inline_script('octo-print-designer-designer', '
+                    console.log("🚀 PRODUCTION MODE: Debug scripts disabled for optimal performance");
+                    console.log("📊 PERFORMANCE OPTIMIZATION: 4+ debug scripts eliminated from head loading");
+                    console.log("⚡ SPEED IMPROVEMENT: Non-blocking script architecture enabled");
+                ', 'before');
+            }
+
+            // 🎯 CRITICAL FIX: Add logCoordinateSystemOutput function to frontend
+            wp_add_inline_script('octo-print-designer-designer', '
+                // Global logging function for coordinate systems (frontend version)
+                window.logCoordinateSystemOutput = function(systemName, data) {
+                    console.log("%c--- 📊 Koordinaten-System: " + systemName + " ---", "background: #0073aa; color: white; font-weight: bold; padding: 2px 5px;");
+                    if (data) {
+                        console.log(data);
+
+                        // Data validation for coordinate system comparison
+                        if (data.elements && Array.isArray(data.elements)) {
+                            console.log("✅ Element Count:", data.elements.length);
+                            if (data.elements.length > 0) {
+                                console.log("📍 Sample Element:", data.elements[0]);
+                            }
+                        } else {
+                            console.warn("⚠️ Keine Element-Array gefunden in:", systemName);
+                        }
+                    } else {
+                        console.warn("❌ Keine Daten generiert von:", systemName);
+                    }
+                    console.log("--- Ende " + systemName + " ---");
+                };
+
+                console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
+            ', 'after');
+
+            // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
+            wp_add_inline_script('octo-print-designer-designer', '
+                // Verify emergency fabric loader worked
+                (function() {
+                    console.log("🔍 EMERGENCY FABRIC VERIFICATION: Checking if fabric is available");
+
+                    if (typeof window.fabric !== "undefined" && window.fabric.Canvas) {
+                        console.log("✅ EMERGENCY FABRIC VERIFICATION: window.fabric verified available");
+                        console.log("Fabric details:", {
+                            hasCanvas: typeof window.fabric.Canvas !== "undefined",
+                            hasImage: typeof window.fabric.Image !== "undefined",
+                            source: window.emergencyFabricLoaded ? "emergency-loader" : "unknown"
+                        });
+                    } else {
+                        console.error("❌ EMERGENCY FABRIC VERIFICATION: window.fabric still not available");
+                        console.error("Emergency loader status:", {
+                            emergencyActive: window.emergencyFabricLoaderActive || false,
+                            emergencyLoaded: window.emergencyFabricLoaded || false
+                        });
+                    }
+                })();
+            ', 'after');
         }
 
 	}
