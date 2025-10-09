@@ -75,6 +75,41 @@ var DesignerWidget = /*#__PURE__*/function () {
     window.designerWidgetInstance = this;
     console.log('🛡️ SINGLETON: DesignerWidget instance registered successfully');
 
+    // 🎯 FABRIC.JS GLOBAL EXPOSURE - Emergency Fix by THADDÄUS Agent 3
+    // Pattern copied from working admin.bundle.js implementation
+    if (!window.fabric && typeof fabric__WEBPACK_IMPORTED_MODULE_1__ !== 'undefined') {
+      try {
+        console.log('🎯 FABRIC EXPOSURE: Emergency fix - exposing fabric globally from designer bundle');
+
+        // Assign fabric module to global scope with error handling
+        window.fabric = fabric__WEBPACK_IMPORTED_MODULE_1__;
+
+        // Validate successful exposure
+        if (window.fabric && typeof window.fabric.Canvas === 'function') {
+          console.log('✅ FABRIC EXPOSURE: window.fabric successfully available from designer bundle');
+
+          // Dispatch event for cross-system communication
+          if (typeof window.CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('fabricGlobalReady', {
+              detail: {
+                fabric: window.fabric,
+                source: 'designer-bundle-emergency-fix',
+                timestamp: Date.now()
+              }
+            }));
+          }
+        } else {
+          console.error('❌ FABRIC EXPOSURE: Failed - window.fabric assignment unsuccessful');
+        }
+      } catch (error) {
+        console.error('❌ FABRIC EXPOSURE: Error during fabric exposure:', error);
+      }
+    } else if (window.fabric) {
+      console.log('✅ FABRIC EXPOSURE: window.fabric already available, skipping emergency fix');
+    } else {
+      console.error('❌ FABRIC EXPOSURE: fabric__WEBPACK_IMPORTED_MODULE_1__ not available for exposure');
+    }
+
     this.init();
   }
   return _createClass(DesignerWidget, [{

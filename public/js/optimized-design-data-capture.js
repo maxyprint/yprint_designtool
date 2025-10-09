@@ -1245,6 +1245,19 @@ class OptimizedDesignDataCapture {
         initializeOptimizedCapture(designerInstance);
     });
 
+    // 🎯 THADDÄUS EMERGENCY: Listen for fabricGlobalReady event from designer bundle fix
+    document.addEventListener('fabricGlobalReady', function(event) {
+        console.log('🎯 THADDÄUS EMERGENCY: fabricGlobalReady event received - fabric is now available!');
+        console.log('🔍 THADDÄUS: Event source:', event.detail.source);
+        console.log('🔍 THADDÄUS: Fabric available:', typeof window.fabric !== 'undefined');
+
+        // If we have a capture instance, try to re-initialize it with fabric now available
+        if (window.OptimizedDesignDataCaptureInstance && typeof window.fabric !== 'undefined') {
+            console.log('🚨 THADDÄUS: Attempting emergency re-initialization with fabric available');
+            window.OptimizedDesignDataCaptureInstance.emergencyFabricDetection();
+        }
+    });
+
     console.log('🎯 GATEKEEPER: optimized-design-data-capture.js waiting for designerReady event...');
     }
 })();
