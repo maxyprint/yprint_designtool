@@ -318,13 +318,20 @@
                 </div>
             `;
 
-            // Initialize Fabric Canvas (wie im echten Plugin)
+            // ⚠️ DEACTIVATED: Canvas creation causes production conflicts
             try {
-                const canvas = new fabric.Canvas('octo-print-designer-canvas', {
-                    width: 600,
-                    height: 400,
-                    backgroundColor: '#ffffff'
-                });
+                console.log('⚠️ CANVAS CREATION DEACTIVATED to prevent production conflicts');
+
+                // DEACTIVATED: Original canvas creation
+                // const canvas = new fabric.Canvas('octo-print-designer-canvas', {
+                //     width: 600,
+                //     height: 400,
+                //     backgroundColor: '#ffffff'
+                // });
+
+                // Alternative: Check if production canvas exists
+                const canvasElement = document.getElementById('octo-print-designer-canvas');
+                const canvas = canvasElement?.__fabric || null;
 
                 // Create mock DesignerWidget instance
                 realDesigner = {

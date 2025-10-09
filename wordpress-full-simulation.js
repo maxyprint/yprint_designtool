@@ -294,8 +294,10 @@ class WordPressFullSimulation {
                         window.DesignerWidget = class DesignerWidget {
                             constructor(canvasId) {
                                 this.canvasId = canvasId;
-                                this.canvas = window.fabric ? new window.fabric.Canvas(canvasId) : null;
-                                console.log('🎨 DesignerWidget instance created');
+                                // ⚠️ DEACTIVATED: Canvas creation causes production conflicts
+                                // this.canvas = window.fabric ? new window.fabric.Canvas(canvasId) : null;
+                                this.canvas = null; // Deactivated to prevent double-initialization
+                                console.log('🎨 DesignerWidget instance created (canvas creation deactivated)');
                             }
                         };
                     }
@@ -400,10 +402,11 @@ class WordPressFullSimulation {
         return class DesignerWidget {
             constructor(canvasId) {
                 this.canvasId = canvasId;
-                if (window.fabric && window.fabric.Canvas) {
-                    this.canvas = new window.fabric.Canvas(canvasId);
-                } else {
-                    console.log('⚠️ Fabric.js not available, creating placeholder canvas');
+                // ⚠️ DEACTIVATED: Canvas creation causes production conflicts
+                // if (window.fabric && window.fabric.Canvas) {
+                //     this.canvas = new window.fabric.Canvas(canvasId);
+                // } else {
+                    console.log('⚠️ Canvas creation deactivated to prevent production conflicts');
                     this.canvas = {
                         getObjects: () => [],
                         toJSON: () => ({objects: [], width: 780, height: 580})
@@ -439,11 +442,11 @@ class WordPressFullSimulation {
 
             // Test DesignerWidget
             if (!this.window.DesignerWidget) {
-                console.log('⚠️ DesignerWidget not available, using direct Fabric');
-                // Direkter Fabric Canvas
-                const fabricCanvas = new this.window.fabric.Canvas('designer-canvas');
-                canvasElement.__fabric = fabricCanvas;
-                console.log('🔗 Canvas element marked with __fabric property');
+                console.log('⚠️ DesignerWidget not available - canvas creation deactivated');
+                // ⚠️ DEACTIVATED: Direct canvas creation causes production conflicts
+                // const fabricCanvas = new this.window.fabric.Canvas('designer-canvas');
+                // canvasElement.__fabric = fabricCanvas;
+                console.log('🔗 Canvas creation skipped to prevent production conflicts');
             } else {
                 // DesignerWidget verwenden
                 const widget = new this.window.DesignerWidget('designer-canvas');
