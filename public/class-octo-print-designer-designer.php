@@ -81,8 +81,8 @@ class Octo_Print_Designer_Designer {
         // 🏆 PERMANENT SAVE FIX: Enqueue permanent AJAX interceptor for save functionality
         wp_enqueue_script('octo-print-designer-permanent-save-fix');
 
-        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Enqueue race condition-free capture system
-        wp_enqueue_script('octo-print-designer-production-capture');
+        // 🚨 DELETED: PRODUCTION-READY DESIGN DATA CAPTURE (VIEWPORT CONTAMINATION ELIMINATED)
+        // wp_enqueue_script('octo-print-designer-production-capture'); // File deleted
 
         // 🔍 SAFEZONE COORDINATE VALIDATOR: Enqueue SafeZone validation fix
         wp_enqueue_script('octo-print-designer-safezone-validator');

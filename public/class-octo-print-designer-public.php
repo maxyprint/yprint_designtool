@@ -336,14 +336,9 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🎯 PRODUCTION-READY DESIGN DATA CAPTURE: Race Condition-freie Implementierung (ENABLED FOR COMPARISON)
-        wp_register_script(
-            'octo-print-designer-production-capture',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/production-ready-design-data-capture.js',
-            ['octo-print-designer-designer'], // Load after designer bundle
-            rand(),
-            true // Enabled for coordinate comparison
-        );
+        // 🚨 DELETED: PRODUCTION-READY DESIGN DATA CAPTURE (VIEWPORT CONTAMINATION ELIMINATED)
+        // File deleted: production-ready-design-data-capture.js contained faulty transformCoordinates()
+        // that added viewport offsets causing print positioning errors
 
         // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Advanced system that bypasses DesignerWidget exposure issues (DEPRECATED)
         wp_register_script(
@@ -449,7 +444,7 @@ class Octo_Print_Designer_Public {
             // Stage 4: Event-driven dependent scripts (ESSENTIAL)
             'octo-print-designer-optimized-capture',      // data capture (1/3)
             'octo-print-designer-yprint-capture',         // THADDÄUS FIX: yprint coordinate system (2/3)
-            'octo-print-designer-production-capture',     // THADDÄUS FIX: production coordinate system (3/3)
+            // 'octo-print-designer-production-capture' - DELETED: viewport contamination eliminated
             'octo-print-designer-permanent-save-fix',     // save fixes
             'octo-print-designer-enhanced-json',          // coordinate system
             'octo-print-designer-safezone-validator',     // validation
