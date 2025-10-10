@@ -490,6 +490,7 @@ class Octo_Print_Designer_Public {
             // 🎯 CRITICAL FIX: Add logCoordinateSystemOutput function to frontend
             wp_add_inline_script('octo-print-designer-designer', '
                 // Global logging function for coordinate systems (frontend version)
+                // 🎯 THADDÄUS TIMING FIX: "before" statt "after" für early availability
                 window.logCoordinateSystemOutput = function(systemName, data) {
                     console.log("%c--- 📊 Koordinaten-System: " + systemName + " ---", "background: #0073aa; color: white; font-weight: bold; padding: 2px 5px;");
                     if (data) {
@@ -510,13 +511,13 @@ class Octo_Print_Designer_Public {
                     console.log("--- Ende " + systemName + " ---");
                 };
 
-                console.log("🎯 THADDÄUS FIX: logCoordinateSystemOutput function loaded on frontend");
+                console.log("🎯 THADDÄUS TIMING FIX: logCoordinateSystemOutput loaded BEFORE designer script execution");
 
                 // 🚨 THADDÄUS EMERGENCY: Ensure script runs even if designer script fails to enqueue
                 if (!' . ($designer_script_enqueued ? 'true' : 'false') . ') {
                     console.warn("🚨 THADDÄUS WARNING: Designer script not enqueued - THADDÄUS function loaded via fallback");
                 }
-            ', 'after');
+            ', 'before');
 
             // 🚨 EMERGENCY FABRIC VERIFICATION: Simple check that emergency loader worked
             wp_add_inline_script('octo-print-designer-designer', '
