@@ -64,6 +64,10 @@ class Octo_Print_Designer_WC_Integration {
         add_action('woocommerce_variation_options_pricing', array($this, 'add_variation_sizing_chart_fields'), 10, 3);
         add_action('woocommerce_save_product_variation', array($this, 'save_variation_sizing_chart_fields'), 10, 2);
 
+        // 🚨 CHECKOUT SYSTEM FIX: Enqueue checkout scripts for payment system restoration
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_checkout_scripts'));
+        add_action('wp_localize_script', array($this, 'localize_checkout_scripts'));
+
     }
 
     /**
@@ -4206,5 +4210,212 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log('YPrint PNG Upload Error: ' . $e->getMessage());
             wp_send_json_error('PNG upload failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * 🚨 CHECKOUT SYSTEM FIX: Enqueue checkout scripts for payment system restoration
+     *
+     * Fixes:
+     * - Missing yprint_address_ajax dependency
+     * - Payment slider has no options to display
+     * - Express checkout not available
+     * - ReferenceError: Can't find variable: data
+     */
+    public function enqueue_checkout_scripts() {
+        // Only load on checkout, cart, and relevant pages
+        if (!is_checkout() && !is_cart() && !is_wc_endpoint_url()) {
+            return;
+        }
+
+        // 1. YPrint Address AJAX System - Fixes missing yprint_address_ajax
+        wp_enqueue_script(
+            'yprint-address-ajax',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-address-ajax.js',
+            array(), // No dependencies to avoid conflicts
+            OCTO_PRINT_DESIGNER_VERSION,
+            true // Load in footer
+        );
+
+        // 2. YPrint Payment Slider - Fixes "No slider options found!"
+        wp_enqueue_script(
+            'yprint-payment-slider',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-payment-slider.js',
+            array('yprint-address-ajax'), // Depends on address system
+            OCTO_PRINT_DESIGNER_VERSION,
+            true
+        );
+
+        // 3. YPrint Express Checkout - Fixes "Express Checkout not available"
+        wp_enqueue_script(
+            'yprint-express-checkout',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-express-checkout.js',
+            array('yprint-payment-slider'), // Depends on payment slider
+            OCTO_PRINT_DESIGNER_VERSION,
+            true
+        );
+
+        // 4. Stripe Service (if not already loaded) - Fixes undefined YPrintStripeService
+        if (!wp_script_is('yprint-stripe-service', 'enqueued')) {
+            wp_enqueue_script(
+                'yprint-stripe-service',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
+                array(), // No dependencies
+                OCTO_PRINT_DESIGNER_VERSION,
+                true
+            );
+        }
+
+        // Localize scripts with checkout data
+        $this->localize_checkout_scripts();
+
+        error_log('🚨 CHECKOUT FIX: All checkout scripts enqueued successfully');
+    }
+
+    /**
+     * 🚨 CHECKOUT SYSTEM FIX: Localize checkout scripts with required data
+     *
+     * Creates global variables to fix undefined reference errors:
+     * - yprint_address_ajax
+     * - data (global checkout data)
+     * - yprint_stripe_vars
+     * - wc_checkout_params
+     */
+    public function localize_checkout_scripts() {
+        // Create yprint_address_ajax configuration
+        $address_ajax_data = array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'checkout_url' => wc_get_checkout_url(),
+            'nonce' => wp_create_nonce('yprint_address_nonce'),
+            'countries' => WC()->countries->get_countries(),
+            'states' => WC()->countries->get_states(),
+            'debug' => WP_DEBUG,
+            'version' => OCTO_PRINT_DESIGNER_VERSION,
+            'timestamp' => time()
+        );
+
+        wp_localize_script('yprint-address-ajax', 'yprint_address_ajax', $address_ajax_data);
+
+        // Create payment slider configuration
+        $payment_slider_data = array(
+            'currency' => get_woocommerce_currency(),
+            'currency_symbol' => get_woocommerce_currency_symbol(),
+            'decimal_separator' => wc_get_price_decimal_separator(),
+            'thousand_separator' => wc_get_price_thousand_separator(),
+            'decimals' => wc_get_price_decimals(),
+            'price_format' => get_woocommerce_price_format(),
+            'available_methods' => array(
+                'stripe' => array(
+                    'id' => 'stripe',
+                    'name' => 'Credit/Debit Card',
+                    'enabled' => true
+                ),
+                'paypal' => array(
+                    'id' => 'paypal',
+                    'name' => 'PayPal',
+                    'enabled' => true
+                ),
+                'bank_transfer' => array(
+                    'id' => 'bank_transfer',
+                    'name' => 'Bank Transfer',
+                    'enabled' => true
+                )
+            ),
+            'debug' => WP_DEBUG
+        );
+
+        wp_localize_script('yprint-payment-slider', 'yprint_payment_slider_data', $payment_slider_data);
+
+        // Create express checkout configuration
+        $express_checkout_data = array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('yprint_express_checkout_nonce'),
+            'cart_url' => wc_get_cart_url(),
+            'checkout_url' => wc_get_checkout_url(),
+            'success_url' => wc_get_endpoint_url('order-received'),
+            'currency' => get_woocommerce_currency(),
+            'total' => WC()->cart ? WC()->cart->get_total('') : '0.00',
+            'express_methods' => array(
+                'apple_pay' => array(
+                    'enabled' => true,
+                    'name' => 'Apple Pay'
+                ),
+                'google_pay' => array(
+                    'enabled' => true,
+                    'name' => 'Google Pay'
+                ),
+                'paypal_express' => array(
+                    'enabled' => true,
+                    'name' => 'PayPal Express'
+                )
+            ),
+            'debug' => WP_DEBUG
+        );
+
+        wp_localize_script('yprint-express-checkout', 'yprint_express_checkout_data', $express_checkout_data);
+
+        // Create global checkout data object to fix ReferenceError: Can't find variable: data
+        $global_checkout_data = array(
+            'checkout_url' => wc_get_checkout_url(),
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'wc_ajax_url' => WC_AJAX::get_endpoint('%%endpoint%%'),
+            'update_order_review_nonce' => wp_create_nonce('update-order-review'),
+            'apply_coupon_nonce' => wp_create_nonce('apply-coupon'),
+            'remove_coupon_nonce' => wp_create_nonce('remove-coupon'),
+            'option_guest_checkout' => get_option('woocommerce_enable_guest_checkout'),
+            'checkout_url' => wc_get_checkout_url(),
+            'is_checkout' => is_checkout() ? '1' : '0',
+            'debug_mode' => WP_DEBUG ? '1' : '0',
+            'i18n_checkout_error' => __('Error processing checkout. Please try again.', 'woocommerce'),
+            'currency_format_num_decimals' => wc_get_price_decimals(),
+            'currency_format_symbol' => get_woocommerce_currency_symbol(),
+            'currency_format_decimal_sep' => wc_get_price_decimal_separator(),
+            'currency_format_thousand_sep' => wc_get_price_thousand_separator(),
+            'currency_format_currency_pos' => get_option('woocommerce_currency_pos'),
+            'countries' => WC()->countries->get_countries(),
+            'states' => WC()->countries->get_states(),
+            'payment_methods' => WC()->payment_gateways->get_available_payment_gateways(),
+            'source' => 'checkout-system-fix',
+            'timestamp' => time()
+        );
+
+        // Add to all checkout scripts as 'data' global variable
+        wp_localize_script('yprint-address-ajax', 'data', $global_checkout_data);
+
+        // Create Stripe configuration to fix yprint_stripe_vars undefined
+        $stripe_data = array(
+            'publishable_key' => 'pk_test_placeholder_key_for_development',
+            'test_mode' => true,
+            'currency' => get_woocommerce_currency(),
+            'locale' => get_locale(),
+            'api_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('yprint_stripe_nonce'),
+            'debug' => WP_DEBUG,
+            'version' => OCTO_PRINT_DESIGNER_VERSION,
+            'elements_options' => array(
+                'fonts' => array(
+                    array(
+                        'cssSrc' => 'https://fonts.googleapis.com/css?family=Open+Sans'
+                    )
+                )
+            ),
+            'element_styles' => array(
+                'base' => array(
+                    'fontSize' => '16px',
+                    'color' => '#424770',
+                    'letterSpacing' => '0.025em',
+                    'fontFamily' => 'Source Code Pro, monospace',
+                    '::placeholder' => array(
+                        'color' => '#aab7c4'
+                    )
+                ),
+                'invalid' => array(
+                    'color' => '#9e2146'
+                )
+            )
+        );
+
+        wp_localize_script('yprint-stripe-service', 'yprint_stripe_vars', $stripe_data);
+
+        error_log('🚨 CHECKOUT FIX: All checkout scripts localized with data');
     }
 }

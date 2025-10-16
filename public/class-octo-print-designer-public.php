@@ -192,6 +192,16 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 FABRIC MASTER LOADER - DEFINITIVE FABRIC.JS SOLUTION
+        // Replaces: emergency-fabric-loader.js, fabric-global-exposer.js, unified-fabric-loader.js
+        wp_register_script(
+            'octo-print-designer-emergency-fabric',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-master-loader.js',
+            ['octo-print-designer-vendor'], // Load after vendor bundle for webpack extraction
+            $this->version . '.fabric-master-v1',
+            true
+        );
+
         // 🚨 DESIGN SAVE EMERGENCY FIX - Solves "Invalid input data" error
         wp_register_script(
             'octo-print-designer-save-fix',
@@ -273,20 +283,14 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🎯 FABRIC GLOBAL EXPOSER: Exposes fabric.js globally (SURGICAL FIX)
-        wp_register_script(
-            'octo-print-designer-fabric-global-exposer',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-global-exposer.js',
-            ['octo-print-designer-webpack-patch'], // Load after webpack patch
-            rand(),
-            true
-        );
+        // ❌ REMOVED: Legacy fabric-global-exposer.js - Replaced by fabric-master-loader.js
+        // This script caused timing conflicts and race conditions
 
         // 🔧 FABRIC CANVAS ELEMENT FIX: Safari toCanvasElement bug fix
         wp_register_script(
             'octo-print-designer-fabric-canvas-fix',
             OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-element-fix.js',
-            ['octo-print-designer-fabric-global-exposer'], // Load after fabric is globally available
+            ['octo-print-designer-emergency-fabric'], // Load after fabric master loader
             $this->version . '.canvas-fix-v1',
             true
         );
@@ -546,7 +550,7 @@ class Octo_Print_Designer_Public {
     public function add_fabric_preload_hints() {
         // Only add preload hints on designer pages
         if (is_page() || (function_exists('is_woocommerce') && is_woocommerce())) {
-            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js" as="script" crossorigin="anonymous">' . "\n";
+            echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-master-loader.js" as="script" crossorigin="anonymous">' . "\n";
             echo '<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" as="script" crossorigin="anonymous">' . "\n";
             echo '<link rel="dns-prefetch" href="cdnjs.cloudflare.com">' . "\n";
             echo '<link rel="dns-prefetch" href="' . parse_url(OCTO_PRINT_DESIGNER_URL, PHP_URL_HOST) . '">' . "\n";

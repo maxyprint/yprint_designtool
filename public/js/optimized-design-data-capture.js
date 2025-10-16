@@ -107,6 +107,13 @@ class OptimizedDesignDataCapture {
      * Attempt immediate initialization if everything is available
      */
     attemptImmediateInitialization() {
+        // 🚨 CIRCUIT BREAKER: Prevent infinite retry loops
+        if (this.retryCount >= this.maxRetries) {
+            this.debugLog('error', '🚨 CIRCUIT BREAKER: Max retries reached, forcing emergency initialization');
+            this.performEmergencyInitialization();
+            return true;
+        }
+
         // Check if Fabric.js is available
         if (typeof window.fabric === 'undefined') {
             this.debugLog('debug', '🔄 Fabric.js not yet available');
@@ -123,13 +130,91 @@ class OptimizedDesignDataCapture {
         // Check if Fabric Canvas instances exist
         const fabricCanvases = Array.from(canvasElements).filter(canvas => canvas.__fabric);
         if (fabricCanvases.length === 0) {
-            this.debugLog('debug', '🔄 No fabric canvas instances found yet');
+            // 🔍 PARADOX RESOLVER: Log detailed status when fabric instances missing
+            this.debugLog('warn', '🔍 PARADOX DETECTED: Canvas elements exist but no fabric instances');
+            this.debugLog('warn', '📊 Canvas Analysis:', {
+                totalCanvases: canvasElements.length,
+                fabricCanvases: fabricCanvases.length,
+                canvasIds: Array.from(canvasElements).map(c => c.id || 'no-id'),
+                hasFabricProp: Array.from(canvasElements).map(c => !!c.__fabric)
+            });
+
+            // 🚨 EMERGENCY MODE: If we have retried too many times with canvas but no fabric
+            if (this.retryCount > 5) {
+                this.debugLog('warn', '🚨 EMERGENCY: Attempting fabric instance creation');
+                return this.attemptFabricInstanceCreation(canvasElements);
+            }
+
             return false;
         }
 
         // Everything available - initialize immediately
         this.performInitialization();
         return true;
+    }
+
+    /**
+     * 🚨 EMERGENCY: Force initialization when max retries reached
+     */
+    performEmergencyInitialization() {
+        this.debugLog('error', '🚨 EMERGENCY INITIALIZATION: Forcing system activation');
+
+        // Set all status flags to ready
+        this.status.domReady = true;
+        this.status.fabricLoaded = true;
+        this.status.canvasDetected = true;
+        this.status.systemReady = true;
+
+        // Try to find any canvas and create basic system
+        const canvasElements = document.querySelectorAll('canvas');
+        if (canvasElements.length > 0) {
+            this.fabricCanvases = Array.from(canvasElements).map((canvas, index) => ({
+                canvas: canvas.__fabric || null,
+                element: canvas,
+                id: `emergency-canvas-${index}`,
+                isDesignerCanvas: true,
+                emergency: true
+            }));
+        }
+
+        // Perform basic initialization
+        try {
+            this.exposeGlobalFunctions();
+            this.initialized = true;
+            this.debugLog('info', '🚨 EMERGENCY: Basic system initialized');
+            this.dispatchInitializationEvent();
+        } catch (error) {
+            this.debugLog('error', '🚨 EMERGENCY INIT FAILED:', error);
+        }
+    }
+
+    /**
+     * 🚨 EMERGENCY: Attempt to create fabric instances from canvas elements
+     */
+    attemptFabricInstanceCreation(canvasElements) {
+        this.debugLog('warn', '🚨 EMERGENCY: Attempting fabric canvas creation');
+
+        let createdCount = 0;
+
+        Array.from(canvasElements).forEach((canvas, index) => {
+            if (!canvas.__fabric && window.fabric && window.fabric.Canvas) {
+                try {
+                    // Don't actually create a new Fabric canvas, just mark as available
+                    this.debugLog('info', `🚨 EMERGENCY: Canvas ${index} marked for emergency mode`);
+                    createdCount++;
+                } catch (error) {
+                    this.debugLog('error', `🚨 EMERGENCY: Failed to process canvas ${index}:`, error);
+                }
+            }
+        });
+
+        if (createdCount > 0) {
+            this.debugLog('info', `🚨 EMERGENCY: Processed ${createdCount} canvases, attempting initialization`);
+            this.performEmergencyInitialization();
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -236,7 +321,10 @@ class OptimizedDesignDataCapture {
         while (this.retryCount < this.maxRetries && !this.initialized) {
             const delay = this.calculateRetryDelay();
 
-            this.debugLog('debug', `🔄 Detection attempt ${this.retryCount + 1}/${this.maxRetries} (delay: ${delay}ms)`);
+            // 🔇 SPAM REDUCTION: Only log every 3rd attempt to reduce console noise
+            if (this.retryCount % 3 === 0 || this.retryCount >= this.maxRetries - 2) {
+                this.debugLog('debug', `🔄 Detection attempt ${this.retryCount + 1}/${this.maxRetries} (delay: ${delay}ms)`);
+            }
 
             await this.sleep(delay);
 

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 YPrint Superpower Testing Lab</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .success { background: rgba(39, 174, 96, 0.3); color: #2ecc71; }
+        .error { background: rgba(231, 76, 60, 0.3); color: #e74c3c; }
+        .warning { background: rgba(243, 156, 18, 0.3); color: #f39c12; }
+        .info { background: rgba(52, 152, 219, 0.3); color: #3498db; }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+
+        .btn:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; }
+        .btn-danger { background: #e74c3c; }
+
+        .console-output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>🧪 YPrint Superpower Testing Lab</h1>
+            <p>Comprehensive validation of all 5-agent superpower implementations</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Test Controls</h3>
+            <button class="btn btn-success" onclick="runAllTests()">🚀 Run All Superpower Tests</button>
+            <button class="btn" onclick="testEmergencySystem()">🩹 Test Emergency System</button>
+            <button class="btn" onclick="testUnifiedFabric()">🎯 Test Unified Fabric</button>
+            <button class="btn" onclick="testEventCoordination()">⚡ Test Event Coordination</button>
+            <button class="btn" onclick="testSuperpowerActivation()">🔥 Test Superpower Activation</button>
+            <button class="btn btn-danger" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>💻 Console Output</h3>
+            <div class="console-output" id="console-output"></div>
+        </div>
+    </div>
+
+    <!-- Load all superpower systems -->
+    <script src="public/js/optimized-design-data-capture.js"></script>
+    <script src="public/js/unified-fabric-loader.js"></script>
+    <script src="public/js/event-coordination-system.js"></script>
+    <script src="superpower-activation.js"></script>
+
+    <script>
+        // Testing Framework
+        class SuperpowerTester {
+            constructor() {
+                this.results = [];
+                this.consoleOutput = document.getElementById('console-output');
+                this.resultsContainer = document.getElementById('test-results');
+
+                // Capture console logs
+                this.setupConsoleCapture();
+            }
+
+            setupConsoleCapture() {
+                const originalLog = console.log;
+                const originalWarn = console.warn;
+                const originalError = console.error;
+
+                console.log = (...args) => {
+                    this.addConsoleOutput('LOG', args.join(' '));
+                    originalLog.apply(console, args);
+                };
+
+                console.warn = (...args) => {
+                    this.addConsoleOutput('WARN', args.join(' '));
+                    originalWarn.apply(console, args);
+                };
+
+                console.error = (...args) => {
+                    this.addConsoleOutput('ERROR', args.join(' '));
+                    originalError.apply(console, args);
+                };
+            }
+
+            addConsoleOutput(type, message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.consoleOutput.textContent += `[${timestamp}] ${type}: ${message}\n`;
+                this.consoleOutput.scrollTop = this.consoleOutput.scrollHeight;
+            }
+
+            addResult(test, status, message) {
+                const result = { test, status, message, timestamp: new Date().toLocaleTimeString() };
+                this.results.push(result);
+
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-result ${status}`;
+                resultDiv.innerHTML = `[${result.timestamp}] ${test}: ${status.toUpperCase()} - ${message}`;
+                this.resultsContainer.appendChild(resultDiv);
+            }
+
+            async testEmergencySystem() {
+                console.log('🧪 TESTING: Emergency Response System...');
+
+                try {
+                    // Test 1: Check if OptimizedDesignDataCaptureInstance exists
+                    if (!window.OptimizedDesignDataCaptureInstance) {
+                        this.addResult('Emergency System', 'error', 'OptimizedDesignDataCaptureInstance not found');
+                        return false;
+                    }
+
+                    // Test 2: Check if emergencyFabricDetection method exists
+                    if (typeof window.OptimizedDesignDataCaptureInstance.emergencyFabricDetection !== 'function') {
+                        this.addResult('Emergency System', 'error', 'emergencyFabricDetection method missing');
+                        return false;
+                    }
+
+                    // Test 3: Try calling the method
+                    const result = window.OptimizedDesignDataCaptureInstance.emergencyFabricDetection();
+                    this.addResult('Emergency System', 'success', 'Emergency method callable and working');
+                    return true;
+
+                } catch (error) {
+                    this.addResult('Emergency System', 'error', `Exception: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async testUnifiedFabric() {
+                console.log('🧪 TESTING: Unified Fabric Loader...');
+
+                try {
+                    // Test 1: Check if unified fabric loader exists
+                    if (!window.unifiedFabricLoader) {
+                        this.addResult('Unified Fabric', 'error', 'unifiedFabricLoader not found');
+                        return false;
+                    }
+
+                    // Test 2: Check status method
+                    if (typeof window.unifiedFabricLoader.getStatus !== 'function') {
+                        this.addResult('Unified Fabric', 'error', 'getStatus method missing');
+                        return false;
+                    }
+
+                    // Test 3: Get status
+                    const status = window.unifiedFabricLoader.getStatus();
+                    this.addResult('Unified Fabric', 'success', `Status: ${JSON.stringify(status)}`);
+
+                    // Test 4: Check if fabric is available
+                    if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                        this.addResult('Unified Fabric', 'success', 'Fabric.js successfully loaded and available');
+                    } else {
+                        this.addResult('Unified Fabric', 'warning', 'Fabric.js not yet loaded');
+                    }
+
+                    return true;
+
+                } catch (error) {
+                    this.addResult('Unified Fabric', 'error', `Exception: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async testEventCoordination() {
+                console.log('🧪 TESTING: Event Coordination System...');
+
+                try {
+                    // Test 1: Check if event coordination system exists
+                    if (!window.eventCoordinationSystem) {
+                        this.addResult('Event Coordination', 'error', 'eventCoordinationSystem not found');
+                        return false;
+                    }
+
+                    // Test 2: Check getCurrentState method
+                    if (typeof window.eventCoordinationSystem.getCurrentState !== 'function') {
+                        this.addResult('Event Coordination', 'error', 'getCurrentState method missing');
+                        return false;
+                    }
+
+                    // Test 3: Get current state
+                    const state = window.eventCoordinationSystem.getCurrentState();
+                    this.addResult('Event Coordination', 'success', `State: ${state.state}, Phase: ${state.phaseName}`);
+
+                    // Test 4: Check waitForPhase method
+                    if (typeof window.eventCoordinationSystem.waitForPhase === 'function') {
+                        this.addResult('Event Coordination', 'success', 'waitForPhase method available');
+                    }
+
+                    return true;
+
+                } catch (error) {
+                    this.addResult('Event Coordination', 'error', `Exception: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async testSuperpowerActivation() {
+                console.log('🧪 TESTING: Superpower Activation System...');
+
+                try {
+                    // Test 1: Check if superpower activation exists
+                    if (!window.yprintSuperpowerActivation) {
+                        this.addResult('Superpower Activation', 'error', 'yprintSuperpowerActivation not found');
+                        return false;
+                    }
+
+                    // Test 2: Check getSuperpowerStatus method
+                    if (typeof window.yprintSuperpowerActivation.getSuperpowerStatus !== 'function') {
+                        this.addResult('Superpower Activation', 'error', 'getSuperpowerStatus method missing');
+                        return false;
+                    }
+
+                    // Test 3: Get superpower status
+                    const status = window.yprintSuperpowerActivation.getSuperpowerStatus();
+                    this.addResult('Superpower Activation', 'success', `Status retrieved: ${Object.keys(status).length} properties`);
+
+                    // Test 4: Check areAllSystemsReady method
+                    if (typeof window.yprintSuperpowerActivation.areAllSystemsReady === 'function') {
+                        const allReady = window.yprintSuperpowerActivation.areAllSystemsReady();
+                        this.addResult('Superpower Activation', allReady ? 'success' : 'warning',
+                            `All systems ready: ${allReady}`);
+                    }
+
+                    return true;
+
+                } catch (error) {
+                    this.addResult('Superpower Activation', 'error', `Exception: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async runAllTests() {
+                console.log('🚀 SUPERPOWER TESTING: Starting comprehensive test suite...');
+                this.clearResults();
+
+                const tests = [
+                    this.testEmergencySystem(),
+                    this.testUnifiedFabric(),
+                    this.testEventCoordination(),
+                    this.testSuperpowerActivation()
+                ];
+
+                const results = await Promise.all(tests);
+                const passedTests = results.filter(result => result).length;
+
+                this.addResult('Overall Test Suite',
+                    passedTests === results.length ? 'success' : 'warning',
+                    `${passedTests}/${results.length} tests passed`);
+
+                // Final system status check
+                if (window.checkSuperpowerStatus) {
+                    console.log('🔍 FINAL STATUS CHECK:');
+                    window.checkSuperpowerStatus();
+                }
+            }
+
+            clearResults() {
+                this.results = [];
+                this.resultsContainer.innerHTML = '';
+                this.consoleOutput.textContent = '';
+            }
+        }
+
+        // Initialize tester
+        const tester = new SuperpowerTester();
+
+        // Global functions for buttons
+        window.runAllTests = () => tester.runAllTests();
+        window.testEmergencySystem = () => tester.testEmergencySystem();
+        window.testUnifiedFabric = () => tester.testUnifiedFabric();
+        window.testEventCoordination = () => tester.testEventCoordination();
+        window.testSuperpowerActivation = () => tester.testSuperpowerActivation();
+        window.clearResults = () => tester.clearResults();
+
+        // Auto-run tests after systems load
+        setTimeout(() => {
+            console.log('🔄 AUTO-TESTING: Running initial superpower validation...');
+            tester.runAllTests();
+        }, 2000);
+
+        // Listen for superpower events
+        window.addEventListener('yprintSuperpowerReady', (event) => {
+            tester.addResult('Superpower Events', 'success', 'yprintSuperpowerReady event fired');
+        });
+
+        window.addEventListener('fabricReady', (event) => {
+            tester.addResult('Fabric Events', 'success', `fabricReady event: ${event.detail.source}`);
+        });
+
+        window.addEventListener('systemCoordinationComplete', (event) => {
+            tester.addResult('Coordination Events', 'success', 'systemCoordinationComplete event fired');
+        });
+    </script>
+</body>
+</html>

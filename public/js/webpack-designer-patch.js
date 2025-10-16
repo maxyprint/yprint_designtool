@@ -379,10 +379,44 @@
                     chunkLength: window.webpackChunkocto_print_designer ? window.webpackChunkocto_print_designer.length : 0
                 });
 
-                clearInterval(retrySearch);
-            }
-        }, 200);
-    }
+    // Run initial multi-strategy search
+    setTimeout(() => {
+        if (bruteForceSearch()) {
+            console.log('✅ WEBPACK PATCH: Brute force search successful!');
+        } else {
+            console.log('❌ WEBPACK PATCH: Brute force search failed');
+
+            // Set up periodic retry
+            let retryCount = 0;
+            const maxRetries = 20;
+
+            const retrySearch = setInterval(() => {
+                retryCount++;
+
+                // 🔇 SPAM REDUCTION: Only log every 5th attempt to reduce console noise
+                if (retryCount % 5 === 0 || retryCount >= maxRetries - 2) {
+                    console.log(`🔄 WEBPACK PATCH: Retry attempt ${retryCount}/${maxRetries}`);
+                }
+
+                if (bruteForceSearch() || retryCount >= maxRetries) {
+                    if (retryCount >= maxRetries) {
+                        console.error('❌ WEBPACK PATCH: Failed to expose DesignerWidget after maximum retries');
+
+                        // Final diagnostic
+                        console.log('🔍 FINAL DIAGNOSTIC:', {
+                            webpackRequire: !!window.__webpack_require__,
+                            webpackCache: window.__webpack_require__ ? Object.keys(window.__webpack_require__.cache || {}).length : 0,
+                            webpackModules: window.__webpack_require__ ? Object.keys(window.__webpack_require__.m || {}).length : 0,
+                            webpackChunk: !!window.webpackChunkocto_print_designer,
+                            chunkLength: window.webpackChunkocto_print_designer ? window.webpackChunkocto_print_designer.length : 0
+                        });
+                    }
+
+                    clearInterval(retrySearch);
+                }
+            }, 200);
+        }
+    }, 500);
 
     console.log('🚀 WEBPACK PATCH: Initialization complete');
 

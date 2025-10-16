@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Fabric Master Loader - Solution Verification Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-card {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .test-card.success {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.2);
+        }
+        .test-card.error {
+            border-color: #f87171;
+            background: rgba(248, 113, 113, 0.2);
+        }
+        .test-card.warning {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.2);
+        }
+        .status-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .btn.success {
+            background: rgba(74, 222, 128, 0.3);
+            border-color: #4ade80;
+        }
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .log-container {
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .timeline-item {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .timeline-item.completed {
+            background: rgba(74, 222, 128, 0.3);
+            border-color: #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Fabric Master Loader Solution Test</h1>
+            <p>Comprehensive verification of the definitive Fabric.js loading solution</p>
+            <div class="timeline" id="loadingTimeline">
+                <div class="timeline-item">1. Vendor Bundle</div>
+                <div class="timeline-item">2. Master Loader</div>
+                <div class="timeline-item">3. Fabric Ready</div>
+                <div class="timeline-item">4. Canvas Available</div>
+                <div class="timeline-item">5. Events Dispatched</div>
+            </div>
+        </div>
+
+        <div class="test-grid">
+            <div class="test-card" id="fabricCard">
+                <div class="status-icon">⏳</div>
+                <h3>Fabric.js Availability</h3>
+                <p id="fabricStatus">Testing fabric.js loading...</p>
+                <div class="code-block" id="fabricDetails">Waiting for test results...</div>
+            </div>
+
+            <div class="test-card" id="loadingCard">
+                <div class="status-icon">🔄</div>
+                <h3>Loading Method</h3>
+                <p id="loadingStatus">Detecting loading method...</p>
+                <div class="code-block" id="loadingDetails">Analyzing loading source...</div>
+            </div>
+
+            <div class="test-card" id="eventsCard">
+                <div class="status-icon">📡</div>
+                <h3>Event System</h3>
+                <p id="eventsStatus">Monitoring events...</p>
+                <div class="code-block" id="eventsDetails">Waiting for events...</div>
+            </div>
+
+            <div class="test-card" id="canvasCard">
+                <div class="status-icon">🎨</div>
+                <h3>Canvas Test</h3>
+                <p id="canvasStatus">Testing canvas creation...</p>
+                <div class="code-block" id="canvasDetails">Creating test canvas...</div>
+            </div>
+
+            <div class="test-card" id="compatibilityCard">
+                <div class="status-icon">🔗</div>
+                <h3>Compatibility</h3>
+                <p id="compatibilityStatus">Testing legacy compatibility...</p>
+                <div class="code-block" id="compatibilityDetails">Checking compatibility flags...</div>
+            </div>
+
+            <div class="test-card" id="performanceCard">
+                <div class="status-icon">⚡</div>
+                <h3>Performance</h3>
+                <p id="performanceStatus">Measuring performance...</p>
+                <div class="code-block" id="performanceDetails">Timing measurements...</div>
+            </div>
+        </div>
+
+        <div class="log-container">
+            <h3>🔍 Real-time Test Log</h3>
+            <div id="testLog"></div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn" onclick="runComprehensiveTest()">🧪 Run Comprehensive Test</button>
+            <button class="btn" onclick="testCanvasCreation()">🎨 Test Canvas Creation</button>
+            <button class="btn" onclick="simulateDesignerWidget()">🛠️ Simulate DesignerWidget</button>
+            <button class="btn" onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+    </div>
+
+    <!-- Load scripts in WordPress order -->
+    <script src="public/js/dist/vendor.bundle.js"></script>
+    <script src="public/js/fabric-master-loader.js"></script>
+
+    <script>
+        // Test Framework
+        class FabricSolutionTester {
+            constructor() {
+                this.testResults = {};
+                this.eventsCaught = [];
+                this.loadStartTime = performance.now();
+                this.setupEventListeners();
+                this.startContinuousMonitoring();
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                console.log(logEntry);
+
+                const logContainer = document.getElementById('testLog');
+                const logElement = document.createElement('div');
+                logElement.textContent = logEntry;
+                logElement.style.color = type === 'error' ? '#f87171' :
+                                       type === 'success' ? '#4ade80' :
+                                       type === 'warning' ? '#fbbf24' : '#e5e7eb';
+                logContainer.appendChild(logElement);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            setupEventListeners() {
+                const events = ['fabricReady', 'fabricGlobalReady', 'fabricGloballyExposed', 'fabricready'];
+
+                events.forEach(eventName => {
+                    window.addEventListener(eventName, (event) => {
+                        this.eventsCaught.push({
+                            name: eventName,
+                            timestamp: performance.now(),
+                            detail: event.detail
+                        });
+                        this.log(`✅ Event caught: ${eventName}`, 'success');
+                        this.updateEventsCard();
+                    });
+
+                    document.addEventListener(eventName, (event) => {
+                        this.log(`📄 Document event: ${eventName}`, 'info');
+                    });
+                });
+
+                window.addEventListener('fabricLoadingFailed', (event) => {
+                    this.log(`❌ Fabric loading failed: ${event.detail?.error}`, 'error');
+                });
+            }
+
+            startContinuousMonitoring() {
+                setInterval(() => {
+                    this.updateAllCards();
+                    this.updateTimeline();
+                }, 500);
+            }
+
+            updateTimeline() {
+                const timeline = document.getElementById('loadingTimeline');
+                const items = timeline.children;
+
+                // 1. Vendor Bundle (check if webpack is available)
+                if (window.webpackChunkocto_print_designer) {
+                    items[0].classList.add('completed');
+                }
+
+                // 2. Master Loader (check if master loader is active)
+                if (window.fabricMasterLoader) {
+                    items[1].classList.add('completed');
+                }
+
+                // 3. Fabric Ready (check if fabric is available)
+                if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                    items[2].classList.add('completed');
+                }
+
+                // 4. Canvas Available (check if canvas can be created)
+                if (this.testResults.canvasCreation?.success) {
+                    items[3].classList.add('completed');
+                }
+
+                // 5. Events Dispatched (check if events were caught)
+                if (this.eventsCaught.length > 0) {
+                    items[4].classList.add('completed');
+                }
+            }
+
+            updateAllCards() {
+                this.updateFabricCard();
+                this.updateLoadingCard();
+                this.updateEventsCard();
+                this.updateCanvasCard();
+                this.updateCompatibilityCard();
+                this.updatePerformanceCard();
+            }
+
+            updateFabricCard() {
+                const card = document.getElementById('fabricCard');
+                const status = document.getElementById('fabricStatus');
+                const details = document.getElementById('fabricDetails');
+
+                if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                    card.className = 'test-card success';
+                    card.querySelector('.status-icon').textContent = '✅';
+                    status.textContent = 'Fabric.js successfully loaded and available';
+
+                    details.textContent = `
+Fabric Details:
+- Canvas: ${typeof window.fabric.Canvas}
+- Object: ${typeof window.fabric.Object}
+- Image: ${typeof window.fabric.Image}
+- Text: ${typeof window.fabric.Text}
+- Version: ${window.fabric.version || 'Unknown'}
+- Master Loader: ${window.fabricMasterLoader ? 'Active' : 'Inactive'}`;
+                } else {
+                    card.className = 'test-card error';
+                    card.querySelector('.status-icon').textContent = '❌';
+                    status.textContent = 'Fabric.js not available';
+                    details.textContent = 'window.fabric is undefined or missing Canvas class';
+                }
+            }
+
+            updateLoadingCard() {
+                const card = document.getElementById('loadingCard');
+                const status = document.getElementById('loadingStatus');
+                const details = document.getElementById('loadingDetails');
+
+                if (window.fabricMasterLoader) {
+                    const loaderStatus = window.fabricMasterLoader.getStatus();
+
+                    card.className = loaderStatus.isLoaded ? 'test-card success' : 'test-card warning';
+                    card.querySelector('.status-icon').textContent = loaderStatus.isLoaded ? '✅' : '⏳';
+
+                    status.textContent = loaderStatus.isLoaded ?
+                        'Master Loader completed successfully' :
+                        'Master Loader in progress';
+
+                    details.textContent = `
+Master Loader Status:
+- Is Loaded: ${loaderStatus.isLoaded}
+- Is Loading: ${loaderStatus.isLoading}
+- Fabric Available: ${loaderStatus.fabricAvailable}
+- Canvas Available: ${loaderStatus.canvasAvailable}
+- Callbacks Queued: ${loaderStatus.callbacksQueued}`;
+                } else {
+                    card.className = 'test-card error';
+                    card.querySelector('.status-icon').textContent = '❌';
+                    status.textContent = 'Master Loader not found';
+                    details.textContent = 'window.fabricMasterLoader is undefined';
+                }
+            }
+
+            updateEventsCard() {
+                const card = document.getElementById('eventsCard');
+                const status = document.getElementById('eventsStatus');
+                const details = document.getElementById('eventsDetails');
+
+                if (this.eventsCaught.length > 0) {
+                    card.className = 'test-card success';
+                    card.querySelector('.status-icon').textContent = '✅';
+                    status.textContent = `${this.eventsCaught.length} events caught`;
+
+                    details.textContent = this.eventsCaught.map(event =>
+                        `${event.name}: ${Math.round(event.timestamp - this.loadStartTime)}ms`
+                    ).join('\n');
+                } else {
+                    card.className = 'test-card warning';
+                    card.querySelector('.status-icon').textContent = '⏳';
+                    status.textContent = 'Waiting for events...';
+                    details.textContent = 'No fabric events detected yet';
+                }
+            }
+
+            updateCanvasCard() {
+                const card = document.getElementById('canvasCard');
+                const status = document.getElementById('canvasStatus');
+                const details = document.getElementById('canvasDetails');
+
+                if (this.testResults.canvasCreation) {
+                    if (this.testResults.canvasCreation.success) {
+                        card.className = 'test-card success';
+                        card.querySelector('.status-icon').textContent = '✅';
+                        status.textContent = 'Canvas creation successful';
+                        details.textContent = `Canvas created successfully\nTest objects: ${this.testResults.canvasCreation.objectCount}`;
+                    } else {
+                        card.className = 'test-card error';
+                        card.querySelector('.status-icon').textContent = '❌';
+                        status.textContent = 'Canvas creation failed';
+                        details.textContent = this.testResults.canvasCreation.error;
+                    }
+                }
+            }
+
+            updateCompatibilityCard() {
+                const card = document.getElementById('compatibilityCard');
+                const status = document.getElementById('compatibilityStatus');
+                const details = document.getElementById('compatibilityDetails');
+
+                const flags = {
+                    fabricReady: window.fabricReady || false,
+                    emergencyFabricLoaded: window.emergencyFabricLoaded || false,
+                    fabricManuallyExposed: window.fabricManuallyExposed || false,
+                    waitForFabric: typeof window.waitForFabric === 'function'
+                };
+
+                const flagCount = Object.values(flags).filter(Boolean).length;
+
+                if (flagCount >= 3) {
+                    card.className = 'test-card success';
+                    card.querySelector('.status-icon').textContent = '✅';
+                    status.textContent = 'Excellent compatibility';
+                } else if (flagCount >= 2) {
+                    card.className = 'test-card warning';
+                    card.querySelector('.status-icon').textContent = '⚠️';
+                    status.textContent = 'Good compatibility';
+                } else {
+                    card.className = 'test-card error';
+                    card.querySelector('.status-icon').textContent = '❌';
+                    status.textContent = 'Poor compatibility';
+                }
+
+                details.textContent = Object.entries(flags)
+                    .map(([key, value]) => `${key}: ${value ? '✅' : '❌'}`)
+                    .join('\n');
+            }
+
+            updatePerformanceCard() {
+                const card = document.getElementById('performanceCard');
+                const status = document.getElementById('performanceStatus');
+                const details = document.getElementById('performanceDetails');
+
+                const currentTime = performance.now();
+                const loadTime = currentTime - this.loadStartTime;
+
+                if (window.fabric && loadTime < 2000) {
+                    card.className = 'test-card success';
+                    card.querySelector('.status-icon').textContent = '⚡';
+                    status.textContent = 'Excellent performance';
+                } else if (window.fabric && loadTime < 5000) {
+                    card.className = 'test-card warning';
+                    card.querySelector('.status-icon').textContent = '⏳';
+                    status.textContent = 'Good performance';
+                } else {
+                    card.className = 'test-card error';
+                    card.querySelector('.status-icon').textContent = '🐌';
+                    status.textContent = 'Performance issues';
+                }
+
+                details.textContent = `
+Load Time: ${Math.round(loadTime)}ms
+First Event: ${this.eventsCaught[0] ? Math.round(this.eventsCaught[0].timestamp - this.loadStartTime) + 'ms' : 'None'}
+Memory Usage: ${performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB' : 'Unknown'}`;
+            }
+
+            async testCanvasCreation() {
+                this.log('🎨 Testing canvas creation...', 'info');
+
+                try {
+                    if (!window.fabric || typeof window.fabric.Canvas !== 'function') {
+                        throw new Error('Fabric.js not available for canvas creation');
+                    }
+
+                    // Create test canvas element
+                    const canvasElement = document.createElement('canvas');
+                    canvasElement.width = 400;
+                    canvasElement.height = 300;
+                    canvasElement.id = 'test-canvas-' + Date.now();
+
+                    // Create fabric canvas
+                    const fabricCanvas = new window.fabric.Canvas(canvasElement);
+
+                    // Add test objects
+                    const rect = new window.fabric.Rect({
+                        left: 50,
+                        top: 50,
+                        width: 100,
+                        height: 100,
+                        fill: 'red'
+                    });
+
+                    const text = new window.fabric.Text('Test Text', {
+                        left: 200,
+                        top: 100,
+                        fontSize: 20
+                    });
+
+                    fabricCanvas.add(rect);
+                    fabricCanvas.add(text);
+                    fabricCanvas.renderAll();
+
+                    this.testResults.canvasCreation = {
+                        success: true,
+                        objectCount: fabricCanvas.getObjects().length,
+                        canvasId: canvasElement.id
+                    };
+
+                    this.log('✅ Canvas creation test successful', 'success');
+
+                    // Clean up
+                    fabricCanvas.dispose();
+
+                } catch (error) {
+                    this.testResults.canvasCreation = {
+                        success: false,
+                        error: error.message
+                    };
+                    this.log(`❌ Canvas creation failed: ${error.message}`, 'error');
+                }
+            }
+
+            runComprehensiveTest() {
+                this.log('🧪 Starting comprehensive fabric solution test...', 'info');
+
+                // Test 1: Check master loader
+                if (window.fabricMasterLoader) {
+                    this.log('✅ Master loader detected', 'success');
+                } else {
+                    this.log('❌ Master loader not found', 'error');
+                }
+
+                // Test 2: Check fabric availability
+                if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                    this.log('✅ Fabric.js available and functional', 'success');
+                } else {
+                    this.log('❌ Fabric.js not available', 'error');
+                }
+
+                // Test 3: Canvas creation
+                this.testCanvasCreation();
+
+                // Test 4: Event system
+                this.log(`📡 Events caught: ${this.eventsCaught.length}`, 'info');
+
+                // Test 5: Performance
+                const loadTime = performance.now() - this.loadStartTime;
+                this.log(`⚡ Total load time: ${Math.round(loadTime)}ms`, loadTime < 2000 ? 'success' : 'warning');
+            }
+
+            simulateDesignerWidget() {
+                this.log('🛠️ Simulating DesignerWidget usage...', 'info');
+
+                if (window.waitForFabric) {
+                    window.waitForFabric((fabric) => {
+                        this.log('✅ waitForFabric callback executed successfully', 'success');
+                        this.log(`Fabric received: ${typeof fabric}`, 'info');
+                    });
+                } else {
+                    this.log('❌ waitForFabric function not available', 'error');
+                }
+            }
+        }
+
+        // Global functions for buttons
+        function runComprehensiveTest() {
+            window.tester.runComprehensiveTest();
+        }
+
+        function testCanvasCreation() {
+            window.tester.testCanvasCreation();
+        }
+
+        function simulateDesignerWidget() {
+            window.tester.simulateDesignerWidget();
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').innerHTML = '';
+        }
+
+        // Initialize tester when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            window.tester = new FabricSolutionTester();
+            window.tester.log('🚀 Fabric Solution Tester initialized', 'success');
+        });
+    </script>
+</body>
+</html>
