@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete PNG Plugin Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        canvas { border: 1px solid #ccc; margin: 10px 0; }
+        .export-results { margin: 20px 0; }
+        .export-preview { max-width: 200px; border: 1px solid #ddd; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🖼️ Complete PNG Plugin Test</h1>
+
+    <div id="test-results"></div>
+    <canvas id="test-canvas" width="400" height="300"></canvas>
+
+    <div class="export-results">
+        <h3>Export Results:</h3>
+        <div id="export-previews"></div>
+    </div>
+
+    <!-- Load Plugin Framework -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+    <!-- Load PNG Engine -->
+    <script src="plugins/yprint-png-export/png-engine.js"></script>
+    <!-- Load PNG Plugin -->
+    <script src="plugins/yprint-png-export/plugin.js"></script>
+
+    <script>
+        console.log('🧪 COMPLETE PNG PLUGIN TEST: Starting comprehensive validation...');
+
+        const results = [];
+
+        function addResult(test, passed, message) {
+            results.push({ test, passed, message });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>ℹ️ INFO:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // Create rich test canvas
+        function createTestCanvas() {
+            const canvas = document.getElementById('test-canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#f0f8ff');
+            gradient.addColorStop(1, '#e6f3ff');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Red rectangle
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(50, 50, 100, 100);
+
+            // Green circle
+            ctx.beginPath();
+            ctx.arc(300, 100, 50, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00ff00';
+            ctx.fill();
+
+            // Blue text
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#0000ff';
+            ctx.fillText('PNG Test', 150, 200);
+
+            // Purple border
+            ctx.strokeStyle = '#800080';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            console.log('🧪 TEST: Rich test canvas created');
+            return canvas;
+        }
+
+        // Test 1: Plugin Framework
+        try {
+            if (typeof window.YPrintPlugins !== 'undefined') {
+                addResult('Plugin Framework', true, 'YPrintPlugins framework available');
+            } else {
+                addResult('Plugin Framework', false, 'Plugin framework not loaded');
+            }
+        } catch (error) {
+            addResult('Plugin Framework', false, `Error: ${error.message}`);
+        }
+
+        // Test 2: PNG Engine
+        try {
+            if (typeof window.YPrintPNGEngine !== 'undefined') {
+                addResult('PNG Engine', true, 'PNG Engine available');
+            } else {
+                addResult('PNG Engine', false, 'PNG Engine not loaded');
+            }
+        } catch (error) {
+            addResult('PNG Engine', false, `Error: ${error.message}`);
+        }
+
+        // Test 3: PNG Plugin
+        try {
+            if (typeof window.YPrintPNGPlugin !== 'undefined') {
+                addResult('PNG Plugin', true, 'PNG Plugin available');
+            } else {
+                addResult('PNG Plugin', false, 'PNG Plugin not loaded');
+            }
+        } catch (error) {
+            addResult('PNG Plugin', false, `Error: ${error.message}`);
+        }
+
+        // Test 4: Plugin Registration
+        try {
+            const hasPlugin = window.YPrintPlugins.hasPlugin('yprint-png-export');
+            addResult('Plugin Registration', hasPlugin, hasPlugin ? 'PNG Plugin registered successfully' : 'PNG Plugin not registered');
+        } catch (error) {
+            addResult('Plugin Registration', false, `Error: ${error.message}`);
+        }
+
+        // Test 5: Canvas Creation
+        let testCanvas;
+        try {
+            testCanvas = createTestCanvas();
+            if (testCanvas && testCanvas.getContext) {
+                addResult('Test Canvas', true, 'Rich test canvas created successfully');
+            } else {
+                addResult('Test Canvas', false, 'Failed to create test canvas');
+            }
+        } catch (error) {
+            addResult('Test Canvas', false, `Error: ${error.message}`);
+        }
+
+        // Test 6: PNG Export Functionality
+        async function testPNGExport() {
+            try {
+                if (!window.YPrintPNGPlugin.exportMultiResolutionPNG) {
+                    addResult('PNG Export', false, 'Export method not available');
+                    return;
+                }
+
+                // Mock Fabric.js canvas for testing
+                const mockFabricCanvas = {
+                    toDataURL: (options) => {
+                        console.log('🧪 MOCK: Fabric canvas toDataURL called with:', options);
+
+                        // Create a mock PNG data URL using the test canvas
+                        const ctx = testCanvas.getContext('2d');
+                        return testCanvas.toDataURL('image/png');
+                    },
+                    getObjects: () => [{ type: 'rect' }, { type: 'circle' }] // Mock objects
+                };
+
+                const result = await window.YPrintPNGPlugin.exportMultiResolutionPNG(mockFabricCanvas);
+
+                if (result && result.print && result.preview && result.thumbnail) {
+                    addResult('PNG Export', true, 'Multi-resolution PNG export successful');
+
+                    // Display export previews
+                    displayExportPreviews(result);
+                } else {
+                    addResult('PNG Export', false, 'PNG export returned invalid result');
+                }
+
+            } catch (error) {
+                addResult('PNG Export', false, `Export failed: ${error.message}`);
+            }
+        }
+
+        // Display export results
+        function displayExportPreviews(exports) {
+            const previewContainer = document.getElementById('export-previews');
+
+            Object.entries(exports).forEach(([type, dataURL]) => {
+                const div = document.createElement('div');
+                div.style.display = 'inline-block';
+                div.style.margin = '10px';
+                div.style.textAlign = 'center';
+
+                const img = document.createElement('img');
+                img.src = dataURL;
+                img.className = 'export-preview';
+                img.title = `${type} resolution`;
+
+                const label = document.createElement('div');
+                label.textContent = `${type.toUpperCase()} (${Math.round(dataURL.length / 1024)}KB)`;
+                label.style.fontSize = '12px';
+                label.style.marginTop = '5px';
+
+                div.appendChild(img);
+                div.appendChild(label);
+                previewContainer.appendChild(div);
+            });
+
+            addInfo('Export previews displayed above');
+        }
+
+        // Test 7: PNG Engine Features
+        async function testPNGEngine() {
+            try {
+                if (!window.YPrintPNGEngine) {
+                    addResult('PNG Engine Features', false, 'PNG Engine not available');
+                    return;
+                }
+
+                // Test optimization
+                const testDataURL = testCanvas.toDataURL('image/png');
+                const optimized = await window.YPrintPNGEngine.optimizeForWeb(testDataURL, {
+                    maxWidth: 200,
+                    maxHeight: 200
+                });
+
+                if (optimized && optimized.dataURL) {
+                    addResult('PNG Engine Features', true, `Optimization successful (${optimized.compressionRatio.toFixed(2)}x compression)`);
+                } else {
+                    addResult('PNG Engine Features', false, 'PNG optimization failed');
+                }
+
+            } catch (error) {
+                addResult('PNG Engine Features', false, `Engine test failed: ${error.message}`);
+            }
+        }
+
+        // Run async tests
+        setTimeout(async () => {
+            await testPNGExport();
+            await testPNGEngine();
+
+            addInfo(`Testing complete! ${results.filter(r => r.passed).length}/${results.length} tests passed`);
+            console.log('🧪 COMPLETE PNG PLUGIN TEST: All tests finished');
+            console.log('Results:', results);
+        }, 500);
+
+    </script>
+</body>
+</html>

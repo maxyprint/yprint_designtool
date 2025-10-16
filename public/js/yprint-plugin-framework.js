@@ -133,10 +133,10 @@
         /**
          * Create safe Designer API for plugins
          */
-        createDesignerAPI() {
-            console.log('🔌 DESIGNER API: Creating safe API interface...');
+        createDesignerAPI(pluginName = 'unknown') {
+            console.log(`🔌 DESIGNER API: Creating safe API interface for '${pluginName}'...`);
 
-            return {
+            const baseAPI = {
                 /**
                  * Get canvas instance (read-only access)
                  */
@@ -187,6 +187,14 @@
                 // SECURITY: No direct access to Designer internals
                 // No access to: designerWidgetInstance, templates, currentView, etc.
             };
+
+            // Apply security layer if available
+            if (window.YPrintPluginSecurity) {
+                console.log(`🔒 SECURITY: Applying security layer for '${pluginName}'`);
+                return window.YPrintPluginSecurity.createSecureDesignerAPI(baseAPI, pluginName);
+            }
+
+            return baseAPI;
         },
 
         /**
@@ -202,11 +210,17 @@
             }
 
             try {
+                // Apply security sandbox if available
+                let securePlugin = plugin;
+                if (window.YPrintPluginSecurity) {
+                    securePlugin = window.YPrintPluginSecurity.createPluginSandbox(plugin, pluginName);
+                }
+
                 // Create safe API for this plugin
-                const designerAPI = this.createDesignerAPI();
+                const designerAPI = this.createDesignerAPI(pluginName);
 
                 // Initialize plugin with API
-                const result = plugin.initialize(designerAPI);
+                const result = securePlugin.initialize(designerAPI);
 
                 // Mark as enabled
                 this.enabledPlugins.add(pluginName);
@@ -223,8 +237,44 @@
 
             } catch (error) {
                 console.error(`❌ PLUGIN INIT: Failed to initialize '${pluginName}':`, error);
+
+                // Security violation handling
+                if (error.message.includes('Security violation')) {
+                    console.error(`🚨 SECURITY: Plugin '${pluginName}' violated security policy`);
+                    this.disablePlugin(pluginName);
+
+                    if (window.YPrintPluginSecurity) {
+                        window.YPrintPluginSecurity.emergencyShutdown(`Plugin ${pluginName} security violation`);
+                    }
+                }
+
                 return false;
             }
+        },
+
+        /**
+         * Disable plugin and cleanup
+         */
+        disablePlugin(pluginName) {
+            console.log(`🔌 PLUGIN: Disabling plugin '${pluginName}'`);
+
+            const plugin = this.registry.get(pluginName);
+            if (plugin && typeof plugin.destroy === 'function') {
+                try {
+                    plugin.destroy();
+                } catch (error) {
+                    console.error(`❌ PLUGIN: Error during plugin '${pluginName}' cleanup:`, error);
+                }
+            }
+
+            this.enabledPlugins.delete(pluginName);
+
+            this.fireEvent('plugin:disabled', {
+                name: pluginName,
+                timestamp: Date.now()
+            });
+
+            console.log(`✅ PLUGIN: Plugin '${pluginName}' disabled`);
         },
 
         /**

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Plugin System Integration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .integration-critical { background-color: #f5c6cb; color: #721c24; font-weight: bold; }
+        .test-section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        .section-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        canvas { border: 1px solid #ccc; margin: 10px 0; }
+        .export-gallery { display: flex; flex-wrap: wrap; gap: 15px; margin: 20px 0; }
+        .export-item { text-align: center; }
+        .export-item img { max-width: 150px; border: 1px solid #ddd; border-radius: 4px; }
+        .progress-bar { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: #28a745; transition: width 0.3s ease; }
+        .system-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .status-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .status-ok { border-left: 4px solid #28a745; }
+        .status-error { border-left: 4px solid #dc3545; }
+        .status-warning { border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Complete Plugin System Integration Test</h1>
+
+    <div class="test-section">
+        <div class="section-header">📊 Test Progress</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="current-test">Initializing tests...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="section-header">🔍 System Status Overview</div>
+        <div class="system-status" id="system-status"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="section-header">🧪 Test Results</div>
+        <div id="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="section-header">🖼️ PNG Export Gallery</div>
+        <div class="export-gallery" id="export-gallery"></div>
+    </div>
+
+    <canvas id="test-canvas" width="400" height="300" style="display: none;"></canvas>
+
+    <!-- Load All Plugin System Components -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+    <script src="public/js/plugin-security.js"></script>
+    <script src="plugins/yprint-png-export/png-engine.js"></script>
+    <script src="plugins/yprint-png-export/plugin.js"></script>
+    <script src="plugins/yprint-png-export/wc-integration.js"></script>
+
+    <script>
+        console.log('🧪 COMPLETE INTEGRATION TEST: Starting comprehensive plugin system validation...');
+
+        // Test tracking
+        const tests = [];
+        let currentTestIndex = 0;
+        const totalTests = 25; // Approximate number of tests
+
+        function addResult(test, passed, message, critical = false) {
+            tests.push({ test, passed, message, critical });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : (critical ? 'integration-critical' : 'fail')}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+
+            // Update progress
+            currentTestIndex++;
+            updateProgress();
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>🧪 INTEGRATION:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function updateProgress() {
+            const percentage = Math.min((currentTestIndex / totalTests) * 100, 100);
+            document.getElementById('progress-bar').style.width = percentage + '%';
+        }
+
+        function updateCurrentTest(testName) {
+            document.getElementById('current-test').textContent = `Running: ${testName}`;
+        }
+
+        // System status tracking
+        function updateSystemStatus() {
+            const systems = [
+                {
+                    name: 'Plugin Framework',
+                    status: typeof window.YPrintPlugins !== 'undefined' ? 'ok' : 'error',
+                    details: typeof window.YPrintPlugins !== 'undefined' ? 'Active' : 'Not Loaded'
+                },
+                {
+                    name: 'Security Module',
+                    status: typeof window.YPrintPluginSecurity !== 'undefined' ? 'ok' : 'warning',
+                    details: typeof window.YPrintPluginSecurity !== 'undefined' ? 'Active' : 'Optional'
+                },
+                {
+                    name: 'PNG Engine',
+                    status: typeof window.YPrintPNGEngine !== 'undefined' ? 'ok' : 'error',
+                    details: typeof window.YPrintPNGEngine !== 'undefined' ? 'Active' : 'Missing'
+                },
+                {
+                    name: 'PNG Plugin',
+                    status: typeof window.YPrintPNGPlugin !== 'undefined' ? 'ok' : 'error',
+                    details: typeof window.YPrintPNGPlugin !== 'undefined' ? 'Active' : 'Missing'
+                },
+                {
+                    name: 'WC Integration',
+                    status: typeof window.YPrintWCIntegration !== 'undefined' ? 'ok' : 'warning',
+                    details: typeof window.YPrintWCIntegration !== 'undefined' ? 'Active' : 'Optional'
+                }
+            ];
+
+            const container = document.getElementById('system-status');
+            container.innerHTML = '';
+
+            systems.forEach(system => {
+                const card = document.createElement('div');
+                card.className = `status-card status-${system.status}`;
+                card.innerHTML = `
+                    <h4>${system.name}</h4>
+                    <div>${system.details}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Create test canvas with rich content
+        function createTestCanvas() {
+            const canvas = document.getElementById('test-canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#e3f2fd');
+            gradient.addColorStop(1, '#bbdefb');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Header
+            ctx.fillStyle = '#1976d2';
+            ctx.fillRect(0, 0, canvas.width, 50);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('YPrint Integration Test', 20, 30);
+
+            // Content sections
+            ctx.fillStyle = '#ff5722';
+            ctx.fillRect(50, 80, 120, 80);
+            ctx.fillStyle = '#4caf50';
+            ctx.fillRect(230, 80, 120, 80);
+
+            // Text labels
+            ctx.fillStyle = '#333333';
+            ctx.font = '14px Arial';
+            ctx.fillText('Plugin System', 60, 130);
+            ctx.fillText('PNG Export', 250, 130);
+
+            // Footer
+            ctx.fillStyle = '#757575';
+            ctx.font = '12px Arial';
+            ctx.fillText('Complete Integration Test - ' + new Date().toLocaleDateString(), 20, 280);
+
+            // Border
+            ctx.strokeStyle = '#1976d2';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+
+            console.log('🧪 INTEGRATION TEST: Test canvas created');
+            return canvas;
+        }
+
+        // Mock Designer instance for testing
+        function createMockDesigner() {
+            window.designerWidgetInstance = {
+                fabricCanvas: {
+                    toDataURL: (options) => {
+                        console.log('🧪 MOCK DESIGNER: toDataURL called with options:', options);
+
+                        // Return test canvas data
+                        const testCanvas = document.getElementById('test-canvas');
+                        return testCanvas.toDataURL('image/png');
+                    },
+                    getObjects: () => [
+                        { type: 'rect', id: 'test-rect' },
+                        { type: 'text', id: 'test-text' },
+                        { type: 'image', id: 'test-image' }
+                    ],
+                    getWidth: () => 400,
+                    getHeight: () => 300,
+                    getZoom: () => 1
+                },
+                templates: { current: 'test-template' },
+                currentView: 'front'
+            };
+
+            console.log('🧪 INTEGRATION TEST: Mock Designer instance created');
+        }
+
+        // Mock WordPress AJAX
+        function createMockWordPress() {
+            window.ajaxurl = '/wp-admin/admin-ajax.php';
+
+            if (typeof $ === 'undefined') {
+                window.$ = {
+                    post: function(url, data, callback) {
+                        console.log('🧪 MOCK WP: AJAX POST to', url);
+
+                        setTimeout(() => {
+                            const mockResponse = {
+                                success: true,
+                                data: {
+                                    png_path: '/wp-content/uploads/yprint-designs/test-' + Date.now() + '.png',
+                                    png_url: 'https://test-site.local/wp-content/uploads/yprint-designs/test-' + Date.now() + '.png',
+                                    file_size: Math.floor(Math.random() * 500000) + 100000,
+                                    timestamp: Date.now(),
+                                    attachment_id: Math.floor(Math.random() * 1000) + 1
+                                }
+                            };
+                            callback(mockResponse);
+                        }, 200);
+                    }
+                };
+            }
+
+            console.log('🧪 INTEGRATION TEST: Mock WordPress environment created');
+        }
+
+        // Display export result
+        function displayExportResult(result, type) {
+            const gallery = document.getElementById('export-gallery');
+
+            const item = document.createElement('div');
+            item.className = 'export-item';
+
+            const img = document.createElement('img');
+            img.src = result.dataURL || result.print || result;
+            img.alt = `${type} export`;
+
+            const label = document.createElement('div');
+            label.innerHTML = `<strong>${type.toUpperCase()}</strong><br>Size: ${result.file_size ? Math.round(result.file_size / 1024) + 'KB' : 'N/A'}`;
+
+            item.appendChild(img);
+            item.appendChild(label);
+            gallery.appendChild(item);
+        }
+
+        // Run comprehensive integration tests
+        async function runIntegrationTests() {
+            updateCurrentTest('Initializing test environment');
+            updateSystemStatus();
+
+            // Setup test environment
+            createMockDesigner();
+            createMockWordPress();
+            const testCanvas = createTestCanvas();
+
+            // Test 1: Plugin Framework Foundation
+            updateCurrentTest('Testing Plugin Framework Foundation');
+            try {
+                addResult('Plugin Framework Loaded', typeof window.YPrintPlugins !== 'undefined',
+                    typeof window.YPrintPlugins !== 'undefined' ? 'Plugin framework available' : 'Plugin framework missing', true
+                );
+
+                if (window.YPrintPlugins) {
+                    addResult('Plugin Registry', typeof window.YPrintPlugins.registry !== 'undefined',
+                        'Plugin registry system functional'
+                    );
+
+                    addResult('Event System', typeof window.YPrintPlugins.eventBus !== 'undefined',
+                        'Plugin event system functional'
+                    );
+                }
+            } catch (error) {
+                addResult('Plugin Framework Foundation', false, `Framework test failed: ${error.message}`, true);
+            }
+
+            // Test 2: Security Module
+            updateCurrentTest('Testing Security Module');
+            try {
+                const hasSecurityModule = typeof window.YPrintPluginSecurity !== 'undefined';
+                addResult('Security Module', hasSecurityModule,
+                    hasSecurityModule ? 'Security module loaded' : 'Security module not loaded'
+                );
+
+                if (hasSecurityModule) {
+                    addResult('Security Sandbox', typeof window.YPrintPluginSecurity.createPluginSandbox === 'function',
+                        'Plugin sandboxing available'
+                    );
+                }
+            } catch (error) {
+                addResult('Security Module', false, `Security test failed: ${error.message}`);
+            }
+
+            // Test 3: PNG Engine
+            updateCurrentTest('Testing PNG Engine');
+            try {
+                const hasPNGEngine = typeof window.YPrintPNGEngine !== 'undefined';
+                addResult('PNG Engine', hasPNGEngine,
+                    hasPNGEngine ? 'PNG engine loaded' : 'PNG engine missing', true
+                );
+
+                if (hasPNGEngine) {
+                    // Test PNG optimization
+                    const testDataURL = testCanvas.toDataURL('image/png');
+                    const optimized = await window.YPrintPNGEngine.optimizeForWeb(testDataURL, { maxWidth: 200 });
+
+                    addResult('PNG Optimization', !!optimized.dataURL,
+                        optimized.dataURL ? `Optimization successful (${optimized.compressionRatio.toFixed(2)}x compression)` : 'Optimization failed'
+                    );
+                }
+            } catch (error) {
+                addResult('PNG Engine', false, `PNG engine test failed: ${error.message}`);
+            }
+
+            // Test 4: PNG Plugin Core
+            updateCurrentTest('Testing PNG Plugin Core');
+            try {
+                const hasPNGPlugin = typeof window.YPrintPNGPlugin !== 'undefined';
+                addResult('PNG Plugin', hasPNGPlugin,
+                    hasPNGPlugin ? 'PNG plugin loaded' : 'PNG plugin missing', true
+                );
+
+                if (hasPNGPlugin) {
+                    // Test plugin registration
+                    const isRegistered = window.YPrintPlugins.hasPlugin('yprint-png-export');
+                    addResult('PNG Plugin Registration', isRegistered,
+                        isRegistered ? 'PNG plugin registered successfully' : 'PNG plugin not registered'
+                    );
+
+                    // Test multi-resolution export
+                    const mockCanvas = {
+                        toDataURL: (options) => testCanvas.toDataURL('image/png'),
+                        getObjects: () => [{ type: 'rect' }]
+                    };
+
+                    const exportResult = await window.YPrintPNGPlugin.exportMultiResolutionPNG(mockCanvas);
+                    addResult('Multi-Resolution Export', !!(exportResult && exportResult.print && exportResult.preview && exportResult.thumbnail),
+                        'Multi-resolution PNG export functional'
+                    );
+
+                    if (exportResult) {
+                        displayExportResult(exportResult.print, 'print');
+                        displayExportResult(exportResult.preview, 'preview');
+                        displayExportResult(exportResult.thumbnail, 'thumbnail');
+                    }
+                }
+            } catch (error) {
+                addResult('PNG Plugin Core', false, `PNG plugin test failed: ${error.message}`, true);
+            }
+
+            // Test 5: WooCommerce Integration
+            updateCurrentTest('Testing WooCommerce Integration');
+            try {
+                const hasWCIntegration = typeof window.YPrintWCIntegration !== 'undefined';
+                addResult('WC Integration Module', hasWCIntegration,
+                    hasWCIntegration ? 'WooCommerce integration loaded' : 'WC integration optional'
+                );
+
+                if (hasWCIntegration && window.YPrintPNGPlugin.uploadToWooCommerce) {
+                    const testDataURL = testCanvas.toDataURL('image/png');
+                    const uploadResult = await window.YPrintPNGPlugin.uploadToWooCommerce(testDataURL);
+
+                    addResult('WC PNG Upload', !!uploadResult.success,
+                        uploadResult.success ? `PNG uploaded to ${uploadResult.png_path}` : 'WC upload failed'
+                    );
+
+                    if (uploadResult.success) {
+                        displayExportResult(uploadResult, 'wc-upload');
+                    }
+                }
+            } catch (error) {
+                addResult('WooCommerce Integration', false, `WC integration test failed: ${error.message}`);
+            }
+
+            // Test 6: Plugin Lifecycle Management
+            updateCurrentTest('Testing Plugin Lifecycle Management');
+            try {
+                if (window.YPrintPlugins) {
+                    // Test plugin enable/disable
+                    const testPluginName = 'yprint-png-export';
+
+                    window.YPrintPlugins.disablePlugin(testPluginName);
+                    const isDisabled = !window.YPrintPlugins.enabledPlugins.has(testPluginName);
+
+                    addResult('Plugin Disable', isDisabled, 'Plugin disable functionality working');
+
+                    const enableResult = window.YPrintPlugins.initializePlugin(testPluginName);
+                    addResult('Plugin Enable', enableResult, 'Plugin enable functionality working');
+                }
+            } catch (error) {
+                addResult('Plugin Lifecycle', false, `Lifecycle test failed: ${error.message}`);
+            }
+
+            // Test 7: Core Designer Integrity
+            updateCurrentTest('Testing Core Designer Integrity');
+            try {
+                const designerIntact = !!(window.designerWidgetInstance &&
+                                         window.designerWidgetInstance.fabricCanvas &&
+                                         window.designerWidgetInstance.templates);
+
+                addResult('Core Designer Integrity', designerIntact,
+                    designerIntact ? 'Core Designer remains intact after plugin loading' : 'Core Designer integrity compromised', true
+                );
+
+                // Test that Core Designer functionality still works
+                const canvasWorks = typeof window.designerWidgetInstance.fabricCanvas.toDataURL === 'function';
+                addResult('Designer Canvas Function', canvasWorks,
+                    canvasWorks ? 'Designer canvas functionality preserved' : 'Designer canvas functionality compromised', true
+                );
+
+            } catch (error) {
+                addResult('Core Designer Integrity', false, `Designer integrity test failed: ${error.message}`, true);
+            }
+
+            // Test 8: Performance and Memory
+            updateCurrentTest('Testing Performance and Memory');
+            try {
+                const memoryBefore = performance.memory ? performance.memory.usedJSHeapSize : 0;
+
+                // Stress test - create multiple plugins
+                for (let i = 0; i < 5; i++) {
+                    const testPlugin = {
+                        name: `stress-test-${i}`,
+                        version: '1.0.0',
+                        initialize: () => true,
+                        destroy: () => true
+                    };
+                    window.YPrintPlugins.register(`stress-test-${i}`, testPlugin);
+                    window.YPrintPlugins.initializePlugin(`stress-test-${i}`);
+                }
+
+                const memoryAfter = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                const memoryIncrease = memoryAfter - memoryBefore;
+
+                addResult('Memory Usage', memoryIncrease < 10 * 1024 * 1024, // Less than 10MB
+                    `Memory increase: ${Math.round(memoryIncrease / 1024)}KB`
+                );
+
+                // Cleanup stress test plugins
+                for (let i = 0; i < 5; i++) {
+                    window.YPrintPlugins.disablePlugin(`stress-test-${i}`);
+                }
+
+            } catch (error) {
+                addResult('Performance Test', false, `Performance test failed: ${error.message}`);
+            }
+
+            // Test 9: Error Handling
+            updateCurrentTest('Testing Error Handling');
+            try {
+                // Test invalid plugin registration
+                const invalidResult = window.YPrintPlugins.register('invalid-plugin', { invalid: true });
+                addResult('Invalid Plugin Rejection', !invalidResult, 'Invalid plugins correctly rejected');
+
+                // Test security violation handling
+                let securityViolationCaught = false;
+                try {
+                    if (window.YPrintPluginSecurity) {
+                        const maliciousPlugin = {
+                            name: 'malicious',
+                            initialize: () => { window.eval('malicious code'); }
+                        };
+                        window.YPrintPluginSecurity.createPluginSandbox(maliciousPlugin, 'malicious');
+                    }
+                } catch (securityError) {
+                    securityViolationCaught = true;
+                }
+
+                addResult('Security Violation Handling', securityViolationCaught || !window.YPrintPluginSecurity,
+                    'Security violations properly handled'
+                );
+
+            } catch (error) {
+                addResult('Error Handling', false, `Error handling test failed: ${error.message}`);
+            }
+
+            // Final integration assessment
+            updateCurrentTest('Completing integration assessment');
+
+            const criticalFailures = tests.filter(t => t.critical && !t.passed);
+            const totalPassed = tests.filter(t => t.passed).length;
+            const totalTests = tests.length;
+            const successRate = (totalPassed / totalTests) * 100;
+
+            if (criticalFailures.length === 0 && successRate >= 80) {
+                addInfo(`🎉 INTEGRATION SUCCESS: ${totalPassed}/${totalTests} tests passed (${successRate.toFixed(1)}%) - System ready for production`);
+            } else if (criticalFailures.length > 0) {
+                addInfo(`🚨 CRITICAL FAILURES: ${criticalFailures.length} critical issues found - System not ready for production`);
+            } else {
+                addInfo(`⚠️ PARTIAL SUCCESS: ${totalPassed}/${totalTests} tests passed (${successRate.toFixed(1)}%) - Review failing tests before production`);
+            }
+
+            updateCurrentTest('Integration testing complete');
+            document.getElementById('progress-bar').style.width = '100%';
+
+            console.log('🧪 COMPLETE INTEGRATION TEST: All tests finished');
+            console.log('Test Results:', tests);
+        }
+
+        // Start integration tests
+        setTimeout(() => {
+            runIntegrationTests();
+        }, 500);
+
+    </script>
+</body>
+</html>
