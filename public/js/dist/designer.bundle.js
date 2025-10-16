@@ -399,9 +399,14 @@ var DesignerWidget = /*#__PURE__*/function () {
   }, {
     key: "initializeCanvas",
     value: function initializeCanvas() {
+      // AGENT 3 FIX: Null check prevents canvas instantiation failure
+      if (!this.canvas) {
+        console.error('❌ CANVAS INSTANTIATION: Canvas element not found, cannot initialize fabric canvas');
+        return;
+      }
       this.fabricCanvas = new fabric__WEBPACK_IMPORTED_MODULE_1__.Canvas('octo-print-designer-canvas', {
-        width: this.canvas.offsetWidth,
-        height: this.canvas.offsetHeight,
+        width: this.canvas.offsetWidth || 800,
+        height: this.canvas.offsetHeight || 600,
         backgroundColor: '#fff',
         preserveObjectStacking: true
       });
