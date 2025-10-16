@@ -26,6 +26,9 @@ class Octo_Print_Designer {
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-designer-wc-integration.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-octo-print-api-integration.php';
 
+        // 🖨️ PNG-Only System Integration
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-png-storage-handler.php';
+
         // 🧠 Agent Implementation: Measurement Database Classes
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-template-measurement-manager.php';
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-measurement-validation-framework.php';

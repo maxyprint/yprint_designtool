@@ -95,6 +95,24 @@ class Octo_Print_Designer_Public_Core_Rebuild {
             true
         );
 
+        // 🖨️ PNG-ONLY SYSTEM: High-DPI Print Export Engine
+        wp_register_script(
+            'yprint-high-dpi-export',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/high-dpi-png-export-engine.js',
+            ['yprint-unified-api'], // Depends on unified API
+            $this->version . '.png-export-v1',
+            true
+        );
+
+        // 🖨️ PNG-ONLY SYSTEM: WordPress Integration Layer
+        wp_register_script(
+            'yprint-png-integration',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/png-only-system-integration.js',
+            ['yprint-high-dpi-export'], // Depends on export engine
+            $this->version . '.png-integration-v1',
+            true
+        );
+
         // 🚀 CORE SCRIPT 4: WordPress Integration (if needed)
         // Handles WordPress-specific functionality
         wp_register_script(
@@ -127,6 +145,10 @@ class Octo_Print_Designer_Public_Core_Rebuild {
         wp_enqueue_script('yprint-unified-fabric-core');
         wp_enqueue_script('yprint-designer-widget-core');
         wp_enqueue_script('yprint-unified-api');
+
+        // Always enqueue PNG-Only System for print functionality
+        wp_enqueue_script('yprint-high-dpi-export');
+        wp_enqueue_script('yprint-png-integration');
 
         // Context-specific enqueues
         if (is_product() || is_shop() || is_cart() || is_checkout()) {
