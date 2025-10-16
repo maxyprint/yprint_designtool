@@ -18,6 +18,7 @@ class YPrintSuperpowerActivation {
             emergencySystemActive: false,
             unifiedFabricActive: false,
             eventCoordinationActive: false,
+            emergencyResolverActive: false,
             systemReady: false
         };
 
@@ -40,7 +41,10 @@ class YPrintSuperpowerActivation {
             // Step 4: Integrate with existing systems
             await this.integrateWithExistingSystems();
 
-            // Step 5: Final validation
+            // Step 5: Activate emergency paradox resolver
+            await this.activateEmergencyResolver();
+
+            // Step 6: Final validation
             await this.validateSuperpowers();
 
             console.log('🎉 SUPERPOWER ACTIVATION: All systems activated successfully!');
@@ -199,6 +203,48 @@ class YPrintSuperpowerActivation {
         }
     }
 
+    async activateEmergencyResolver() {
+        console.log('🚨 SUPERPOWER: Activating emergency paradox resolver...');
+
+        // Check if emergency paradox resolver is active
+        if (window.emergencyParadoxResolver) {
+            console.log('✅ SUPERPOWER: Emergency paradox resolver active');
+
+            // Monitor resolver status
+            const checkResolverStatus = () => {
+                const status = window.emergencyParadoxResolver.getStatus();
+                if (status.systemReady) {
+                    this.status.emergencyResolverActive = true;
+                    console.log('🎉 SUPERPOWER: Emergency paradox successfully resolved!');
+                    return true;
+                }
+                return false;
+            };
+
+            // Check immediately
+            if (!checkResolverStatus()) {
+                // Wait for resolution with timeout
+                await new Promise((resolve) => {
+                    const maxWait = 30; // 30 seconds max
+                    let waited = 0;
+
+                    const interval = setInterval(() => {
+                        waited++;
+                        if (checkResolverStatus() || waited >= maxWait) {
+                            clearInterval(interval);
+                            resolve();
+                        }
+                    }, 1000);
+                });
+            }
+
+            return true;
+        }
+
+        console.warn('⚠️ SUPERPOWER: Emergency paradox resolver not active');
+        return false;
+    }
+
     handleFabricReady(fabricDetail) {
         console.log('🔥 SUPERPOWER: Fabric ready event received');
         console.log('🔍 SUPERPOWER: Fabric source:', fabricDetail.source);
@@ -252,6 +298,7 @@ class YPrintSuperpowerActivation {
     areAllSystemsReady() {
         return this.status.emergencySystemActive &&
                this.status.unifiedFabricActive &&
+               this.status.emergencyResolverActive &&
                this.status.systemReady;
     }
 

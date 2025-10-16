@@ -173,12 +173,19 @@
                 <div class="status-indicator" id="plugin-status">✅</div>
                 <p id="plugin-detail">Compatibility confirmed - no conflicts</p>
             </div>
+
+            <div class="status-card">
+                <h3>🚨 Emergency Resolver</h3>
+                <div class="status-indicator" id="emergency-resolver-status">⏳</div>
+                <p id="emergency-resolver-detail">Canvas/Fabric paradox resolution</p>
+            </div>
         </div>
 
         <div class="controls">
             <button class="btn btn-primary" onclick="deploySuperpower('emergency')">🩹 Deploy Emergency Fix</button>
             <button class="btn btn-primary" onclick="deploySuperpower('fabric')">🎯 Deploy Unified Fabric</button>
             <button class="btn btn-primary" onclick="deploySuperpower('events')">⚡ Deploy Event System</button>
+            <button class="btn btn-primary" onclick="deploySuperpower('paradox')">🚨 Deploy Paradox Resolver</button>
             <button class="btn btn-success" onclick="deployAllSuperpowers()">🔥 ACTIVATE ALL SUPERPOWERS</button>
         </div>
 
@@ -200,6 +207,9 @@
     <script src="public/js/unified-fabric-loader.js"></script>
     <script src="public/js/event-coordination-system.js"></script>
     <script src="superpower-activation.js"></script>
+
+    <!-- Emergency paradox resolver -->
+    <script src="emergency-paradox-resolver.js"></script>
 
     <script>
         // Deployment System
@@ -266,6 +276,9 @@
                             break;
                         case 'integration':
                             await this.deployIntegration();
+                            break;
+                        case 'paradox':
+                            await this.deployParadoxResolver();
                             break;
                     }
 
@@ -334,10 +347,32 @@
                 }
             },
 
+            async deployParadoxResolver() {
+                // Check if emergency paradox resolver is working
+                if (window.emergencyParadoxResolver) {
+                    this.updateStatus('emergency-resolver', '✅', 'Emergency paradox resolver active');
+                    this.log('success', '🚨 Emergency paradox resolver system active');
+
+                    // Get resolver status
+                    const status = window.emergencyParadoxResolver.getStatus();
+                    this.log('info', `🔍 Paradox resolution status: ${JSON.stringify(status.resolvers)}`);
+
+                    if (status.systemReady) {
+                        this.log('success', '🎉 Canvas/Fabric paradox successfully resolved!');
+                    } else {
+                        this.log('warning', '⚠️ Paradox resolver working but not fully resolved yet');
+                    }
+
+                    return true;
+                } else {
+                    throw new Error('Emergency paradox resolver not found');
+                }
+            },
+
             async deployAll() {
                 this.log('info', '🔥 DEPLOYING ALL SUPERPOWERS...');
 
-                const systems = ['emergency', 'fabric', 'events', 'integration'];
+                const systems = ['emergency', 'fabric', 'events', 'integration', 'paradox'];
 
                 for (const system of systems) {
                     await this.deploySuperpower(system);
@@ -380,6 +415,14 @@
                     this.log('success', `✅ Integration test: ${status ? 'All systems ready' : 'Some systems pending'}`);
                 } else {
                     this.log('error', '❌ Integration test: System not found');
+                }
+
+                // Test emergency paradox resolver
+                if (window.emergencyParadoxResolver) {
+                    const resolverStatus = window.emergencyParadoxResolver.getStatus();
+                    this.log('success', `✅ Paradox resolver test: ${resolverStatus.systemReady ? 'Paradox resolved' : 'Still resolving'}`);
+                } else {
+                    this.log('error', '❌ Paradox resolver test: System not found');
                 }
 
                 this.log('info', '🧪 SUPERPOWER TESTING COMPLETE');
@@ -427,6 +470,11 @@
 
         window.addEventListener('systemCoordinationComplete', (event) => {
             deploymentSystem.log('success', '⚡ System coordination complete');
+        });
+
+        window.addEventListener('emergencyParadoxResolved', (event) => {
+            deploymentSystem.log('success', '🚨 Emergency paradox successfully resolved!');
+            deploymentSystem.updateStatus('emergency-resolver', '✅', 'Canvas/Fabric paradox resolved');
         });
     </script>
 </body>
