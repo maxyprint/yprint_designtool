@@ -83,10 +83,10 @@ class PNGOnlySystemIntegration {
     }
 
     setupPrintPNGAJAX() {
-        // Add to cart with print PNG data
-        this.addToCartWithPrintPNG = async () => {
+        // Auto-generate PNG when design is created/modified
+        this.autoGeneratePrintPNG = async () => {
             try {
-                console.log('🛒 PNG-ONLY INTEGRATION: Adding to cart with print PNG...');
+                console.log('🖨️ PNG-ONLY INTEGRATION: Auto-generating print PNG...');
 
                 // Generate print-ready PNG
                 const printPNG = await this.exportEngine.exportForPrintMachine({
@@ -98,29 +98,27 @@ class PNGOnlySystemIntegration {
                 // Get design data
                 const designData = this.yprintAPI.design.getData();
 
-                // Prepare cart data
-                const cartData = {
-                    product_id: this.getCurrentProductId(),
-                    design_data: JSON.stringify(designData),
+                // Prepare design PNG data
+                const designPNGData = {
+                    design_id: this.generateDesignId(designData),
                     print_png: printPNG,
                     print_area_px: JSON.stringify(this.exportEngine.printAreaPx),
                     print_area_mm: JSON.stringify(this.exportEngine.printAreaMm),
                     template_id: this.exportEngine.currentTemplateId
                 };
 
-                // Send to WordPress
-                await this.sendPrintDataToWordPress(cartData);
+                // Save to WordPress for 'Designdaten laden' access
+                await this.saveDesignPrintPNG(designPNGData);
 
-                console.log('✅ PNG-ONLY INTEGRATION: Cart data sent with print PNG');
+                console.log('✅ PNG-ONLY INTEGRATION: Print PNG auto-generated and saved');
 
             } catch (error) {
-                console.error('❌ PNG-ONLY INTEGRATION: Add to cart failed:', error);
-                this.showErrorMessage('Failed to add print design to cart: ' + error.message);
+                console.error('❌ PNG-ONLY INTEGRATION: Auto PNG generation failed:', error);
             }
         };
     }
 
-    async sendPrintDataToWordPress(cartData) {
+    async saveDesignPrintPNG(designPNGData) {
         const config = window.octo_print_designer_config;
 
         if (!config?.ajax_url || !config?.nonce) {
@@ -128,14 +126,13 @@ class PNGOnlySystemIntegration {
         }
 
         const formData = new FormData();
-        formData.append('action', 'yprint_add_to_cart_with_print_png');
+        formData.append('action', 'yprint_save_design_print_png');
         formData.append('nonce', config.nonce);
-        formData.append('product_id', cartData.product_id);
-        formData.append('design_data', cartData.design_data);
-        formData.append('print_png', cartData.print_png);
-        formData.append('print_area_px', cartData.print_area_px);
-        formData.append('print_area_mm', cartData.print_area_mm);
-        formData.append('template_id', cartData.template_id);
+        formData.append('design_id', designPNGData.design_id);
+        formData.append('print_png', designPNGData.print_png);
+        formData.append('print_area_px', designPNGData.print_area_px);
+        formData.append('print_area_mm', designPNGData.print_area_mm);
+        formData.append('template_id', designPNGData.template_id);
 
         const response = await fetch(config.ajax_url, {
             method: 'POST',
@@ -145,14 +142,10 @@ class PNGOnlySystemIntegration {
         const result = await response.json();
 
         if (!result.success) {
-            throw new Error(result.data || 'Failed to add to cart');
+            throw new Error(result.data || 'Failed to save design PNG');
         }
 
-        // Redirect to cart or show success
-        if (result.data.redirect_url) {
-            window.location.href = result.data.redirect_url;
-        }
-
+        console.log('💾 PNG-ONLY INTEGRATION: Design PNG saved to WordPress');
         return result.data;
     }
 
@@ -210,10 +203,7 @@ class PNGOnlySystemIntegration {
     setupUIIntegration() {
         console.log('🔗 PNG-ONLY INTEGRATION: Setting up UI integration...');
 
-        // Replace standard "Add to Cart" with print PNG export
-        this.replaceAddToCartButtons();
-
-        // Add print PNG preview button
+        // Add print PNG preview button only (NO CART REPLACEMENT)
         this.addPrintPreviewButton();
 
         console.log('✅ PNG-ONLY INTEGRATION: UI integration ready');
@@ -261,32 +251,37 @@ class PNGOnlySystemIntegration {
         if (designerContainer) {
             const previewButton = document.createElement('button');
             previewButton.className = 'btn btn-secondary yprint-print-preview';
-            previewButton.innerHTML = '🖨️ Preview Print PNG';
+            previewButton.innerHTML = '🖨️ Generate Print PNG';
             previewButton.style.margin = '10px 0';
 
             previewButton.addEventListener('click', async () => {
                 try {
-                    previewButton.textContent = 'Generating Preview...';
+                    previewButton.textContent = 'Generating Print PNG...';
                     previewButton.disabled = true;
 
+                    // Generate high-quality print PNG when design is ready
                     const printPNG = await this.exportEngine.exportForPrintMachine({
-                        dpi: 150, // Lower DPI for preview
-                        format: 'png'
+                        dpi: 300, // Full print quality
+                        format: 'png',
+                        quality: 1.0
                     });
+
+                    // Save PNG for later 'Designdaten laden' access
+                    await this.savePrintPNGToCurrentDesign(printPNG);
 
                     this.showPrintPreview(printPNG);
 
                 } catch (error) {
-                    console.error('❌ PNG-ONLY INTEGRATION: Preview failed:', error);
-                    this.showErrorMessage('Failed to generate print preview');
+                    console.error('❌ PNG-ONLY INTEGRATION: PNG generation failed:', error);
+                    this.showErrorMessage('Failed to generate print PNG');
                 } finally {
-                    previewButton.innerHTML = '🖨️ Preview Print PNG';
+                    previewButton.innerHTML = '🖨️ Generate Print PNG';
                     previewButton.disabled = false;
                 }
             });
 
             designerContainer.appendChild(previewButton);
-            console.log('✅ PNG-ONLY INTEGRATION: Print preview button added');
+            console.log('✅ PNG-ONLY INTEGRATION: Print PNG generator button added');
         }
     }
 
@@ -361,12 +356,43 @@ class PNGOnlySystemIntegration {
     setupEventHandlers() {
         console.log('🔗 PNG-ONLY INTEGRATION: Setting up event handlers...');
 
-        // Listen for print PNG exports
+        // Listen for design creation/modification
+        window.addEventListener('yprintDesignCreated', (event) => {
+            console.log('📢 PNG-ONLY INTEGRATION: Design created, auto-generating PNG...');
+            this.autoGeneratePrintPNG();
+        });
+
+        window.addEventListener('yprintDesignModified', (event) => {
+            console.log('📢 PNG-ONLY INTEGRATION: Design modified, auto-generating PNG...');
+            this.autoGeneratePrintPNG();
+        });
+
+        // Listen for order design loading (from "Designdaten laden")
+        window.addEventListener('yprintOrderDesignLoaded', (event) => {
+            const { designId } = event.detail;
+            console.log('📢 PNG-ONLY INTEGRATION: Order design loaded for "Designdaten laden", generating PNG...', designId);
+            this.generatePNGForOrder(designId);
+        });
+
+        // Listen for fabric canvas changes (fallback)
+        if (window.YPrint?.fabric?.canvas) {
+            window.YPrint.fabric.canvas.on('object:added', () => {
+                this.debounceAutoGenerate();
+            });
+
+            window.YPrint.fabric.canvas.on('object:modified', () => {
+                this.debounceAutoGenerate();
+            });
+
+            window.YPrint.fabric.canvas.on('object:removed', () => {
+                this.debounceAutoGenerate();
+            });
+        }
+
+        // Listen for print PNG exports (manual generation)
         window.addEventListener('yprintPrintPNGExported', (event) => {
             const { printPNG, printAreaPx, options } = event.detail;
-            console.log('📢 PNG-ONLY INTEGRATION: Print PNG export detected');
-
-            // Could trigger automatic save or other actions here
+            console.log('📢 PNG-ONLY INTEGRATION: Manual print PNG export detected');
         });
 
         console.log('✅ PNG-ONLY INTEGRATION: Event handlers ready');
@@ -435,6 +461,33 @@ class PNGOnlySystemIntegration {
         };
     }
 
+    // Save Print PNG to current design data
+    async savePrintPNGToCurrentDesign(printPNG) {
+        try {
+            const designData = this.yprintAPI.design.getData();
+            const templateId = this.exportEngine.currentTemplateId;
+
+            // Add print PNG to design data
+            designData.printPNG = {
+                data: printPNG,
+                timestamp: Date.now(),
+                templateId: templateId,
+                printAreaPx: this.exportEngine.printAreaPx,
+                printAreaMm: this.exportEngine.printAreaMm,
+                dpi: 300
+            };
+
+            // Save updated design data back to YPrint system
+            await this.yprintAPI.design.save(designData);
+
+            console.log('✅ PNG-ONLY INTEGRATION: Print PNG saved to design data');
+
+        } catch (error) {
+            console.error('❌ PNG-ONLY INTEGRATION: Failed to save print PNG:', error);
+            throw error;
+        }
+    }
+
     // Public API
     async exportPrintPNG(options = {}) {
         if (!this.exportEngine) {
@@ -452,8 +505,93 @@ class PNGOnlySystemIntegration {
         return this.exportEngine.getPrintAreaDimensions();
     }
 
+    // Debounce auto-generation to prevent too frequent calls
+    debounceAutoGenerate() {
+        clearTimeout(this.autoGenerateTimeout);
+        this.autoGenerateTimeout = setTimeout(() => {
+            this.autoGeneratePrintPNG();
+        }, 2000); // Wait 2 seconds after last change
+    }
+
+    // Generate unique design ID from design data
+    generateDesignId(designData) {
+        try {
+            // Create hash from design data for unique ID
+            const dataString = JSON.stringify(designData);
+            const timestamp = Date.now();
+            const productId = this.getCurrentProductId() || 'unknown';
+            const templateId = this.exportEngine?.currentTemplateId || 'unknown';
+
+            // Simple hash function
+            let hash = 0;
+            for (let i = 0; i < dataString.length; i++) {
+                const char = dataString.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+
+            return `design_${productId}_${templateId}_${Math.abs(hash)}_${timestamp}`;
+        } catch (error) {
+            console.error('❌ PNG-ONLY INTEGRATION: Failed to generate design ID:', error);
+            return `design_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+    }
+
+    // Generate PNG specifically for order design (triggered by "Designdaten laden")
+    async generatePNGForOrder(designId) {
+        try {
+            console.log('🖨️ PNG-ONLY INTEGRATION: Generating PNG for order design:', designId);
+
+            // Check if we have valid design and export engine
+            if (!this.exportEngine || !this.yprintAPI) {
+                console.warn('⚠️ PNG-ONLY INTEGRATION: Export engine or YPrint API not ready');
+                return;
+            }
+
+            // Generate print-ready PNG
+            const printPNG = await this.exportEngine.exportForPrintMachine({
+                dpi: 300,
+                format: 'png',
+                quality: 1.0
+            });
+
+            // Get current design data
+            const designData = this.yprintAPI.design.getData();
+
+            // Prepare order PNG data
+            const orderPNGData = {
+                design_id: designId,
+                print_png: printPNG,
+                print_area_px: JSON.stringify(this.exportEngine.printAreaPx),
+                print_area_mm: JSON.stringify(this.exportEngine.printAreaMm),
+                template_id: this.exportEngine.currentTemplateId
+            };
+
+            // Save PNG data for order
+            await this.saveDesignPrintPNG(orderPNGData);
+
+            // Notify that PNG is ready for order
+            window.dispatchEvent(new CustomEvent('yprintOrderPNGGenerated', {
+                detail: {
+                    designId: designId,
+                    pngUrl: printPNG
+                }
+            }));
+
+            console.log('✅ PNG-ONLY INTEGRATION: Order PNG generated and saved for:', designId);
+
+        } catch (error) {
+            console.error('❌ PNG-ONLY INTEGRATION: Order PNG generation failed:', error);
+        }
+    }
+
     dispose() {
         console.log('🧹 PNG-ONLY INTEGRATION: Disposing...');
+
+        // Clear timeout
+        if (this.autoGenerateTimeout) {
+            clearTimeout(this.autoGenerateTimeout);
+        }
 
         this.initialized = false;
         delete window.pngOnlySystemIntegration;

@@ -36,19 +36,17 @@ class PNG_Storage_Handler {
         // Create upload directory if it doesn't exist
         $this->ensure_upload_directory();
 
-        // Register AJAX handlers
-        add_action('wp_ajax_yprint_add_to_cart_with_print_png', array($this, 'handle_add_to_cart_with_print_png'));
-        add_action('wp_ajax_nopriv_yprint_add_to_cart_with_print_png', array($this, 'handle_add_to_cart_with_print_png'));
-
-        add_action('wp_ajax_yprint_save_order_print_data', array($this, 'handle_save_order_print_data'));
-        add_action('wp_ajax_nopriv_yprint_save_order_print_data', array($this, 'handle_save_order_print_data'));
+        // Register AJAX handlers for PNG storage (NOT cart integration)
+        add_action('wp_ajax_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
+        add_action('wp_ajax_nopriv_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
 
         add_action('wp_ajax_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
         add_action('wp_ajax_nopriv_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
 
-        // WooCommerce hooks
-        add_action('woocommerce_add_order_item_meta', array($this, 'add_print_png_to_order_item'), 10, 3);
-        add_action('woocommerce_order_status_completed', array($this, 'prepare_print_files'));
+        // AJAX handler for adding PNG to order design data (integrates with "Designdaten laden")
+        add_action('wp_ajax_yprint_add_png_to_order_design_data', array($this, 'handle_add_png_to_order_design_data'));
+
+        // NO WooCommerce cart hooks - PNG system works independently
 
         // Admin hooks
         add_action('add_meta_boxes', array($this, 'add_order_meta_boxes'));
@@ -73,9 +71,9 @@ class PNG_Storage_Handler {
     }
 
     /**
-     * Handle AJAX request to add to cart with print PNG
+     * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
-    public function handle_add_to_cart_with_print_png() {
+    public function handle_save_design_print_png() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
             wp_send_json_error('Invalid nonce');
@@ -83,59 +81,51 @@ class PNG_Storage_Handler {
         }
 
         try {
-            $product_id = intval($_POST['product_id']);
-            $design_data = stripslashes($_POST['design_data']);
+            $design_id = sanitize_text_field($_POST['design_id']);
             $print_png = $_POST['print_png'];
             $print_area_px = stripslashes($_POST['print_area_px']);
             $print_area_mm = stripslashes($_POST['print_area_mm']);
             $template_id = sanitize_text_field($_POST['template_id']);
 
             // Validate inputs
-            if (!$product_id || !$print_png || !$design_data) {
+            if (!$design_id || !$print_png) {
                 wp_send_json_error('Missing required data');
                 return;
             }
 
             // Save print PNG file
-            $png_file_info = $this->save_print_png($print_png, $product_id, $template_id);
+            $png_file_info = $this->save_print_png($print_png, $design_id, $template_id);
 
             if (!$png_file_info) {
                 wp_send_json_error('Failed to save print PNG');
                 return;
             }
 
-            // Prepare cart item data
-            $cart_item_data = array(
-                'yprint_design_data' => $design_data,
-                'yprint_print_png_url' => $png_file_info['url'],
-                'yprint_print_png_path' => $png_file_info['path'],
-                'yprint_print_area_px' => $print_area_px,
-                'yprint_print_area_mm' => $print_area_mm,
-                'yprint_template_id' => $template_id,
-                'yprint_print_ready' => true,
-                'yprint_created' => current_time('mysql')
+            // Save PNG info to design meta (for 'Designdaten laden' access)
+            $design_meta = array(
+                'print_png_url' => $png_file_info['url'],
+                'print_png_path' => $png_file_info['path'],
+                'print_area_px' => $print_area_px,
+                'print_area_mm' => $print_area_mm,
+                'template_id' => $template_id,
+                'created' => current_time('mysql'),
+                'dpi' => 300
             );
 
-            // Add to WooCommerce cart
-            $cart_item_key = WC()->cart->add_to_cart($product_id, 1, 0, array(), $cart_item_data);
+            // Save to design meta or option (depending on how designs are stored)
+            update_option('yprint_design_' . $design_id . '_print_png', $design_meta);
 
-            if (!$cart_item_key) {
-                wp_send_json_error('Failed to add to cart');
-                return;
-            }
-
-            error_log('🛒 PNG STORAGE: Added to cart with print PNG - Product: ' . $product_id);
+            error_log('💾 PNG STORAGE: Design print PNG saved - Design: ' . $design_id);
 
             wp_send_json_success(array(
-                'cart_item_key' => $cart_item_key,
                 'png_url' => $png_file_info['url'],
-                'redirect_url' => wc_get_cart_url(),
-                'message' => 'Print-ready design added to cart!'
+                'design_id' => $design_id,
+                'message' => 'Print PNG saved for design!'
             ));
 
         } catch (Exception $e) {
-            error_log('❌ PNG STORAGE: Add to cart failed: ' . $e->getMessage());
-            wp_send_json_error('Failed to process request: ' . $e->getMessage());
+            error_log('❌ PNG STORAGE: Save design PNG failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to save print PNG: ' . $e->getMessage());
         }
     }
 
@@ -198,36 +188,74 @@ class PNG_Storage_Handler {
     }
 
     /**
-     * Handle AJAX request to save order print data
+     * Handle AJAX request to add PNG data to existing order design data
+     * This integrates with the "Designdaten laden" functionality
      */
-    public function handle_save_order_print_data() {
-        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+    public function handle_add_png_to_order_design_data() {
+        if (!wp_verify_nonce($_POST['nonce'], 'octo_send_to_print_provider')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
 
         try {
             $order_id = intval($_POST['order_id']);
-            $print_data = stripslashes($_POST['print_data']);
+            $design_id = sanitize_text_field($_POST['design_id']);
 
-            if (!$order_id || !$print_data) {
+            if (!$order_id || !$design_id) {
                 wp_send_json_error('Missing required data');
                 return;
             }
 
-            // Save to order meta
-            $result = update_post_meta($order_id, '_yprint_print_data', $print_data);
+            // Get the stored design PNG data
+            $design_png_meta = get_option('yprint_design_' . $design_id . '_print_png');
 
-            if ($result) {
-                error_log('📦 PNG STORAGE: Order print data saved - Order: ' . $order_id);
-                wp_send_json_success('Print data saved to order');
+            if (!$design_png_meta) {
+                wp_send_json_error('No PNG data found for this design');
+                return;
+            }
+
+            // Get existing order design data
+            $existing_design_data = get_post_meta($order_id, '_design_data', true);
+
+            if ($existing_design_data) {
+                // Parse existing JSON
+                $design_data = json_decode($existing_design_data, true);
+
+                if ($design_data) {
+                    // Add PNG data to existing design data
+                    $design_data['print_png'] = array(
+                        'url' => $design_png_meta['print_png_url'],
+                        'path' => $design_png_meta['print_png_path'],
+                        'print_area_px' => json_decode($design_png_meta['print_area_px'], true),
+                        'print_area_mm' => json_decode($design_png_meta['print_area_mm'], true),
+                        'template_id' => $design_png_meta['template_id'],
+                        'dpi' => $design_png_meta['dpi'],
+                        'created' => $design_png_meta['created']
+                    );
+
+                    // Save updated design data back to order
+                    $updated_json = json_encode($design_data);
+                    $result = update_post_meta($order_id, '_design_data', wp_slash($updated_json));
+
+                    if ($result) {
+                        error_log('📦 PNG STORAGE: PNG data added to order design data - Order: ' . $order_id);
+                        wp_send_json_success(array(
+                            'message' => 'PNG data added to order design data',
+                            'png_url' => $design_png_meta['print_png_url']
+                        ));
+                    } else {
+                        wp_send_json_error('Failed to update order design data');
+                    }
+                } else {
+                    wp_send_json_error('Invalid existing design data format');
+                }
             } else {
-                wp_send_json_error('Failed to save print data');
+                wp_send_json_error('No existing design data found in order');
             }
 
         } catch (Exception $e) {
-            error_log('❌ PNG STORAGE: Save order data failed: ' . $e->getMessage());
-            wp_send_json_error('Failed to save: ' . $e->getMessage());
+            error_log('❌ PNG STORAGE: Add PNG to order failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to add PNG data: ' . $e->getMessage());
         }
     }
 
