@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🎯 Timing Fix Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        #octo-print-designer-canvas { border: 2px solid #28a745; margin: 20px 0; }
+        .progress { display: inline-block; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h1>🎯 Canvas Timing Fix Verification</h1>
+    <p>Testing the DOM timing fix that ensures canvas element availability before DesignerWidget instantiation.</p>
+
+    <div id="test-results"></div>
+
+    <!-- Simulate real DOM structure -->
+    <div class="octo-print-designer">
+        <h3>Designer Canvas (should load with fabric instance):</h3>
+        <canvas id="octo-print-designer-canvas" width="800" height="600"></canvas>
+    </div>
+
+    <!-- Load the fixed designer.bundle.js -->
+    <script src="public/js/dist/designer.bundle.js"></script>
+
+    <script>
+        const results = document.getElementById('test-results');
+        let testsPassed = 0;
+        let testsTotal = 0;
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+
+            if (type === 'success') testsPassed++;
+            if (type !== 'info') testsTotal++;
+        }
+
+        function updateProgress() {
+            const progressDiv = document.querySelector('.progress-summary');
+            if (progressDiv) {
+                progressDiv.innerHTML = `<strong>Progress: ${testsPassed}/${testsTotal} tests passed</strong>`;
+            }
+        }
+
+        // Test sequence
+        async function runTimingTests() {
+            addResult('🔄 Starting Canvas Timing Fix Tests...', 'info');
+            addResult('<div class="progress-summary">Initializing...</div>', 'info');
+
+            // Test 1: Verify timing fix messages appear
+            addResult('📋 Test 1: Monitoring timing fix console messages...', 'info');
+
+            let timingFixDetected = false;
+            let canvasAvailableMessage = false;
+
+            // Override console.log to detect timing fix messages
+            const originalLog = console.log;
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                const message = args.join(' ');
+
+                if (message.includes('⏳ TIMING FIX: Canvas element not ready, retrying...')) {
+                    timingFixDetected = true;
+                    addResult('✅ Timing fix retry mechanism detected', 'success');
+                }
+                if (message.includes('✅ TIMING FIX: DesignerWidget created with canvas element available')) {
+                    canvasAvailableMessage = true;
+                    addResult('✅ Canvas availability confirmed before instantiation', 'success');
+                }
+            };
+
+            // Test 2: Canvas element exists
+            setTimeout(() => {
+                const canvas = document.getElementById('octo-print-designer-canvas');
+                if (canvas) {
+                    addResult('✅ Test 2: Canvas element exists in DOM', 'success');
+                } else {
+                    addResult('❌ Test 2: Canvas element missing', 'error');
+                }
+                updateProgress();
+            }, 100);
+
+            // Test 3: Check timing fix execution
+            setTimeout(() => {
+                if (timingFixDetected || canvasAvailableMessage) {
+                    addResult('✅ Test 3: Timing fix mechanism executed', 'success');
+                } else {
+                    addResult('⚠️ Test 3: No timing fix messages detected (may not be needed)', 'warning');
+                }
+                updateProgress();
+            }, 500);
+
+            // Test 4: Verify DesignerWidget instance creation
+            setTimeout(() => {
+                if (window.designerWidgetInstance) {
+                    addResult('✅ Test 4: DesignerWidget instance created successfully', 'success');
+                } else {
+                    addResult('❌ Test 4: DesignerWidget instance not found', 'error');
+                }
+                updateProgress();
+            }, 1000);
+
+            // Test 5: Check if canvas has fabric instance
+            setTimeout(() => {
+                const canvas = document.getElementById('octo-print-designer-canvas');
+                if (canvas && canvas.__fabric) {
+                    addResult('🎉 Test 5: PARADOX ELIMINATED! Canvas has fabric instance (__fabric property set)', 'success');
+                } else {
+                    addResult('⚠️ Test 5: Canvas fabric instance not yet available (may still be initializing)', 'warning');
+
+                    // Extended wait for fabric initialization
+                    setTimeout(() => {
+                        const canvas = document.getElementById('octo-print-designer-canvas');
+                        if (canvas && canvas.__fabric) {
+                            addResult('🎉 Test 5 (Extended): PARADOX ELIMINATED! Canvas has fabric instance', 'success');
+                        } else {
+                            addResult('❌ Test 5 (Extended): Paradox persists - no fabric instance on canvas', 'error');
+                        }
+                        updateProgress();
+                    }, 2000);
+                }
+                updateProgress();
+            }, 1500);
+
+            // Test 6: Verify canvas paradox resolution
+            setTimeout(() => {
+                const allCanvases = document.querySelectorAll('canvas');
+                let fabricCanvases = 0;
+
+                allCanvases.forEach(canvas => {
+                    if (canvas.__fabric) fabricCanvases++;
+                });
+
+                addResult(`📊 Test 6: Canvas Analysis - Total: ${allCanvases.length}, With Fabric: ${fabricCanvases}`, 'info');
+
+                if (fabricCanvases > 0) {
+                    addResult('✅ Test 6: Canvas/Fabric paradox resolved!', 'success');
+                } else {
+                    addResult('❌ Test 6: Canvas/Fabric paradox still exists', 'error');
+                }
+                updateProgress();
+            }, 3000);
+
+            // Final summary
+            setTimeout(() => {
+                addResult('📋 Test Summary:', 'info');
+                if (testsPassed >= testsTotal * 0.8) {
+                    addResult(`🎉 TIMING FIX SUCCESSFUL! ${testsPassed}/${testsTotal} tests passed`, 'success');
+                } else {
+                    addResult(`⚠️ Some tests failed: ${testsPassed}/${testsTotal} tests passed`, 'warning');
+                }
+            }, 4000);
+
+            // Restore original console.log
+            setTimeout(() => {
+                console.log = originalLog;
+            }, 5000);
+        }
+
+        // Wait for page load then run tests
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runTimingTests);
+        } else {
+            runTimingTests();
+        }
+
+        // Manual test function
+        window.runTimingTests = runTimingTests;
+        window.checkCanvasStatus = function() {
+            const canvas = document.getElementById('octo-print-designer-canvas');
+            console.log('Canvas element:', canvas);
+            console.log('Canvas __fabric:', canvas ? canvas.__fabric : 'N/A');
+            console.log('DesignerWidget instance:', window.designerWidgetInstance);
+        };
+
+        console.log('🎯 Timing Fix Verification Loaded');
+        console.log('💡 Run window.checkCanvasStatus() to manually check canvas state');
+        console.log('💡 Run window.runTimingTests() to re-run tests');
+    </script>
+</body>
+</html>

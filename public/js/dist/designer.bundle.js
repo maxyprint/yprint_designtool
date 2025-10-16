@@ -2574,59 +2574,30 @@ setTimeout(function () {
 /******/ 		console.log("✅ WEBPACK FIX: DesignerWidget exposed globally from bundle");
 /******/
 /******/ 		// 🎯 GATEKEEPER SOLUTION: Auto-create instance and fire ready event
-/******/ 		setTimeout(() => {
-/******/ 			try {
-/******/ 				const instance = new window.DesignerWidget();
-/******/ 				window.designerWidgetInstance = instance;
-/******/ 				console.log("✅ GATEKEEPER: DesignerWidget instance created and ready");
+/******/ 		function waitForCanvasElement() {
+/******/ 			const canvasElement = document.querySelector('#octo-print-designer-canvas');
+/******/ 			if (canvasElement) {
+/******/ 				try {
+/******/ 					const instance = new window.DesignerWidget();
+/******/ 					window.designerWidgetInstance = instance;
+/******/ 					console.log("✅ TIMING FIX: DesignerWidget created with canvas element available");
 /******/
-/******/ 				// Fire the designerReady event to signal all dependent scripts
-/******/ 				document.dispatchEvent(new CustomEvent('designerReady', {
-/******/ 					detail: { instance: instance }
-/******/ 				}));
-/******/ 				console.log("🚀 GATEKEEPER: designerReady event fired - dependent scripts can now initialize");
-/******/ 			} catch (error) {
-/******/ 				console.error("❌ GATEKEEPER: Failed to create DesignerWidget instance:", error);
-/******/ 				console.warn("🔄 RESILIENCE: Attempting GATEKEEPER fallback mechanisms...");
-/******/
-/******/ 				// FALLBACK 1: Retry after DOM readiness
-/******/ 				setTimeout(() => {
-/******/ 					try {
-/******/ 						const fallbackInstance = new window.DesignerWidget();
-/******/ 						window.designerWidgetInstance = fallbackInstance;
-/******/ 						document.dispatchEvent(new CustomEvent('designerReady', {
-/******/ 							detail: { instance: fallbackInstance, fallback: true }
-/******/ 						}));
-/******/ 						console.log("✅ RESILIENCE: GATEKEEPER fallback 1 successful");
-/******/ 					} catch (fallbackError) {
-/******/ 						console.warn("⚠️ RESILIENCE: GATEKEEPER fallback 1 failed, trying fallback 2");
-/******/
-/******/ 						// FALLBACK 2: Manual DOM readiness check
-/******/ 						if (document.readyState === 'complete') {
-/******/ 							try {
-/******/ 								const manualInstance = new window.DesignerWidget();
-/******/ 								window.designerWidgetInstance = manualInstance;
-/******/ 								document.dispatchEvent(new CustomEvent('designerReady', {
-/******/ 									detail: { instance: manualInstance, fallback: true, manual: true }
-/******/ 								}));
-/******/ 								console.log("✅ RESILIENCE: GATEKEEPER fallback 2 (manual) successful");
-/******/ 							} catch (manualError) {
-/******/ 								console.error("❌ RESILIENCE: All GATEKEEPER fallbacks failed. UI degradation mode activated.");
-/******/ 								// FALLBACK 3: Signal degraded mode for dependent scripts
-/******/ 								document.dispatchEvent(new CustomEvent('designerDegraded', {
-/******/ 									detail: { error: manualError, fallbacksExhausted: true }
-/******/ 								}));
-/******/ 							}
-/******/ 						} else {
-/******/ 							console.error("❌ RESILIENCE: DOM not ready and all GATEKEEPER attempts failed");
-/******/ 							document.dispatchEvent(new CustomEvent('designerDegraded', {
-/******/ 								detail: { error: fallbackError, domNotReady: true }
-/******/ 							}));
-/******/ 						}
-/******/ 					}
-/******/ 				}, 500); // Longer delay for retry
+/******/ 					// Fire the designerReady event to signal all dependent scripts
+/******/ 					document.dispatchEvent(new CustomEvent('designerReady', {
+/******/ 						detail: { instance: instance }
+/******/ 					}));
+/******/ 					console.log("🚀 GATEKEEPER: designerReady event fired - dependent scripts can now initialize");
+/******/ 				} catch (error) {
+/******/ 					console.error("❌ GATEKEEPER: Failed to create DesignerWidget instance:", error);
+/******/ 					// Retry with fallback after short delay
+/******/ 					setTimeout(waitForCanvasElement, 50);
+/******/ 				}
+/******/ 			} else {
+/******/ 				console.log("⏳ TIMING FIX: Canvas element not ready, retrying...");
+/******/ 				setTimeout(waitForCanvasElement, 10);
 /******/ 			}
-/******/ 		}, 100); // Small delay to ensure DOM is ready
+/******/ 		}
+/******/ 		waitForCanvasElement();
 /******/ 	}
 /******/
 /******/
