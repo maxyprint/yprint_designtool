@@ -211,14 +211,20 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🚨 CRITICAL STRIPE SERVICE FIX - Issue #11
-        wp_register_script(
-            'octo-print-designer-stripe-service',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
-            [],
-            rand(),
-            true
-        );
+        // 🚨 STRIPE SERVICE - CONDITIONAL REGISTRATION (Development/Debug only)
+        // Only register in development mode to prevent mock checkout interference
+        $enable_stripe_mock = defined('YPRINT_STRIPE_ENABLED') && YPRINT_STRIPE_ENABLED;
+        $debug_mode = WP_DEBUG || (isset($_GET['enable_stripe_mock']) && $_GET['enable_stripe_mock'] == '1');
+
+        if ($enable_stripe_mock || $debug_mode) {
+            wp_register_script(
+                'octo-print-designer-stripe-service',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
+                [],
+                rand(),
+                true
+            );
+        }
 
         // 🏆 HIVE MIND ENHANCED JSON COORDINATE SYSTEM - Advanced Design Data Capture
         wp_register_script(
@@ -251,7 +257,7 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-designer',
             OCTO_PRINT_DESIGNER_URL . 'public/js/dist/designer.bundle.js',
-            ['octo-canvas-creation-blocker', 'octo-fabric-readiness-detector', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common', 'octo-print-designer-stripe-service'], // Added canvas-creation-blocker as first dependency
+            ['octo-canvas-creation-blocker', 'octo-fabric-readiness-detector', 'octo-canvas-initialization-controller-public', 'octo-print-designer-products-listing-common'], // Removed stripe-service dependency to prevent mock checkout interference
             $this->version . '.designer-staged-' . time(), // Updated version identifier
             true
         );
@@ -438,7 +444,7 @@ class Octo_Print_Designer_Public {
             // Stage 2.5: Pre-Designer Dependencies (THADDÄUS FIX)
             'octo-canvas-creation-blocker',                    // Must load before designer bundle
             'octo-print-designer-products-listing-common',    // Common bundle dependency
-            'octo-print-designer-stripe-service',             // Service dependency
+            // 'octo-print-designer-stripe-service' - REMOVED: Conditional loading prevents checkout interference
 
             // Stage 3: Designer Foundation (ESSENTIAL)
             'octo-print-designer-designer',      // designer bundle (includes THADDÄUS fix inline script)

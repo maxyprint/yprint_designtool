@@ -4322,8 +4322,12 @@ private function build_print_provider_email_content($order, $design_items, $note
             true
         );
 
-        // 4. Stripe Service (if not already loaded) - Fixes undefined YPrintStripeService
-        if (!wp_script_is('yprint-stripe-service', 'enqueued')) {
+        // 4. Stripe Service (CONDITIONAL LOADING - Mock system disabled for production)
+        // Only load in development mode or when explicitly enabled
+        $enable_stripe_mock = defined('YPRINT_STRIPE_ENABLED') && YPRINT_STRIPE_ENABLED;
+        $debug_mode = WP_DEBUG || (isset($_GET['enable_stripe_mock']) && $_GET['enable_stripe_mock'] == '1');
+
+        if (($enable_stripe_mock || $debug_mode) && !wp_script_is('yprint-stripe-service', 'enqueued')) {
             wp_enqueue_script(
                 'yprint-stripe-service',
                 OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
@@ -4331,6 +4335,9 @@ private function build_print_provider_email_content($order, $design_items, $note
                 OCTO_PRINT_DESIGNER_VERSION,
                 true
             );
+            error_log('🔧 STRIPE MOCK: Mock Stripe service loaded (development mode)');
+        } else {
+            error_log('✅ STRIPE MOCK: Mock system disabled - using normal checkout');
         }
 
         // Localize scripts with checkout data
