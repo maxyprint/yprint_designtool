@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YPrint Plugin Framework Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🔌 YPrint Plugin Framework Test</h1>
+
+    <div id="test-results"></div>
+
+    <!-- Load Plugin Framework -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+
+    <script>
+        console.log('🧪 PLUGIN FRAMEWORK TEST: Starting validation...');
+
+        const results = [];
+
+        function addResult(test, passed, message) {
+            results.push({ test, passed, message });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>ℹ️ INFO:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // Test 1: Plugin Framework should exist
+        try {
+            if (typeof window.YPrintPlugins !== 'undefined') {
+                addResult('Plugin Framework Existence', true, 'YPrintPlugins defined and available');
+            } else {
+                addResult('Plugin Framework Existence', false, 'YPrintPlugins not defined');
+            }
+        } catch (error) {
+            addResult('Plugin Framework Existence', false, `Error: ${error.message}`);
+        }
+
+        // Test 2: Core Designer should remain intact (if present)
+        try {
+            // Core Designer might not be loaded in test environment
+            addInfo('Core Designer integrity check - depends on environment');
+            if (typeof window.designerWidgetInstance !== 'undefined') {
+                addResult('Core Designer Integrity', true, 'Designer instance exists and intact');
+            } else {
+                addInfo('Designer instance not present - test environment OK');
+            }
+        } catch (error) {
+            addResult('Core Designer Integrity', false, `Error: ${error.message}`);
+        }
+
+        // Test 3: Plugin registration should work
+        try {
+            const testPlugin = {
+                name: 'test-plugin',
+                version: '1.0.0',
+                initialize: function() {
+                    console.log('Test plugin initialized');
+                }
+            };
+
+            const result = window.YPrintPlugins.register('test-plugin', testPlugin);
+            addResult('Plugin Registration', result, result ? 'Plugin registered successfully' : 'Plugin registration failed');
+        } catch (error) {
+            addResult('Plugin Registration', false, `Error: ${error.message}`);
+        }
+
+        // Test 4: Plugin validation
+        try {
+            const invalidPlugin = { name: 'invalid' }; // Missing initialize
+            const result = window.YPrintPlugins.register('invalid', invalidPlugin);
+            addResult('Plugin Validation', !result, !result ? 'Invalid plugin correctly rejected' : 'Invalid plugin incorrectly accepted');
+        } catch (error) {
+            addResult('Plugin Validation', false, `Error: ${error.message}`);
+        }
+
+        // Test 5: Plugin listing
+        try {
+            const plugins = window.YPrintPlugins.listPlugins();
+            const hasTestPlugin = plugins.some(p => p.name === 'test-plugin');
+            addResult('Plugin Listing', hasTestPlugin, hasTestPlugin ? 'Plugin appears in listing' : 'Plugin missing from listing');
+        } catch (error) {
+            addResult('Plugin Listing', false, `Error: ${error.message}`);
+        }
+
+        addInfo('Plugin Framework Foundation tests complete');
+
+        console.log('🧪 PLUGIN FRAMEWORK TEST: Foundation tests complete');
+        console.log('Results:', results);
+    </script>
+</body>
+</html>
