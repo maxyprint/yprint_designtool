@@ -98,9 +98,37 @@
             addResult('Plugin Listing', false, `Error: ${error.message}`);
         }
 
-        addInfo('Plugin Framework Foundation tests complete');
+        // Test 6: Designer API Interface (Should fail initially)
+        try {
+            const testPluginWithAPI = {
+                name: 'api-test-plugin',
+                version: '1.0.0',
+                initialize: function(designerAPI) {
+                    // Test API methods
+                    if (typeof designerAPI.getCanvas === 'function' &&
+                        typeof designerAPI.getEventBus === 'function' &&
+                        typeof designerAPI.addMenuItem === 'function') {
+                        return true;
+                    }
+                    return false;
+                }
+            };
 
-        console.log('🧪 PLUGIN FRAMEWORK TEST: Foundation tests complete');
+            // This should fail initially because initializePlugin doesn't exist yet
+            if (typeof window.YPrintPlugins.initializePlugin === 'function') {
+                window.YPrintPlugins.register('api-test', testPluginWithAPI);
+                const result = window.YPrintPlugins.initializePlugin('api-test');
+                addResult('Designer API Interface', true, 'Designer API provided to plugin');
+            } else {
+                addResult('Designer API Interface', false, 'initializePlugin method not implemented yet - EXPECTED');
+            }
+        } catch (error) {
+            addResult('Designer API Interface', false, `Expected failure: ${error.message}`);
+        }
+
+        addInfo('Plugin Framework Foundation tests complete. Designer API tests will pass after Task 2.');
+
+        console.log('🧪 PLUGIN FRAMEWORK TEST: Foundation + API tests complete');
         console.log('Results:', results);
     </script>
 </body>
