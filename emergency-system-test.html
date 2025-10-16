@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Response System Test - YPrint Design Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: #2196F3;
+            color: white;
+            padding: 20px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .button-group {
+            margin: 10px 0;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #2196F3; color: white; }
+        .btn-warning { background: #FF9800; color: white; }
+        .btn-danger { background: #F44336; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .status-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .canvas-container {
+            border: 2px dashed #ccc;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        .mockup_design_area {
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border: 1px solid #eee;
+        }
+        .log-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .metric-card {
+            display: inline-block;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 6px;
+            border-left: 4px solid #2196F3;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Emergency Response System Test Suite</h1>
+            <p>Comprehensive testing and validation for YPrint emergency fallback systems</p>
+        </div>
+
+        <!-- System Status -->
+        <div class="test-section">
+            <h3>📊 System Status</h3>
+            <div id="system-metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="emergency-level">-</div>
+                    <div class="metric-label">Emergency Level</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="recovery-attempts">-</div>
+                    <div class="metric-label">Recovery Attempts</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="degradation-level">-</div>
+                    <div class="metric-label">Degradation Level</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="fabric-status">-</div>
+                    <div class="metric-label">Fabric Status</div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="refreshSystemStatus()">Refresh Status</button>
+                <button class="btn btn-warning" onclick="showDetailedStatus()">Detailed Status</button>
+            </div>
+            <div id="status-display" class="status-display"></div>
+        </div>
+
+        <!-- Canvas Test Area -->
+        <div class="test-section">
+            <h3>🎨 Canvas Test Area</h3>
+            <div class="canvas-container">
+                <div class="mockup_design_area" id="test-design-area">
+                    <canvas id="test-canvas" width="800" height="400" style="border: 1px solid #ccc;"></canvas>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="initializeCanvas()">Initialize Canvas</button>
+                <button class="btn btn-warning" onclick="simulateCanvasFailure()">Simulate Canvas Failure</button>
+                <button class="btn btn-danger" onclick="destroyCanvas()">Destroy Canvas</button>
+            </div>
+        </div>
+
+        <!-- Emergency Simulation Tests -->
+        <div class="test-section">
+            <h3>🚨 Emergency Simulation Tests</h3>
+            <div class="button-group">
+                <button class="btn btn-warning" onclick="simulateEmergency('fabric-load-failed')">Fabric Load Failed</button>
+                <button class="btn btn-warning" onclick="simulateEmergency('canvas-creation-failed')">Canvas Creation Failed</button>
+                <button class="btn btn-warning" onclick="simulateEmergency('initialization-failed')">Initialization Failed</button>
+                <button class="btn btn-danger" onclick="simulateEmergency('system-crash')">System Crash</button>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testRecoveryStrategy('immediate-reinit')">Test Immediate Reinit</button>
+                <button class="btn btn-primary" onclick="testRecoveryStrategy('delayed-reinit')">Test Delayed Reinit</button>
+                <button class="btn btn-primary" onclick="testRecoveryStrategy('emergency-mock')">Test Emergency Mock</button>
+                <button class="btn btn-danger" onclick="testRecoveryStrategy('critical-fallback')">Test Critical Fallback</button>
+            </div>
+        </div>
+
+        <!-- Graceful Degradation Tests -->
+        <div class="test-section">
+            <h3>📉 Graceful Degradation Tests</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testDegradation(0)">Normal Mode (Level 0)</button>
+                <button class="btn btn-warning" onclick="testDegradation(1)">Limited Mode (Level 1)</button>
+                <button class="btn btn-warning" onclick="testDegradation(2)">Minimal Mode (Level 2)</button>
+                <button class="btn btn-danger" onclick="testDegradation(3)">Critical Mode (Level 3)</button>
+            </div>
+            <div id="degradation-info" class="status-display"></div>
+        </div>
+
+        <!-- User Interface Tests -->
+        <div class="test-section">
+            <h3>🖥️ User Interface Tests</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="showEmergencyNotification('warning')">Show Warning Notification</button>
+                <button class="btn btn-warning" onclick="showEmergencyNotification('critical')">Show Critical Notification</button>
+                <button class="btn btn-danger" onclick="showEmergencyNotification('emergency')">Show Emergency Overlay</button>
+                <button class="btn btn-success" onclick="clearAllNotifications()">Clear Notifications</button>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="toggleEmergencyControls()">Toggle Emergency Controls (Ctrl+Shift+E)</button>
+                <button class="btn btn-primary" onclick="showRecoveryInterface()">Show Recovery Interface</button>
+            </div>
+        </div>
+
+        <!-- Data Recovery Tests -->
+        <div class="test-section">
+            <h3>💾 Data Recovery Tests</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testEmergencySave()">Test Emergency Save</button>
+                <button class="btn btn-primary" onclick="testJsonExport()">Test JSON Export</button>
+                <button class="btn btn-warning" onclick="testDataRecovery()">Test Data Recovery</button>
+                <button class="btn btn-danger" onclick="clearEmergencyData()">Clear Emergency Data</button>
+            </div>
+            <div id="recovery-status" class="status-display"></div>
+        </div>
+
+        <!-- Performance Monitoring -->
+        <div class="test-section">
+            <h3>📈 Performance Monitoring</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="startPerformanceTest()">Start Performance Test</button>
+                <button class="btn btn-warning" onclick="stressTestSystem()">Stress Test System</button>
+                <button class="btn btn-success" onclick="generatePerformanceReport()">Generate Report</button>
+            </div>
+            <div id="performance-output" class="log-output"></div>
+        </div>
+
+        <!-- System Log -->
+        <div class="test-section">
+            <h3>📝 System Log</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="clearLog()">Clear Log</button>
+                <button class="btn btn-primary" onclick="exportLog()">Export Log</button>
+                <button class="btn btn-warning" onclick="toggleAutoScroll()">Toggle Auto-scroll</button>
+            </div>
+            <div id="system-log" class="log-output"></div>
+        </div>
+    </div>
+
+    <!-- Load Emergency Response System -->
+    <script src="public/js/emergency-response-system.js"></script>
+    <script src="public/js/emergency-system-integration.js"></script>
+
+    <!-- Test Suite Implementation -->
+    <script>
+        // Test Suite Implementation
+        let logAutoScroll = true;
+        let testResults = [];
+
+        // Console override to capture logs
+        const originalConsole = {
+            log: console.log,
+            warn: console.warn,
+            error: console.error
+        };
+
+        function logToDisplay(message, type = 'log') {
+            const logElement = document.getElementById('system-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> <span style="color: ${getLogColor(type)};">${message}</span>`;
+            logElement.appendChild(logEntry);
+
+            if (logAutoScroll) {
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+        }
+
+        function getLogColor(type) {
+            const colors = {
+                log: '#00ff00',
+                warn: '#ffff00',
+                error: '#ff4444',
+                success: '#44ff44',
+                info: '#4444ff'
+            };
+            return colors[type] || '#00ff00';
+        }
+
+        // Override console methods
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            logToDisplay(args.join(' '), 'log');
+        };
+
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            logToDisplay(args.join(' '), 'warn');
+        };
+
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            logToDisplay(args.join(' '), 'error');
+        };
+
+        // Test Functions
+        function refreshSystemStatus() {
+            const status = window.emergencyResponseSystem ? window.emergencyResponseSystem.getSystemStatus() : null;
+
+            if (status) {
+                document.getElementById('emergency-level').textContent = status.emergencyLevel;
+                document.getElementById('recovery-attempts').textContent = status.recoveryAttempts;
+                document.getElementById('degradation-level').textContent = status.degradationLevel;
+                document.getElementById('fabric-status').textContent = typeof window.fabric !== 'undefined' ? 'Available' : 'Missing';
+
+                document.getElementById('status-display').innerHTML = '<pre>' + JSON.stringify(status, null, 2) + '</pre>';
+            } else {
+                document.getElementById('status-display').innerHTML = '<div style="color: red;">Emergency Response System not available</div>';
+            }
+        }
+
+        function showDetailedStatus() {
+            const details = {
+                emergencySystem: !!window.emergencyResponseSystem,
+                fabric: typeof window.fabric !== 'undefined',
+                canvas: document.querySelectorAll('canvas').length,
+                optimizedCapture: !!window.OptimizedDesignDataCaptureInstance,
+                globalFunctions: {
+                    generateDesignData: typeof window.generateDesignData,
+                    emergencySaveData: typeof window.emergencySaveData,
+                    triggerEmergency: typeof window.triggerEmergency
+                },
+                localStorage: {
+                    emergencyReports: localStorage.getItem('yprint_emergency_reports') ? 'Available' : 'None',
+                    emergencySaves: Object.keys(localStorage).filter(k => k.startsWith('yprint_emergency_save_')).length
+                }
+            };
+
+            document.getElementById('status-display').innerHTML = '<pre>' + JSON.stringify(details, null, 2) + '</pre>';
+        }
+
+        function initializeCanvas() {
+            const canvas = document.getElementById('test-canvas');
+
+            if (window.fabric && window.fabric.Canvas) {
+                try {
+                    if (window.testFabricCanvas) {
+                        window.testFabricCanvas.dispose();
+                    }
+
+                    window.testFabricCanvas = new window.fabric.Canvas(canvas);
+
+                    // Add test objects
+                    const rect = new window.fabric.Rect({
+                        left: 100,
+                        top: 100,
+                        width: 100,
+                        height: 100,
+                        fill: '#4CAF50'
+                    });
+
+                    window.testFabricCanvas.add(rect);
+                    console.log('✅ Test canvas initialized successfully');
+                } catch (error) {
+                    console.error('❌ Canvas initialization failed:', error);
+                }
+            } else {
+                console.error('❌ Fabric.js not available for canvas initialization');
+            }
+        }
+
+        function simulateCanvasFailure() {
+            console.warn('🚨 Simulating canvas failure...');
+
+            if (window.testFabricCanvas) {
+                window.testFabricCanvas.dispose();
+                window.testFabricCanvas = null;
+            }
+
+            // Trigger canvas failure event
+            window.dispatchEvent(new CustomEvent('canvasCreationFailed', {
+                detail: {
+                    error: 'Simulated canvas failure',
+                    timestamp: Date.now(),
+                    test: true
+                }
+            }));
+        }
+
+        function destroyCanvas() {
+            const canvas = document.getElementById('test-canvas');
+
+            if (window.testFabricCanvas) {
+                window.testFabricCanvas.dispose();
+                window.testFabricCanvas = null;
+            }
+
+            // Clear canvas
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            console.log('🗑️ Canvas destroyed');
+        }
+
+        function simulateEmergency(type) {
+            console.warn(`🚨 Simulating emergency: ${type}`);
+
+            const errorDetails = {
+                simulated: true,
+                timestamp: Date.now(),
+                testType: type,
+                userAgent: navigator.userAgent
+            };
+
+            if (window.emergencyResponseSystem) {
+                window.emergencyResponseSystem.triggerEmergency(type, errorDetails);
+            } else {
+                console.error('❌ Emergency Response System not available');
+            }
+        }
+
+        function testRecoveryStrategy(strategy) {
+            console.log(`🔧 Testing recovery strategy: ${strategy}`);
+
+            if (window.emergencyResponseSystem) {
+                // Access internal method for testing
+                window.emergencyResponseSystem.executeRecoveryStrategy(strategy, 'test-failure', {
+                    test: true,
+                    strategy: strategy
+                }, {
+                    source: 'test-suite'
+                }).then(result => {
+                    console.log(`✅ Recovery strategy ${strategy} result:`, result);
+                }).catch(error => {
+                    console.error(`❌ Recovery strategy ${strategy} failed:`, error);
+                });
+            } else {
+                console.error('❌ Emergency Response System not available');
+            }
+        }
+
+        function testDegradation(level) {
+            console.log(`📉 Testing degradation level: ${level}`);
+
+            if (window.emergencyResponseSystem) {
+                window.emergencyResponseSystem.emergencyState.degradationLevel = level;
+                const levelConfig = window.emergencyResponseSystem.degradationLevels[level];
+
+                document.getElementById('degradation-info').innerHTML = `
+                    <strong>Level ${level}: ${levelConfig.name}</strong><br>
+                    Features: ${levelConfig.features.join(', ')}<br>
+                    Status: Active
+                `;
+
+                // Implement degradation
+                window.emergencyResponseSystem.implementFeatureRestrictions(levelConfig);
+                window.emergencyResponseSystem.updateUIForDegradation(levelConfig);
+
+                console.log(`📉 Degradation level ${level} (${levelConfig.name}) activated`);
+            } else {
+                console.error('❌ Emergency Response System not available');
+            }
+        }
+
+        function showEmergencyNotification(level) {
+            console.log(`🔔 Showing ${level} notification`);
+
+            if (window.emergencyResponseSystem) {
+                window.emergencyResponseSystem.showEmergencyNotification('test-notification', level);
+            } else {
+                // Fallback notification
+                alert(`Test ${level} notification - Emergency Response System not available`);
+            }
+        }
+
+        function clearAllNotifications() {
+            const notifications = document.querySelectorAll('.emergency-notification, #degradation-indicator');
+            notifications.forEach(n => n.remove());
+            console.log('🧹 All notifications cleared');
+        }
+
+        function toggleEmergencyControls() {
+            // Simulate Ctrl+Shift+E
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+                ctrlKey: true,
+                shiftKey: true,
+                key: 'E'
+            }));
+        }
+
+        function showRecoveryInterface() {
+            if (window.emergencyResponseSystem) {
+                window.emergencyResponseSystem.createBasicSaveInterface();
+                window.emergencyResponseSystem.createJsonExportInterface();
+                window.emergencyResponseSystem.createErrorReportingInterface();
+                console.log('🔧 Recovery interface elements created');
+            }
+        }
+
+        function testEmergencySave() {
+            const testData = {
+                test: true,
+                timestamp: Date.now(),
+                elements: [
+                    { type: 'text', content: 'Test Emergency Save', x: 100, y: 100 }
+                ]
+            };
+
+            if (window.emergencySaveData) {
+                const result = window.emergencySaveData(testData);
+                document.getElementById('recovery-status').innerHTML = `Emergency save result: ${result ? 'Success' : 'Failed'}`;
+                console.log('💾 Emergency save test:', result);
+            } else {
+                console.error('❌ Emergency save function not available');
+            }
+        }
+
+        function testJsonExport() {
+            const testData = window.generateDesignData ? window.generateDesignData() : { test: true };
+
+            const blob = new Blob([JSON.stringify(testData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test-export.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            console.log('📄 JSON export test completed');
+        }
+
+        function testDataRecovery() {
+            const saves = Object.keys(localStorage).filter(k => k.startsWith('yprint_emergency_save_'));
+            const reports = localStorage.getItem('yprint_emergency_reports');
+
+            document.getElementById('recovery-status').innerHTML = `
+                Emergency Saves: ${saves.length}<br>
+                Emergency Reports: ${reports ? 'Available' : 'None'}<br>
+                Recovery Status: ${saves.length > 0 ? 'Data Available' : 'No Data'}
+            `;
+
+            console.log('🔍 Data recovery check:', { saves: saves.length, reports: !!reports });
+        }
+
+        function clearEmergencyData() {
+            const saves = Object.keys(localStorage).filter(k => k.startsWith('yprint_emergency_save_'));
+            saves.forEach(key => localStorage.removeItem(key));
+            localStorage.removeItem('yprint_emergency_reports');
+
+            document.getElementById('recovery-status').innerHTML = 'Emergency data cleared';
+            console.log('🧹 Emergency data cleared');
+        }
+
+        function startPerformanceTest() {
+            console.log('📈 Starting performance test...');
+
+            const startTime = performance.now();
+            let operations = 0;
+
+            const performanceInterval = setInterval(() => {
+                operations++;
+
+                // Simulate system operations
+                if (window.generateDesignData) {
+                    window.generateDesignData();
+                }
+
+                if (operations >= 100) {
+                    clearInterval(performanceInterval);
+                    const endTime = performance.now();
+                    const duration = endTime - startTime;
+
+                    const results = {
+                        operations: operations,
+                        duration: duration.toFixed(2) + 'ms',
+                        opsPerSecond: (operations / (duration / 1000)).toFixed(2),
+                        memory: performance.memory ? performance.memory.usedJSHeapSize : 'N/A'
+                    };
+
+                    document.getElementById('performance-output').innerHTML = JSON.stringify(results, null, 2);
+                    console.log('📊 Performance test completed:', results);
+                }
+            }, 10);
+        }
+
+        function stressTestSystem() {
+            console.log('⚡ Starting stress test...');
+
+            // Rapid emergency simulations
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    simulateEmergency('stress-test-' + i);
+                }, i * 500);
+            }
+        }
+
+        function generatePerformanceReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                performance: {
+                    timing: performance.timing,
+                    memory: performance.memory || 'N/A'
+                },
+                emergencySystem: window.emergencyResponseSystem ? window.emergencyResponseSystem.getSystemStatus() : 'N/A',
+                testResults: testResults
+            };
+
+            document.getElementById('performance-output').innerHTML = JSON.stringify(report, null, 2);
+            console.log('📋 Performance report generated');
+        }
+
+        function clearLog() {
+            document.getElementById('system-log').innerHTML = '';
+        }
+
+        function exportLog() {
+            const logContent = document.getElementById('system-log').textContent;
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'emergency-system-log.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function toggleAutoScroll() {
+            logAutoScroll = !logAutoScroll;
+            console.log('Auto-scroll:', logAutoScroll ? 'enabled' : 'disabled');
+        }
+
+        // Initialize test environment
+        window.addEventListener('load', function() {
+            console.log('🚀 Emergency Response System Test Suite Loaded');
+            refreshSystemStatus();
+
+            // Auto-refresh status every 5 seconds
+            setInterval(refreshSystemStatus, 5000);
+        });
+
+        // Test completion tracking
+        window.addEventListener('emergencyHandled', function(event) {
+            testResults.push({
+                timestamp: Date.now(),
+                type: 'emergency-handled',
+                details: event.detail
+            });
+        });
+    </script>
+</body>
+</html>

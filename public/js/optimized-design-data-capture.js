@@ -196,6 +196,38 @@ class OptimizedDesignDataCapture {
     }
 
     /**
+     * 🚨 SUPERPOWER FIX: Emergency Fabric Detection Method
+     * Handles fabric availability events and re-initializes system
+     */
+    emergencyFabricDetection() {
+        this.debugLog('info', '🚨 EMERGENCY FABRIC DETECTION: Starting emergency re-initialization...');
+
+        // Verify fabric is actually available
+        if (typeof window.fabric === 'undefined') {
+            this.debugLog('error', '❌ EMERGENCY: Fabric still not available during emergency detection');
+            return false;
+        }
+
+        this.debugLog('info', '✅ EMERGENCY: Fabric confirmed available - proceeding with re-initialization');
+
+        // Update fabric status
+        this.status.fabricLoaded = true;
+
+        // Reset retry count for fresh attempt
+        this.retryCount = 0;
+
+        // Attempt immediate initialization with fabric available
+        if (this.attemptImmediateInitialization()) {
+            this.debugLog('info', '✅ EMERGENCY: Re-initialization successful!');
+            return true;
+        } else {
+            this.debugLog('warn', '⚠️ EMERGENCY: Re-initialization failed - starting polling');
+            this.startOptimizedPolling();
+            return false;
+        }
+    }
+
+    /**
      * 🚀 ISSUE #18: Optimized polling detection (reduced attempts)
      */
     async startOptimizedPolling() {
