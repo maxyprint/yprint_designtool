@@ -48,6 +48,10 @@ class PNG_Storage_Handler {
         add_action('wp_ajax_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
         add_action('wp_ajax_nopriv_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
 
+        // 🏷️ TEMPLATE METADATA: Handler for template metadata retrieval
+        add_action('wp_ajax_yprint_get_template_metadata', array($this, 'handle_get_template_metadata'));
+        add_action('wp_ajax_nopriv_yprint_get_template_metadata', array($this, 'handle_get_template_metadata'));
+
         // AJAX handler for adding PNG to order design data (integrates with "Designdaten laden")
         add_action('wp_ajax_yprint_add_png_to_order_design_data', array($this, 'handle_add_png_to_order_design_data'));
 
@@ -141,6 +145,11 @@ class PNG_Storage_Handler {
             $print_area_mm = stripslashes($_POST['print_area_mm'] ?? $_REQUEST['print_area_mm'] ?? '{}');
             $template_id = sanitize_text_field($_POST['template_id'] ?? $_REQUEST['template_id'] ?? 'default');
 
+            // 🏷️ ENHANCED: Support for template metadata from new generation system
+            $enhanced_metadata = stripslashes($_POST['metadata'] ?? $_REQUEST['metadata'] ?? null);
+            $save_type = sanitize_text_field($_POST['save_type'] ?? $_REQUEST['save_type'] ?? 'standard');
+            $order_id = sanitize_text_field($_POST['order_id'] ?? $_REQUEST['order_id'] ?? null);
+
             // Validate inputs
             if (!$design_id || !$print_png) {
                 wp_send_json_error('Missing required data');
@@ -163,23 +172,69 @@ class PNG_Storage_Handler {
                 'print_area_mm' => $print_area_mm,
                 'template_id' => $template_id,
                 'created' => current_time('mysql'),
-                'dpi' => 300
+                'dpi' => 300,
+                'save_type' => $save_type,
+                'order_id' => $order_id
             );
+
+            // 🏷️ ENHANCED: Add enhanced metadata if available
+            if ($enhanced_metadata) {
+                $parsed_metadata = json_decode($enhanced_metadata, true);
+                if ($parsed_metadata) {
+                    $design_meta['enhanced_metadata'] = $parsed_metadata;
+                    $design_meta['generation_method'] = 'print_ready_with_metadata';
+
+                    // Extract key information for easy access
+                    if (isset($parsed_metadata['dpi'])) {
+                        $design_meta['dpi'] = $parsed_metadata['dpi'];
+                    }
+                    if (isset($parsed_metadata['elementsCount'])) {
+                        $design_meta['elements_count'] = $parsed_metadata['elementsCount'];
+                    }
+                    if (isset($parsed_metadata['templateMetadata'])) {
+                        $design_meta['template_metadata'] = $parsed_metadata['templateMetadata'];
+                    }
+                    if (isset($parsed_metadata['printSpecifications'])) {
+                        $design_meta['print_specifications'] = $parsed_metadata['printSpecifications'];
+                    }
+
+                    error_log('🏷️ PNG STORAGE: Enhanced metadata stored for design ' . $design_id);
+                } else {
+                    error_log('⚠️ PNG STORAGE: Failed to parse enhanced metadata');
+                }
+            }
 
             // Save to design meta or option (depending on how designs are stored)
             update_option('yprint_design_' . $design_id . '_print_png', $design_meta);
 
             error_log('💾 PNG STORAGE: Design print PNG saved - Design: ' . $design_id);
 
-            wp_send_json_success(array(
+            // 🏷️ Prepare response with enhanced metadata support
+            $response_data = array(
                 'png_url' => $png_file_info['url'],
                 'png_path' => $png_file_info['path'],
                 'design_id' => $design_id,
                 'template_id' => $template_id,
                 'print_area_px' => $print_area_px,
                 'print_area_mm' => $print_area_mm,
+                'save_type' => $save_type,
+                'generation_method' => $design_meta['generation_method'] ?? 'standard',
                 'message' => 'Print PNG saved for design!'
-            ));
+            );
+
+            // Add enhanced metadata to response if available
+            if (isset($design_meta['enhanced_metadata'])) {
+                $response_data['enhanced_metadata'] = $design_meta['enhanced_metadata'];
+                $response_data['dpi'] = $design_meta['dpi'];
+                $response_data['elements_count'] = $design_meta['elements_count'] ?? 0;
+                $response_data['message'] = 'Enhanced print-ready PNG saved with template metadata!';
+            }
+
+            if ($order_id) {
+                $response_data['order_id'] = $order_id;
+            }
+
+            wp_send_json_success($response_data);
 
         } catch (Exception $e) {
             error_log('❌ PNG STORAGE: Save design PNG failed: ' . $e->getMessage());
@@ -419,6 +474,132 @@ class PNG_Storage_Handler {
         } catch (Exception $e) {
             error_log('❌ PNG STORAGE: Get template data failed: ' . $e->getMessage());
             wp_send_json_error('Failed to get template data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🏷️ TEMPLATE METADATA: Handle AJAX request to get comprehensive template metadata
+     */
+    public function handle_get_template_metadata() {
+        try {
+            // Verify nonce for security
+            if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+                wp_send_json_error('Security check failed');
+                return;
+            }
+
+            $template_id = sanitize_text_field($_POST['template_id']);
+
+            if (!$template_id) {
+                wp_send_json_error('Missing template ID');
+                return;
+            }
+
+            error_log('🏷️ PNG STORAGE: Retrieving template metadata for: ' . $template_id);
+
+            // Get comprehensive template metadata
+            $template_metadata = $this->get_comprehensive_template_metadata($template_id);
+
+            if ($template_metadata) {
+                error_log('✅ PNG STORAGE: Template metadata retrieved successfully');
+
+                wp_send_json_success($template_metadata);
+            } else {
+                error_log('⚠️ PNG STORAGE: Template metadata not found');
+                wp_send_json_error('Template metadata not found');
+            }
+
+        } catch (Exception $e) {
+            error_log('❌ PNG STORAGE: Get template metadata failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to get template metadata: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🏷️ Get comprehensive template metadata for print optimization
+     */
+    private function get_comprehensive_template_metadata($template_id) {
+        try {
+            // Basic template info
+            $template_post = get_post($template_id);
+            if (!$template_post) {
+                return null;
+            }
+
+            // Get all template metadata
+            $printable_area_px = get_post_meta($template_id, '_template_printable_area_px', true);
+            $printable_area_mm = get_post_meta($template_id, '_template_printable_area_mm', true);
+            $template_views = get_post_meta($template_id, '_template_views', true);
+            $template_dimensions = get_post_meta($template_id, '_template_dimensions', true);
+            $product_category = get_post_meta($template_id, '_template_product_category', true);
+            $material_type = get_post_meta($template_id, '_template_material_type', true);
+            $care_instructions = get_post_meta($template_id, '_template_care_instructions', true);
+            $print_method = get_post_meta($template_id, '_template_print_method', true);
+            $color_profile = get_post_meta($template_id, '_template_color_profile', true);
+
+            // Parse JSON data
+            $printable_area_px = $printable_area_px ? json_decode($printable_area_px, true) : null;
+            $printable_area_mm = $printable_area_mm ? json_decode($printable_area_mm, true) : null;
+            $template_views = $template_views ? json_decode($template_views, true) : array();
+            $template_dimensions = $template_dimensions ? json_decode($template_dimensions, true) : null;
+
+            // Set defaults if needed
+            if (!$printable_area_px) {
+                $printable_area_px = array('x' => 0, 'y' => 0, 'width' => 800, 'height' => 600);
+            }
+
+            if (!$printable_area_mm) {
+                $printable_area_mm = array('width' => 200, 'height' => 250);
+            }
+
+            // Build comprehensive metadata
+            $metadata = array(
+                'template_id' => $template_id,
+                'template_name' => $template_post->post_title,
+                'template_slug' => $template_post->post_name,
+                'printable_area_px' => $printable_area_px,
+                'printable_area_mm' => $printable_area_mm,
+                'template_views' => $template_views,
+                'template_dimensions' => $template_dimensions,
+                'product_category' => $product_category ?: 'clothing',
+                'material_type' => $material_type ?: 'cotton',
+                'substrate' => $material_type ?: 'cotton', // Alias for material_type
+                'care_instructions' => $care_instructions ?: 'machine_wash_30c',
+                'print_method' => $print_method ?: 'digital_textile',
+                'color_profile' => $color_profile ?: 'sRGB',
+                'created_at' => $template_post->post_date,
+                'modified_at' => $template_post->post_modified,
+
+                // Print specifications
+                'print_specifications' => array(
+                    'max_dpi' => 300,
+                    'min_dpi' => 150,
+                    'color_mode' => 'CMYK',
+                    'file_format' => 'PNG',
+                    'alpha_channel' => true,
+                    'bleed_support' => true,
+                    'max_bleed_mm' => 5
+                ),
+
+                // Quality assurance
+                'quality_requirements' => array(
+                    'min_resolution' => $printable_area_px['width'] . 'x' . $printable_area_px['height'],
+                    'color_accuracy' => 'high',
+                    'edge_sharpness' => 'required',
+                    'transparency_support' => true
+                ),
+
+                'retrieval_timestamp' => current_time('mysql'),
+                'api_version' => '1.0'
+            );
+
+            error_log('🏷️ PNG STORAGE: Comprehensive metadata compiled for template ' . $template_id);
+
+            return $metadata;
+
+        } catch (Exception $e) {
+            error_log('❌ PNG STORAGE: Failed to compile template metadata: ' . $e->getMessage());
+            return null;
         }
     }
 

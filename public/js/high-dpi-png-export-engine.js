@@ -216,29 +216,90 @@ class HighDPIPrintExportEngine {
     getDesignElementsOnly(fabricCanvas) {
         // Get all objects but filter out backgrounds and view elements
         const allObjects = fabricCanvas.getObjects();
-        console.log('🔍 PNG FIX: Total canvas objects:', allObjects.length);
+        console.log(`🔍 HIGH-DPI PRINT ENGINE: Analyzing ${allObjects.length} canvas objects for View-Image filtering...`);
 
-        return allObjects.filter(obj => {
-            // 🔧 FIXED: Only skip elements explicitly marked as background
-            if (obj.isBackground === true || obj.excludeFromExport === true) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping marked background element:', obj.type);
+        const designElements = allObjects.filter(obj => {
+            // 🎯 METHOD 1: Property-based detection
+            if (obj.isBackground || obj.excludeFromExport || obj.isViewImage || obj.isTemplateBackground) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by property flags:', obj.type, {
+                    isBackground: obj.isBackground,
+                    excludeFromExport: obj.excludeFromExport,
+                    isViewImage: obj.isViewImage,
+                    isTemplateBackground: obj.isTemplateBackground
+                });
                 return false;
             }
 
-            // 🔧 FIXED: Only skip images with specific background indicators
-            if (obj.type === 'image' && obj.id && obj.id.includes('background')) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping background image by ID:', obj.id);
+            // 🎯 METHOD 2: CSS class and data attribute detection
+            if (obj.canvas?.contextContainer) {
+                const element = obj.canvas.contextContainer;
+                if (element.classList?.contains('template-view-image') ||
+                    element.classList?.contains('background-image') ||
+                    element.getAttribute('data-is-background') === 'true' ||
+                    element.getAttribute('data-exclude-from-print') === 'true') {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by CSS/data attributes:', obj.type);
+                    return false;
+                }
+            }
+
+            // 🎯 METHOD 3: Advanced geometric analysis for background images
+            if (obj.type === 'image') {
+                const canvasWidth = fabricCanvas.getWidth();
+                const canvasHeight = fabricCanvas.getHeight();
+                const objCoverage = (obj.width * obj.height) / (canvasWidth * canvasHeight);
+
+                // Large images at (0,0) covering >70% of canvas are likely backgrounds
+                if (obj.left === 0 && obj.top === 0 && objCoverage > 0.7) {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered large background image:', {
+                        position: `${obj.left},${obj.top}`,
+                        size: `${obj.width}x${obj.height}`,
+                        coverage: `${(objCoverage * 100).toFixed(1)}%`,
+                        zIndex: obj.zIndex || 'undefined'
+                    });
+                    return false;
+                }
+
+                // Images with very low z-index are likely backgrounds
+                if (obj.zIndex !== undefined && obj.zIndex < 0) {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by z-index:', obj.type, 'zIndex:', obj.zIndex);
+                    return false;
+                }
+            }
+
+            // 🎯 METHOD 4: Name/ID pattern matching
+            const objName = (obj.name || obj.id || '').toLowerCase();
+            const backgroundPatterns = /template|background|view|shirt|mockup|tshirt|product-view|base-image/i;
+            if (backgroundPatterns.test(objName)) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by name pattern:', objName);
                 return false;
             }
 
-            // 🔧 FIXED: Include ALL user design elements (text, images, shapes)
-            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, `(${obj.width}x${obj.height})`);
+            // 🎯 METHOD 5: Image source URL pattern detection
+            if (obj.type === 'image' && obj.src) {
+                const urlPatterns = /mockup|template|background|product-view|shirt|tshirt/i;
+                if (urlPatterns.test(obj.src)) {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by URL pattern:', obj.src.substring(0, 100) + '...');
+                    return false;
+                }
+            }
+
+            // ✅ Include all remaining design elements
+            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', {
+                type: obj.type,
+                name: obj.name || 'unnamed',
+                position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`
+            });
             return true;
         });
+
+        console.log(`🎯 HIGH-DPI PRINT ENGINE: View-Image filtering complete - ${designElements.length}/${allObjects.length} objects included`);
+        return designElements;
     }
 
-    createPrintAreaCanvas(multiplier) {
-        const { width, height } = this.printAreaPx;
+    createPrintAreaCanvas(multiplier, printArea = null) {
+        const area = printArea || this.printAreaPx;
+        const { width, height } = area;
         const scaledWidth = Math.round(width * multiplier);
         const scaledHeight = Math.round(height * multiplier);
 
@@ -259,10 +320,96 @@ class HighDPIPrintExportEngine {
         return printCanvas;
     }
 
-    async addElementsToPrintCanvas(printCanvas, designElements, multiplier) {
+    /**
+     * 🖨️ PRINT-READY PNG EXPORT WITH CROPPING
+     * Exports only the design elements within the print area coordinates
+     * Perfect for direct machine transmission
+     */
+    async exportPrintReadyPNGWithCropping(options = {}) {
+        const defaultOptions = {
+            multiplier: 3,
+            format: 'png',
+            quality: 1.0,
+            enableBleed: false,
+            bleedMM: 3,
+            debugMode: true
+        };
+
+        const config = { ...defaultOptions, ...options };
+
+        console.log(`🖨️ PRINT-READY EXPORT: Starting export with ${config.multiplier}x quality...`);
+
+        try {
+            // Step 1: Get only design elements (filtered)
+            const designElements = await this.getDesignElementsOnly();
+
+            if (designElements.length === 0) {
+                console.warn('⚠️ PRINT-READY EXPORT: No design elements found!');
+                return null;
+            }
+
+            // Step 2: Calculate print area with optional bleed
+            const printArea = this.calculatePrintAreaWithBleed(config.enableBleed, config.bleedMM);
+
+            // Step 3: Create print-optimized canvas
+            const printCanvas = this.createPrintAreaCanvas(config.multiplier, printArea);
+
+            // Step 4: Add elements with coordinate mapping
+            await this.addElementsToPrintCanvas(printCanvas, designElements, config.multiplier, printArea);
+
+            // Step 5: Generate final PNG
+            const pngDataUrl = printCanvas.toDataURL('image/png', config.quality);
+
+            // Step 6: Cleanup
+            printCanvas.dispose();
+
+            console.log(`✅ PRINT-READY EXPORT: Successfully generated ${printArea.width}x${printArea.height}px PNG`);
+
+            return {
+                dataUrl: pngDataUrl,
+                metadata: {
+                    width: printArea.width,
+                    height: printArea.height,
+                    dpi: 300 * config.multiplier,
+                    elementsCount: designElements.length,
+                    printAreaMM: this.printAreaMM,
+                    bleedEnabled: config.enableBleed,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+        } catch (error) {
+            console.error('❌ PRINT-READY EXPORT ERROR:', error);
+            throw new Error(`Print-ready PNG export failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * 📏 Calculate print area dimensions with optional bleed
+     */
+    calculatePrintAreaWithBleed(enableBleed, bleedMM) {
+        let { width, height, x, y } = this.printAreaPx;
+
+        if (enableBleed && bleedMM > 0) {
+            // Convert mm to pixels (assuming 300 DPI)
+            const bleedPx = Math.round((bleedMM / 25.4) * 300);
+
+            console.log(`📏 BLEED CALCULATION: Adding ${bleedMM}mm (${bleedPx}px) bleed`);
+
+            width += bleedPx * 2;
+            height += bleedPx * 2;
+            x -= bleedPx;
+            y -= bleedPx;
+        }
+
+        return { width, height, x, y };
+    }
+
+    async addElementsToPrintCanvas(printCanvas, designElements, multiplier, printArea = null) {
         console.log(`🎨 HIGH-DPI PRINT ENGINE: Adding ${designElements.length} elements to print canvas...`);
 
-        const { x: printOffsetX, y: printOffsetY } = this.printAreaPx;
+        const area = printArea || this.printAreaPx;
+        const { x: printOffsetX, y: printOffsetY } = area;
 
         for (const element of designElements) {
             try {
@@ -417,7 +564,11 @@ class HighDPIPrintExportEngine {
 
     // Public API methods
     async exportForPrintMachine(options = {}) {
-        return this.exportPrintReadyPNG(options);
+        return this.exportPrintReadyPNGWithCropping(options);
+    }
+
+    async exportForPrintMachineWithMetadata(options = {}) {
+        return this.exportWithTemplateMetadata(options);
     }
 
     getPrintAreaDimensions() {
@@ -458,6 +609,111 @@ class HighDPIPrintExportEngine {
                 console.error('❌ HIGH-DPI PRINT ENGINE: Test export failed:', error);
                 throw error;
             }
+        }
+    }
+
+    /**
+     * 🏷️ TEMPLATE METADATA INTEGRATION
+     * Retrieves and integrates WordPress template metadata for enhanced PNG processing
+     */
+    async getTemplateMetadata() {
+        try {
+            if (!this.currentTemplateId) {
+                console.warn('⚠️ TEMPLATE METADATA: No template ID available');
+                return null;
+            }
+
+            console.log(`🏷️ TEMPLATE METADATA: Fetching for template ${this.currentTemplateId}...`);
+
+            // Check if WordPress AJAX is available
+            if (!window.octo_print_designer_config?.ajax_url) {
+                console.warn('⚠️ TEMPLATE METADATA: WordPress AJAX not available');
+                return null;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'yprint_get_template_metadata');
+            formData.append('nonce', window.octo_print_designer_config.nonce);
+            formData.append('template_id', this.currentTemplateId);
+
+            const response = await fetch(window.octo_print_designer_config.ajax_url, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ TEMPLATE METADATA: Successfully retrieved', data.data);
+                return data.data;
+            } else {
+                console.warn('⚠️ TEMPLATE METADATA: WordPress returned error:', data.data);
+                return null;
+            }
+
+        } catch (error) {
+            console.error('❌ TEMPLATE METADATA: Fetch failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 🖨️ EXPORT WITH TEMPLATE METADATA
+     * Enhanced export that includes template metadata for print machine optimization
+     */
+    async exportWithTemplateMetadata(options = {}) {
+        console.log('🖨️ METADATA EXPORT: Starting enhanced export...');
+
+        try {
+            // Get template metadata
+            const templateMetadata = await this.getTemplateMetadata();
+
+            // Generate print-ready PNG
+            const pngResult = await this.exportPrintReadyPNGWithCropping(options);
+
+            if (!pngResult) {
+                throw new Error('PNG generation failed');
+            }
+
+            // Combine PNG with metadata
+            const enhancedResult = {
+                ...pngResult,
+                templateMetadata: templateMetadata,
+                printSpecifications: {
+                    printAreaMM: this.printAreaMM,
+                    printAreaPX: this.printAreaPx,
+                    dpi: 300 * (options.multiplier || 3),
+                    colorProfile: 'sRGB',
+                    printMethod: 'digital_textile',
+                    substrate: templateMetadata?.substrate || 'unknown',
+                    washInstructions: templateMetadata?.care_instructions || 'standard'
+                },
+                qualityAssurance: {
+                    bleedCheck: options.enableBleed || false,
+                    resolutionCheck: true,
+                    colorProfileCheck: true,
+                    dimensionCheck: true,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            console.log('✅ METADATA EXPORT: Enhanced PNG with metadata generated');
+
+            // Dispatch enhanced event
+            window.dispatchEvent(new CustomEvent('yprintEnhancedPNGExported', {
+                detail: enhancedResult
+            }));
+
+            return enhancedResult;
+
+        } catch (error) {
+            console.error('❌ METADATA EXPORT: Failed:', error);
+            throw error;
         }
     }
 

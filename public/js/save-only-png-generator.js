@@ -461,17 +461,48 @@ class SaveOnlyPNGGenerator {
         try {
             console.log(`🖨️ SAVE-ONLY PNG: Generating PNG for ${saveType}...`);
 
-            // 🔧 ADDITIONAL SAFETY: Double-check exportEngine before calling
-            if (!this.pngEngine || !this.pngEngine.exportEngine || typeof this.pngEngine.exportEngine.exportForPrintMachine !== 'function') {
-                throw new Error('Export engine or exportForPrintMachine method not available');
+            // 🔧 ENHANCED SAFETY: Check for any available export method
+            if (!this.pngEngine || !this.pngEngine.exportEngine) {
+                throw new Error('Export engine not available');
             }
 
-            // Generate high-quality print PNG
-            const printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
-                dpi: 300,
-                format: 'png',
-                quality: 1.0
-            });
+            // 🎯 PRIORITY 1: Try enhanced metadata export (most advanced)
+            const enhancedResult = await this.generateEnhancedPNG(designData, saveType, orderId);
+            if (enhancedResult) {
+                console.log('✅ SAVE-ONLY PNG: Enhanced PNG with metadata completed successfully');
+                return enhancedResult;
+            }
+
+            // 🎯 PRIORITY 2: Try print-ready PNG with cropping
+            console.log('🖨️ SAVE-ONLY PNG: Trying print-ready PNG with cropping...');
+            let printPNG;
+
+            if (typeof this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping === 'function') {
+                console.log('✅ SAVE-ONLY PNG: Using print-ready PNG with cropping');
+                const pngResult = await this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
+                    multiplier: 3,
+                    quality: 1.0,
+                    enableBleed: false,
+                    debugMode: true
+                });
+
+                printPNG = pngResult ? pngResult.dataUrl : null;
+
+                // Log enhanced metadata
+                if (pngResult && pngResult.metadata) {
+                    console.log('🎯 ENHANCED PNG METADATA:', pngResult.metadata);
+                }
+
+            } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
+                console.log('📦 SAVE-ONLY PNG: Using standard export (fallback)');
+                printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
+                    dpi: 300,
+                    format: 'png',
+                    quality: 1.0
+                });
+            } else {
+                throw new Error('No PNG export methods available');
+            }
 
             // Store PNG with metadata
             const pngData = {
@@ -568,6 +599,65 @@ class SaveOnlyPNGGenerator {
 
         } catch (error) {
             console.error('❌ SAVE-ONLY PNG: Retrieval failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 🖨️ GENERATE ENHANCED PNG WITH METADATA
+     * Uses the new template metadata integration for print-optimized PNGs
+     */
+    async generateEnhancedPNG(designData, saveType, orderId = null) {
+        try {
+            console.log('🖨️ SAVE-ONLY PNG: Generating enhanced PNG with metadata...');
+
+            // Check if enhanced metadata export is available
+            if (typeof this.pngEngine.exportEngine.exportWithTemplateMetadata === 'function') {
+                console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
+
+                const enhancedResult = await this.pngEngine.exportEngine.exportWithTemplateMetadata({
+                    multiplier: 3,
+                    quality: 1.0,
+                    enableBleed: false,
+                    debugMode: true
+                });
+
+                if (enhancedResult) {
+                    console.log('🎯 ENHANCED EXPORT SUCCESS:', {
+                        dimensions: `${enhancedResult.metadata.width}x${enhancedResult.metadata.height}px`,
+                        dpi: enhancedResult.metadata.dpi,
+                        elements: enhancedResult.metadata.elementsCount,
+                        template: enhancedResult.templateMetadata?.template_name || 'unknown'
+                    });
+
+                    // Store enhanced PNG with all metadata
+                    const enhancedPngData = {
+                        design_id: this.generateDesignId(designData),
+                        print_png: enhancedResult.dataUrl,
+                        save_type: saveType,
+                        order_id: orderId,
+                        generated_at: new Date().toISOString(),
+                        print_area_px: JSON.stringify(enhancedResult.printSpecifications.printAreaPX),
+                        print_area_mm: JSON.stringify(enhancedResult.printSpecifications.printAreaMM),
+                        template_id: enhancedResult.templateMetadata?.template_id || this.pngEngine.exportEngine.currentTemplateId,
+                        metadata: JSON.stringify({
+                            ...enhancedResult.metadata,
+                            templateMetadata: enhancedResult.templateMetadata,
+                            printSpecifications: enhancedResult.printSpecifications,
+                            qualityAssurance: enhancedResult.qualityAssurance
+                        })
+                    };
+
+                    return await this.storePNGInDatabase(enhancedPngData);
+                }
+            }
+
+            // Fallback to standard generation
+            console.log('📦 SAVE-ONLY PNG: Template metadata not available, using standard generation');
+            return null;
+
+        } catch (error) {
+            console.error('❌ ENHANCED PNG GENERATION: Failed:', error);
             return null;
         }
     }
