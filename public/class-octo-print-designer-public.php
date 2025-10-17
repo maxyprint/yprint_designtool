@@ -221,7 +221,7 @@ class Octo_Print_Designer_Public {
 
         if ($enable_stripe_mock || $debug_mode) {
             wp_register_script(
-                'octo-print-designer-stripe-service',
+                'yprint-stripe-service',
                 OCTO_PRINT_DESIGNER_URL . 'public/js/yprint-stripe-service.js',
                 [],
                 rand(),
