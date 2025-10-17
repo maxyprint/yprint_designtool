@@ -44,6 +44,21 @@ class SaveOnlyPNGGenerator {
                 // 🔧 FIX: Check for both possible integration instances
                 const pngIntegration = window.yprintPNGIntegration || window.pngOnlySystemIntegration;
 
+                // 🔧 FALLBACK: Check for high-DPI engine directly
+                const highDPIEngine = window.highDPIPrintExportEngine;
+
+                // 🔧 MANUAL SETUP: If we have highDPIEngine but no integration, create a minimal wrapper
+                if (highDPIEngine && !pngIntegration) {
+                    console.log('🔧 SAVE-ONLY PNG: Creating fallback PNG engine wrapper...');
+                    this.pngEngine = {
+                        exportEngine: highDPIEngine,
+                        isReady: () => !!highDPIEngine
+                    };
+                    console.log('✅ SAVE-ONLY PNG: Fallback PNG engine connected');
+                    resolve();
+                    return;
+                }
+
                 if (pngIntegration && pngIntegration.exportEngine) {
                     this.pngEngine = pngIntegration;
                     console.log('✅ SAVE-ONLY PNG: PNG engine connected');
@@ -61,6 +76,8 @@ class SaveOnlyPNGGenerator {
                     if (attempts >= maxAttempts) {
                         console.error('❌ SAVE-ONLY PNG: Timeout waiting for PNG integration. System unavailable.');
                         console.error('💡 SAVE-ONLY PNG: Please check WordPress admin for plugin activation status.');
+                        // 🔧 FINAL FALLBACK: Try to create minimal working engine
+                        this.createMinimalPNGEngine();
                         resolve(); // Resolve anyway to prevent hanging
                     } else {
                         setTimeout(checkEngine, 500);
@@ -69,6 +86,41 @@ class SaveOnlyPNGGenerator {
             };
             checkEngine();
         });
+    }
+
+    createMinimalPNGEngine() {
+        console.log('🔧 SAVE-ONLY PNG: Creating minimal PNG engine...');
+
+        // Check if we have fabric and a designer instance available
+        const fabric = window.fabric;
+        const designerWidget = window.designerWidgetInstance;
+
+        if (fabric && designerWidget && designerWidget.fabricCanvas) {
+            this.pngEngine = {
+                exportEngine: {
+                    exportForPrintMachine: async (options = {}) => {
+                        console.log('🔧 MINIMAL PNG: Exporting canvas to PNG...');
+
+                        const canvas = designerWidget.fabricCanvas;
+                        const dataURL = canvas.toDataURL({
+                            format: 'png',
+                            quality: options.quality || 1.0,
+                            multiplier: options.dpi ? options.dpi / 72 : 4 // 300 DPI default
+                        });
+
+                        console.log('✅ MINIMAL PNG: Canvas exported successfully');
+                        return dataURL;
+                    },
+                    printAreaPx: { width: 800, height: 600 },
+                    printAreaMm: { width: 200, height: 150 },
+                    currentTemplateId: 'fallback'
+                },
+                isReady: () => true
+            };
+            console.log('✅ SAVE-ONLY PNG: Minimal PNG engine created');
+        } else {
+            console.error('❌ SAVE-ONLY PNG: Cannot create minimal engine - fabric or designer not available');
+        }
     }
 
     // Public method for fallback loader to trigger recheck
@@ -118,7 +170,7 @@ class SaveOnlyPNGGenerator {
 
         // Monitor for save button clicks in designer interface
         const monitorSaveButtons = () => {
-            // Look for common save button selectors
+            // Look for common save button selectors (excluding :contains which is invalid)
             const saveButtonSelectors = [
                 'button[data-action="save"]',
                 'button[data-action="add-to-cart"]',
@@ -126,52 +178,88 @@ class SaveOnlyPNGGenerator {
                 '.designer-action-button',  // 🎯 FIX: Added missing selector for user's "Save product" button
                 '.add-to-cart-button',
                 '#add-to-cart',
-                'button:contains("Save")',
-                'button:contains("speichern")',
                 'button[type="submit"]'
             ];
 
+            // First handle standard selectors
             saveButtonSelectors.forEach(selector => {
-                document.querySelectorAll(selector).forEach(button => {
-                    // Check if already monitored
-                    if (button.hasAttribute('data-save-png-monitored')) {
-                        return;
-                    }
+                try {
+                    document.querySelectorAll(selector).forEach(button => {
+                        // Check if already monitored
+                        if (button.hasAttribute('data-save-png-monitored')) {
+                            return;
+                        }
 
-                    // Mark as monitored
-                    button.setAttribute('data-save-png-monitored', 'true');
+                        // Mark as monitored
+                        button.setAttribute('data-save-png-monitored', 'true');
 
-                    // Add click listener
-                    button.addEventListener('click', (event) => {
-                        console.log('🎨 SAVE-ONLY PNG: Designer save button clicked!', button);
-                        console.log('🔍 SAVE-ONLY PNG: Button details:', {
-                            tagName: button.tagName,
-                            className: button.className,
-                            textContent: button.textContent.trim(),
-                            id: button.id
+                        // Add click listener
+                        button.addEventListener('click', (event) => {
+                            console.log('🎨 SAVE-ONLY PNG: Designer save button clicked!', button);
+                            console.log('🔍 SAVE-ONLY PNG: Button details:', {
+                                tagName: button.tagName,
+                                className: button.className,
+                                textContent: button.textContent.trim(),
+                                id: button.id
+                            });
+
+                            // Short delay to allow design data to be updated
+                            setTimeout(() => {
+                                console.log('🔍 SAVE-ONLY PNG: About to get current design data...');
+                                const designData = this.getCurrentDesignData();
+                                console.log('🔍 SAVE-ONLY PNG: Got design data:', designData);
+
+                                // Fire our custom event
+                                console.log('🔍 SAVE-ONLY PNG: Dispatching designerShortcodeSave event...');
+                                document.dispatchEvent(new CustomEvent('designerShortcodeSave', {
+                                    detail: {
+                                        button: button,
+                                        designData: designData
+                                    }
+                                }));
+                                console.log('✅ SAVE-ONLY PNG: Event dispatched!');
+                            }, 500); // 500ms delay for data update
                         });
 
-                        // Short delay to allow design data to be updated
-                        setTimeout(() => {
-                            console.log('🔍 SAVE-ONLY PNG: About to get current design data...');
-                            const designData = this.getCurrentDesignData();
-                            console.log('🔍 SAVE-ONLY PNG: Got design data:', designData);
-
-                            // Fire our custom event
-                            console.log('🔍 SAVE-ONLY PNG: Dispatching designerShortcodeSave event...');
-                            document.dispatchEvent(new CustomEvent('designerShortcodeSave', {
-                                detail: {
-                                    button: button,
-                                    designData: designData
-                                }
-                            }));
-                            console.log('✅ SAVE-ONLY PNG: Event dispatched!');
-                        }, 500); // 500ms delay for data update
+                        console.log('🎯 SAVE-ONLY PNG: Monitoring save button:', selector);
                     });
-
-                    console.log('🎯 SAVE-ONLY PNG: Monitoring save button:', selector);
-                });
+                } catch (error) {
+                    console.warn('⚠️ SAVE-ONLY PNG: Invalid selector:', selector, error.message);
+                }
             });
+
+            // Also search for buttons by text content (safe fallback)
+            try {
+                const textSearchTerms = ['Save', 'speichern', 'Speichern', 'Save Design', 'Save product'];
+                textSearchTerms.forEach(searchTerm => {
+                    document.querySelectorAll('button').forEach(button => {
+                        if (button.textContent.includes(searchTerm) && !button.hasAttribute('data-save-png-monitored')) {
+                            // Mark as monitored
+                            button.setAttribute('data-save-png-monitored', 'true');
+
+                            // Add click listener
+                            button.addEventListener('click', (event) => {
+                                console.log(`🎨 SAVE-ONLY PNG: Text-based save button clicked! (${searchTerm})`, button);
+
+                                // Short delay to allow design data to be updated
+                                setTimeout(() => {
+                                    const designData = this.getCurrentDesignData();
+                                    document.dispatchEvent(new CustomEvent('designerShortcodeSave', {
+                                        detail: {
+                                            button: button,
+                                            designData: designData
+                                        }
+                                    }));
+                                }, 500);
+                            });
+
+                            console.log(`🎯 SAVE-ONLY PNG: Monitoring text-based save button: "${searchTerm}"`);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.warn('⚠️ SAVE-ONLY PNG: Error in text-based button search:', error.message);
+            }
         };
 
         // Initial scan
@@ -319,6 +407,16 @@ class SaveOnlyPNGGenerator {
             return;
         }
 
+        // 🔧 CRITICAL FIX: Check if PNG engine is available
+        if (!this.pngEngine || !this.pngEngine.exportEngine) {
+            console.error('❌ SAVE-ONLY PNG: PNG engine not available. Cannot generate PNG.');
+            this.isGenerating = false;
+            return {
+                success: false,
+                error: 'PNG engine not available'
+            };
+        }
+
         this.isGenerating = true;
         const startTime = Date.now();
 
@@ -339,9 +437,9 @@ class SaveOnlyPNGGenerator {
                 save_type: saveType,
                 order_id: orderId,
                 generated_at: new Date().toISOString(),
-                print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx),
-                print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm),
-                template_id: this.pngEngine.exportEngine.currentTemplateId
+                print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 }),
+                print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }),
+                template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback'
             };
 
             // Save to WordPress database
@@ -380,7 +478,10 @@ class SaveOnlyPNGGenerator {
 
         } catch (error) {
             console.error('❌ SAVE-ONLY PNG: Generation failed:', error);
-            throw error;
+            return {
+                success: false,
+                error: error.message || 'PNG generation failed'
+            };
         } finally {
             this.isGenerating = false;
         }
