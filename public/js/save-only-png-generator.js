@@ -121,16 +121,28 @@ class SaveOnlyPNGGenerator {
                     // Add click listener
                     button.addEventListener('click', (event) => {
                         console.log('🎨 SAVE-ONLY PNG: Designer save button clicked!', button);
+                        console.log('🔍 SAVE-ONLY PNG: Button details:', {
+                            tagName: button.tagName,
+                            className: button.className,
+                            textContent: button.textContent.trim(),
+                            id: button.id
+                        });
 
                         // Short delay to allow design data to be updated
                         setTimeout(() => {
+                            console.log('🔍 SAVE-ONLY PNG: About to get current design data...');
+                            const designData = this.getCurrentDesignData();
+                            console.log('🔍 SAVE-ONLY PNG: Got design data:', designData);
+
                             // Fire our custom event
+                            console.log('🔍 SAVE-ONLY PNG: Dispatching designerShortcodeSave event...');
                             document.dispatchEvent(new CustomEvent('designerShortcodeSave', {
                                 detail: {
                                     button: button,
-                                    designData: this.getCurrentDesignData()
+                                    designData: designData
                                 }
                             }));
+                            console.log('✅ SAVE-ONLY PNG: Event dispatched!');
                         }, 500); // 500ms delay for data update
                     });
 
@@ -416,12 +428,22 @@ class SaveOnlyPNGGenerator {
      * 🛠️ UTILITY METHODS
      */
     getCurrentDesignData() {
+        // 🔍 DEBUG: Detailed function availability check
+        console.log('🔍 SAVE-ONLY PNG: Checking for generateDesignData function...');
+        console.log('🔍 typeof window.generateDesignData:', typeof window.generateDesignData);
+        console.log('🔍 window.enhancedJSONSystem exists:', !!window.enhancedJSONSystem);
+        console.log('🔍 window.generateDesignData function:', window.generateDesignData);
+
         // Get current design data from global function
         if (typeof window.generateDesignData === 'function') {
-            return window.generateDesignData();
+            console.log('✅ SAVE-ONLY PNG: generateDesignData function found, calling it...');
+            const result = window.generateDesignData();
+            console.log('🔍 SAVE-ONLY PNG: generateDesignData returned:', result);
+            return result;
         }
 
-        console.warn('⚠️ SAVE-ONLY PNG: generateDesignData function not available');
+        console.warn('❌ SAVE-ONLY PNG: generateDesignData function not available');
+        console.log('🔍 Available window functions:', Object.keys(window).filter(key => key.includes('generate') || key.includes('design') || key.includes('JSON')));
         return null;
     }
 

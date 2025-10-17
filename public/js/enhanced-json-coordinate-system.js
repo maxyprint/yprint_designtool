@@ -391,10 +391,15 @@
     };
 
     // Create global instance
+    console.log('🔍 ENHANCED-JSON: Script is executing...');
+    console.log('🔍 ENHANCED-JSON: window.enhancedJSONSystem exists?', !!window.enhancedJSONSystem);
+
     if (!window.enhancedJSONSystem) {
+        console.log('🔍 ENHANCED-JSON: Creating new EnhancedJSONCoordinateSystem instance...');
         window.enhancedJSONSystem = new window.EnhancedJSONCoordinateSystem();
 
         // Override global generateDesignData function
+        console.log('🔍 ENHANCED-JSON: Setting up window.generateDesignData function...');
         window.generateDesignData = () => window.enhancedJSONSystem.generateDesignData();
 
         // Add test function
@@ -402,6 +407,9 @@
 
         console.log('🏆 HIVE MIND: Enhanced JSON Coordinate System ready!');
         console.log('💡 Usage: generateDesignData() or testJSONGeneration()');
+        console.log('🔍 ENHANCED-JSON: generateDesignData function type:', typeof window.generateDesignData);
+    } else {
+        console.log('ℹ️ ENHANCED-JSON: System already initialized');
     }
 
 })();

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 PNG Script Loading Diagnostic</title>
+</head>
+<body>
+    <h1>🔍 PNG Script Loading Diagnostic</h1>
+
+    <script>
+        console.log("🔍 PNG DIAGNOSTIC: Starting script loading check...");
+
+        // Check if we're on the WordPress site
+        if (window.location.hostname === 'test-site.local' || window.location.hostname === 'localhost') {
+            console.log("✅ PNG DIAGNOSTIC: On WordPress test site");
+
+            // Check for PNG system scripts in DOM
+            const checkPNGScripts = () => {
+                const scripts = document.querySelectorAll('script[src*="png"], script[src*="yprint"]');
+                console.log("🔍 PNG DIAGNOSTIC: Found PNG-related scripts:", scripts.length);
+
+                scripts.forEach((script, index) => {
+                    console.log(`🔍 PNG SCRIPT ${index + 1}:`, script.src);
+                });
+
+                // Check for PNG system global objects
+                console.log("🔍 PNG DIAGNOSTIC: Checking global objects...");
+                console.log("  - window.pngOnlySystemIntegration:", !!window.pngOnlySystemIntegration);
+                console.log("  - window.yprintPNGIntegration:", !!window.yprintPNGIntegration);
+                console.log("  - window.saveOnlyPNGGenerator:", !!window.saveOnlyPNGGenerator);
+
+                // Check script loading status
+                const pngScriptHandles = [
+                    'yprint-high-dpi-export',
+                    'yprint-png-integration',
+                    'yprint-save-only-png'
+                ];
+
+                pngScriptHandles.forEach(handle => {
+                    const script = document.querySelector(`script[id*="${handle}"]`);
+                    console.log(`🔍 PNG SCRIPT STATUS [${handle}]:`, script ? 'FOUND' : 'MISSING');
+                });
+            };
+
+            // Initial check
+            checkPNGScripts();
+
+            // Check again after DOM fully loads
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    console.log("🔍 PNG DIAGNOSTIC: DOM loaded, rechecking...");
+                    checkPNGScripts();
+                });
+            }
+
+            // Check again after window loads
+            window.addEventListener('load', () => {
+                console.log("🔍 PNG DIAGNOSTIC: Window loaded, final check...");
+                setTimeout(checkPNGScripts, 2000); // Wait 2 seconds
+            });
+
+        } else {
+            console.log("❌ PNG DIAGNOSTIC: Not on WordPress test site");
+            console.log("Current hostname:", window.location.hostname);
+            console.log("Attempting to check for PNG scripts anyway...");
+
+            // Still run checks in case we're testing locally
+            const checkPNGScripts = () => {
+                const scripts = document.querySelectorAll('script[src*="png"], script[src*="yprint"]');
+                console.log("🔍 PNG DIAGNOSTIC: Found PNG-related scripts:", scripts.length);
+
+                scripts.forEach((script, index) => {
+                    console.log(`🔍 PNG SCRIPT ${index + 1}:`, script.src);
+                });
+            };
+
+            checkPNGScripts();
+        }
+    </script>
+</body>
+</html>
