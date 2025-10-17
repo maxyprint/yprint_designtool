@@ -172,12 +172,23 @@ class HighDPIPrintExportEngine {
 
     async createPrintAreaExport(fabricCanvas, multiplier, options) {
         console.log('📐 HIGH-DPI PRINT ENGINE: Creating print area export...');
+        console.log('🔍 PNG FIX: Canvas size:', fabricCanvas.getWidth(), 'x', fabricCanvas.getHeight());
 
         // Get only the design elements (no background)
         const designElements = this.getDesignElementsOnly(fabricCanvas);
+        console.log('🎯 PNG FIX: Found design elements:', designElements.length);
 
         if (designElements.length === 0) {
-            console.warn('⚠️ HIGH-DPI PRINT ENGINE: No design elements found');
+            console.warn('⚠️ HIGH-DPI PRINT ENGINE: No design elements found - check canvas content!');
+            console.log('🔍 DEBUG: All canvas objects:', fabricCanvas.getObjects().map(obj => ({
+                type: obj.type,
+                left: obj.left,
+                top: obj.top,
+                width: obj.width,
+                height: obj.height,
+                isBackground: obj.isBackground,
+                excludeFromExport: obj.excludeFromExport
+            })));
             return this.createEmptyPrintPNG(multiplier);
         }
 
@@ -205,28 +216,23 @@ class HighDPIPrintExportEngine {
     getDesignElementsOnly(fabricCanvas) {
         // Get all objects but filter out backgrounds and view elements
         const allObjects = fabricCanvas.getObjects();
+        console.log('🔍 PNG FIX: Total canvas objects:', allObjects.length);
 
         return allObjects.filter(obj => {
-            // Skip background images (usually large, positioned at 0,0)
-            if (obj.type === 'image' && obj.left === 0 && obj.top === 0) {
-                const canvasWidth = fabricCanvas.getWidth();
-                const canvasHeight = fabricCanvas.getHeight();
-
-                // Skip if image covers most of the canvas (likely background)
-                if (obj.width >= canvasWidth * 0.8 && obj.height >= canvasHeight * 0.8) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping background image:', obj);
-                    return false;
-                }
-            }
-
-            // Skip elements marked as background
-            if (obj.isBackground || obj.excludeFromExport) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping marked background element:', obj);
+            // 🔧 FIXED: Only skip elements explicitly marked as background
+            if (obj.isBackground === true || obj.excludeFromExport === true) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping marked background element:', obj.type);
                 return false;
             }
 
-            // Include all other design elements
-            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, obj);
+            // 🔧 FIXED: Only skip images with specific background indicators
+            if (obj.type === 'image' && obj.id && obj.id.includes('background')) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping background image by ID:', obj.id);
+                return false;
+            }
+
+            // 🔧 FIXED: Include ALL user design elements (text, images, shapes)
+            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, `(${obj.width}x${obj.height})`);
             return true;
         });
     }
@@ -323,16 +329,30 @@ class HighDPIPrintExportEngine {
 
     createEmptyPrintPNG(multiplier) {
         const { width, height } = this.printAreaPx;
-        const scaledWidth = Math.round(width * multiplier);
-        const scaledHeight = Math.round(height * multiplier);
 
-        // Create transparent PNG
+        // 🔧 FIXED: Ensure minimum viable dimensions (prevent 1x1 pixel PNGs)
+        const scaledWidth = Math.max(Math.round(width * multiplier), 200);
+        const scaledHeight = Math.max(Math.round(height * multiplier), 200);
+
+        console.warn('⚠️ HIGH-DPI PRINT ENGINE: Creating fallback PNG:', `${scaledWidth}x${scaledHeight}`);
+
+        // Create canvas with proper dimensions
         const canvas = document.createElement('canvas');
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
 
         const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, scaledWidth, scaledHeight);
+
+        // 🔧 FIXED: Create visible placeholder instead of transparent
+        ctx.fillStyle = 'rgba(240, 240, 240, 0.8)';
+        ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+
+        // Add debug text
+        ctx.fillStyle = '#666';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No Design Elements', scaledWidth/2, scaledHeight/2 - 10);
+        ctx.fillText('Found for Export', scaledWidth/2, scaledHeight/2 + 10);
 
         return canvas.toDataURL('image/png');
     }
