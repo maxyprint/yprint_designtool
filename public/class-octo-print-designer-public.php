@@ -244,6 +244,33 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🖨️ PNG-ONLY SYSTEM: High-DPI Print Export Engine
+        wp_register_script(
+            'yprint-high-dpi-export',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/high-dpi-png-export-engine.js',
+            ['octo-print-designer-enhanced-json'], // Depends on coordinate system
+            $this->version . '.png-export-v1',
+            true
+        );
+
+        // 🖨️ PNG-ONLY SYSTEM: WordPress Integration Layer
+        wp_register_script(
+            'yprint-png-integration',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/png-only-system-integration.js',
+            ['yprint-high-dpi-export'], // Depends on export engine
+            $this->version . '.png-integration-v1',
+            true
+        );
+
+        // 🎯 SAVE-ONLY PNG GENERATOR: Clean PNG generation system
+        wp_register_script(
+            'yprint-save-only-png',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/save-only-png-generator.js',
+            ['yprint-png-integration'], // Depends on PNG integration
+            $this->version . '.save-only-png-v1',
+            true
+        );
+
         // 🚨 HARD-LOCK: Canvas Creation Blocker (PRIORITY 1)
         // CRITICAL: Must load before designer.bundle.js to prevent double Canvas initialization
         wp_register_script(
@@ -428,6 +455,16 @@ class Octo_Print_Designer_Public {
             'dpi' => Octo_Print_Designer_Settings::get_dpi()
         ]);
 
+        // 🖨️ PNG-Only System configuration
+        wp_localize_script('yprint-save-only-png', 'octo_print_designer_config', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('octo_print_designer_nonce'),
+            'plugin_url' => OCTO_PRINT_DESIGNER_URL,
+            'version' => $this->version,
+            'debug_mode' => WP_DEBUG,
+            'png_only_system' => true
+        ]);
+
         // 🎯 PRODUCTION-OPTIMIZED STAGED LOADING: Environment-aware script loading
         $staged_loading_scripts = [
             // Stage 1: Webpack Foundation (ESSENTIAL)
@@ -458,6 +495,11 @@ class Octo_Print_Designer_Public {
             'octo-print-designer-permanent-save-fix',     // save fixes
             'octo-print-designer-enhanced-json',          // coordinate system
             'octo-print-designer-safezone-validator',     // validation
+
+            // Stage 5: PNG-Only System (Save-Only PNG generation)
+            'yprint-high-dpi-export',                     // PNG export engine
+            'yprint-png-integration',                     // PNG system integration
+            'yprint-save-only-png',                       // Save-only PNG generator
         ];
 
         // 🔧 CONDITIONAL DEBUG SCRIPTS: Only add to staging when in debug mode
