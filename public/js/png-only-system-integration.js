@@ -440,8 +440,9 @@ class PNGOnlySystemIntegration {
     markReady() {
         this.initialized = true;
 
-        // Expose globally
+        // Expose globally with both names for compatibility
         window.pngOnlySystemIntegration = this;
+        window.yprintPNGIntegration = this;  // 🔧 FIX: Also expose with expected name
 
         // Dispatch ready event
         window.dispatchEvent(new CustomEvent('yprintPNGOnlySystemReady', {
@@ -595,6 +596,7 @@ class PNGOnlySystemIntegration {
 
         this.initialized = false;
         delete window.pngOnlySystemIntegration;
+        delete window.yprintPNGIntegration;  // 🔧 FIX: Clean up both global references
 
         console.log('✅ PNG-ONLY INTEGRATION: Disposed');
     }
@@ -610,7 +612,9 @@ const requiredSystems = 2;
 const checkAndInit = () => {
     systemsReady++;
     if (systemsReady >= requiredSystems) {
-        window.pngOnlySystemIntegration = new PNGOnlySystemIntegration();
+        const pngIntegration = new PNGOnlySystemIntegration();
+        window.pngOnlySystemIntegration = pngIntegration;
+        window.yprintPNGIntegration = pngIntegration;  // 🔧 FIX: Expose with both names
     }
 };
 

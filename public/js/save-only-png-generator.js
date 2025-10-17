@@ -38,11 +38,15 @@ class SaveOnlyPNGGenerator {
     async waitForPNGEngine() {
         return new Promise((resolve) => {
             const checkEngine = () => {
-                if (window.yprintPNGIntegration && window.yprintPNGIntegration.exportEngine) {
-                    this.pngEngine = window.yprintPNGIntegration;
+                // 🔧 FIX: Check for both possible integration instances
+                const pngIntegration = window.yprintPNGIntegration || window.pngOnlySystemIntegration;
+
+                if (pngIntegration && pngIntegration.exportEngine) {
+                    this.pngEngine = pngIntegration;
                     console.log('✅ SAVE-ONLY PNG: PNG engine connected');
                     resolve();
                 } else {
+                    console.log('⏳ SAVE-ONLY PNG: Waiting for PNG integration... (checking window.yprintPNGIntegration and window.pngOnlySystemIntegration)');
                     setTimeout(checkEngine, 500);
                 }
             };
@@ -96,6 +100,7 @@ class SaveOnlyPNGGenerator {
                 'button[data-action="save"]',
                 'button[data-action="add-to-cart"]',
                 '.designer-save-button',
+                '.designer-action-button',  // 🎯 FIX: Added missing selector for user's "Save product" button
                 '.add-to-cart-button',
                 '#add-to-cart',
                 'button:contains("Save")',
