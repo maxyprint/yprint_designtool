@@ -58,7 +58,9 @@ class Octo_Print_Designer_Public {
         $this->designer = new Octo_Print_Designer_Designer();
         $this->products = new Octo_Print_Designer_Products();
 
+        error_log("🔍 PNG DEBUG: Octo_Print_Designer_Public constructor called");
         $this->define_hooks();
+        error_log("🔍 PNG DEBUG: Hooks defined for PNG system");
 
 	}
 
@@ -87,6 +89,7 @@ class Octo_Print_Designer_Public {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
+        error_log("🔍 PNG DEBUG: enqueue_scripts() method called");
 
         // 🚀 PRODUCTION-OPTIMIZED DEBUG SYSTEM: Conditional loading for performance
         // Only load debug scripts in development/debug mode to eliminate production bloat
@@ -230,10 +233,11 @@ class Octo_Print_Designer_Public {
         wp_register_script(
             'octo-print-designer-enhanced-json',
             OCTO_PRINT_DESIGNER_URL . 'public/js/enhanced-json-coordinate-system.js',
-            ['octo-print-designer-canvas-singleton'], // Load after singleton manager
+            ['octo-fabric-canvas-singleton-public'], // 🔧 FIX: Corrected dependency name
             rand(),
             true
         );
+        error_log("🔍 PNG REGISTRATION: octo-print-designer-enhanced-json registered with correct dependency");
 
         // 🔍 SAFEZONE COORDINATE VALIDATOR - Fixes coordinates capture bug causing SafeZone warnings
         wp_register_script(
@@ -252,6 +256,7 @@ class Octo_Print_Designer_Public {
             $this->version . '.png-export-v1',
             true
         );
+        error_log("🔍 PNG REGISTRATION: yprint-high-dpi-export registered");
 
         // 🖨️ PNG-ONLY SYSTEM: WordPress Integration Layer
         wp_register_script(
@@ -261,6 +266,7 @@ class Octo_Print_Designer_Public {
             $this->version . '.png-integration-v1',
             true
         );
+        error_log("🔍 PNG REGISTRATION: yprint-png-integration registered");
 
         // 🎯 SAVE-ONLY PNG GENERATOR: Clean PNG generation system
         wp_register_script(
@@ -270,6 +276,7 @@ class Octo_Print_Designer_Public {
             $this->version . '.save-only-png-v1',
             true
         );
+        error_log("🔍 PNG REGISTRATION: yprint-save-only-png registered");
 
         // 🚨 HARD-LOCK: Canvas Creation Blocker (PRIORITY 1)
         // CRITICAL: Must load before designer.bundle.js to prevent double Canvas initialization
@@ -515,6 +522,16 @@ class Octo_Print_Designer_Public {
         foreach ($staged_loading_scripts as $script_handle) {
             if (wp_script_is($script_handle, 'registered')) {
                 wp_enqueue_script($script_handle);
+
+                // 🔍 DEBUG: Log PNG script enqueueing
+                if (strpos($script_handle, 'yprint') !== false) {
+                    error_log("🖨️ PNG SCRIPT ENQUEUED: {$script_handle}");
+                }
+            } else {
+                // 🔍 DEBUG: Log missing PNG script registrations
+                if (strpos($script_handle, 'yprint') !== false) {
+                    error_log("❌ PNG SCRIPT NOT REGISTERED: {$script_handle}");
+                }
             }
         }
 
