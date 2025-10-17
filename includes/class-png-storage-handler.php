@@ -78,15 +78,48 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🔍 ENHANCED DEBUG: Log incoming request details
+        error_log('🔍 PNG STORAGE: Incoming request - Action: ' . ($_POST['action'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: POST data keys: ' . implode(', ', array_keys($_POST)));
+
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+        $nonce_valid = wp_verify_nonce($_POST['nonce'] ?? '', 'octo_print_designer_nonce');
+        error_log('🔍 PNG STORAGE: Nonce verification result: ' . ($nonce_valid ? 'VALID' : 'INVALID'));
+
+        if (!$nonce_valid) {
+            error_log('❌ PNG STORAGE: Nonce verification failed - sending error response');
             wp_send_json_error('Invalid nonce');
             return;
         }
 
         try {
+            // 🔧 ENHANCED VALIDATION: Check all required fields
+            $required_fields = ['design_id', 'print_png'];
+            $missing_fields = [];
+
+            foreach ($required_fields as $field) {
+                if (!isset($_POST[$field]) || empty($_POST[$field])) {
+                    $missing_fields[] = $field;
+                }
+            }
+
+            if (!empty($missing_fields)) {
+                $error_msg = 'Missing required fields: ' . implode(', ', $missing_fields);
+                error_log('❌ PNG STORAGE: Validation failed - ' . $error_msg);
+                wp_send_json_error($error_msg);
+                return;
+            }
+
             $design_id = sanitize_text_field($_POST['design_id']);
             $print_png = $_POST['print_png'];
+
+            // 🔧 ENHANCED VALIDATION: Validate PNG data format
+            if (!$this->validatePNGData($print_png)) {
+                error_log('❌ PNG STORAGE: Invalid PNG data format');
+                wp_send_json_error('Invalid PNG data format');
+                return;
+            }
             $print_area_px = stripslashes($_POST['print_area_px']);
             $print_area_mm = stripslashes($_POST['print_area_mm']);
             $template_id = sanitize_text_field($_POST['template_id']);
@@ -534,6 +567,57 @@ class PNG_Storage_Handler {
         }
 
         return $stats;
+    }
+
+    /**
+     * 🔧 ENHANCED VALIDATION: Validate PNG data format
+     */
+    private function validatePNGData($png_data) {
+        // Check if it's a valid data URL
+        if (!is_string($png_data)) {
+            error_log('❌ PNG VALIDATION: PNG data is not a string');
+            return false;
+        }
+
+        // Check for data URL format
+        if (!preg_match('/^data:image\/png;base64,/', $png_data)) {
+            error_log('❌ PNG VALIDATION: Invalid PNG data URL format');
+            return false;
+        }
+
+        // Extract base64 data
+        $base64_data = substr($png_data, strpos($png_data, ',') + 1);
+
+        // Validate base64 encoding
+        if (!base64_decode($base64_data, true)) {
+            error_log('❌ PNG VALIDATION: Invalid base64 encoding');
+            return false;
+        }
+
+        // Decode and check if it's valid PNG
+        $binary_data = base64_decode($base64_data);
+
+        // Check PNG signature (first 8 bytes)
+        $png_signature = "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A";
+        if (substr($binary_data, 0, 8) !== $png_signature) {
+            error_log('❌ PNG VALIDATION: Invalid PNG signature');
+            return false;
+        }
+
+        // Check minimum size (PNG header + minimum chunk)
+        if (strlen($binary_data) < 33) {
+            error_log('❌ PNG VALIDATION: PNG data too small');
+            return false;
+        }
+
+        // Check maximum reasonable size (10MB)
+        if (strlen($binary_data) > 10 * 1024 * 1024) {
+            error_log('❌ PNG VALIDATION: PNG data too large (' . strlen($binary_data) . ' bytes)');
+            return false;
+        }
+
+        error_log('✅ PNG VALIDATION: PNG data is valid (' . strlen($binary_data) . ' bytes)');
+        return true;
     }
 }
 

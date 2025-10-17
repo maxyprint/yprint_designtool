@@ -229,6 +229,15 @@ class Octo_Print_Designer_Public {
             );
         }
 
+        // 🔧 SCRIPT CONFLICT RESOLVER: Prevent duplicate variable declarations and script conflicts
+        wp_register_script(
+            'yprint-script-conflict-resolver',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/script-conflict-resolver.js',
+            [], // No dependencies - must load first
+            $this->version . '.conflict-resolver-v1',
+            false // Load in head, not footer
+        );
+
         // 🏆 HIVE MIND ENHANCED JSON COORDINATE SYSTEM - Advanced Design Data Capture
         wp_register_script(
             'octo-print-designer-enhanced-json',
@@ -658,8 +667,27 @@ class Octo_Print_Designer_Public {
      * Add preload hints for critical fabric.js resources
      */
     public function add_fabric_preload_hints() {
-        // Only add preload hints on designer pages
-        if (is_page() || (function_exists('is_woocommerce') && is_woocommerce())) {
+        // 🔧 OPTIMIZED PRELOAD: Only preload on pages that will actually use the designer
+        global $post;
+
+        $should_preload = false;
+
+        // Check if current page contains ops-designer shortcode
+        if ($post && has_shortcode($post->post_content, 'ops-designer')) {
+            $should_preload = true;
+        }
+
+        // Or check if it's a customizable product page
+        if (is_product() && get_post_meta(get_the_ID(), '_yprint_customizable', true)) {
+            $should_preload = true;
+        }
+
+        // Or admin pages that use the designer
+        if (isset($_GET['page']) && strpos($_GET['page'], 'designer') !== false) {
+            $should_preload = true;
+        }
+
+        if ($should_preload) {
             echo '<link rel="preload" href="' . OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-master-loader.js" as="script" crossorigin="anonymous">' . "\n";
             echo '<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" as="script" crossorigin="anonymous">' . "\n";
             echo '<link rel="dns-prefetch" href="cdnjs.cloudflare.com">' . "\n";

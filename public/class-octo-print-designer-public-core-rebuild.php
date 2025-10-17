@@ -155,6 +155,9 @@ class Octo_Print_Designer_Public_Core_Rebuild {
         wp_enqueue_script('yprint-designer-widget-core');
         wp_enqueue_script('yprint-unified-api');
 
+        // Always enqueue conflict resolver first
+        wp_enqueue_script('yprint-script-conflict-resolver');
+
         // Always enqueue PNG-Only System for print functionality
         wp_enqueue_script('yprint-high-dpi-export');
         wp_enqueue_script('yprint-png-integration');
@@ -191,6 +194,9 @@ class Octo_Print_Designer_Public_Core_Rebuild {
         );
 
         wp_localize_script('yprint-unified-api', 'octo_print_designer_config', $config_data);
+
+        // 🔧 CRITICAL FIX: Also localize to save-only-png script for PNG functionality
+        wp_localize_script('yprint-save-only-png', 'octo_print_designer_config', $config_data);
     }
 
     /**

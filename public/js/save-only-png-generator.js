@@ -56,7 +56,7 @@ class SaveOnlyPNGGenerator {
     async waitForPNGEngine() {
         return new Promise((resolve) => {
             let attempts = 0;
-            const maxAttempts = 20; // 10 seconds total (20 * 500ms)
+            const maxAttempts = 10; // 🔧 REDUCED: 5 seconds total (10 * 500ms)
 
             const checkEngine = () => {
                 // 🔧 FIX: Check for both possible integration instances
@@ -85,8 +85,17 @@ class SaveOnlyPNGGenerator {
                     attempts++;
                     console.log(`⏳ SAVE-ONLY PNG: Waiting for PNG integration... (attempt ${attempts}/${maxAttempts})`);
 
-                    // After 5 attempts (2.5 seconds), trigger fallback loader if available
-                    if (attempts === 5 && window.pngFallbackLoader) {
+                    // 🔧 ENHANCED DETECTION: Log what's available for faster debugging
+                    console.log('🔍 Detection status:', {
+                        pngIntegration: !!pngIntegration,
+                        highDPIEngine: !!highDPIEngine,
+                        designerWidget: !!window.designerWidgetInstance,
+                        fabricCanvas: !!window.designerWidgetInstance?.fabricCanvas,
+                        fabric: !!window.fabric
+                    });
+
+                    // After 3 attempts (1.5 seconds), trigger fallback loader if available
+                    if (attempts === 3 && window.pngFallbackLoader) {
                         console.log('🚨 SAVE-ONLY PNG: Triggering fallback loader...');
                         window.pngFallbackLoader.checkAndLoadMissingScripts();
                     }
@@ -660,16 +669,26 @@ class SaveOnlyPNGGenerator {
 
         console.log('📡 SAVE-ONLY PNG: Sending to WordPress AJAX:', config.ajax_url);
 
+        // 🔍 ENHANCED DEBUG: Log the exact request being sent
+        const requestData = {
+            action: 'yprint_save_design_print_png',
+            nonce: config.nonce,
+            ...pngData
+        };
+        console.log('🔍 REQUEST DEBUG: Sending data:', {
+            action: requestData.action,
+            nonce: requestData.nonce ? 'PRESENT' : 'MISSING',
+            design_id: requestData.design_id,
+            data_size: JSON.stringify(requestData).length + ' bytes',
+            ajax_url: config.ajax_url
+        });
+
         const response = await fetch(config.ajax_url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({
-                action: 'yprint_save_design_print_png',
-                nonce: config.nonce,
-                ...pngData
-            })
+            body: new URLSearchParams(requestData)
         });
 
         if (!response.ok) {
