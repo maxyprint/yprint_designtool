@@ -113,6 +113,15 @@ class Octo_Print_Designer_Public_Core_Rebuild {
             true
         );
 
+        // 🎯 SAVE-ONLY PNG GENERATOR: Clean PNG generation system
+        wp_register_script(
+            'yprint-save-only-png',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/save-only-png-generator.js',
+            ['yprint-png-integration'], // Depends on PNG integration
+            $this->version . '.save-only-png-v1',
+            true
+        );
+
         // 🚀 CORE SCRIPT 4: WordPress Integration (if needed)
         // Handles WordPress-specific functionality
         wp_register_script(
@@ -149,6 +158,7 @@ class Octo_Print_Designer_Public_Core_Rebuild {
         // Always enqueue PNG-Only System for print functionality
         wp_enqueue_script('yprint-high-dpi-export');
         wp_enqueue_script('yprint-png-integration');
+        wp_enqueue_script('yprint-save-only-png');
 
         // Context-specific enqueues
         if (is_product() || is_shop() || is_cart() || is_checkout()) {

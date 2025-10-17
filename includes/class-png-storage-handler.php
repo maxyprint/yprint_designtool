@@ -40,6 +40,10 @@ class PNG_Storage_Handler {
         add_action('wp_ajax_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
         add_action('wp_ajax_nopriv_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
 
+        // 📥 SAVE-ONLY PNG: Handler to retrieve existing PNGs (no generation)
+        add_action('wp_ajax_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
+        add_action('wp_ajax_nopriv_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
+
         add_action('wp_ajax_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
         add_action('wp_ajax_nopriv_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
 
@@ -119,13 +123,79 @@ class PNG_Storage_Handler {
 
             wp_send_json_success(array(
                 'png_url' => $png_file_info['url'],
+                'png_path' => $png_file_info['path'],
                 'design_id' => $design_id,
+                'template_id' => $template_id,
+                'print_area_px' => $print_area_px,
+                'print_area_mm' => $print_area_mm,
                 'message' => 'Print PNG saved for design!'
             ));
 
         } catch (Exception $e) {
             error_log('❌ PNG STORAGE: Save design PNG failed: ' . $e->getMessage());
             wp_send_json_error('Failed to save print PNG: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 📥 SAVE-ONLY PNG: Retrieve existing PNG (no generation)
+     * Used by "Designdaten laden" and preview system
+     */
+    public function handle_get_existing_png() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+            wp_send_json_error('Invalid nonce');
+            return;
+        }
+
+        try {
+            $identifier = sanitize_text_field($_POST['identifier']);
+
+            error_log('📥 PNG STORAGE: Retrieving existing PNG for: ' . $identifier);
+
+            // Try different lookup methods
+            $png_data = null;
+
+            // Method 1: Direct order lookup
+            if (is_numeric($identifier)) {
+                $png_data = get_post_meta($identifier, 'print_png_data', true);
+            }
+
+            // Method 2: Design ID lookup
+            if (!$png_data) {
+                global $wpdb;
+                $result = $wpdb->get_row($wpdb->prepare(
+                    "SELECT meta_value FROM {$wpdb->postmeta}
+                     WHERE meta_key = 'print_png_data'
+                     AND meta_value LIKE %s
+                     ORDER BY meta_id DESC LIMIT 1",
+                    '%' . $wpdb->esc_like($identifier) . '%'
+                ));
+
+                if ($result) {
+                    $png_data = $result->meta_value;
+                }
+            }
+
+            if ($png_data) {
+                wp_send_json_success(array(
+                    'png' => $png_data,
+                    'identifier' => $identifier,
+                    'found' => true,
+                    'message' => 'Existing PNG retrieved successfully'
+                ));
+            } else {
+                wp_send_json_success(array(
+                    'png' => null,
+                    'identifier' => $identifier,
+                    'found' => false,
+                    'message' => 'No existing PNG found'
+                ));
+            }
+
+        } catch (Exception $e) {
+            error_log('🚨 PNG STORAGE: Error retrieving PNG: ' . $e->getMessage());
+            wp_send_json_error('Error retrieving PNG: ' . $e->getMessage());
         }
     }
 
