@@ -37,6 +37,9 @@ class SaveOnlyPNGGenerator {
 
     async waitForPNGEngine() {
         return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 20; // 10 seconds total (20 * 500ms)
+
             const checkEngine = () => {
                 // 🔧 FIX: Check for both possible integration instances
                 const pngIntegration = window.yprintPNGIntegration || window.pngOnlySystemIntegration;
@@ -46,12 +49,32 @@ class SaveOnlyPNGGenerator {
                     console.log('✅ SAVE-ONLY PNG: PNG engine connected');
                     resolve();
                 } else {
-                    console.log('⏳ SAVE-ONLY PNG: Waiting for PNG integration... (checking window.yprintPNGIntegration and window.pngOnlySystemIntegration)');
-                    setTimeout(checkEngine, 500);
+                    attempts++;
+                    console.log(`⏳ SAVE-ONLY PNG: Waiting for PNG integration... (attempt ${attempts}/${maxAttempts})`);
+
+                    // After 5 attempts (2.5 seconds), trigger fallback loader if available
+                    if (attempts === 5 && window.pngFallbackLoader) {
+                        console.log('🚨 SAVE-ONLY PNG: Triggering fallback loader...');
+                        window.pngFallbackLoader.checkAndLoadMissingScripts();
+                    }
+
+                    if (attempts >= maxAttempts) {
+                        console.error('❌ SAVE-ONLY PNG: Timeout waiting for PNG integration. System unavailable.');
+                        console.error('💡 SAVE-ONLY PNG: Please check WordPress admin for plugin activation status.');
+                        resolve(); // Resolve anyway to prevent hanging
+                    } else {
+                        setTimeout(checkEngine, 500);
+                    }
                 }
             };
             checkEngine();
         });
+    }
+
+    // Public method for fallback loader to trigger recheck
+    checkSystemReady() {
+        console.log('🔄 SAVE-ONLY PNG: System readiness recheck triggered by fallback loader');
+        return this.waitForPNGEngine();
     }
 
     setupSaveEventListeners() {

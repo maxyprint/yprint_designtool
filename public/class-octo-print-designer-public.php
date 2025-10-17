@@ -278,6 +278,16 @@ class Octo_Print_Designer_Public {
         );
         error_log("🔍 PNG REGISTRATION: yprint-save-only-png registered");
 
+        // 🚨 PNG FALLBACK LOADER: Emergency script loading when WordPress staging fails
+        wp_register_script(
+            'yprint-fallback-loader',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/png-fallback-loader.js',
+            [], // No dependencies - loads first as fallback
+            $this->version . '.fallback-loader-v1',
+            true
+        );
+        error_log("🔍 PNG REGISTRATION: yprint-fallback-loader registered");
+
         // 🚨 HARD-LOCK: Canvas Creation Blocker (PRIORITY 1)
         // CRITICAL: Must load before designer.bundle.js to prevent double Canvas initialization
         wp_register_script(
@@ -474,6 +484,9 @@ class Octo_Print_Designer_Public {
 
         // 🎯 PRODUCTION-OPTIMIZED STAGED LOADING: Environment-aware script loading
         $staged_loading_scripts = [
+            // Stage 0: Emergency Fallback Loader (FIRST)
+            'yprint-fallback-loader',            // PNG emergency loader - no dependencies
+
             // Stage 1: Webpack Foundation (ESSENTIAL)
             'octo-webpack-readiness-detector',   // Load first in HEAD
 
@@ -519,19 +532,51 @@ class Octo_Print_Designer_Public {
         }
 
         // 🚀 PERFORMANCE-OPTIMIZED ENQUEUEING: Load only registered scripts
+        error_log("🔍 PNG DEBUG: Starting staged script loading process...");
+
         foreach ($staged_loading_scripts as $script_handle) {
             if (wp_script_is($script_handle, 'registered')) {
                 wp_enqueue_script($script_handle);
 
-                // 🔍 DEBUG: Log PNG script enqueueing
-                if (strpos($script_handle, 'yprint') !== false) {
+                // 🔍 DEBUG: Log PNG script enqueueing with dependency check
+                if (strpos($script_handle, 'yprint') !== false || strpos($script_handle, 'enhanced-json') !== false || strpos($script_handle, 'fallback-loader') !== false) {
                     error_log("🖨️ PNG SCRIPT ENQUEUED: {$script_handle}");
+
+                    // Check dependencies
+                    global $wp_scripts;
+                    if (isset($wp_scripts->registered[$script_handle])) {
+                        $deps = $wp_scripts->registered[$script_handle]->deps;
+                        error_log("  📋 Dependencies: " . implode(', ', $deps));
+
+                        // Check if dependencies are registered
+                        foreach ($deps as $dep) {
+                            $dep_status = wp_script_is($dep, 'registered') ? 'REGISTERED' : 'MISSING';
+                            error_log("    🔗 Dependency {$dep}: {$dep_status}");
+                        }
+                    }
                 }
             } else {
-                // 🔍 DEBUG: Log missing PNG script registrations
-                if (strpos($script_handle, 'yprint') !== false) {
+                // 🔍 DEBUG: Log missing script registrations (especially PNG)
+                if (strpos($script_handle, 'yprint') !== false || strpos($script_handle, 'enhanced-json') !== false || strpos($script_handle, 'fallback-loader') !== false) {
                     error_log("❌ PNG SCRIPT NOT REGISTERED: {$script_handle}");
                 }
+            }
+        }
+
+        // 🔍 PNG DEBUG: Final verification of enqueued PNG scripts
+        global $wp_scripts;
+        error_log("🔍 PNG DEBUG: Staged loading complete. Checking final script queue...");
+
+        $png_scripts_check = ['yprint-fallback-loader', 'yprint-high-dpi-export', 'yprint-png-integration', 'yprint-save-only-png', 'octo-print-designer-enhanced-json'];
+        foreach ($png_scripts_check as $script) {
+            $registered = wp_script_is($script, 'registered') ? 'YES' : 'NO';
+            $enqueued = wp_script_is($script, 'enqueued') ? 'YES' : 'NO';
+            $queued = wp_script_is($script, 'queue') ? 'YES' : 'NO';
+
+            error_log("🖨️ PNG FINAL CHECK: {$script} - Registered: {$registered}, Enqueued: {$enqueued}, In Queue: {$queued}");
+
+            if ($registered === 'YES' && $enqueued === 'NO') {
+                error_log("⚠️ PNG ISSUE: {$script} is registered but not enqueued - dependency problem?");
             }
         }
 
