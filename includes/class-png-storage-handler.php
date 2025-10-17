@@ -78,14 +78,28 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
-        // 🔍 ENHANCED DEBUG: Log incoming request details
-        error_log('🔍 PNG STORAGE: Incoming request - Action: ' . ($_POST['action'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: POST data keys: ' . implode(', ', array_keys($_POST)));
+        // 🔍 ULTRA-DETAILED DEBUG: Log everything about the incoming request
+        error_log('🔍 PNG STORAGE: === INCOMING REQUEST START ===');
+        error_log('🔍 PNG STORAGE: Request method: ' . $_SERVER['REQUEST_METHOD']);
+        error_log('🔍 PNG STORAGE: Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: Action: ' . ($_POST['action'] ?? $_REQUEST['action'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: POST data keys: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
+        error_log('🔍 PNG STORAGE: REQUEST data keys: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
+        error_log('🔍 PNG STORAGE: Raw input length: ' . strlen(file_get_contents('php://input')));
+
+        // Check if this is a FormData request vs regular POST
+        $is_form_data = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
+        error_log('🔍 PNG STORAGE: Is FormData request: ' . ($is_form_data ? 'YES' : 'NO'));
+
+        // Try to get nonce from both POST and REQUEST
+        $nonce = $_POST['nonce'] ?? $_REQUEST['nonce'] ?? null;
+        error_log('🔍 PNG STORAGE: Final nonce: ' . ($nonce ?? 'NULL'));
 
         // Verify nonce
-        $nonce_valid = wp_verify_nonce($_POST['nonce'] ?? '', 'octo_print_designer_nonce');
+        $nonce_valid = $nonce ? wp_verify_nonce($nonce, 'octo_print_designer_nonce') : false;
         error_log('🔍 PNG STORAGE: Nonce verification result: ' . ($nonce_valid ? 'VALID' : 'INVALID'));
+        error_log('🔍 PNG STORAGE: === INCOMING REQUEST END ===');
 
         if (!$nonce_valid) {
             error_log('❌ PNG STORAGE: Nonce verification failed - sending error response');
@@ -94,14 +108,16 @@ class PNG_Storage_Handler {
         }
 
         try {
-            // 🔧 ENHANCED VALIDATION: Check all required fields
+            // 🔧 ENHANCED VALIDATION: Check all required fields (POST and REQUEST)
             $required_fields = ['design_id', 'print_png'];
             $missing_fields = [];
 
             foreach ($required_fields as $field) {
-                if (!isset($_POST[$field]) || empty($_POST[$field])) {
+                $value = $_POST[$field] ?? $_REQUEST[$field] ?? null;
+                if (!$value || empty($value)) {
                     $missing_fields[] = $field;
                 }
+                error_log("🔍 PNG STORAGE: Field '$field' = " . ($value ? 'PRESENT' : 'MISSING'));
             }
 
             if (!empty($missing_fields)) {
@@ -111,8 +127,8 @@ class PNG_Storage_Handler {
                 return;
             }
 
-            $design_id = sanitize_text_field($_POST['design_id']);
-            $print_png = $_POST['print_png'];
+            $design_id = sanitize_text_field($_POST['design_id'] ?? $_REQUEST['design_id']);
+            $print_png = $_POST['print_png'] ?? $_REQUEST['print_png'];
 
             // 🔧 ENHANCED VALIDATION: Validate PNG data format
             if (!$this->validatePNGData($print_png)) {
@@ -120,9 +136,9 @@ class PNG_Storage_Handler {
                 wp_send_json_error('Invalid PNG data format');
                 return;
             }
-            $print_area_px = stripslashes($_POST['print_area_px']);
-            $print_area_mm = stripslashes($_POST['print_area_mm']);
-            $template_id = sanitize_text_field($_POST['template_id']);
+            $print_area_px = stripslashes($_POST['print_area_px'] ?? $_REQUEST['print_area_px'] ?? '{}');
+            $print_area_mm = stripslashes($_POST['print_area_mm'] ?? $_REQUEST['print_area_mm'] ?? '{}');
+            $template_id = sanitize_text_field($_POST['template_id'] ?? $_REQUEST['template_id'] ?? 'default');
 
             // Validate inputs
             if (!$design_id || !$print_png) {
