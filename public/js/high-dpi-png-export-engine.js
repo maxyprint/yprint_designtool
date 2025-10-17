@@ -218,6 +218,31 @@ class HighDPIPrintExportEngine {
         const allObjects = fabricCanvas.getObjects();
         console.log(`🔍 HIGH-DPI PRINT ENGINE: Analyzing ${allObjects.length} canvas objects for View-Image filtering...`);
 
+        // 🚨 EMERGENCY DEBUG: Log ALL objects before filtering
+        console.log('🔍 ALL CANVAS OBJECTS BEFORE FILTERING:');
+        allObjects.forEach((obj, idx) => {
+            console.log(`Object ${idx}:`, {
+                type: obj.type,
+                name: obj.name || 'unnamed',
+                id: obj.id || 'no-id',
+                visible: obj.visible,
+                position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`,
+                isViewImage: obj.isViewImage,
+                isTemplateBackground: obj.isTemplateBackground,
+                isBackground: obj.isBackground,
+                excludeFromExport: obj.excludeFromExport,
+                src: obj.src ? obj.src.substring(0, 100) + '...' : 'no-src'
+            });
+        });
+
+        // 🚨 EMERGENCY MODE: Skip ALL filtering if needed for debugging
+        const EMERGENCY_NO_FILTER = window.YPRINT_DEBUG_NO_FILTER || false;
+        if (EMERGENCY_NO_FILTER) {
+            console.warn('🚨 EMERGENCY MODE: ALL FILTERING DISABLED - INCLUDING ALL OBJECTS');
+            return allObjects;
+        }
+
         const designElements = allObjects.filter(obj => {
             // 🎯 METHOD 1: Property-based detection - ONLY filter VIEW IMAGES, not design backgrounds
             if (obj.isViewImage || obj.isTemplateBackground) {
