@@ -16,6 +16,9 @@ class Octo_Print_Designer {
         $this->wc_integration = Octo_Print_Designer_WC_Integration::get_instance();
         $this->api_integration = Octo_Print_API_Integration::get_instance();
 
+        // 🔧 CRITICAL FIX: Instantiate PNG Storage Handler to register AJAX hooks
+        new PNG_Storage_Handler($this->plugin_name, $this->version);
+
         $plugin_admin = new Octo_Print_Designer_Admin($this->plugin_name, $this->version);
         $plugin_public = new Octo_Print_Designer_Public($this->plugin_name, $this->version);
     }

@@ -22,6 +22,7 @@ class PNG_Storage_Handler {
     private $upload_dir;
 
     public function __construct($plugin_name, $version) {
+        error_log('🔥 PNG STORAGE HANDLER: CONSTRUCTOR CALLED - INSTANTIATION SUCCESSFUL!');
         $this->plugin_name = $plugin_name;
         $this->version = $version;
 
