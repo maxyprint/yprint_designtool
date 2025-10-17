@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real PNG Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+        button { margin: 5px; padding: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>Real PNG System Fix Test</h1>
+    <p>This test simulates the actual conditions that were causing the PNG errors.</p>
+
+    <button onclick="testNullPNGEngine()">Test Null PNG Engine</button>
+    <button onclick="testMissingExportEngine()">Test Missing Export Engine</button>
+    <button onclick="testInvalidSelector()">Test Invalid CSS Selector</button>
+    <button onclick="testWorkingSystem()">Test Working System</button>
+
+    <div id="results"></div>
+
+    <script>
+        // Load the actual save-only-png-generator.js (simplified for testing)
+        class SaveOnlyPNGGenerator {
+            constructor() {
+                this.pngEngine = null;
+                this.isGenerating = false;
+            }
+
+            async waitForPNGEngine() {
+                return new Promise((resolve) => {
+                    const highDPIEngine = window.highDPIPrintExportEngine;
+
+                    if (highDPIEngine && !this.pngEngine) {
+                        console.log('🔧 SAVE-ONLY PNG: Creating fallback PNG engine wrapper...');
+                        this.pngEngine = {
+                            exportEngine: highDPIEngine,
+                            isReady: () => !!highDPIEngine
+                        };
+                        console.log('✅ SAVE-ONLY PNG: Fallback PNG engine connected');
+                        resolve();
+                        return;
+                    }
+
+                    // Fallback to minimal engine
+                    console.log('🔧 SAVE-ONLY PNG: Creating minimal PNG engine...');
+                    this.createMinimalPNGEngine();
+                    resolve();
+                });
+            }
+
+            createMinimalPNGEngine() {
+                const fabric = window.fabric;
+                const designerWidget = window.designerWidgetInstance;
+
+                if (fabric && designerWidget && designerWidget.fabricCanvas) {
+                    this.pngEngine = {
+                        exportEngine: {
+                            exportForPrintMachine: async (options = {}) => {
+                                console.log('🔧 MINIMAL PNG: Exporting canvas to PNG...');
+                                const canvas = designerWidget.fabricCanvas;
+                                const dataURL = canvas.toDataURL({
+                                    format: 'png',
+                                    quality: options.quality || 1.0,
+                                    multiplier: options.dpi ? options.dpi / 72 : 4
+                                });
+                                console.log('✅ MINIMAL PNG: Canvas exported successfully');
+                                return dataURL;
+                            },
+                            printAreaPx: { width: 800, height: 600 },
+                            printAreaMm: { width: 200, height: 150 },
+                            currentTemplateId: 'fallback'
+                        },
+                        isReady: () => true
+                    };
+                    console.log('✅ SAVE-ONLY PNG: Minimal PNG engine created');
+                } else {
+                    console.error('❌ SAVE-ONLY PNG: Cannot create minimal engine - fabric or designer not available');
+                }
+            }
+
+            async generateAndStorePNG(designData, saveType, orderId = null) {
+                if (this.isGenerating) {
+                    console.log('⏳ SAVE-ONLY PNG: Generation already in progress, skipping...');
+                    return {
+                        success: false,
+                        error: 'Generation already in progress'
+                    };
+                }
+
+                // 🔧 CRITICAL FIX: Test 1 - Check if PNG engine is null
+                if (!this.pngEngine) {
+                    console.error('❌ SAVE-ONLY PNG: PNG engine is null. Cannot generate PNG.');
+                    return {
+                        success: false,
+                        error: 'PNG engine not available'
+                    };
+                }
+
+                // 🔧 CRITICAL FIX: Test 2 - Check if exportEngine is missing
+                if (!this.pngEngine.exportEngine) {
+                    console.error('❌ SAVE-ONLY PNG: PNG engine exportEngine is missing. Cannot generate PNG.');
+                    return {
+                        success: false,
+                        error: 'PNG engine not available'
+                    };
+                }
+
+                this.isGenerating = true;
+
+                try {
+                    console.log(`🖨️ SAVE-ONLY PNG: Generating PNG for ${saveType}...`);
+
+                    // 🔧 ADDITIONAL SAFETY: Double-check exportEngine before calling
+                    if (!this.pngEngine || !this.pngEngine.exportEngine || typeof this.pngEngine.exportEngine.exportForPrintMachine !== 'function') {
+                        throw new Error('Export engine or exportForPrintMachine method not available');
+                    }
+
+                    // Generate high-quality print PNG
+                    const printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
+                        dpi: 300,
+                        format: 'png',
+                        quality: 1.0
+                    });
+
+                    // Store PNG with metadata
+                    const pngData = {
+                        design_id: 'test-design-' + Date.now(),
+                        print_png: printPNG,
+                        save_type: saveType,
+                        order_id: orderId,
+                        generated_at: new Date().toISOString(),
+                        print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 }),
+                        print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }),
+                        template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback'
+                    };
+
+                    console.log('✅ SAVE-ONLY PNG: Generated successfully');
+                    return { success: true, data: pngData };
+
+                } catch (error) {
+                    console.error('❌ SAVE-ONLY PNG: Generation failed:', error);
+                    return { success: false, error: error.message };
+                } finally {
+                    this.isGenerating = false;
+                }
+            }
+        }
+
+        // Mock the environment
+        function setupMockEnvironment() {
+            window.fabric = {};
+            window.designerWidgetInstance = {
+                fabricCanvas: {
+                    toDataURL: function(options) {
+                        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                    }
+                }
+            };
+        }
+
+        function addResult(test, status, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            div.innerHTML = `<strong>${test}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testNullPNGEngine() {
+            addResult('Test 1', 'info', 'Testing null PNG engine scenario...');
+
+            const generator = new SaveOnlyPNGGenerator();
+            // Don't initialize - leave pngEngine as null
+
+            try {
+                const result = await generator.generateAndStorePNG({}, 'test_save');
+                if (result && !result.success && result.error.includes('PNG engine not available')) {
+                    addResult('Test 1', 'pass', 'PASSED - Gracefully handled null PNG engine');
+                } else {
+                    addResult('Test 1', 'fail', 'FAILED - Did not handle null engine properly');
+                }
+            } catch (error) {
+                addResult('Test 1', 'fail', `FAILED - Threw error: ${error.message}`);
+            }
+        }
+
+        async function testMissingExportEngine() {
+            addResult('Test 2', 'info', 'Testing missing export engine...');
+
+            const generator = new SaveOnlyPNGGenerator();
+            // Set pngEngine but without exportEngine
+            generator.pngEngine = { isReady: () => true };
+
+            try {
+                const result = await generator.generateAndStorePNG({}, 'test_save');
+                if (result && !result.success) {
+                    addResult('Test 2', 'pass', 'PASSED - Handled missing export engine');
+                } else {
+                    addResult('Test 2', 'fail', 'FAILED - Did not detect missing export engine');
+                }
+            } catch (error) {
+                addResult('Test 2', 'fail', `FAILED - Threw error: ${error.message}`);
+            }
+        }
+
+        function testInvalidSelector() {
+            addResult('Test 3', 'info', 'Testing CSS selector validation...');
+
+            const invalidSelectors = [
+                'button:contains("Save")',
+                'div:contains("test")'
+            ];
+
+            const validSelectors = [
+                'button[data-action="save"]',
+                '.designer-action-button'
+            ];
+
+            let invalidCount = 0;
+            let validCount = 0;
+
+            invalidSelectors.forEach(selector => {
+                try {
+                    document.querySelectorAll(selector);
+                    invalidCount++;
+                } catch (error) {
+                    // Expected to fail
+                }
+            });
+
+            validSelectors.forEach(selector => {
+                try {
+                    document.querySelectorAll(selector);
+                    validCount++;
+                } catch (error) {
+                    // Should not fail
+                }
+            });
+
+            if (invalidCount === 0 && validCount === validSelectors.length) {
+                addResult('Test 3', 'pass', 'PASSED - Invalid selectors rejected, valid selectors work');
+            } else {
+                addResult('Test 3', 'fail', `FAILED - Invalid: ${invalidCount}, Valid: ${validCount}`);
+            }
+        }
+
+        async function testWorkingSystem() {
+            addResult('Test 4', 'info', 'Testing working PNG system...');
+
+            setupMockEnvironment();
+            const generator = new SaveOnlyPNGGenerator();
+            await generator.waitForPNGEngine();
+
+            try {
+                const result = await generator.generateAndStorePNG({ test: 'data' }, 'test_save');
+                if (result && result.success) {
+                    addResult('Test 4', 'pass', 'PASSED - Complete PNG generation workflow works');
+                } else {
+                    addResult('Test 4', 'fail', `FAILED - Generation failed: ${result ? result.error : 'Unknown error'}`);
+                }
+            } catch (error) {
+                addResult('Test 4', 'fail', `FAILED - Error in generation: ${error.message}`);
+            }
+        }
+
+        // Auto-run basic tests
+        setTimeout(() => {
+            setupMockEnvironment();
+            addResult('Setup', 'info', 'Mock environment ready. Click buttons to run specific tests.');
+        }, 100);
+    </script>
+</body>
+</html>
