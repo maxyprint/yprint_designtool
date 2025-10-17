@@ -155,6 +155,10 @@
                     });
 
                     console.log('✅ CANVAS CONTROLLER: New fabric.js Canvas created successfully');
+
+                    // 🔧 CRITICAL FIX: Attach fabric instance to DOM element.__fabric
+                    canvasElement.__fabric = this.canvasInstance;
+                    console.log('🔗 CANVAS CONTROLLER: Attached fabric instance to DOM element.__fabric');
                 }
 
                 const result = {

@@ -110,7 +110,7 @@
         discoverAndValidateCanvas() {
             this.debugLog('debug', '🔍 Phase 1: Canvas discovery...');
 
-            // Method 1: Use Canvas Singleton Manager
+            // Method 1: Use Canvas Singleton Manager with Readiness Check
             console.log('🔍 JSON DEBUG: Checking Canvas Singleton Manager...');
             if (this.canvasManager) {
                 const status = this.canvasManager.getStatus();
@@ -123,6 +123,9 @@
                     if (canvas && canvas.getObjects) {
                         const element = document.getElementById(canvasId);
                         if (element) {
+                            // 🔧 READINESS VALIDATION: Check if canvas has design elements
+                            const objects = canvas.getObjects();
+                            console.log('🔍 JSON DEBUG: Canvas objects count:', objects.length);
                             this.debugLog('info', '✅ Found canvas via Singleton Manager:', canvasId);
                             return { success: true, canvas, canvasElement: element };
                         }
@@ -132,7 +135,7 @@
                 console.log('🔍 JSON DEBUG: Canvas Manager not available');
             }
 
-            // Method 2: Search for fabric canvas instances
+            // Method 2: Search for fabric canvas instances with Enhanced Detection
             console.log('🔍 JSON DEBUG: Searching DOM for canvas elements...');
             const canvasElements = document.querySelectorAll('canvas');
             console.log('🔍 JSON DEBUG: Found', canvasElements.length, 'canvas elements');
@@ -142,6 +145,9 @@
                 if (element.__fabric) {
                     console.log('🔍 JSON DEBUG: __fabric type:', typeof element.__fabric, 'has getObjects:', typeof element.__fabric.getObjects);
                     if (element.__fabric.getObjects) {
+                        // 🔧 ENHANCED VALIDATION: Check objects and readiness
+                        const objects = element.__fabric.getObjects();
+                        console.log('🔍 JSON DEBUG: Canvas objects via __fabric:', objects.length);
                         console.log('✅ JSON DEBUG: Found functional canvas via __fabric:', element.id);
                         this.debugLog('info', '✅ Found canvas via __fabric property:', element.id);
                         return { success: true, canvas: element.__fabric, canvasElement: element };
@@ -190,11 +196,18 @@
             };
 
             try {
+                console.log('🔍 JSON DEBUG: Canvas coordinate extraction - canvas type:', typeof canvas);
+                console.log('🔍 JSON DEBUG: Canvas has toJSON:', typeof canvas.toJSON);
+                console.log('🔍 JSON DEBUG: Canvas has getObjects:', typeof canvas.getObjects);
+
                 // Method 1: Use toJSON for complete data
                 if (canvas.toJSON) {
                     const jsonData = canvas.toJSON();
                     coordinateData.method = 'toJSON';
                     coordinateData.state = 'complete';
+
+                    console.log('🔍 JSON DEBUG: toJSON data:', jsonData);
+                    console.log('🔍 JSON DEBUG: toJSON objects count:', jsonData.objects?.length || 0);
 
                     if (jsonData.objects && Array.isArray(jsonData.objects)) {
                         coordinateData.elements = jsonData.objects.map((obj, index) =>
@@ -204,7 +217,9 @@
                     }
 
                     this.debugLog('debug', `📊 Captured ${coordinateData.elements.length} elements via toJSON`);
-                    return coordinateData;
+                    if (coordinateData.elements.length > 0) {
+                        return coordinateData;
+                    }
                 }
 
                 // Method 2: Direct object iteration
@@ -213,20 +228,68 @@
                     coordinateData.method = 'getObjects';
                     coordinateData.state = 'partial';
 
+                    console.log('🔍 JSON DEBUG: getObjects returned:', objects);
+                    console.log('🔍 JSON DEBUG: getObjects count:', objects.length);
+
                     coordinateData.elements = objects.map((obj, index) =>
                         this.extractElementCoordinates(obj, index)
                     );
 
                     this.debugLog('debug', `📊 Captured ${coordinateData.elements.length} elements via getObjects`);
-                    return coordinateData;
+                    if (coordinateData.elements.length > 0) {
+                        return coordinateData;
+                    }
                 }
 
-                // Method 3: Fallback empty structure
+                // Method 3: Direct _objects access (internal fabric.js property)
+                if (canvas._objects && Array.isArray(canvas._objects)) {
+                    console.log('🔍 JSON DEBUG: Accessing internal _objects array');
+                    const objects = canvas._objects;
+                    coordinateData.method = '_objects';
+                    coordinateData.state = 'internal';
+
+                    console.log('🔍 JSON DEBUG: _objects count:', objects.length);
+
+                    coordinateData.elements = objects.map((obj, index) =>
+                        this.extractElementCoordinates(obj, index)
+                    );
+
+                    this.debugLog('debug', `📊 Captured ${coordinateData.elements.length} elements via _objects`);
+                    if (coordinateData.elements.length > 0) {
+                        return coordinateData;
+                    }
+                }
+
+                // Method 4: Check designerWidgetInstance
+                if (window.designerWidgetInstance && window.designerWidgetInstance.fabricCanvas) {
+                    console.log('🔍 JSON DEBUG: Trying designerWidgetInstance.fabricCanvas');
+                    const designerCanvas = window.designerWidgetInstance.fabricCanvas;
+                    if (designerCanvas.getObjects) {
+                        const objects = designerCanvas.getObjects();
+                        coordinateData.method = 'designerWidget';
+                        coordinateData.state = 'widget';
+
+                        console.log('🔍 JSON DEBUG: designerWidget objects count:', objects.length);
+
+                        coordinateData.elements = objects.map((obj, index) =>
+                            this.extractElementCoordinates(obj, index)
+                        );
+
+                        this.debugLog('debug', `📊 Captured ${coordinateData.elements.length} elements via designerWidget`);
+                        if (coordinateData.elements.length > 0) {
+                            return coordinateData;
+                        }
+                    }
+                }
+
+                // Method 5: Fallback empty structure
                 coordinateData.method = 'fallback';
                 coordinateData.state = 'empty';
+                console.log('⚠️ JSON DEBUG: No coordinate extraction method found objects');
                 this.debugLog('warn', '⚠️ No coordinate extraction method available');
 
             } catch (error) {
+                console.log('❌ JSON DEBUG: Error in coordinate extraction:', error);
                 this.debugLog('error', '❌ Error capturing coordinates:', error);
                 coordinateData.method = 'error';
                 coordinateData.state = 'failed';
