@@ -219,14 +219,18 @@ class HighDPIPrintExportEngine {
         console.log(`🔍 HIGH-DPI PRINT ENGINE: Analyzing ${allObjects.length} canvas objects for View-Image filtering...`);
 
         const designElements = allObjects.filter(obj => {
-            // 🎯 METHOD 1: Property-based detection
-            if (obj.isBackground || obj.excludeFromExport || obj.isViewImage || obj.isTemplateBackground) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by property flags:', obj.type, {
-                    isBackground: obj.isBackground,
-                    excludeFromExport: obj.excludeFromExport,
+            // 🎯 METHOD 1: Property-based detection - ONLY filter VIEW IMAGES, not design backgrounds
+            if (obj.isViewImage || obj.isTemplateBackground) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW IMAGE by property flags:', obj.type, {
                     isViewImage: obj.isViewImage,
                     isTemplateBackground: obj.isTemplateBackground
                 });
+                return false;
+            }
+
+            // Allow design elements that might have isBackground but are user-added content
+            if (obj.excludeFromExport === true) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by explicit excludeFromExport flag:', obj.type);
                 return false;
             }
 
@@ -248,9 +252,9 @@ class HighDPIPrintExportEngine {
                 const canvasHeight = fabricCanvas.getHeight();
                 const objCoverage = (obj.width * obj.height) / (canvasWidth * canvasHeight);
 
-                // Large images at (0,0) covering >70% of canvas are likely backgrounds
-                if (obj.left === 0 && obj.top === 0 && objCoverage > 0.7) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered large background image:', {
+                // ONLY filter MASSIVE images at (0,0) covering >95% of canvas - these are view backgrounds
+                if (obj.left <= 5 && obj.top <= 5 && objCoverage > 0.95) {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered MASSIVE VIEW BACKGROUND image:', {
                         position: `${obj.left},${obj.top}`,
                         size: `${obj.width}x${obj.height}`,
                         coverage: `${(objCoverage * 100).toFixed(1)}%`,
@@ -266,19 +270,19 @@ class HighDPIPrintExportEngine {
                 }
             }
 
-            // 🎯 METHOD 4: Name/ID pattern matching
+            // 🎯 METHOD 4: Name/ID pattern matching - ONLY filter clear view background patterns
             const objName = (obj.name || obj.id || '').toLowerCase();
-            const backgroundPatterns = /template|background|view|shirt|mockup|tshirt|product-view|base-image/i;
-            if (backgroundPatterns.test(objName)) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by name pattern:', objName);
+            const viewBackgroundPatterns = /^(template-view|background-view|product-view|mockup-base|view-background)$/i;
+            if (viewBackgroundPatterns.test(objName)) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW BACKGROUND by name pattern:', objName);
                 return false;
             }
 
-            // 🎯 METHOD 5: Image source URL pattern detection
+            // 🎯 METHOD 5: Image source URL pattern detection - ONLY filter clear view image URLs
             if (obj.type === 'image' && obj.src) {
-                const urlPatterns = /mockup|template|background|product-view|shirt|tshirt/i;
-                if (urlPatterns.test(obj.src)) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by URL pattern:', obj.src.substring(0, 100) + '...');
+                const viewUrlPatterns = /(mockup-base|product-view-background|template-background).*\.(jpg|jpeg|png)/i;
+                if (viewUrlPatterns.test(obj.src)) {
+                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW BACKGROUND by URL pattern:', obj.src.substring(0, 100) + '...');
                     return false;
                 }
             }
