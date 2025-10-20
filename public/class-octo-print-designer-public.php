@@ -262,7 +262,7 @@ class Octo_Print_Designer_Public {
             'yprint-high-dpi-export',
             OCTO_PRINT_DESIGNER_URL . 'public/js/high-dpi-png-export-engine.js',
             ['octo-print-designer-enhanced-json'], // Depends on coordinate system
-            $this->version . '.png-export-v1',
+            $this->version,
             true
         );
         error_log("🔍 PNG REGISTRATION: yprint-high-dpi-export registered");
@@ -272,7 +272,7 @@ class Octo_Print_Designer_Public {
             'yprint-png-integration',
             OCTO_PRINT_DESIGNER_URL . 'public/js/png-only-system-integration.js',
             ['yprint-high-dpi-export'], // Depends on export engine
-            $this->version . '.png-integration-v1',
+            $this->version,
             true
         );
         error_log("🔍 PNG REGISTRATION: yprint-png-integration registered");
@@ -282,7 +282,7 @@ class Octo_Print_Designer_Public {
             'yprint-save-only-png',
             OCTO_PRINT_DESIGNER_URL . 'public/js/save-only-png-generator.js',
             ['yprint-png-integration'], // Depends on PNG integration
-            $this->version . '.save-only-png-v1',
+            $this->version,
             true
         );
         error_log("🔍 PNG REGISTRATION: yprint-save-only-png registered");
@@ -292,7 +292,7 @@ class Octo_Print_Designer_Public {
             'yprint-fallback-loader',
             OCTO_PRINT_DESIGNER_URL . 'public/js/png-fallback-loader.js',
             [], // No dependencies - loads first as fallback
-            $this->version . '.fallback-loader-v1',
+            $this->version,
             true
         );
         error_log("🔍 PNG REGISTRATION: yprint-fallback-loader registered");
