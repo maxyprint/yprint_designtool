@@ -126,25 +126,118 @@ class SaveOnlyPNGGenerator {
             this.pngEngine = {
                 exportEngine: {
                     exportForPrintMachine: async (options = {}) => {
-                        console.log('🔧 MINIMAL PNG: Exporting canvas to PNG...');
+                        console.log('🔧 MINIMAL PNG: Exporting PRINT-READY PNG with template cropping...');
 
                         const canvas = designerWidget.fabricCanvas;
-                        const dataURL = canvas.toDataURL({
-                            format: 'png',
-                            quality: options.quality || 1.0,
-                            multiplier: options.dpi ? options.dpi / 72 : 4 // 300 DPI default
+
+                        // 🎯 STEP 1: Get template print area from WordPress or URL
+                        let printArea = await this.getTemplatePrintArea();
+                        if (!printArea) {
+                            console.warn('⚠️ MINIMAL PNG: No template print area found, using fallback');
+                            printArea = { x: 100, y: 100, width: 600, height: 400 };
+                        }
+
+                        console.log('🎯 PRINT AREA:', printArea);
+
+                        // 🚨 EMERGENCY DEBUG: Log ALL objects before filtering
+                        const allObjects = canvas.getObjects();
+                        console.log('🔍 MINIMAL PNG: ALL CANVAS OBJECTS BEFORE FILTERING:');
+                        allObjects.forEach((obj, idx) => {
+                            console.log(`Object ${idx}:`, {
+                                type: obj.type,
+                                name: obj.name || 'unnamed',
+                                id: obj.id || 'no-id',
+                                visible: obj.visible,
+                                position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                                size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`,
+                                isViewImage: obj.isViewImage,
+                                isTemplateBackground: obj.isTemplateBackground,
+                                isBackground: obj.isBackground,
+                                excludeFromExport: obj.excludeFromExport,
+                                src: obj.src ? obj.src.substring(0, 100) + '...' : 'no-src'
+                            });
                         });
 
-                        console.log('✅ MINIMAL PNG: Canvas exported successfully');
-                        return dataURL;
+                        // 🎯 STEP 2: Filter out view images and backgrounds, keep only design elements
+                        const originalObjects = [...allObjects];
+                        const designElements = allObjects.filter(obj => {
+                            // Skip invisible objects
+                            if (!obj.visible) {
+                                console.log(`🚫 MINIMAL PNG: Filtering out invisible object: ${obj.type}`);
+                                return false;
+                            }
+
+                            // Skip explicitly excluded objects
+                            if (obj.excludeFromExport) {
+                                console.log(`🚫 MINIMAL PNG: Filtering out excluded object: ${obj.type}`);
+                                return false;
+                            }
+
+                            // Skip view/background images
+                            if (obj.isViewImage || obj.isTemplateBackground || obj.isBackground) {
+                                console.log(`🚫 MINIMAL PNG: Filtering out view/background: ${obj.type}`);
+                                return false;
+                            }
+
+                            // Keep design elements (text, user uploads, graphics)
+                            console.log(`✅ MINIMAL PNG: Keeping design element: ${obj.type}`);
+                            return true;
+                        });
+
+                        console.log(`🎯 MINIMAL PNG: Filtered ${originalObjects.length} objects → ${designElements.length} design elements`);
+
+                        // 🎯 STEP 3: Temporarily hide non-design elements
+                        const hiddenObjects = [];
+                        originalObjects.forEach(obj => {
+                            if (!designElements.includes(obj)) {
+                                obj.visible = false;
+                                hiddenObjects.push(obj);
+                            }
+                        });
+
+                        // 🎯 STEP 4: Create print-area-only canvas
+                        canvas.renderAll();
+
+                        const multiplier = options.dpi ? options.dpi / 72 : 4; // 300 DPI default
+                        const cropArea = {
+                            left: printArea.x * multiplier,
+                            top: printArea.y * multiplier,
+                            width: printArea.width * multiplier,
+                            height: printArea.height * multiplier
+                        };
+
+                        console.log('🎯 CROP AREA (with multiplier):', cropArea);
+
+                        // Export full canvas first
+                        const fullCanvasDataURL = canvas.toDataURL({
+                            format: 'png',
+                            quality: options.quality || 1.0,
+                            multiplier: multiplier
+                        });
+
+                        // 🎯 STEP 5: Crop to print area using canvas manipulation
+                        const croppedDataURL = await this.cropImageToArea(fullCanvasDataURL, cropArea);
+
+                        // 🎯 STEP 6: Restore visibility of hidden objects
+                        hiddenObjects.forEach(obj => {
+                            obj.visible = true;
+                        });
+                        canvas.renderAll();
+
+                        console.log('✅ MINIMAL PNG: Print-ready PNG exported successfully with print area cropping');
+                        console.log(`🎯 FINAL PNG SIZE: ${printArea.width}x${printArea.height}px (print area only)`);
+
+                        return croppedDataURL;
                     },
                     printAreaPx: { width: 800, height: 600 },
                     printAreaMm: { width: 200, height: 150 },
                     currentTemplateId: 'fallback'
                 },
-                isReady: () => true
+                isReady: () => true,
+                getTemplatePrintArea: this.getTemplatePrintArea.bind(this),
+                cropImageToArea: this.cropImageToArea.bind(this)
             };
-            console.log('✅ SAVE-ONLY PNG: Minimal PNG engine created');
+            console.log('✅ SAVE-ONLY PNG: Minimal PNG engine created with print-area cropping');
         } else {
             console.error('❌ SAVE-ONLY PNG: Cannot create minimal engine - fabric or designer not available');
         }
@@ -686,6 +779,146 @@ class SaveOnlyPNGGenerator {
         }
 
         return true;
+    }
+
+    /**
+     * 🎯 PRINT AREA DETECTION - Get template print area from WordPress
+     */
+    async getTemplatePrintArea() {
+        try {
+            // Method 1: Try to get from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const templateId = urlParams.get('template_id');
+
+            if (templateId) {
+                console.log('🔍 PRINT AREA: Found template ID in URL:', templateId);
+
+                // Try to get template data from WordPress
+                const config = window.octo_print_designer_config;
+                if (config && config.ajax_url && config.nonce) {
+                    const response = await fetch(config.ajax_url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            action: 'yprint_get_template_data',
+                            nonce: config.nonce,
+                            template_id: templateId
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success && result.data.printable_area_px) {
+                        console.log('✅ PRINT AREA: Retrieved from WordPress:', result.data.printable_area_px);
+                        return result.data.printable_area_px;
+                    }
+                }
+            }
+
+            // Method 2: Check for template data in DOM
+            const templateElement = document.querySelector('[data-template-id]');
+            if (templateElement && templateElement.dataset.printArea) {
+                const printArea = JSON.parse(templateElement.dataset.printArea);
+                console.log('✅ PRINT AREA: Retrieved from DOM:', printArea);
+                return printArea;
+            }
+
+            // Method 3: Check for existing high-DPI engine data
+            if (window.highDPIPrintExportEngine && window.highDPIPrintExportEngine.printAreaPx) {
+                console.log('✅ PRINT AREA: Retrieved from existing engine:', window.highDPIPrintExportEngine.printAreaPx);
+                return window.highDPIPrintExportEngine.printAreaPx;
+            }
+
+            console.warn('⚠️ PRINT AREA: No template data found, using intelligent fallback');
+            return this.calculateIntelligentPrintArea();
+
+        } catch (error) {
+            console.error('❌ PRINT AREA: Error retrieving template data:', error);
+            return this.calculateIntelligentPrintArea();
+        }
+    }
+
+    /**
+     * 🧠 INTELLIGENT FALLBACK - Calculate print area based on design elements
+     */
+    calculateIntelligentPrintArea() {
+        try {
+            const canvas = window.designerWidgetInstance?.fabricCanvas;
+            if (!canvas) {
+                return { x: 100, y: 100, width: 600, height: 400 };
+            }
+
+            // Get all design elements (non-background)
+            const designElements = canvas.getObjects().filter(obj =>
+                obj.visible &&
+                !obj.isBackground &&
+                !obj.isViewImage &&
+                !obj.isTemplateBackground &&
+                !obj.excludeFromExport
+            );
+
+            if (designElements.length === 0) {
+                console.log('🧠 INTELLIGENT FALLBACK: No design elements, using center area');
+                return { x: 100, y: 100, width: 600, height: 400 };
+            }
+
+            // Calculate bounding box of all design elements
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+            designElements.forEach(obj => {
+                const bounds = obj.getBoundingRect();
+                minX = Math.min(minX, bounds.left);
+                minY = Math.min(minY, bounds.top);
+                maxX = Math.max(maxX, bounds.left + bounds.width);
+                maxY = Math.max(maxY, bounds.top + bounds.height);
+            });
+
+            // Add some padding around design elements
+            const padding = 50;
+            const printArea = {
+                x: Math.max(0, minX - padding),
+                y: Math.max(0, minY - padding),
+                width: (maxX - minX) + (padding * 2),
+                height: (maxY - minY) + (padding * 2)
+            };
+
+            console.log('🧠 INTELLIGENT FALLBACK: Calculated print area from design elements:', printArea);
+            return printArea;
+
+        } catch (error) {
+            console.error('❌ INTELLIGENT FALLBACK: Error calculating print area:', error);
+            return { x: 100, y: 100, width: 600, height: 400 };
+        }
+    }
+
+    /**
+     * ✂️ IMAGE CROPPING - Crop canvas export to specific area
+     */
+    async cropImageToArea(dataURL, cropArea) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Set canvas to crop area size
+                canvas.width = cropArea.width;
+                canvas.height = cropArea.height;
+
+                // Draw cropped section
+                ctx.drawImage(
+                    img,
+                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
+                    0, 0, cropArea.width, cropArea.height
+                );
+
+                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
+                console.log('✂️ CROP: Image cropped to print area successfully');
+                resolve(croppedDataURL);
+            };
+            img.src = dataURL;
+        });
     }
 
     /**
