@@ -83,9 +83,10 @@
                     name: 'enhanced-json-coordinate-system'
                 },
                 {
-                    check: () => typeof window.HighDPIPNGExportEngine !== 'undefined',
+                    check: () => typeof window.HighDPIPrintExportEngine !== 'undefined',
                     url: 'public/js/high-dpi-png-export-engine.js',
-                    name: 'high-dpi-png-export-engine'
+                    name: 'high-dpi-png-export-engine',
+                    skipIfRegistered: true // Skip if WordPress already enqueued this
                 },
                 {
                     check: () => typeof window.PNGOnlySystemIntegration !== 'undefined' ||
@@ -99,6 +100,12 @@
 
             for (const script of requiredScripts) {
                 if (!script.check()) {
+                    // 🔧 CHECK: Skip if WordPress already registered this script
+                    if (script.skipIfRegistered && this.isScriptRegisteredByWordPress(script.name)) {
+                        console.log(`⏭️ PNG FALLBACK: ${script.name} registered by WordPress, skipping fallback`);
+                        continue;
+                    }
+
                     missingScripts++;
                     console.log(`❌ PNG FALLBACK: Missing ${script.name}`);
 
@@ -149,10 +156,27 @@
             this.loadedScripts.add(scriptName);
         }
 
+        isScriptRegisteredByWordPress(scriptName) {
+            // 🔍 CHECK: Look for WordPress-enqueued scripts in DOM
+            const scriptElements = document.querySelectorAll('script[src]');
+            for (const element of scriptElements) {
+                const src = element.src;
+
+                // Check if this script contains our target script name
+                if (src.includes(scriptName + '.js') ||
+                    src.includes('yprint-high-dpi-export') ||
+                    src.includes('yprint-png-integration')) {
+                    console.log(`🔍 PNG FALLBACK: Found WordPress-registered script: ${src}`);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         allPNGScriptsLoaded() {
             return (
                 typeof window.EnhancedJSONCoordinateSystem !== 'undefined' &&
-                typeof window.HighDPIPNGExportEngine !== 'undefined' &&
+                typeof window.HighDPIPrintExportEngine !== 'undefined' &&
                 (typeof window.PNGOnlySystemIntegration !== 'undefined' ||
                  typeof window.yprintPNGIntegration !== 'undefined')
             );

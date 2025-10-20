@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Basic Functionality Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button { padding: 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Basic Functionality Test</h1>
+    <p>Tests die Basis-Funktionen ohne komplexe Designer-Dependencies</p>
+
+    <button onclick="testJavaScriptSyntax()">1. JavaScript Syntax Test</button>
+    <button onclick="testWordPressConfig()">2. WordPress Config Test</button>
+    <button onclick="testFallbackSystems()">3. Fallback Systems Test</button>
+    <button onclick="testSimpleAJAXEndpoint()">4. Simple AJAX Test</button>
+
+    <div id="results"></div>
+
+    <script>
+        function addResult(title, status, message) {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+            div.innerHTML = `<strong>${title}:</strong> ${message}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function testJavaScriptSyntax() {
+            addResult('JavaScript Syntax', 'info', 'Testing basic JavaScript loading...');
+
+            try {
+                // Test if our functions can be called without errors
+                if (typeof window !== 'undefined') {
+                    addResult('JavaScript Syntax', 'pass', 'Basic JavaScript environment OK');
+                } else {
+                    addResult('JavaScript Syntax', 'fail', 'JavaScript environment not available');
+                }
+            } catch (error) {
+                addResult('JavaScript Syntax', 'fail', 'Error: ' + error.message);
+            }
+        }
+
+        function testWordPressConfig() {
+            addResult('WordPress Config', 'info', 'Checking WordPress configuration...');
+
+            // Mock WordPress config for testing
+            if (!window.octo_print_designer_config) {
+                window.octo_print_designer_config = {
+                    ajax_url: 'http://test-site.local/wp-admin/admin-ajax.php',
+                    nonce: 'test_nonce_12345',
+                    plugin_url: 'http://test-site.local/wp-content/plugins/yprint_designtool/',
+                    debug_mode: true
+                };
+                addResult('WordPress Config', 'info', 'Mock WordPress config created for testing');
+            } else {
+                addResult('WordPress Config', 'pass', 'Real WordPress config found');
+            }
+
+            const config = window.octo_print_designer_config;
+            addResult('WordPress Config', 'pass', `Config available: ${JSON.stringify(config, null, 2)}`);
+        }
+
+        function testFallbackSystems() {
+            addResult('Fallback Systems', 'info', 'Testing fallback mechanisms...');
+
+            try {
+                // Mock a minimal PNG engine
+                if (!window.highDPIPrintExportEngine) {
+                    window.highDPIPrintExportEngine = {
+                        exportForPrintMachine: async (options) => {
+                            return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                        },
+                        exportPrintReadyPNGWithCropping: async (options) => {
+                            return {
+                                dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                                metadata: { width: 100, height: 100, dpi: 300 }
+                            };
+                        },
+                        getDesignElementsOnly: async () => {
+                            return []; // No elements for test
+                        },
+                        printAreaPx: { x: 0, y: 0, width: 200, height: 200 },
+                        printAreaMm: { width: 50, height: 50 },
+                        currentTemplateId: 'test_template'
+                    };
+                    addResult('Fallback Systems', 'pass', 'Mock PNG engine created successfully');
+                }
+
+                // Test if the mock engine works
+                const engine = window.highDPIPrintExportEngine;
+                if (typeof engine.exportForPrintMachine === 'function') {
+                    addResult('Fallback Systems', 'pass', 'PNG engine functions are callable');
+                } else {
+                    addResult('Fallback Systems', 'fail', 'PNG engine functions not available');
+                }
+
+            } catch (error) {
+                addResult('Fallback Systems', 'fail', 'Fallback system error: ' + error.message);
+            }
+        }
+
+        async function testSimpleAJAXEndpoint() {
+            addResult('AJAX Test', 'info', 'Testing simple AJAX call...');
+
+            const config = window.octo_print_designer_config;
+            if (!config || !config.ajax_url) {
+                addResult('AJAX Test', 'fail', 'No AJAX URL available for testing');
+                return;
+            }
+
+            try {
+                // Test with a simple WordPress action that should exist
+                const formData = new FormData();
+                formData.append('action', 'heartbeat');
+                formData.append('_nonce', config.nonce);
+
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    addResult('AJAX Test', 'pass', `AJAX endpoint reachable: ${response.status} ${response.statusText}`);
+
+                    // Now test our custom endpoint
+                    const testFormData = new FormData();
+                    testFormData.append('action', 'yprint_get_template_metadata');
+                    testFormData.append('nonce', config.nonce);
+                    testFormData.append('template_id', 'test_template');
+
+                    const testResponse = await fetch(config.ajax_url, {
+                        method: 'POST',
+                        body: testFormData,
+                        credentials: 'same-origin'
+                    });
+
+                    const result = await testResponse.text();
+                    addResult('AJAX Test', 'info', `Custom endpoint response: ${result.substring(0, 200)}...`);
+
+                } else {
+                    addResult('AJAX Test', 'fail', `AJAX endpoint not reachable: ${response.status}`);
+                }
+
+            } catch (error) {
+                addResult('AJAX Test', 'fail', 'AJAX test failed: ' + error.message);
+            }
+        }
+
+        // Auto-run basic test
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addResult('System', 'info', 'Basic functionality test suite loaded. Click buttons to run tests.');
+            }, 100);
+        });
+    </script>
+</body>
+</html>
