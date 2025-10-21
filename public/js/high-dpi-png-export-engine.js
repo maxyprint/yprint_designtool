@@ -298,8 +298,8 @@ class HighDPIPrintExportEngine {
                 const element = obj.canvas.contextContainer;
                 if (element.classList?.contains('template-view-image') ||
                     element.classList?.contains('background-image') ||
-                    element.getAttribute('data-is-background') === 'true' ||
-                    element.getAttribute('data-exclude-from-print') === 'true') {
+                    (element.getAttribute && element.getAttribute('data-is-background') === 'true') ||
+                    (element.getAttribute && element.getAttribute('data-exclude-from-print') === 'true')) {
                     console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by CSS/data attributes:', obj.type);
                     return false;
                 }
