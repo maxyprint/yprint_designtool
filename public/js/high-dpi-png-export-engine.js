@@ -278,78 +278,14 @@ class HighDPIPrintExportEngine {
         }
 
         const designElements = allObjects.filter(obj => {
-            // 🎯 METHOD 1: Property-based detection - ONLY filter VIEW IMAGES, not design backgrounds
-            if (obj.isViewImage || obj.isTemplateBackground) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW IMAGE by property flags:', obj.type, {
-                    isViewImage: obj.isViewImage,
-                    isTemplateBackground: obj.isTemplateBackground
-                });
+            // 🎯 MINIMAL FILTER: Only filter explicit template background elements
+            if (obj.isTemplateBackground === true || obj.excludeFromExport === true) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered template background:', obj.type);
                 return false;
             }
 
-            // Allow design elements that might have isBackground but are user-added content
-            if (obj.excludeFromExport === true) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by explicit excludeFromExport flag:', obj.type);
-                return false;
-            }
-
-            // 🎯 METHOD 2: Fabric.js object attribute detection (Fixed: No DOM methods on Fabric objects)
-            if (obj.customAttributes?.isBackground === 'true' ||
-                obj.customAttributes?.excludeFromPrint === 'true' ||
-                obj.isTemplateViewImage === true ||
-                obj.isBackgroundImage === true) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by Fabric object attributes:', obj.type);
-                return false;
-            }
-
-            // 🎯 METHOD 3: Advanced geometric analysis for background images
-            if (obj.type === 'image') {
-                const canvasWidth = fabricCanvas.getWidth();
-                const canvasHeight = fabricCanvas.getHeight();
-                const objCoverage = (obj.width * obj.height) / (canvasWidth * canvasHeight);
-
-                // ONLY filter MASSIVE images at (0,0) covering >95% of canvas - these are view backgrounds
-                if (obj.left <= 5 && obj.top <= 5 && objCoverage > 0.95) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered MASSIVE VIEW BACKGROUND image:', {
-                        position: `${obj.left},${obj.top}`,
-                        size: `${obj.width}x${obj.height}`,
-                        coverage: `${(objCoverage * 100).toFixed(1)}%`,
-                        zIndex: obj.zIndex || 'undefined'
-                    });
-                    return false;
-                }
-
-                // Images with very low z-index are likely backgrounds
-                if (obj.zIndex !== undefined && obj.zIndex < 0) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by z-index:', obj.type, 'zIndex:', obj.zIndex);
-                    return false;
-                }
-            }
-
-            // 🎯 METHOD 4: Name/ID pattern matching - ONLY filter clear view background patterns
-            const objName = (obj.name || obj.id || '').toLowerCase();
-            const viewBackgroundPatterns = /^(template-view|background-view|product-view|mockup-base|view-background)$/i;
-            if (viewBackgroundPatterns.test(objName)) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW BACKGROUND by name pattern:', objName);
-                return false;
-            }
-
-            // 🎯 METHOD 5: Image source URL pattern detection - ONLY filter clear view image URLs
-            if (obj.type === 'image' && obj.src) {
-                const viewUrlPatterns = /(mockup-base|product-view-background|template-background).*\.(jpg|jpeg|png)/i;
-                if (viewUrlPatterns.test(obj.src)) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered VIEW BACKGROUND by URL pattern:', obj.src.substring(0, 100) + '...');
-                    return false;
-                }
-            }
-
-            // ✅ Include all remaining design elements
-            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', {
-                type: obj.type,
-                name: obj.name || 'unnamed',
-                position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
-                size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`
-            });
+            // Include ALL other elements (text, images, shapes, etc.)
+            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, `${obj.left},${obj.top}`);
             return true;
         });
 
