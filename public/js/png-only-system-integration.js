@@ -35,7 +35,7 @@ class PNGOnlySystemIntegration {
     }
 
     async waitForSystems() {
-        // Wait for YPrint API
+        // Wait for fabric.js and designer canvas
         await this.waitForYPrintAPI();
 
         // Wait for print export engine
@@ -44,12 +44,26 @@ class PNGOnlySystemIntegration {
 
     async waitForYPrintAPI() {
         return new Promise((resolve) => {
-            if (window.YPrint?.fabric?.isReady()) {
-                this.yprintAPI = window.YPrint;
+            // Direct fabric.js detection instead of YPrint wrapper
+            if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+                console.log('✅ PNG-ONLY INTEGRATION: Fabric.js and designer canvas ready');
+                this.yprintAPI = {
+                    fabric: {
+                        canvas: window.designerWidgetInstance.fabricCanvas,
+                        isReady: () => true
+                    }
+                };
                 resolve();
             } else {
-                window.addEventListener('yprintSystemReady', () => {
-                    this.yprintAPI = window.YPrint;
+                console.log('⏳ PNG-ONLY INTEGRATION: Waiting for fabric.js and designer canvas...');
+                window.addEventListener('designerReady', () => {
+                    console.log('🚀 PNG-ONLY INTEGRATION: designerReady event received');
+                    this.yprintAPI = {
+                        fabric: {
+                            canvas: window.designerWidgetInstance.fabricCanvas,
+                            isReady: () => true
+                        }
+                    };
                     resolve();
                 }, { once: true });
             }
@@ -375,16 +389,16 @@ class PNGOnlySystemIntegration {
         });
 
         // Listen for fabric canvas changes (fallback)
-        if (window.YPrint?.fabric?.canvas) {
-            window.YPrint.fabric.canvas.on('object:added', () => {
+        if (this.yprintAPI?.fabric?.canvas) {
+            this.yprintAPI.fabric.canvas.on('object:added', () => {
                 this.debounceAutoGenerate();
             });
 
-            window.YPrint.fabric.canvas.on('object:modified', () => {
+            this.yprintAPI.fabric.canvas.on('object:modified', () => {
                 this.debounceAutoGenerate();
             });
 
-            window.YPrint.fabric.canvas.on('object:removed', () => {
+            this.yprintAPI.fabric.canvas.on('object:removed', () => {
                 this.debounceAutoGenerate();
             });
         }
@@ -545,7 +559,7 @@ class PNGOnlySystemIntegration {
 
             // Check if we have valid design and export engine
             if (!this.exportEngine || !this.yprintAPI) {
-                console.warn('⚠️ PNG-ONLY INTEGRATION: Export engine or YPrint API not ready');
+                console.warn('⚠️ PNG-ONLY INTEGRATION: Export engine or fabric API not ready');
                 return;
             }
 
@@ -605,7 +619,7 @@ class PNGOnlySystemIntegration {
 // Auto-initialize when systems are ready
 console.log('🔗 PNG-ONLY INTEGRATION: Auto-initializing...');
 
-// Wait for both YPrint and print engine
+// Wait for both fabric.js/designer and print engine
 let systemsReady = 0;
 const requiredSystems = 2;
 
@@ -618,10 +632,15 @@ const checkAndInit = () => {
     }
 };
 
-if (window.YPrint?.fabric?.isReady()) {
+if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+    console.log('✅ PNG-ONLY INTEGRATION: Direct initialization - fabric ready');
     checkAndInit();
 } else {
-    window.addEventListener('yprintSystemReady', checkAndInit, { once: true });
+    console.log('⏳ PNG-ONLY INTEGRATION: Waiting for designerReady event...');
+    window.addEventListener('designerReady', () => {
+        console.log('🚀 PNG-ONLY INTEGRATION: designerReady event received, checking init...');
+        checkAndInit();
+    }, { once: true });
 }
 
 if (window.highDPIPrintExportEngine?.initialized) {

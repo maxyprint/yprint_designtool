@@ -538,30 +538,46 @@ class HighDPIPrintExportEngine {
     }
 
     getFabricCanvas() {
+        console.log('🔍 HIGH-DPI PRINT ENGINE: getFabricCanvas() called - debugging canvas access...');
+
+        // Debug current state
+        console.log('🔍 window.YPrint exists:', !!window.YPrint);
+        console.log('🔍 window.designerWidgetInstance exists:', !!window.designerWidgetInstance);
+        console.log('🔍 window.designerWidgetInstance?.fabricCanvas exists:', !!window.designerWidgetInstance?.fabricCanvas);
+        console.log('🔍 window.fabricCanvas exists:', !!window.fabricCanvas);
+
         // Multiple methods to get fabric canvas
 
-        // 1. From YPrint unified API
+        // 1. From YPrint unified API (deprecated, should not work)
         if (window.YPrint?.designer?.getCanvas) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using YPrint API canvas');
             return window.YPrint.designer.getCanvas();
         }
 
-        // 2. From global designer widget
+        // 2. From global designer widget (primary method)
         if (window.designerWidgetInstance?.fabricCanvas) {
-            return window.designerWidgetInstance.fabricCanvas;
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using designerWidgetInstance.fabricCanvas');
+            const canvas = window.designerWidgetInstance.fabricCanvas;
+            console.log('🔍 Canvas type:', typeof canvas);
+            console.log('🔍 Canvas has getObjects method:', typeof canvas.getObjects === 'function');
+            return canvas;
         }
 
         // 3. From fabric canvas global
         if (window.fabricCanvas) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using global fabricCanvas');
             return window.fabricCanvas;
         }
 
         // 4. From canvas element
         const canvasElement = document.getElementById('octo-print-designer-canvas');
+        console.log('🔍 Canvas element found:', !!canvasElement);
         if (canvasElement && canvasElement.__fabric) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using canvas element.__fabric');
             return canvasElement.__fabric;
         }
 
-        console.error('❌ HIGH-DPI PRINT ENGINE: No fabric canvas found');
+        console.error('❌ HIGH-DPI PRINT ENGINE: No fabric canvas found through any method');
         return null;
     }
 
