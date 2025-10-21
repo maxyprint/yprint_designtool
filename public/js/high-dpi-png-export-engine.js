@@ -39,10 +39,14 @@ class HighDPIPrintExportEngine {
 
     async waitForFabric() {
         return new Promise((resolve) => {
-            if (window.fabric && window.YPrint?.fabric?.isReady()) {
+            // Direct fabric.js detection instead of YPrint wrapper
+            if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+                console.log('✅ HIGH-DPI PRINT ENGINE: Fabric.js and designer canvas ready');
                 resolve();
             } else {
-                window.addEventListener('yprintSystemReady', resolve, { once: true });
+                console.log('⏳ HIGH-DPI PRINT ENGINE: Waiting for fabric.js and designer canvas...');
+                // Use existing event system
+                window.addEventListener('designerReady', resolve, { once: true });
             }
         });
     }
@@ -759,10 +763,14 @@ class HighDPIPrintExportEngine {
 // Auto-initialize when fabric is ready
 console.log('🖨️ HIGH-DPI PRINT ENGINE: Auto-initializing...');
 
-if (window.YPrint?.fabric?.isReady()) {
+// Direct fabric.js detection instead of YPrint wrapper
+if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+    console.log('✅ HIGH-DPI PRINT ENGINE: Direct initialization - fabric ready');
     window.highDPIPrintExportEngine = new HighDPIPrintExportEngine();
 } else {
-    window.addEventListener('yprintSystemReady', () => {
+    console.log('⏳ HIGH-DPI PRINT ENGINE: Waiting for designerReady event...');
+    window.addEventListener('designerReady', () => {
+        console.log('🚀 HIGH-DPI PRINT ENGINE: designerReady event received, initializing...');
         window.highDPIPrintExportEngine = new HighDPIPrintExportEngine();
     });
 }
