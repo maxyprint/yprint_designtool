@@ -173,10 +173,35 @@ class SaveOnlyPNGGenerator {
                                 return false;
                             }
 
-                            // Skip view/background images
+                            // Skip view/background images (check flags first)
                             if (obj.isViewImage || obj.isTemplateBackground || obj.isBackground) {
                                 console.log(`🚫 MINIMAL PNG: Filtering out view/background: ${obj.type}`);
                                 return false;
+                            }
+
+                            // Enhanced background detection by size and position
+                            if (obj.type === 'image') {
+                                const bounds = obj.getBoundingRect();
+                                const canvasWidth = canvas.width || 656;
+                                const canvasHeight = canvas.height || 420;
+
+                                // Check if image is very large (likely a background)
+                                if (bounds.width > canvasWidth * 0.8 && bounds.height > canvasHeight * 0.8) {
+                                    console.log(`🚫 MINIMAL PNG: Filtering out large background image: ${obj.type} (${Math.round(bounds.width)}x${Math.round(bounds.height)})`);
+                                    return false;
+                                }
+
+                                // Check if image is positioned like a background (centered, large)
+                                if (obj.width > 1000 && obj.height > 1000) {
+                                    console.log(`🚫 MINIMAL PNG: Filtering out oversized background: ${obj.type} (${Math.round(obj.width)}x${Math.round(obj.height)})`);
+                                    return false;
+                                }
+
+                                // Check by source URL pattern (shirt/template images)
+                                if (obj.src && (obj.src.includes('shirt') || obj.src.includes('template') || obj.src.includes('mock'))) {
+                                    console.log(`🚫 MINIMAL PNG: Filtering out template image by URL: ${obj.type}`);
+                                    return false;
+                                }
                             }
 
                             // Keep design elements (text, user uploads, graphics)
@@ -904,6 +929,31 @@ class SaveOnlyPNGGenerator {
                     return false;
                 }
 
+                // Enhanced background detection by size and position
+                if (obj.type === 'image') {
+                    const bounds = obj.getBoundingRect();
+                    const canvasWidth = canvas.width || 656;
+                    const canvasHeight = canvas.height || 420;
+
+                    // Check if image is very large (likely a background)
+                    if (bounds.width > canvasWidth * 0.8 && bounds.height > canvasHeight * 0.8) {
+                        console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - large background image (${Math.round(bounds.width)}x${Math.round(bounds.height)})`);
+                        return false;
+                    }
+
+                    // Check if image is positioned like a background (centered, large)
+                    if (obj.width > 1000 && obj.height > 1000) {
+                        console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - oversized background (${Math.round(obj.width)}x${Math.round(obj.height)})`);
+                        return false;
+                    }
+
+                    // Check by source URL pattern (shirt/template images)
+                    if (obj.src && (obj.src.includes('shirt') || obj.src.includes('template') || obj.src.includes('mock'))) {
+                        console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - template image by URL`);
+                        return false;
+                    }
+                }
+
                 console.log(`  ✅ Object ${idx} (${obj.type}): INCLUDED as design element`);
                 return true;
             });
@@ -943,21 +993,20 @@ class SaveOnlyPNGGenerator {
                 rawHeight: Math.round(maxY - minY)
             });
 
-            // Add some padding around design elements
-            const padding = 50;
+            // Calculate exact print area based on design elements only (no padding)
             const printArea = {
-                x: Math.max(0, minX - padding),
-                y: Math.max(0, minY - padding),
-                width: (maxX - minX) + (padding * 2),
-                height: (maxY - minY) + (padding * 2)
+                x: Math.max(0, Math.floor(minX)),
+                y: Math.max(0, Math.floor(minY)),
+                width: Math.ceil(maxX - minX),
+                height: Math.ceil(maxY - minY)
             };
 
-            console.log('🧠 FINAL PRINT AREA (with padding):', {
+            console.log('🧠 FINAL PRINT AREA (exact design size):', {
                 x: Math.round(printArea.x),
                 y: Math.round(printArea.y),
                 width: Math.round(printArea.width),
                 height: Math.round(printArea.height),
-                padding: padding
+                paddingRemoved: "exact size"
             });
 
             console.log('🧠 === INTELLIGENT PRINT AREA CALCULATION END ===');
