@@ -619,34 +619,42 @@ class PNGOnlySystemIntegration {
 // Auto-initialize when systems are ready
 console.log('🔗 PNG-ONLY INTEGRATION: Auto-initializing...');
 
-// Wait for both fabric.js/designer and print engine
-let systemsReady = 0;
-const requiredSystems = 2;
+// Prevent duplicate initialization
+if (window.pngOnlySystemIntegration) {
+    console.log('✅ PNG-ONLY INTEGRATION: Already initialized, skipping');
+    return;
+}
 
-const checkAndInit = () => {
-    systemsReady++;
-    if (systemsReady >= requiredSystems) {
+// Wait for both fabric.js/designer and print engine
+let pngSystemsReady = 0;
+const pngRequiredSystems = 2;
+
+const pngCheckAndInit = () => {
+    pngSystemsReady++;
+    if (pngSystemsReady >= pngRequiredSystems) {
+        console.log('🚀 PNG-ONLY INTEGRATION: All systems ready, creating integration...');
         const pngIntegration = new PNGOnlySystemIntegration();
         window.pngOnlySystemIntegration = pngIntegration;
         window.yprintPNGIntegration = pngIntegration;  // 🔧 FIX: Expose with both names
+        console.log('✅ PNG-ONLY INTEGRATION: Integration created and exposed globally');
     }
 };
 
 if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
     console.log('✅ PNG-ONLY INTEGRATION: Direct initialization - fabric ready');
-    checkAndInit();
+    pngCheckAndInit();
 } else {
     console.log('⏳ PNG-ONLY INTEGRATION: Waiting for designerReady event...');
     window.addEventListener('designerReady', () => {
         console.log('🚀 PNG-ONLY INTEGRATION: designerReady event received, checking init...');
-        checkAndInit();
+        pngCheckAndInit();
     }, { once: true });
 }
 
 if (window.highDPIPrintExportEngine?.initialized) {
-    checkAndInit();
+    pngCheckAndInit();
 } else {
-    window.addEventListener('yprintPrintEngineReady', checkAndInit, { once: true });
+    window.addEventListener('yprintPrintEngineReady', pngCheckAndInit, { once: true });
 }
 
 // Export for module systems

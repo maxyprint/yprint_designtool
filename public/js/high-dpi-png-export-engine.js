@@ -149,10 +149,24 @@ class HighDPIPrintExportEngine {
                 quality = 1.0           // Max quality
             } = options;
 
-            // Get fabric canvas
-            const fabricCanvas = this.getFabricCanvas();
+            // Get fabric canvas with retry mechanism
+            let fabricCanvas = this.getFabricCanvas();
             if (!fabricCanvas) {
-                throw new Error('Fabric canvas not available');
+                console.warn('⚠️ HIGH-DPI PRINT ENGINE: First attempt to get canvas failed, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                fabricCanvas = this.getFabricCanvas();
+
+                if (!fabricCanvas) {
+                    throw new Error('Fabric canvas not available after retry');
+                }
+            }
+
+            // Validate canvas has required methods
+            if (typeof fabricCanvas.getObjects !== 'function') {
+                console.error('❌ HIGH-DPI PRINT ENGINE: Canvas missing getObjects method');
+                console.log('🔍 Canvas type:', typeof fabricCanvas);
+                console.log('🔍 Canvas constructor:', fabricCanvas.constructor?.name);
+                throw new Error('Fabric canvas is invalid - missing required methods');
             }
 
             // Calculate DPI multiplier (300 DPI = 3.125x multiplier for 96 DPI base)
@@ -218,6 +232,22 @@ class HighDPIPrintExportEngine {
     }
 
     getDesignElementsOnly(fabricCanvas) {
+        // Validate canvas before accessing methods
+        console.log('🔍 HIGH-DPI PRINT ENGINE: Validating fabricCanvas before getObjects...');
+        console.log('🔍 fabricCanvas type:', typeof fabricCanvas);
+        console.log('🔍 fabricCanvas is null/undefined:', fabricCanvas == null);
+
+        if (!fabricCanvas) {
+            console.error('❌ HIGH-DPI PRINT ENGINE: fabricCanvas is null/undefined');
+            throw new Error('Fabric canvas is null or undefined');
+        }
+
+        if (typeof fabricCanvas.getObjects !== 'function') {
+            console.error('❌ HIGH-DPI PRINT ENGINE: fabricCanvas.getObjects is not a function');
+            console.log('🔍 Available methods:', Object.getOwnPropertyNames(fabricCanvas));
+            throw new Error('Fabric canvas does not have getObjects method');
+        }
+
         // Get all objects but filter out backgrounds and view elements
         const allObjects = fabricCanvas.getObjects();
         console.log(`🔍 HIGH-DPI PRINT ENGINE: Analyzing ${allObjects.length} canvas objects for View-Image filtering...`);
