@@ -74,47 +74,106 @@
         }
 
         checkAndLoadMissingScripts() {
-            console.log('🔍 PNG FALLBACK: Checking for missing PNG scripts...');
+            console.log('🔍 === PNG FALLBACK SCRIPT CHECK START ===');
+            console.log(`🔍 Load attempt: ${this.loadAttempts + 1}/${this.maxAttempts}`);
 
             const requiredScripts = [
                 {
                     check: () => typeof window.EnhancedJSONCoordinateSystem !== 'undefined',
                     url: 'public/js/enhanced-json-coordinate-system.js',
-                    name: 'enhanced-json-coordinate-system'
+                    name: 'enhanced-json-coordinate-system',
+                    globalVar: 'EnhancedJSONCoordinateSystem'
                 },
                 {
                     check: () => typeof window.HighDPIPrintExportEngine !== 'undefined',
                     url: 'public/js/high-dpi-png-export-engine.js',
                     name: 'high-dpi-png-export-engine',
+                    globalVar: 'HighDPIPrintExportEngine',
                     skipIfRegistered: true // Skip if WordPress already enqueued this
                 },
                 {
                     check: () => typeof window.PNGOnlySystemIntegration !== 'undefined' ||
                                  typeof window.yprintPNGIntegration !== 'undefined',
                     url: 'public/js/png-only-system-integration.js',
-                    name: 'png-only-system-integration'
+                    name: 'png-only-system-integration',
+                    globalVar: 'PNGOnlySystemIntegration'
                 }
             ];
 
-            let missingScripts = 0;
+            // Debug current global state
+            console.log('🔍 CURRENT GLOBAL VARIABLES STATE:');
+            requiredScripts.forEach((script, idx) => {
+                const globalExists = typeof window[script.globalVar] !== 'undefined';
+                const checkResult = script.check();
+                console.log(`  ${idx + 1}. ${script.globalVar}: ${globalExists ? 'EXISTS' : 'MISSING'} (check: ${checkResult})`);
 
-            for (const script of requiredScripts) {
-                if (!script.check()) {
-                    // 🔧 CHECK: Skip if WordPress already registered this script
-                    if (script.skipIfRegistered && this.isScriptRegisteredByWordPress(script.name)) {
-                        console.log(`⏭️ PNG FALLBACK: ${script.name} registered by WordPress, skipping fallback`);
-                        continue;
+                if (globalExists) {
+                    const globalObj = window[script.globalVar];
+                    console.log(`     Type: ${typeof globalObj}, Constructor: ${globalObj?.constructor?.name || 'unknown'}`);
+                }
+            });
+
+            console.log('🔍 LOADED SCRIPTS TRACKING:');
+            console.log(`  Already loaded by fallback: [${Array.from(this.loadedScripts).join(', ')}]`);
+
+            let missingScripts = 0;
+            const scriptsToLoad = [];
+            const skippedScripts = [];
+
+            for (let i = 0; i < requiredScripts.length; i++) {
+                const script = requiredScripts[i];
+                console.log(`🔍 === CHECKING SCRIPT ${i + 1}: ${script.name} ===`);
+
+                const isAvailable = script.check();
+                console.log(`  Global check result: ${isAvailable}`);
+
+                if (!isAvailable) {
+                    console.log(`  ❌ MISSING: ${script.name}`);
+
+                    // Check if WordPress has registered this script
+                    if (script.skipIfRegistered) {
+                        console.log(`  🔧 Checking WordPress registration for ${script.name}...`);
+                        const isRegistered = this.isScriptRegisteredByWordPress(script.name);
+
+                        if (isRegistered) {
+                            console.log(`  ⏭️ SKIPPING: ${script.name} already registered by WordPress`);
+                            skippedScripts.push(script.name);
+                            continue;
+                        } else {
+                            console.log(`  🔄 PROCEEDING: ${script.name} not found in WordPress, will load via fallback`);
+                        }
                     }
 
                     missingScripts++;
-                    console.log(`❌ PNG FALLBACK: Missing ${script.name}`);
 
-                    if (!this.loadedScripts.has(script.name)) {
-                        this.loadScript(script.url, script.name);
+                    // Check if we've already attempted to load this script
+                    if (this.loadedScripts.has(script.name)) {
+                        console.log(`  ⏳ ALREADY LOADING: ${script.name} (attempted previously)`);
+                    } else {
+                        console.log(`  📥 WILL LOAD: ${script.name}`);
+                        scriptsToLoad.push(script);
                     }
                 } else {
-                    console.log(`✅ PNG FALLBACK: ${script.name} available`);
+                    console.log(`  ✅ AVAILABLE: ${script.name}`);
                 }
+            }
+
+            console.log('🔍 SUMMARY:');
+            console.log(`  Missing scripts: ${missingScripts}`);
+            console.log(`  Scripts to load: ${scriptsToLoad.length}`);
+            console.log(`  Skipped (WordPress): ${skippedScripts.length}`);
+
+            // Load the scripts that need loading
+            if (scriptsToLoad.length > 0) {
+                console.log('🔍 LOADING SCRIPTS:');
+                scriptsToLoad.forEach(script => {
+                    console.log(`  📥 Loading: ${script.name}`);
+                    this.loadScript(script.url, script.name);
+                });
+            } else if (missingScripts === 0) {
+                console.log('🔍 ✅ ALL SCRIPTS AVAILABLE');
+            } else {
+                console.log('🔍 ⏳ ALL MISSING SCRIPTS ALREADY LOADING');
             }
 
             if (missingScripts === 0) {
@@ -128,6 +187,7 @@
                 }
             }
 
+            console.log(`🔍 === PNG FALLBACK SCRIPT CHECK END (attempt ${this.loadAttempts + 1}) ===`);
             this.loadAttempts++;
         }
 
@@ -157,20 +217,109 @@
         }
 
         isScriptRegisteredByWordPress(scriptName) {
-            // 🔍 CHECK: Look for WordPress-enqueued scripts in DOM
-            const scriptElements = document.querySelectorAll('script[src]');
-            for (const element of scriptElements) {
-                const src = element.src;
+            console.log(`🔍 === WORDPRESS SCRIPT DETECTION START: ${scriptName} ===`);
 
-                // Check if this script contains our target script name
-                if (src.includes(scriptName + '.js') ||
-                    src.includes('yprint-high-dpi-export') ||
-                    src.includes('yprint-png-integration')) {
-                    console.log(`🔍 PNG FALLBACK: Found WordPress-registered script: ${src}`);
-                    return true;
+            // Get all script elements
+            const scriptElements = document.querySelectorAll('script[src]');
+            console.log(`🔍 TOTAL SCRIPTS IN DOM: ${scriptElements.length}`);
+
+            // Debug all PNG-related scripts
+            console.log('🔍 ALL PNG-RELATED SCRIPTS ANALYSIS:');
+            const pngRelatedScripts = [];
+            scriptElements.forEach((element, idx) => {
+                const src = element.src;
+                if (src.includes('png') || src.includes('yprint') || src.includes('octo-print-designer')) {
+                    const info = {
+                        index: idx,
+                        src: src,
+                        filename: src.split('/').pop(),
+                        hasVersion: src.includes('ver='),
+                        version: (src.match(/ver=([^&]+)/) || ['', 'none'])[1]
+                    };
+                    pngRelatedScripts.push(info);
+                    console.log(`  Script ${idx}: ${info.filename} (ver: ${info.version})`);
+                }
+            });
+
+            console.log(`🔍 FOUND ${pngRelatedScripts.length} PNG-RELATED SCRIPTS`);
+
+            // Check for duplicates
+            console.log('🔍 DUPLICATE DETECTION:');
+            const scriptNames = pngRelatedScripts.map(s => s.filename.split('?')[0]);
+            const duplicates = scriptNames.filter((name, idx) => scriptNames.indexOf(name) !== idx);
+            if (duplicates.length > 0) {
+                console.warn('❌ DETECTED DUPLICATE SCRIPTS:', [...new Set(duplicates)]);
+            } else {
+                console.log('✅ NO DUPLICATE SCRIPT FILENAMES DETECTED');
+            }
+
+            // Check for target script specifically
+            console.log(`🔍 SEARCHING FOR TARGET SCRIPT: ${scriptName}`);
+            const matchingScripts = [];
+
+            for (let i = 0; i < scriptElements.length; i++) {
+                const element = scriptElements[i];
+                const src = element.src;
+                const filename = src.split('/').pop().split('?')[0];
+
+                // Multiple matching strategies
+                const matches = {
+                    exactFilename: filename === scriptName + '.js',
+                    containsName: src.includes(scriptName + '.js'),
+                    highDPIAlias: src.includes('yprint-high-dpi-export'),
+                    integrationAlias: src.includes('yprint-png-integration'),
+                    coordinateAlias: src.includes('enhanced-json-coordinate')
+                };
+
+                const isMatch = Object.values(matches).some(m => m);
+
+                if (isMatch) {
+                    const matchInfo = {
+                        index: i,
+                        src: src,
+                        filename: filename,
+                        matchReason: Object.keys(matches).filter(key => matches[key]),
+                        version: (src.match(/ver=([^&]+)/) || ['', 'none'])[1],
+                        loadedAt: element.getAttribute('data-loaded-at') || 'unknown'
+                    };
+                    matchingScripts.push(matchInfo);
+                    console.log(`  ✅ MATCH ${i}: ${filename} - Reason: ${matchInfo.matchReason.join(', ')}`);
                 }
             }
-            return false;
+
+            console.log(`🔍 FOUND ${matchingScripts.length} MATCHING SCRIPTS FOR ${scriptName}`);
+
+            // Check global variables too
+            console.log('🔍 GLOBAL VARIABLE CHECK:');
+            const globalVars = {
+                'enhanced-json-coordinate-system': 'EnhancedJSONCoordinateSystem',
+                'high-dpi-png-export-engine': 'HighDPIPrintExportEngine',
+                'png-only-system-integration': 'PNGOnlySystemIntegration'
+            };
+
+            const expectedGlobalVar = globalVars[scriptName];
+            if (expectedGlobalVar) {
+                const globalExists = typeof window[expectedGlobalVar] !== 'undefined';
+                console.log(`  Global variable ${expectedGlobalVar}: ${globalExists ? 'EXISTS' : 'MISSING'}`);
+
+                if (globalExists && matchingScripts.length === 0) {
+                    console.warn(`  ⚠️ ANOMALY: Global variable exists but no DOM script found!`);
+                } else if (!globalExists && matchingScripts.length > 0) {
+                    console.warn(`  ⚠️ ANOMALY: DOM script found but global variable missing!`);
+                }
+            }
+
+            const result = matchingScripts.length > 0;
+            console.log(`🔍 FINAL RESULT: WordPress has ${result ? 'REGISTERED' : 'NOT REGISTERED'} ${scriptName}`);
+
+            if (result) {
+                console.log(`🔍 RECOMMENDATION: Skip fallback loading for ${scriptName}`);
+            } else {
+                console.log(`🔍 RECOMMENDATION: Proceed with fallback loading for ${scriptName}`);
+            }
+
+            console.log(`🔍 === WORDPRESS SCRIPT DETECTION END: ${scriptName} ===`);
+            return result;
         }
 
         allPNGScriptsLoaded() {

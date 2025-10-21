@@ -844,34 +844,103 @@ class SaveOnlyPNGGenerator {
      */
     calculateIntelligentPrintArea() {
         try {
+            console.log('🧠 === INTELLIGENT PRINT AREA CALCULATION START ===');
+
             const canvas = window.designerWidgetInstance?.fabricCanvas;
             if (!canvas) {
+                console.warn('🧠 FALLBACK: No canvas found, using default area');
                 return { x: 100, y: 100, width: 600, height: 400 };
             }
 
-            // Get all design elements (non-background)
-            const designElements = canvas.getObjects().filter(obj =>
-                obj.visible &&
-                !obj.isBackground &&
-                !obj.isViewImage &&
-                !obj.isTemplateBackground &&
-                !obj.excludeFromExport
-            );
+            console.log('🧠 CANVAS INFO:', {
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                totalObjects: canvas.getObjects().length
+            });
+
+            // Debug all canvas objects first
+            const allObjects = canvas.getObjects();
+            console.log('🧠 ALL CANVAS OBJECTS ANALYSIS:');
+            allObjects.forEach((obj, idx) => {
+                const bounds = obj.getBoundingRect ? obj.getBoundingRect() : {};
+                console.log(`  Object ${idx}: ${obj.type}`, {
+                    name: obj.name || 'unnamed',
+                    id: obj.id || 'no-id',
+                    visible: obj.visible,
+                    position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                    size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`,
+                    bounds: `${Math.round(bounds.left || 0)},${Math.round(bounds.top || 0)} ${Math.round(bounds.width || 0)}x${Math.round(bounds.height || 0)}`,
+                    flags: {
+                        isBackground: !!obj.isBackground,
+                        isViewImage: !!obj.isViewImage,
+                        isTemplateBackground: !!obj.isTemplateBackground,
+                        excludeFromExport: !!obj.excludeFromExport
+                    },
+                    src: obj.src ? obj.src.substring(obj.src.lastIndexOf('/') + 1, obj.src.lastIndexOf('/') + 30) + '...' : 'no-src'
+                });
+            });
+
+            // Get all design elements (non-background) with detailed filtering log
+            console.log('🧠 DESIGN ELEMENT FILTERING:');
+            const designElements = canvas.getObjects().filter((obj, idx) => {
+                if (!obj.visible) {
+                    console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - not visible`);
+                    return false;
+                }
+                if (obj.isBackground) {
+                    console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - isBackground flag`);
+                    return false;
+                }
+                if (obj.isViewImage) {
+                    console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - isViewImage flag`);
+                    return false;
+                }
+                if (obj.isTemplateBackground) {
+                    console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - isTemplateBackground flag`);
+                    return false;
+                }
+                if (obj.excludeFromExport) {
+                    console.log(`  ❌ Object ${idx} (${obj.type}): FILTERED OUT - excludeFromExport flag`);
+                    return false;
+                }
+
+                console.log(`  ✅ Object ${idx} (${obj.type}): INCLUDED as design element`);
+                return true;
+            });
+
+            console.log(`🧠 FILTERING RESULT: ${allObjects.length} total → ${designElements.length} design elements`);
 
             if (designElements.length === 0) {
-                console.log('🧠 INTELLIGENT FALLBACK: No design elements, using center area');
+                console.warn('🧠 FALLBACK: No design elements found, using center area');
                 return { x: 100, y: 100, width: 600, height: 400 };
             }
 
-            // Calculate bounding box of all design elements
+            // Calculate bounding box of all design elements with detailed logging
+            console.log('🧠 BOUNDING BOX CALCULATION:');
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-            designElements.forEach(obj => {
+            designElements.forEach((obj, idx) => {
                 const bounds = obj.getBoundingRect();
-                minX = Math.min(minX, bounds.left);
-                minY = Math.min(minY, bounds.top);
-                maxX = Math.max(maxX, bounds.left + bounds.width);
-                maxY = Math.max(maxY, bounds.top + bounds.height);
+                const left = bounds.left;
+                const top = bounds.top;
+                const right = bounds.left + bounds.width;
+                const bottom = bounds.top + bounds.height;
+
+                console.log(`  Element ${idx} (${obj.type}): bounds ${Math.round(left)},${Math.round(top)} to ${Math.round(right)},${Math.round(bottom)}`);
+
+                minX = Math.min(minX, left);
+                minY = Math.min(minY, top);
+                maxX = Math.max(maxX, right);
+                maxY = Math.max(maxY, bottom);
+            });
+
+            console.log('🧠 COMBINED BOUNDS:', {
+                minX: Math.round(minX),
+                minY: Math.round(minY),
+                maxX: Math.round(maxX),
+                maxY: Math.round(maxY),
+                rawWidth: Math.round(maxX - minX),
+                rawHeight: Math.round(maxY - minY)
             });
 
             // Add some padding around design elements
@@ -883,11 +952,20 @@ class SaveOnlyPNGGenerator {
                 height: (maxY - minY) + (padding * 2)
             };
 
-            console.log('🧠 INTELLIGENT FALLBACK: Calculated print area from design elements:', printArea);
+            console.log('🧠 FINAL PRINT AREA (with padding):', {
+                x: Math.round(printArea.x),
+                y: Math.round(printArea.y),
+                width: Math.round(printArea.width),
+                height: Math.round(printArea.height),
+                padding: padding
+            });
+
+            console.log('🧠 === INTELLIGENT PRINT AREA CALCULATION END ===');
             return printArea;
 
         } catch (error) {
             console.error('❌ INTELLIGENT FALLBACK: Error calculating print area:', error);
+            console.log('❌ FALLBACK: Using emergency default area');
             return { x: 100, y: 100, width: 600, height: 400 };
         }
     }

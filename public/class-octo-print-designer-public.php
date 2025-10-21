@@ -257,25 +257,65 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🖨️ === PNG SCRIPT REGISTRATION START ===
+        error_log("🔍 PNG REGISTRATION: Starting PNG script registration...");
+        error_log("🔍 PNG REGISTRATION: Current version: " . $this->version);
+        error_log("🔍 PNG REGISTRATION: Plugin URL: " . OCTO_PRINT_DESIGNER_URL);
+
+        // Check if scripts are already registered
+        $high_dpi_already_registered = wp_script_is('yprint-high-dpi-export', 'registered');
+        $integration_already_registered = wp_script_is('yprint-png-integration', 'registered');
+
+        error_log("🔍 PNG REGISTRATION: Pre-check - yprint-high-dpi-export already registered: " . ($high_dpi_already_registered ? 'YES' : 'NO'));
+        error_log("🔍 PNG REGISTRATION: Pre-check - yprint-png-integration already registered: " . ($integration_already_registered ? 'YES' : 'NO'));
+
         // 🖨️ PNG-ONLY SYSTEM: High-DPI Print Export Engine
-        wp_register_script(
-            'yprint-high-dpi-export',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/high-dpi-png-export-engine.js',
-            ['octo-print-designer-enhanced-json'], // Depends on coordinate system
-            $this->version,
-            true
-        );
-        error_log("🔍 PNG REGISTRATION: yprint-high-dpi-export registered");
+        if (!$high_dpi_already_registered) {
+            wp_register_script(
+                'yprint-high-dpi-export',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/high-dpi-png-export-engine.js',
+                ['octo-print-designer-enhanced-json'], // Depends on coordinate system
+                $this->version,
+                true
+            );
+            error_log("🔍 PNG REGISTRATION: yprint-high-dpi-export registered with version " . $this->version);
+        } else {
+            error_log("⚠️ PNG REGISTRATION: yprint-high-dpi-export already registered, skipping");
+        }
 
         // 🖨️ PNG-ONLY SYSTEM: WordPress Integration Layer
-        wp_register_script(
-            'yprint-png-integration',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/png-only-system-integration.js',
-            ['yprint-high-dpi-export'], // Depends on export engine
-            $this->version,
-            true
-        );
-        error_log("🔍 PNG REGISTRATION: yprint-png-integration registered");
+        if (!$integration_already_registered) {
+            wp_register_script(
+                'yprint-png-integration',
+                OCTO_PRINT_DESIGNER_URL . 'public/js/png-only-system-integration.js',
+                ['yprint-high-dpi-export'], // Depends on export engine
+                $this->version,
+                true
+            );
+            error_log("🔍 PNG REGISTRATION: yprint-png-integration registered with version " . $this->version);
+        } else {
+            error_log("⚠️ PNG REGISTRATION: yprint-png-integration already registered, skipping");
+        }
+
+        // Verify registration success
+        $high_dpi_now_registered = wp_script_is('yprint-high-dpi-export', 'registered');
+        $integration_now_registered = wp_script_is('yprint-png-integration', 'registered');
+
+        error_log("🔍 PNG REGISTRATION: Post-check - yprint-high-dpi-export registered: " . ($high_dpi_now_registered ? 'YES' : 'NO'));
+        error_log("🔍 PNG REGISTRATION: Post-check - yprint-png-integration registered: " . ($integration_now_registered ? 'YES' : 'NO'));
+
+        // Check for version consistency
+        global $wp_scripts;
+        if (isset($wp_scripts->registered['yprint-high-dpi-export'])) {
+            $high_dpi_version = $wp_scripts->registered['yprint-high-dpi-export']->ver;
+            error_log("🔍 PNG REGISTRATION: yprint-high-dpi-export actual version: " . $high_dpi_version);
+        }
+        if (isset($wp_scripts->registered['yprint-png-integration'])) {
+            $integration_version = $wp_scripts->registered['yprint-png-integration']->ver;
+            error_log("🔍 PNG REGISTRATION: yprint-png-integration actual version: " . $integration_version);
+        }
+
+        error_log("🔍 PNG REGISTRATION: === PNG SCRIPT REGISTRATION END ===");
 
         // 🎯 SAVE-ONLY PNG GENERATOR: Clean PNG generation system
         wp_register_script(
@@ -540,18 +580,42 @@ class Octo_Print_Designer_Public {
             );
         }
 
-        // 🚀 PERFORMANCE-OPTIMIZED ENQUEUEING: Load only registered scripts
+        // 🚀 === SCRIPT ENQUEUEING DEBUG START ===
         error_log("🔍 PNG DEBUG: Starting staged script loading process...");
+        error_log("🔍 PNG DEBUG: Total scripts to process: " . count($staged_loading_scripts));
 
-        foreach ($staged_loading_scripts as $script_handle) {
-            if (wp_script_is($script_handle, 'registered')) {
-                wp_enqueue_script($script_handle);
+        // Debug all PNG-related scripts before enqueueing
+        global $wp_scripts;
+        error_log("🔍 PNG DEBUG: PNG script registration status before enqueueing:");
+        $png_script_handles = ['yprint-fallback-loader', 'yprint-high-dpi-export', 'yprint-png-integration', 'yprint-save-only-png', 'octo-print-designer-enhanced-json'];
+        foreach ($png_script_handles as $handle) {
+            $registered = wp_script_is($handle, 'registered') ? 'YES' : 'NO';
+            $enqueued = wp_script_is($handle, 'enqueued') ? 'YES' : 'NO';
+            $in_queue = wp_script_is($handle, 'queue') ? 'YES' : 'NO';
+            $version = isset($wp_scripts->registered[$handle]) ? $wp_scripts->registered[$handle]->ver : 'N/A';
+            error_log("  {$handle}: registered={$registered}, enqueued={$enqueued}, queue={$in_queue}, version={$version}");
+        }
 
-                // 🔍 DEBUG: Log PNG script enqueueing with dependency check
-                if (strpos($script_handle, 'yprint') !== false || strpos($script_handle, 'enhanced-json') !== false || strpos($script_handle, 'fallback-loader') !== false) {
-                    error_log("🖨️ PNG SCRIPT ENQUEUED: {$script_handle}");
+        $enqueued_count = 0;
+        $skipped_count = 0;
 
-                    // Check dependencies
+        foreach ($staged_loading_scripts as $index => $script_handle) {
+            $is_registered = wp_script_is($script_handle, 'registered');
+            $is_already_enqueued = wp_script_is($script_handle, 'enqueued');
+
+            error_log("🔍 PNG DEBUG: Processing script {$index}: {$script_handle} (registered: " . ($is_registered ? 'YES' : 'NO') . ", already enqueued: " . ($is_already_enqueued ? 'YES' : 'NO') . ")");
+
+            if ($is_registered) {
+                if (!$is_already_enqueued) {
+                    wp_enqueue_script($script_handle);
+                    $enqueued_count++;
+                    error_log("✅ PNG DEBUG: ENQUEUED: {$script_handle}");
+
+                    // 🔍 DEBUG: Detailed PNG script enqueueing with dependency check
+                    if (strpos($script_handle, 'yprint') !== false || strpos($script_handle, 'enhanced-json') !== false || strpos($script_handle, 'fallback-loader') !== false) {
+                        error_log("🖨️ PNG SCRIPT ENQUEUED: {$script_handle}");
+
+                        // Check dependencies and version
                     global $wp_scripts;
                     if (isset($wp_scripts->registered[$script_handle])) {
                         $deps = $wp_scripts->registered[$script_handle]->deps;
@@ -563,14 +627,24 @@ class Octo_Print_Designer_Public {
                             error_log("    🔗 Dependency {$dep}: {$dep_status}");
                         }
                     }
+                    }
+                } else {
+                    error_log("⏭️ PNG DEBUG: ALREADY ENQUEUED: {$script_handle}");
+                    $skipped_count++;
                 }
             } else {
+                error_log("❌ PNG DEBUG: NOT REGISTERED: {$script_handle}");
+                $skipped_count++;
+
                 // 🔍 DEBUG: Log missing script registrations (especially PNG)
                 if (strpos($script_handle, 'yprint') !== false || strpos($script_handle, 'enhanced-json') !== false || strpos($script_handle, 'fallback-loader') !== false) {
                     error_log("❌ PNG SCRIPT NOT REGISTERED: {$script_handle}");
                 }
             }
         }
+
+        error_log("🔍 PNG DEBUG: Enqueueing complete - enqueued: {$enqueued_count}, skipped: {$skipped_count}");
+        error_log("🚀 === SCRIPT ENQUEUEING DEBUG END ===");
 
         // 🔍 PNG DEBUG: Final verification of enqueued PNG scripts
         global $wp_scripts;
