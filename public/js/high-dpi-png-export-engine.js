@@ -403,27 +403,39 @@ class HighDPIPrintExportEngine {
         console.log(`🖨️ PRINT-READY EXPORT: Starting export with ${config.multiplier}x quality...`);
 
         try {
-            // Step 1: Get only design elements (filtered)
-            const designElements = await this.getDesignElementsOnly();
+            // Step 1: Get fabric canvas first
+            let fabricCanvas = this.getFabricCanvas();
+            if (!fabricCanvas) {
+                console.warn('⚠️ PRINT-READY EXPORT: First attempt to get canvas failed, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                fabricCanvas = this.getFabricCanvas();
+
+                if (!fabricCanvas) {
+                    throw new Error('Fabric canvas not available after retry');
+                }
+            }
+
+            // Step 2: Get only design elements (filtered)
+            const designElements = this.getDesignElementsOnly(fabricCanvas);
 
             if (designElements.length === 0) {
                 console.warn('⚠️ PRINT-READY EXPORT: No design elements found!');
                 return null;
             }
 
-            // Step 2: Calculate print area with optional bleed
+            // Step 3: Calculate print area with optional bleed
             const printArea = this.calculatePrintAreaWithBleed(config.enableBleed, config.bleedMM);
 
-            // Step 3: Create print-optimized canvas
+            // Step 4: Create print-optimized canvas
             const printCanvas = this.createPrintAreaCanvas(config.multiplier, printArea);
 
-            // Step 4: Add elements with coordinate mapping
+            // Step 5: Add elements with coordinate mapping
             await this.addElementsToPrintCanvas(printCanvas, designElements, config.multiplier, printArea);
 
-            // Step 5: Generate final PNG
+            // Step 6: Generate final PNG
             const pngDataUrl = printCanvas.toDataURL('image/png', config.quality);
 
-            // Step 6: Cleanup
+            // Step 7: Cleanup
             printCanvas.dispose();
 
             console.log(`✅ PRINT-READY EXPORT: Successfully generated ${printArea.width}x${printArea.height}px PNG`);
