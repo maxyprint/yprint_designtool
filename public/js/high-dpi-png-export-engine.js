@@ -293,16 +293,13 @@ class HighDPIPrintExportEngine {
                 return false;
             }
 
-            // 🎯 METHOD 2: CSS class and data attribute detection
-            if (obj.canvas?.contextContainer) {
-                const element = obj.canvas.contextContainer;
-                if (element.classList?.contains('template-view-image') ||
-                    element.classList?.contains('background-image') ||
-                    (element.getAttribute && element.getAttribute('data-is-background') === 'true') ||
-                    (element.getAttribute && element.getAttribute('data-exclude-from-print') === 'true')) {
-                    console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by CSS/data attributes:', obj.type);
-                    return false;
-                }
+            // 🎯 METHOD 2: Fabric.js object attribute detection (Fixed: No DOM methods on Fabric objects)
+            if (obj.customAttributes?.isBackground === 'true' ||
+                obj.customAttributes?.excludeFromPrint === 'true' ||
+                obj.isTemplateViewImage === true ||
+                obj.isBackgroundImage === true) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered by Fabric object attributes:', obj.type);
+                return false;
             }
 
             // 🎯 METHOD 3: Advanced geometric analysis for background images
