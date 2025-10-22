@@ -416,13 +416,78 @@ class HighDPIPrintExportEngine {
     async addElementsToPrintCanvas(printCanvas, designElements, multiplier, printArea = null) {
         console.log(`🎨 HIGH-DPI PRINT ENGINE: Adding ${designElements.length} elements to print canvas...`);
 
+        // 🚀 ALL-IN-ONE MEGA-DEBUG SYSTEM START
+        console.group('🔬 === COMPREHENSIVE DEBUG ANALYSIS START ===');
+
+        // 🌐 BROWSER ENVIRONMENT
+        console.log('🌐 BROWSER ENV:', {
+            userAgent: navigator.userAgent,
+            supportsSpread: (() => { try { return [...[1,2,3]].length === 3; } catch(e) { return false; } })(),
+            fabricVersion: fabric?.version,
+            webGL: !!window.WebGLRenderingContext,
+            memory: performance.memory ? {
+                used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+                total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB'
+            } : 'not available'
+        });
+
+        // 🔧 ES6 FEATURE SUPPORT
+        const es6Support = {
+            spread: (() => { try { return [...[1]].length === 1; } catch(e) { return false; } })(),
+            iterator: (() => { try { return typeof [1][Symbol.iterator] === 'function'; } catch(e) { return false; } })(),
+            destructuring: (() => { try { const [a] = [1]; return a === 1; } catch(e) { return false; } })()
+        };
+        console.log('🔧 ES6 SUPPORT:', es6Support);
+
+        // 📚 FABRIC.JS INFO
+        console.log('📚 FABRIC INFO:', {
+            version: fabric.version,
+            buildDate: fabric.buildDate,
+            revision: fabric.revision,
+            hasCanvasMethod: typeof fabric.Canvas === 'function',
+            hasImageMethod: typeof fabric.Image === 'function'
+        });
+
+        // 🎨 CANVAS STATE BEFORE
+        console.log('🎨 CANVAS BEFORE:', {
+            objects: printCanvas.getObjects().length,
+            width: printCanvas.width,
+            height: printCanvas.height,
+            canvasType: typeof printCanvas,
+            hasFabricCanvas: printCanvas._objects !== undefined
+        });
+
+        console.groupEnd();
+
         const area = printArea || this.printAreaPx;
         const { x: printOffsetX, y: printOffsetY } = area;
 
         for (const element of designElements) {
             try {
+                console.group(`🔍 === ELEMENT ${designElements.indexOf(element) + 1} DEBUG ===`);
+
+                // 🎯 ELEMENT DEEP ANALYSIS
+                console.log('🔍 ELEMENT BEFORE CLONE:', {
+                    element: element,
+                    type: typeof element,
+                    constructor: element.constructor.name,
+                    fabricType: element.type,
+                    properties: Object.keys(element),
+                    hasCloneMethod: typeof element.clone === 'function',
+                    position: `${element.left},${element.top}`,
+                    size: `${element.width}x${element.height}`,
+                    visible: element.visible,
+                    hasIterator: element[Symbol.iterator] !== undefined,
+                    isIterable: (() => { try { return typeof element[Symbol.iterator] === 'function'; } catch(e) { return false; } })()
+                });
+
                 // Clone the element to avoid modifying original
                 const clonedElement = await this.cloneElementWithQuality(element);
+                console.log('✅ CLONE SUCCESS:', {
+                    cloned: clonedElement,
+                    type: typeof clonedElement,
+                    constructor: clonedElement.constructor.name
+                });
 
                 // Adjust position relative to print area
                 const adjustedLeft = (element.left - printOffsetX) * multiplier;
@@ -435,24 +500,133 @@ class HighDPIPrintExportEngine {
                     scaleX: (element.scaleX || 1) * multiplier,
                     scaleY: (element.scaleY || 1) * multiplier
                 });
+                console.log('🎯 ELEMENT SCALED:', {
+                    adjustedLeft,
+                    adjustedTop,
+                    scaleX: (element.scaleX || 1) * multiplier,
+                    scaleY: (element.scaleY || 1) * multiplier
+                });
 
                 // Preserve original image quality for image elements
                 if (element.type === 'image' && element._originalElement) {
                     // Use original high-resolution source
                     await this.preserveImageQuality(clonedElement, element);
+                    console.log('🖼️ IMAGE QUALITY PRESERVED');
                 }
 
-                printCanvas.add(clonedElement);
-                console.log('✅ HIGH-DPI PRINT ENGINE: Added element:', element.type);
+                // 🎨 INDIVIDUAL ADD TEST WITH ALL METHODS
+                console.log('🎨 TESTING CANVAS ADD METHODS...');
+
+                try {
+                    // Method 1: Direct add
+                    printCanvas.add(clonedElement);
+                    console.log('✅ METHOD 1 SUCCESS: Direct add - Object count:', printCanvas.getObjects().length);
+                    console.log('✅ HIGH-DPI PRINT ENGINE: Added element:', element.type);
+                } catch (addError) {
+                    console.error('❌ METHOD 1 FAILED:', {
+                        error: addError,
+                        message: addError.message,
+                        stack: addError.stack,
+                        element: clonedElement
+                    });
+
+                    // 🔄 FALLBACK METHODS
+                    console.log('🔄 TRYING FALLBACK METHODS...');
+
+                    try {
+                        // Fallback 1: Manual clone for images
+                        if (element.type === 'image' && element.getSrc) {
+                            console.log('🔄 FALLBACK 1: Manual image clone...');
+                            const manualClone = new fabric.Image(element.getSrc(), {
+                                left: adjustedLeft,
+                                top: adjustedTop,
+                                scaleX: (element.scaleX || 1) * multiplier,
+                                scaleY: (element.scaleY || 1) * multiplier
+                            });
+                            printCanvas.add(manualClone);
+                            console.log('✅ FALLBACK 1 SUCCESS: Manual image clone');
+                        } else {
+                            // Fallback 2: JSON serialization clone
+                            console.log('🔄 FALLBACK 2: JSON clone...');
+                            const jsonClone = fabric.util.object.clone(element);
+                            jsonClone.set({
+                                left: adjustedLeft,
+                                top: adjustedTop,
+                                scaleX: (element.scaleX || 1) * multiplier,
+                                scaleY: (element.scaleY || 1) * multiplier
+                            });
+                            printCanvas.add(jsonClone);
+                            console.log('✅ FALLBACK 2 SUCCESS: JSON clone');
+                        }
+                    } catch (fallbackError) {
+                        console.error('❌ ALL FALLBACKS FAILED:', fallbackError);
+
+                        // Fallback 3: toObject/fromObject
+                        try {
+                            console.log('🔄 FALLBACK 3: toObject/fromObject...');
+                            const objectData = element.toObject();
+                            objectData.left = adjustedLeft;
+                            objectData.top = adjustedTop;
+                            objectData.scaleX = (element.scaleX || 1) * multiplier;
+                            objectData.scaleY = (element.scaleY || 1) * multiplier;
+
+                            fabric.util.enlivenObjects([objectData], (objects) => {
+                                if (objects && objects[0]) {
+                                    printCanvas.add(objects[0]);
+                                    console.log('✅ FALLBACK 3 SUCCESS: toObject/fromObject');
+                                }
+                            });
+                        } catch (fallback3Error) {
+                            console.error('❌ FALLBACK 3 FAILED:', fallback3Error);
+                        }
+                    }
+                }
+
+                console.groupEnd();
 
             } catch (error) {
-                console.warn('⚠️ HIGH-DPI PRINT ENGINE: Failed to add element:', element.type, error);
+                console.error('❌ ELEMENT PROCESSING FAILED:', {
+                    elementIndex: designElements.indexOf(element),
+                    elementType: element.type,
+                    error: error,
+                    message: error.message,
+                    stack: error.stack
+                });
+                console.groupEnd();
             }
         }
 
         // Render all elements
         printCanvas.renderAll();
+
+        // 🎨 CANVAS STATE AFTER
+        console.group('🎨 === FINAL CANVAS STATE ===');
+        console.log('🎨 CANVAS AFTER:', {
+            objects: printCanvas.getObjects().length,
+            lastObject: printCanvas.getObjects()[printCanvas.getObjects().length - 1],
+            allObjects: printCanvas.getObjects().map(obj => ({
+                type: obj.type,
+                position: `${obj.left},${obj.top}`,
+                visible: obj.visible
+            }))
+        });
+
+        // 🖼️ CANVAS DATA VERIFICATION
+        try {
+            const canvasElement = printCanvas.toCanvasElement({ multiplier: 1 });
+            console.log('🖼️ GENERATED CANVAS:', {
+                width: canvasElement.width,
+                height: canvasElement.height,
+                hasData: canvasElement.toDataURL().length > 100,
+                dataUrlLength: canvasElement.toDataURL().length,
+                dataUrlPreview: canvasElement.toDataURL().substring(0, 100) + '...'
+            });
+        } catch (canvasError) {
+            console.error('❌ CANVAS GENERATION FAILED:', canvasError);
+        }
+
         console.log('🎨 HIGH-DPI PRINT ENGINE: All elements rendered on print canvas');
+        console.groupEnd();
     }
 
     async cloneElementWithQuality(element) {
