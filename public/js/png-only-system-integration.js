@@ -622,8 +622,7 @@ console.log('🔗 PNG-ONLY INTEGRATION: Auto-initializing...');
 // Prevent duplicate initialization
 if (window.pngOnlySystemIntegration) {
     console.log('✅ PNG-ONLY INTEGRATION: Already initialized, skipping');
-    return;
-}
+} else {
 
 // Wait for both fabric.js/designer and print engine
 let pngSystemsReady = 0;
@@ -656,6 +655,8 @@ if (window.highDPIPrintExportEngine?.initialized) {
 } else {
     window.addEventListener('yprintPrintEngineReady', pngCheckAndInit, { once: true });
 }
+
+} // End of else block for duplicate initialization check
 
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {

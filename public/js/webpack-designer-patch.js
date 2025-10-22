@@ -378,6 +378,7 @@
                     webpackChunk: !!window.webpackChunkocto_print_designer,
                     chunkLength: window.webpackChunkocto_print_designer ? window.webpackChunkocto_print_designer.length : 0
                 });
+    }
 
     // Run initial multi-strategy search
     setTimeout(() => {
