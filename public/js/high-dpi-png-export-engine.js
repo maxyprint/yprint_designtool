@@ -561,10 +561,45 @@ class HighDPIPrintExportEngine {
                     } catch (fallbackError) {
                         console.error('❌ ALL FALLBACKS FAILED:', fallbackError);
 
-                        // Fallback 3: toObject/fromObject
+                        // Fallback 3: toObject/fromObject with safe parameter handling
                         try {
                             console.log('🔄 FALLBACK 3: toObject/fromObject...');
-                            const objectData = element.toObject();
+
+                            // Safe toObject() call - handle different parameter formats
+                            let objectData;
+                            try {
+                                // Try without parameters first
+                                objectData = element.toObject();
+                            } catch (toObjectError) {
+                                console.log('🔄 FALLBACK 3a: toObject() without params failed, trying with empty array...');
+                                try {
+                                    // Try with empty array
+                                    objectData = element.toObject([]);
+                                } catch (toObjectError2) {
+                                    console.log('🔄 FALLBACK 3b: toObject([]) failed, trying with basic properties...');
+                                    // Fallback to manual property extraction
+                                    objectData = {
+                                        type: element.type,
+                                        left: element.left,
+                                        top: element.top,
+                                        width: element.width,
+                                        height: element.height,
+                                        scaleX: element.scaleX,
+                                        scaleY: element.scaleY,
+                                        angle: element.angle,
+                                        opacity: element.opacity,
+                                        visible: element.visible,
+                                        fill: element.fill,
+                                        stroke: element.stroke
+                                    };
+
+                                    // Add image-specific properties if it's an image
+                                    if (element.type === 'image' && element.getSrc) {
+                                        objectData.src = element.getSrc();
+                                    }
+                                }
+                            }
+
                             objectData.left = adjustedLeft;
                             objectData.top = adjustedTop;
                             objectData.scaleX = (element.scaleX || 1) * multiplier;
@@ -630,11 +665,112 @@ class HighDPIPrintExportEngine {
     }
 
     async cloneElementWithQuality(element) {
-        return new Promise((resolve) => {
-            element.clone((cloned) => {
-                resolve(cloned);
-            });
+        return new Promise((resolve, reject) => {
+            try {
+                // Primary clone method
+                element.clone((cloned) => {
+                    if (cloned) {
+                        resolve(cloned);
+                    } else {
+                        console.log('🔄 CLONE: Primary method returned null, trying fallback...');
+                        this.cloneElementFallback(element).then(resolve).catch(reject);
+                    }
+                });
+            } catch (cloneError) {
+                console.log('🔄 CLONE: Primary method failed, trying fallback...', cloneError.message);
+                this.cloneElementFallback(element).then(resolve).catch(reject);
+            }
         });
+    }
+
+    async cloneElementFallback(element) {
+        try {
+            console.log('🔄 CLONE FALLBACK: Attempting manual clone...');
+
+            // Safe toObject call with multiple fallback strategies
+            let objectData;
+
+            // Strategy 1: Standard toObject
+            try {
+                objectData = element.toObject();
+                console.log('✅ CLONE FALLBACK: Standard toObject succeeded');
+            } catch (toObjectError) {
+                console.log('🔄 CLONE FALLBACK: Standard toObject failed, trying with empty array...');
+
+                // Strategy 2: toObject with empty array
+                try {
+                    objectData = element.toObject([]);
+                    console.log('✅ CLONE FALLBACK: toObject([]) succeeded');
+                } catch (toObjectError2) {
+                    console.log('🔄 CLONE FALLBACK: toObject([]) failed, using manual property extraction...');
+
+                    // Strategy 3: Manual property extraction
+                    objectData = this.extractElementProperties(element);
+                    console.log('✅ CLONE FALLBACK: Manual extraction succeeded');
+                }
+            }
+
+            // Create new element from object data
+            return new Promise((resolve) => {
+                fabric.util.enlivenObjects([objectData], (objects) => {
+                    if (objects && objects[0]) {
+                        console.log('✅ CLONE FALLBACK: Successfully created cloned element');
+                        resolve(objects[0]);
+                    } else {
+                        console.log('❌ CLONE FALLBACK: enlivenObjects failed, returning original');
+                        resolve(element); // Return original as last resort
+                    }
+                });
+            });
+
+        } catch (fallbackError) {
+            console.error('❌ CLONE FALLBACK: All strategies failed', fallbackError);
+            return element; // Return original element as absolute fallback
+        }
+    }
+
+    extractElementProperties(element) {
+        console.log('🔧 EXTRACTING PROPERTIES: Manual element property extraction...');
+
+        const baseProps = {
+            type: element.type,
+            left: element.left || 0,
+            top: element.top || 0,
+            width: element.width || 0,
+            height: element.height || 0,
+            scaleX: element.scaleX || 1,
+            scaleY: element.scaleY || 1,
+            angle: element.angle || 0,
+            opacity: element.opacity !== undefined ? element.opacity : 1,
+            visible: element.visible !== undefined ? element.visible : true,
+            fill: element.fill,
+            stroke: element.stroke,
+            strokeWidth: element.strokeWidth || 0
+        };
+
+        // Add type-specific properties
+        if (element.type === 'image') {
+            if (element.getSrc && typeof element.getSrc === 'function') {
+                baseProps.src = element.getSrc();
+            } else if (element.src) {
+                baseProps.src = element.src;
+            }
+
+            if (element.crossOrigin) {
+                baseProps.crossOrigin = element.crossOrigin;
+            }
+        }
+
+        if (element.type === 'text' || element.type === 'textbox') {
+            baseProps.text = element.text || '';
+            baseProps.fontFamily = element.fontFamily || 'Arial';
+            baseProps.fontSize = element.fontSize || 16;
+            baseProps.fontWeight = element.fontWeight || 'normal';
+            baseProps.fontStyle = element.fontStyle || 'normal';
+        }
+
+        console.log('✅ EXTRACTING PROPERTIES: Extracted', Object.keys(baseProps).length, 'properties');
+        return baseProps;
     }
 
     async preserveImageQuality(clonedElement, originalElement) {
