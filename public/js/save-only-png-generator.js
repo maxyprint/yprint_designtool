@@ -1163,6 +1163,60 @@ class SaveOnlyPNGGenerator {
     }
 
     /**
+     * 🧪 TEST FUNCTION - Comprehensive save functionality test
+     */
+    async testSaveFunction(designName = 'test_save_verification') {
+        console.log('🧪 SAVE-ONLY PNG: Starting comprehensive save test...');
+
+        try {
+            // 1. Check system requirements
+            const systemStatus = {
+                pngEngine: !!this.pngEngine,
+                wpConfig: !!window.octo_print_designer_config,
+                fabricCanvas: !!window.designerWidgetInstance?.fabricCanvas,
+                generateDesignData: !!window.generateDesignData
+            };
+
+            console.log('🔍 System Requirements Check:', systemStatus);
+
+            const missingRequirements = Object.entries(systemStatus)
+                .filter(([key, value]) => !value)
+                .map(([key]) => key);
+
+            if (missingRequirements.length > 0) {
+                throw new Error(`Missing requirements: ${missingRequirements.join(', ')}`);
+            }
+
+            // 2. Generate design data
+            const designData = window.generateDesignData();
+            if (!designData || !designData.canvas) {
+                throw new Error('Failed to generate design data');
+            }
+
+            console.log('✅ Design data generated successfully');
+
+            // 3. Test PNG generation
+            console.log('🖨️ Testing PNG generation...');
+            const result = await this.generateAndStorePNG(designData, designName, null);
+
+            if (result && result.png_url) {
+                console.log('✅ SAVE TEST SUCCESSFUL!', {
+                    design_name: designName,
+                    png_url: result.png_url ? 'Generated' : 'Missing',
+                    result: result
+                });
+                return { success: true, result };
+            } else {
+                throw new Error('PNG generation succeeded but no result returned');
+            }
+
+        } catch (error) {
+            console.error('❌ SAVE TEST FAILED:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * 🧹 CLEANUP - Remove all auto-generation triggers
      */
     static removeAutoGenerationTriggers() {
@@ -1190,6 +1244,17 @@ if (document.readyState === 'loading') {
 } else {
     new SaveOnlyPNGGenerator();
 }
+
+// 🧪 GLOBAL TEST FUNCTION - Easy access for testing
+window.testDesignSave = async function(designName = 'test_design') {
+    console.log('🧪 Running comprehensive design save test...');
+    if (window.saveOnlyPNGGenerator && window.saveOnlyPNGGenerator.testSaveFunction) {
+        return await window.saveOnlyPNGGenerator.testSaveFunction(designName);
+    } else {
+        console.error('❌ Save test function not available');
+        return { success: false, error: 'Test function not available' };
+    }
+};
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
