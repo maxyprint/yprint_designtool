@@ -95,8 +95,19 @@ class PNG_Storage_Handler {
         error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
         error_log('🔍 PNG STORAGE: POST data keys: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
         error_log('🔍 PNG STORAGE: REQUEST data keys: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
-        // FIXED: Removed problematic file_get_contents('php://input') that was causing hanging requests
-        error_log('🔍 PNG STORAGE: Raw input length: SKIPPED_TO_PREVENT_HANGING');
+        // 🔧 SAFE RAW INPUT: Only read raw input if POST data is incomplete
+        $raw_input_length = 0;
+        $raw_input = '';
+
+        // Only attempt raw input reading if print_png is missing or suspiciously small
+        $post_png_size = strlen($_POST['print_png'] ?? '');
+        if ($post_png_size < 1000) { // Less than 1KB suggests incomplete POST data
+            $raw_input = file_get_contents('php://input');
+            $raw_input_length = strlen($raw_input);
+            error_log('🔍 PNG STORAGE: Raw input read (POST data incomplete) - Length: ' . $raw_input_length);
+        } else {
+            error_log('🔍 PNG STORAGE: Using POST data (complete) - print_png size: ' . $post_png_size);
+        }
 
         // Check if this is a FormData request vs regular POST
         $is_form_data = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
@@ -138,7 +149,31 @@ class PNG_Storage_Handler {
             }
 
             $design_id = sanitize_text_field($_POST['design_id'] ?? $_REQUEST['design_id']);
+
+            // 🔧 ENHANCED DATA EXTRACTION: Use raw input if POST data is incomplete
             $print_png = $_POST['print_png'] ?? $_REQUEST['print_png'];
+
+            // If print_png is missing/small and we have raw input, parse it
+            if ((!$print_png || strlen($print_png) < 1000) && !empty($raw_input)) {
+                error_log('🔧 PNG STORAGE: Parsing raw input for print_png data...');
+
+                // Parse raw input for JSON or form data
+                if (strpos($raw_input, '"print_png"') !== false) {
+                    $parsed_data = json_decode($raw_input, true);
+                    if ($parsed_data && isset($parsed_data['print_png'])) {
+                        $print_png = $parsed_data['print_png'];
+                        error_log('✅ PNG STORAGE: Extracted print_png from JSON raw input');
+                    }
+                }
+
+                // If still no data, check if entire raw input is the PNG data
+                if (!$print_png && strpos($raw_input, 'data:image/png;base64,') === 0) {
+                    $print_png = $raw_input;
+                    error_log('✅ PNG STORAGE: Using entire raw input as print_png data');
+                }
+            }
+
+            error_log('🔍 PNG STORAGE: Final print_png size: ' . strlen($print_png ?? ''));
 
             // 🔧 ENHANCED VALIDATION: Validate PNG data format
             error_log('🔍 PNG STORAGE: About to validate PNG data...');
