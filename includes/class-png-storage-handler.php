@@ -91,7 +91,8 @@ class PNG_Storage_Handler {
         error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
         error_log('🔍 PNG STORAGE: POST data keys: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
         error_log('🔍 PNG STORAGE: REQUEST data keys: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
-        error_log('🔍 PNG STORAGE: Raw input length: ' . strlen(file_get_contents('php://input')));
+        // FIXED: Removed problematic file_get_contents('php://input') that was causing hanging requests
+        error_log('🔍 PNG STORAGE: Raw input length: SKIPPED_TO_PREVENT_HANGING');
 
         // Check if this is a FormData request vs regular POST
         $is_form_data = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;

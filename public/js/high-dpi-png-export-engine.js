@@ -685,15 +685,20 @@ class HighDPIPrintExportEngine {
 
     async cloneElementFallback(element) {
         try {
-            console.log('🔄 CLONE FALLBACK: Attempting manual clone...');
+            console.log('🔄 CLONE FALLBACK: Attempting enhanced metadata-preserving clone...');
 
-            // Safe toObject call with multiple fallback strategies
+            // Enhanced toObject call with comprehensive print metadata preservation
             let objectData;
 
-            // Strategy 1: Standard toObject
+            // Strategy 1: Enhanced toObject with print metadata preservation
             try {
                 objectData = element.toObject();
-                console.log('✅ CLONE FALLBACK: Standard toObject succeeded');
+
+                // ENHANCED METADATA PRESERVATION: Extract critical print properties
+                const enhancedMetadata = this.extractPrintMetadata(element);
+                objectData = { ...objectData, ...enhancedMetadata };
+
+                console.log('✅ CLONE FALLBACK: Enhanced metadata-preserving toObject succeeded');
             } catch (toObjectError) {
                 console.log('🔄 CLONE FALLBACK: Standard toObject failed, trying with empty array...');
 
@@ -771,6 +776,65 @@ class HighDPIPrintExportEngine {
 
         console.log('✅ EXTRACTING PROPERTIES: Extracted', Object.keys(baseProps).length, 'properties');
         return baseProps;
+    }
+
+    /**
+     * 🎯 ENHANCED METADATA EXTRACTION - Preserve critical print properties
+     * Ensures that print-specific data survives the clone fallback process
+     */
+    extractPrintMetadata(element) {
+        const printMetadata = {};
+
+        try {
+            // 🎯 CRITICAL PRINT PROPERTIES
+            const criticalProps = [
+                'printScale', 'dpi', 'customId', 'printAreaX', 'printAreaY',
+                'originalImageSrc', 'printQuality', 'bleedSettings',
+                'colorProfile', 'templateId', 'designId', 'printOrder',
+                'fabricType', 'materialSettings', 'cutLines', 'safeZone'
+            ];
+
+            criticalProps.forEach(prop => {
+                if (element[prop] !== undefined && element[prop] !== null) {
+                    printMetadata[prop] = element[prop];
+                }
+            });
+
+            // 🎯 FABRIC CANVAS SPECIFIC PROPERTIES
+            if (element._originalElement) {
+                printMetadata._originalElement = element._originalElement;
+            }
+            if (element._element) {
+                printMetadata._element = element._element;
+            }
+
+            // 🎯 IMAGE QUALITY PRESERVATION
+            if (element.type === 'image') {
+                if (element.src) printMetadata.originalSrc = element.src;
+                if (element.crossOrigin) printMetadata.crossOrigin = element.crossOrigin;
+                if (element.filters) printMetadata.filters = element.filters;
+            }
+
+            // 🎯 TEXT ENHANCEMENT PROPERTIES
+            if (element.type === 'text' || element.type === 'i-text') {
+                if (element.fontWeight) printMetadata.fontWeight = element.fontWeight;
+                if (element.textAlign) printMetadata.textAlign = element.textAlign;
+                if (element.lineHeight) printMetadata.lineHeight = element.lineHeight;
+                if (element.charSpacing) printMetadata.charSpacing = element.charSpacing;
+            }
+
+            // 🎯 TRANSFORMATION PRESERVATION
+            if (element.matrix) printMetadata.matrix = element.matrix;
+            if (element.transformMatrix) printMetadata.transformMatrix = element.transformMatrix;
+
+            console.log(`🎯 METADATA EXTRACTION: Preserved ${Object.keys(printMetadata).length} critical print properties`);
+
+            return printMetadata;
+
+        } catch (error) {
+            console.warn('⚠️ METADATA EXTRACTION: Error extracting print metadata:', error);
+            return {};
+        }
     }
 
     async preserveImageQuality(clonedElement, originalElement) {

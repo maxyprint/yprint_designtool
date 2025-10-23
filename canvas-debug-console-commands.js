@@ -498,6 +498,78 @@ window.canvasDebug = {
         }
 
         return report;
+    },
+
+    // 🧪 Test enhanced clone functionality
+    testEnhancedClone: function() {
+        console.log('🧪 === TESTING ENHANCED CLONE FUNCTIONALITY ===');
+
+        if (!window.designerWidgetInstance?.fabricCanvas) {
+            console.log('❌ Designer canvas not available for testing');
+            return;
+        }
+
+        const canvas = window.designerWidgetInstance.fabricCanvas;
+        const objects = canvas.getObjects();
+
+        if (objects.length === 0) {
+            console.log('❌ No objects available for clone testing');
+            return;
+        }
+
+        console.log(`🧪 Testing clone functionality with ${objects.length} objects...`);
+
+        // Test our enhanced clone system
+        if (window.HighDPIPrintExportEngine || window.highDPIPrintExportEngine) {
+            const engine = window.HighDPIPrintExportEngine || window.highDPIPrintExportEngine;
+
+            console.log('🧪 Testing enhanced clone on first object...');
+            const testObject = objects[0];
+
+            // Add some mock print metadata to test preservation
+            testObject.printScale = 3.0;
+            testObject.printQuality = 'high';
+            testObject.customId = 'test-object-' + Date.now();
+
+            console.log('🧪 Added test metadata:', {
+                printScale: testObject.printScale,
+                printQuality: testObject.printQuality,
+                customId: testObject.customId
+            });
+
+            // Test the clone functionality
+            if (engine.cloneElement) {
+                engine.cloneElement(testObject).then(clonedObject => {
+                    console.log('✅ Enhanced clone test completed');
+                    console.log('🧪 Original metadata:', {
+                        printScale: testObject.printScale,
+                        printQuality: testObject.printQuality,
+                        customId: testObject.customId
+                    });
+                    console.log('🧪 Cloned metadata:', {
+                        printScale: clonedObject.printScale,
+                        printQuality: clonedObject.printQuality,
+                        customId: clonedObject.customId
+                    });
+
+                    if (clonedObject.printScale === testObject.printScale &&
+                        clonedObject.printQuality === testObject.printQuality &&
+                        clonedObject.customId === testObject.customId) {
+                        console.log('✅ METADATA PRESERVATION: SUCCESS - All print properties preserved!');
+                    } else {
+                        console.log('⚠️ METADATA PRESERVATION: Partial - Some properties may be missing');
+                    }
+                }).catch(error => {
+                    console.log('❌ Enhanced clone test failed:', error);
+                });
+            } else {
+                console.log('❌ cloneElement method not available');
+            }
+        } else {
+            console.log('❌ High-DPI Print Export Engine not available');
+        }
+
+        console.log('🧪 === ENHANCED CLONE TEST COMPLETE ===');
     }
 };
 
@@ -507,4 +579,5 @@ console.log('  canvasDebug.analyzeObjects() - Object details');
 console.log('  canvasDebug.analyzePrintArea() - Print area detection');
 console.log('  canvasDebug.analyzeScriptLoading() - Script status');
 console.log('  canvasDebug.testPNGGeneration() - Test PNG export');
+console.log('  canvasDebug.testEnhancedClone() - Test enhanced clone system');
 console.log('  canvasDebug.generateReport() - Create debug report');
