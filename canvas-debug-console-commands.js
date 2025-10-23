@@ -415,7 +415,7 @@ window.canvasDebug = {
             console.log(`Data URL length: ${dataURL.length} characters`);
 
             // Test with design-only filtering
-            const originalObjects = [...objects];
+            const originalObjects = Array.from(objects);
             const hiddenObjects = [];
 
             // Hide non-design objects

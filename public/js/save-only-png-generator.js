@@ -159,7 +159,7 @@ class SaveOnlyPNGGenerator {
                         });
 
                         // 🎯 STEP 2: Filter out view images and backgrounds, keep only design elements
-                        const originalObjects = [...allObjects];
+                        const originalObjects = Array.from(allObjects);
                         const designElements = allObjects.filter(obj => {
                             // Skip invisible objects
                             if (!obj.visible) {
