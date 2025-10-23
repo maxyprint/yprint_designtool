@@ -685,6 +685,22 @@ class HighDPIPrintExportEngine {
 
     async cloneElementFallback(element) {
         try {
+            // Strategy 0: Simple direct element return (emergency fallback)
+            console.log('🔄 CLONE FALLBACK: Attempting simple element return as emergency fallback...');
+            try {
+                // For image elements, create a minimal working copy
+                if (element.type === 'image') {
+                    console.log('✅ CLONE FALLBACK: Using original image element directly');
+                    return element; // Use original element directly to avoid cloning issues
+                }
+
+                // For other elements, also use original for now
+                console.log('✅ CLONE FALLBACK: Using original element directly');
+                return element;
+            } catch (directReturnError) {
+                console.log('🔄 CLONE FALLBACK: Direct return failed, trying metadata approach...', directReturnError.message);
+            }
+
             console.log('🔄 CLONE FALLBACK: Attempting enhanced metadata-preserving clone...');
 
             // Enhanced toObject call with comprehensive print metadata preservation
@@ -716,16 +732,28 @@ class HighDPIPrintExportEngine {
             }
 
             // Create new element from object data
-            return new Promise((resolve) => {
-                fabric.util.enlivenObjects([objectData], (objects) => {
-                    if (objects && objects[0]) {
-                        console.log('✅ CLONE FALLBACK: Successfully created cloned element');
-                        resolve(objects[0]);
-                    } else {
-                        console.log('❌ CLONE FALLBACK: enlivenObjects failed, returning original');
-                        resolve(element); // Return original as last resort
-                    }
-                });
+            return new Promise((resolve, reject) => {
+                try {
+                    fabric.util.enlivenObjects([objectData], (objects) => {
+                        if (objects && objects[0]) {
+                            console.log('✅ CLONE FALLBACK: Successfully created cloned element');
+                            resolve(objects[0]);
+                        } else {
+                            console.log('❌ CLONE FALLBACK: enlivenObjects failed, returning original');
+                            resolve(element); // Return original as last resort
+                        }
+                    });
+
+                    // Add timeout fallback to prevent hanging
+                    setTimeout(() => {
+                        console.log('⚠️ CLONE FALLBACK: enlivenObjects timeout, returning original element');
+                        resolve(element);
+                    }, 2000);
+
+                } catch (enlivenError) {
+                    console.log('❌ CLONE FALLBACK: enlivenObjects error, returning original:', enlivenError.message);
+                    resolve(element);
+                }
             });
 
         } catch (fallbackError) {
