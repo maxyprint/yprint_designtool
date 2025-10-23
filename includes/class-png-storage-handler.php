@@ -87,27 +87,29 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
-        // 🔍 ULTRA-DETAILED DEBUG: Log everything about the incoming request
-        error_log('🔍 PNG STORAGE: === INCOMING REQUEST START ===');
+        // 🚨 FORENSIC DEBUG: Complete data flow analysis for PNG generation failure
+        error_log('🔍 PNG STORAGE: === FORENSIC DEBUGGING START ===');
         error_log('🔍 PNG STORAGE: Request method: ' . $_SERVER['REQUEST_METHOD']);
         error_log('🔍 PNG STORAGE: Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'NOT_SET'));
         error_log('🔍 PNG STORAGE: Action: ' . ($_POST['action'] ?? $_REQUEST['action'] ?? 'NOT_SET'));
         error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: POST data keys: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
-        error_log('🔍 PNG STORAGE: REQUEST data keys: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
-        // 🔧 SAFE RAW INPUT: Only read raw input if POST data is incomplete
-        $raw_input_length = 0;
-        $raw_input = '';
 
-        // Only attempt raw input reading if print_png is missing or suspiciously small
-        $post_png_size = strlen($_POST['print_png'] ?? '');
-        if ($post_png_size < 1000) { // Less than 1KB suggests incomplete POST data
-            $raw_input = file_get_contents('php://input');
-            $raw_input_length = strlen($raw_input);
-            error_log('🔍 PNG STORAGE: Raw input read (POST data incomplete) - Length: ' . $raw_input_length);
-        } else {
-            error_log('🔍 PNG STORAGE: Using POST data (complete) - print_png size: ' . $post_png_size);
+        // 🔍 Q1: RAW INPUT LENGTH - Check if client data reaches server
+        $raw_input = file_get_contents('php://input');
+        $raw_input_length = strlen($raw_input);
+        error_log('🔍 Q1 RAW INPUT LENGTH: ' . $raw_input_length . ' bytes');
+        if ($raw_input_length > 0) {
+            error_log('🔍 Q1 RAW INPUT PREVIEW: ' . substr($raw_input, 0, 200) . '...');
         }
+
+        // 🔍 Q2: POST ARRAY DUMP - Check if PHP parses POST data correctly
+        error_log('🔍 Q2 RAW POST DUMP: ' . print_r($_POST, true));
+        error_log('🔍 Q2 POST KEYS: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
+        error_log('🔍 Q2 REQUEST KEYS: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
+
+        // Initial PNG size check
+        $post_png_size = strlen($_POST['print_png'] ?? '');
+        error_log('🔍 Q2 POST print_png SIZE: ' . $post_png_size . ' bytes');
 
         // Check if this is a FormData request vs regular POST
         $is_form_data = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
@@ -175,10 +177,30 @@ class PNG_Storage_Handler {
 
             error_log('🔍 PNG STORAGE: Final print_png size: ' . strlen($print_png ?? ''));
 
-            // 🔧 ENHANCED VALIDATION: Validate PNG data format
-            error_log('🔍 PNG STORAGE: About to validate PNG data...');
-            if (!$this->validatePNGData($print_png)) {
-                error_log('❌ PNG STORAGE: Invalid PNG data format');
+            // 🔍 Q3: PNG DATA PREVIEW - Check what's being passed to PNG library
+            if ($print_png) {
+                error_log('🔍 Q3 PNG DATA PREVIEW: ' . substr($print_png, 0, 100) . '...');
+                error_log('🔍 Q3 PNG DATA TYPE: ' . gettype($print_png));
+                error_log('🔍 Q3 PNG DATA LENGTH: ' . strlen($print_png) . ' bytes');
+
+                // Check if it looks like valid base64 PNG
+                if (strpos($print_png, 'data:image/png;base64,') === 0) {
+                    error_log('🔍 Q3 PNG FORMAT: Valid data URL format detected');
+                    $base64_part = substr($print_png, 22); // Remove "data:image/png;base64,"
+                    error_log('🔍 Q3 BASE64 LENGTH: ' . strlen($base64_part) . ' chars');
+                } else {
+                    error_log('🔍 Q3 PNG FORMAT: NOT a data URL - raw data or other format');
+                }
+            } else {
+                error_log('❌ Q3 PNG DATA: NULL OR EMPTY!');
+            }
+
+            // 🔍 Q4: PNG VALIDATION RESULT - Check if data passes validation
+            $validation_result = $this->validatePNGData($print_png);
+            error_log('🔍 Q4 PNG VALIDATION RESULT: ' . ($validation_result ? 'VALID' : 'INVALID'));
+
+            if (!$validation_result) {
+                error_log('❌ PNG STORAGE: Invalid PNG data format - failing validation');
                 wp_send_json_error('Invalid PNG data format');
                 return;
             }
