@@ -41,6 +41,10 @@ class PNG_Storage_Handler {
         add_action('wp_ajax_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
         add_action('wp_ajax_nopriv_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
 
+        // Register nonce refresh handler for session stability
+        add_action('wp_ajax_yprint_refresh_nonce', array($this, 'handle_refresh_nonce'));
+        add_action('wp_ajax_nopriv_yprint_refresh_nonce', array($this, 'handle_refresh_nonce'));
+
         // 📥 SAVE-ONLY PNG: Handler to retrieve existing PNGs (no generation)
         add_action('wp_ajax_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
         add_action('wp_ajax_nopriv_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
@@ -84,28 +88,29 @@ class PNG_Storage_Handler {
      */
     public function handle_save_design_print_png() {
         // 🔍 FORENSIC DEBUGGING: Q1-Q4 Pipeline Analysis
+        error_log('🔍 PNG STORAGE: === FORENSIC DEBUGGING START ===');
+
+        // 🔬 Q1: Raw input transfer check - Length
         $raw_input = file_get_contents('php://input');
         $raw_length = strlen($raw_input);
         error_log("🔬 Q1: Raw input transfer check - Length: {$raw_length} bytes");
 
+        // 🔬 Q2: POST array dump - Keys
         error_log('🔬 Q2: POST array dump - Keys: ' . (empty($_POST) ? 'EMPTY' : implode(', ', array_keys($_POST))));
+
+        // Basic request info
+        error_log('🔍 PNG STORAGE: Request method: ' . $_SERVER['REQUEST_METHOD']);
+        error_log('🔍 PNG STORAGE: Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: Action: ' . ($_POST['action'] ?? $_REQUEST['action'] ?? 'NOT_SET'));
+        error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
+
+        // 🔬 Q3: PNG data preview - Check what we have before processing
         if (!empty($_POST['print_png'])) {
             $png_preview = substr($_POST['print_png'], 0, 100) . '...';
             error_log("🔬 Q3: PNG data preview - First 100 chars: {$png_preview}");
         } else {
             error_log('🔬 Q3: PNG data preview - NO PNG DATA FOUND');
         }
-
-        // 🔍 ULTRA-DETAILED DEBUG: Log everything about the incoming request
-        error_log('🔍 PNG STORAGE: === INCOMING REQUEST START ===');
-        error_log('🔍 PNG STORAGE: Request method: ' . $_SERVER['REQUEST_METHOD']);
-        error_log('🔍 PNG STORAGE: Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: Action: ' . ($_POST['action'] ?? $_REQUEST['action'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: Nonce received: ' . ($_POST['nonce'] ?? $_REQUEST['nonce'] ?? 'NOT_SET'));
-        error_log('🔍 PNG STORAGE: POST data keys: ' . (empty($_POST) ? 'EMPTY_POST' : implode(', ', array_keys($_POST))));
-        error_log('🔍 PNG STORAGE: REQUEST data keys: ' . (empty($_REQUEST) ? 'EMPTY_REQUEST' : implode(', ', array_keys($_REQUEST))));
-        // FIXED: Removed problematic file_get_contents('php://input') that was causing hanging requests
-        error_log('🔍 PNG STORAGE: Raw input length: SKIPPED_TO_PREVENT_HANGING');
 
         // Check if this is a FormData request vs regular POST
         $is_form_data = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
@@ -147,10 +152,31 @@ class PNG_Storage_Handler {
             }
 
             $design_id = sanitize_text_field($_POST['design_id'] ?? $_REQUEST['design_id']);
+
+            // 🔧 ENHANCED DATA EXTRACTION: Use raw input if POST data is incomplete
             $print_png = $_POST['print_png'] ?? $_REQUEST['print_png'];
 
-            // 🔧 ENHANCED VALIDATION: Validate PNG data format
-            error_log('🔍 PNG STORAGE: About to validate PNG data...');
+            // If print_png is missing/small and we have raw input, parse it
+            if ((!$print_png || strlen($print_png) < 1000) && !empty($raw_input)) {
+                error_log('🔧 PNG STORAGE: Parsing raw input for print_png data...');
+
+                // Parse raw input for JSON or form data
+                if (strpos($raw_input, '"print_png"') !== false) {
+                    $parsed_data = json_decode($raw_input, true);
+                    if ($parsed_data && isset($parsed_data['print_png'])) {
+                        $print_png = $parsed_data['print_png'];
+                        error_log('✅ PNG STORAGE: Extracted print_png from JSON raw input');
+                    }
+                }
+
+                // If still no data, check if entire raw input is the PNG data
+                if (!$print_png && strpos($raw_input, 'data:image/png;base64,') === 0) {
+                    $print_png = $raw_input;
+                    error_log('✅ PNG STORAGE: Using entire raw input as print_png data');
+                }
+            }
+
+            error_log('🔍 PNG STORAGE: Final print_png size: ' . strlen($print_png ?? ''));
 
             // 🔬 Q4: PNG validation result
             $png_validation = $this->validatePNGData($print_png);
@@ -261,6 +287,28 @@ class PNG_Storage_Handler {
         } catch (Exception $e) {
             error_log('❌ PNG STORAGE: Save design PNG failed: ' . $e->getMessage());
             wp_send_json_error('Failed to save print PNG: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🔄 Nonce Refresh Handler
+     * Provides fresh nonces to prevent 403 errors during long design sessions
+     */
+    public function handle_refresh_nonce() {
+        try {
+            // Generate a fresh nonce
+            $fresh_nonce = wp_create_nonce('octo_print_designer_nonce');
+
+            error_log('🔄 NONCE REFRESH: Generated fresh nonce');
+
+            wp_send_json_success(array(
+                'nonce' => $fresh_nonce,
+                'message' => 'Nonce refreshed successfully'
+            ));
+
+        } catch (Exception $e) {
+            error_log('❌ NONCE REFRESH: Failed to refresh nonce: ' . $e->getMessage());
+            wp_send_json_error('Failed to refresh nonce: ' . $e->getMessage());
         }
     }
 
