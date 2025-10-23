@@ -85,10 +85,10 @@
                     globalVar: 'EnhancedJSONCoordinateSystem'
                 },
                 {
-                    check: () => typeof window.HighDPIPrintExportEngine !== 'undefined',
+                    check: () => typeof window.highDPIPrintExportEngine !== 'undefined',
                     url: 'public/js/high-dpi-png-export-engine.js',
                     name: 'high-dpi-png-export-engine',
-                    globalVar: 'HighDPIPrintExportEngine',
+                    globalVar: 'highDPIPrintExportEngine',
                     skipIfRegistered: true // Skip if WordPress already enqueued this
                 },
                 {
@@ -293,7 +293,7 @@
             console.log('🔍 GLOBAL VARIABLE CHECK:');
             const globalVars = {
                 'enhanced-json-coordinate-system': 'EnhancedJSONCoordinateSystem',
-                'high-dpi-png-export-engine': 'HighDPIPrintExportEngine',
+                'high-dpi-png-export-engine': 'highDPIPrintExportEngine',
                 'png-only-system-integration': 'PNGOnlySystemIntegration'
             };
 
