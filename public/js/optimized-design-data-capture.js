@@ -1405,7 +1405,7 @@ class OptimizedDesignDataCapture {
     /**
      * 🖨️ AUTO PNG GENERATION: Trigger PNG creation when design data is generated
      */
-    triggerAutoPNGGeneration(designData) {
+    function triggerAutoPNGGeneration(designData) {
         try {
             console.log('🖨️ AUTO PNG GENERATION: Design data generated, checking for PNG system...');
 

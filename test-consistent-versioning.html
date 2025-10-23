@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Test: Consistent Script Versioning</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        .test-section { background: white; margin: 10px 0; padding: 15px; border-left: 4px solid #007cba; }
+        .success { border-left-color: #28a745; }
+        .error { border-left-color: #dc3545; }
+        .warning { border-left-color: #ffc107; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .version-box { background: #e9ecef; padding: 10px; margin: 5px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 WordPress Consistent Script Versioning Test</h1>
+
+    <div class="test-section">
+        <h3>📝 Test Instructions</h3>
+        <p>Diese Seite testet die konsistente Script-Versionierung für PNG Scripts.</p>
+        <p><strong>Kopiere folgenden Console-Code in deinen Browser:</strong></p>
+        <pre id="testCode">
+// 🔧 CONSISTENT VERSIONING TEST
+console.log('🔧 CONSISTENT VERSIONING TEST: Starting analysis...');
+
+// Get all scripts with PNG-related names
+const allScripts = Array.from(document.querySelectorAll('script[src]'));
+const pngScripts = allScripts.filter(script => {
+    const src = script.src;
+    return src.includes('high-dpi-png-export-engine') ||
+           src.includes('png-only-system-integration') ||
+           src.includes('save-only-png-generator') ||
+           src.includes('png-fallback-loader');
+});
+
+console.log(`📊 Found ${pngScripts.length} PNG-related scripts:`);
+
+// Analyze version consistency
+const versionPattern = /ver=([^&]+)/;
+const versions = new Set();
+
+pngScripts.forEach((script, index) => {
+    const src = script.src;
+    const scriptName = src.split('/').pop().split('?')[0];
+    const versionMatch = src.match(versionPattern);
+    const version = versionMatch ? versionMatch[1] : 'NO_VERSION';
+
+    versions.add(version);
+
+    console.log(`   ${index + 1}. ${scriptName}`);
+    console.log(`      URL: ${src}`);
+    console.log(`      Version: ${version}`);
+    console.log('');
+});
+
+// Version consistency check
+console.log('📋 VERSION ANALYSIS:');
+console.log(`   Unique versions found: ${versions.size}`);
+versions.forEach(version => {
+    console.log(`   - ${version}`);
+});
+
+// Result summary
+if (versions.size === 1) {
+    const singleVersion = Array.from(versions)[0];
+    if (singleVersion !== 'NO_VERSION') {
+        console.log('✅ SUCCESS: All PNG scripts use consistent versioning!');
+        console.log(`   Common version: ${singleVersion}`);
+    } else {
+        console.log('⚠️ WARNING: All scripts load without version parameters');
+    }
+} else {
+    console.log('❌ PROBLEM: Inconsistent versioning detected!');
+    console.log('   This can cause duplicate script loading issues.');
+}
+
+// Check for duplicate script base names
+const scriptNames = pngScripts.map(s => s.src.split('/').pop().split('?')[0]);
+const uniqueNames = new Set(scriptNames);
+
+console.log('🔍 DUPLICATE SCRIPT CHECK:');
+if (scriptNames.length === uniqueNames.size) {
+    console.log('✅ No duplicate script base names found');
+} else {
+    console.log('❌ Duplicate script base names detected!');
+    scriptNames.forEach((name, idx) => {
+        const count = scriptNames.filter(n => n === name).length;
+        if (count > 1) {
+            console.log(`   ${name}: loaded ${count} times`);
+        }
+    });
+}
+
+console.log('🔧 CONSISTENT VERSIONING TEST: Complete');
+        </pre>
+    </div>
+
+    <div class="test-section warning">
+        <h3>⚠️ Expected Results After Versioning Fix</h3>
+        <div class="version-box">
+            <strong>Before Fix (Inconsistent):</strong>
+            <ul>
+                <li>high-dpi-png-export-engine.js?ver=1.0.9.png-export-v1</li>
+                <li>png-only-system-integration.js?ver=1.0.9.png-integration-v1</li>
+                <li>save-only-png-generator.js?ver=1.0.9.save-only-png-v1</li>
+            </ul>
+        </div>
+        <div class="version-box">
+            <strong>After Fix (Consistent):</strong>
+            <ul>
+                <li>high-dpi-png-export-engine.js?ver=1.0.9</li>
+                <li>png-only-system-integration.js?ver=1.0.9</li>
+                <li>save-only-png-generator.js?ver=1.0.9</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section success">
+        <h3>✅ Benefits of Consistent Versioning</h3>
+        <ul>
+            <li><strong>No Duplicate Loading:</strong> WordPress erkennt Scripts als gleiche Version</li>
+            <li><strong>Better Caching:</strong> Browser kann Scripts effizienter cachen</li>
+            <li><strong>Reduced Conflicts:</strong> Weniger JavaScript Variable Conflicts</li>
+            <li><strong>Easier Debugging:</strong> Klare Script-Identifikation</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🔍 High-DPI Engine Initialization Check</h3>
+        <p>Nach der Versioning-Fix sollte das High-DPI Engine ordnungsgemäß initialisieren:</p>
+        <pre>
+// Test High-DPI Engine after versioning fix
+setTimeout(() => {
+    console.log('🖨️ HIGH-DPI ENGINE STATUS:');
+    console.log('   HighDPIPrintExportEngine:', typeof window.HighDPIPrintExportEngine);
+
+    if (window.HighDPIPrintExportEngine) {
+        console.log('   - initialized:', !!window.HighDPIPrintExportEngine.initialized);
+        console.log('   - version:', window.HighDPIPrintExportEngine.version || 'unknown');
+    }
+
+    if (window.HighDPIPrintExportEngine?.initialized) {
+        console.log('✅ High-DPI PNG Engine successfully initialized with consistent versioning!');
+    } else {
+        console.log('❌ High-DPI PNG Engine still not initialized');
+    }
+}, 3000);
+        </pre>
+    </div>
+
+    <script>
+        // Auto-copy test code functionality
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                console.log('📋 Versioning test code copied to clipboard!');
+            });
+        }
+
+        const testCodeElement = document.getElementById('testCode');
+        testCodeElement.addEventListener('click', () => {
+            copyToClipboard(testCodeElement.textContent);
+            testCodeElement.style.background = '#d4edda';
+            setTimeout(() => {
+                testCodeElement.style.background = '#f8f9fa';
+            }, 1000);
+        });
+
+        console.log('🔧 CONSISTENT VERSIONING TEST PAGE: Ready');
+        console.log('📋 Click on the test code to copy it to clipboard');
+    </script>
+</body>
+</html>

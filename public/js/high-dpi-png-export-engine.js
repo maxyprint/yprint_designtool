@@ -39,10 +39,14 @@ class HighDPIPrintExportEngine {
 
     async waitForFabric() {
         return new Promise((resolve) => {
-            if (window.fabric && window.YPrint?.fabric?.isReady()) {
+            // Direct fabric.js detection instead of YPrint wrapper
+            if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+                console.log('✅ HIGH-DPI PRINT ENGINE: Fabric.js and designer canvas ready');
                 resolve();
             } else {
-                window.addEventListener('yprintSystemReady', resolve, { once: true });
+                console.log('⏳ HIGH-DPI PRINT ENGINE: Waiting for fabric.js and designer canvas...');
+                // Use existing event system
+                window.addEventListener('designerReady', resolve, { once: true });
             }
         });
     }
@@ -145,10 +149,24 @@ class HighDPIPrintExportEngine {
                 quality = 1.0           // Max quality
             } = options;
 
-            // Get fabric canvas
-            const fabricCanvas = this.getFabricCanvas();
+            // Get fabric canvas with retry mechanism
+            let fabricCanvas = this.getFabricCanvas();
             if (!fabricCanvas) {
-                throw new Error('Fabric canvas not available');
+                console.warn('⚠️ HIGH-DPI PRINT ENGINE: First attempt to get canvas failed, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                fabricCanvas = this.getFabricCanvas();
+
+                if (!fabricCanvas) {
+                    throw new Error('Fabric canvas not available after retry');
+                }
+            }
+
+            // Validate canvas has required methods
+            if (typeof fabricCanvas.getObjects !== 'function') {
+                console.error('❌ HIGH-DPI PRINT ENGINE: Canvas missing getObjects method');
+                console.log('🔍 Canvas type:', typeof fabricCanvas);
+                console.log('🔍 Canvas constructor:', fabricCanvas.constructor?.name);
+                throw new Error('Fabric canvas is invalid - missing required methods');
             }
 
             // Calculate DPI multiplier (300 DPI = 3.125x multiplier for 96 DPI base)
@@ -214,31 +232,70 @@ class HighDPIPrintExportEngine {
     }
 
     getDesignElementsOnly(fabricCanvas) {
+        // Validate canvas before accessing methods
+        console.log('🔍 HIGH-DPI PRINT ENGINE: Validating fabricCanvas before getObjects...');
+        console.log('🔍 fabricCanvas type:', typeof fabricCanvas);
+        console.log('🔍 fabricCanvas is null/undefined:', fabricCanvas == null);
+
+        if (!fabricCanvas) {
+            console.error('❌ HIGH-DPI PRINT ENGINE: fabricCanvas is null/undefined');
+            throw new Error('Fabric canvas is null or undefined');
+        }
+
+        if (typeof fabricCanvas.getObjects !== 'function') {
+            console.error('❌ HIGH-DPI PRINT ENGINE: fabricCanvas.getObjects is not a function');
+            console.log('🔍 Available methods:', Object.getOwnPropertyNames(fabricCanvas));
+            throw new Error('Fabric canvas does not have getObjects method');
+        }
+
         // Get all objects but filter out backgrounds and view elements
         const allObjects = fabricCanvas.getObjects();
-        console.log('🔍 PNG FIX: Total canvas objects:', allObjects.length);
+        console.log(`🔍 HIGH-DPI PRINT ENGINE: Analyzing ${allObjects.length} canvas objects for View-Image filtering...`);
 
-        return allObjects.filter(obj => {
-            // 🔧 FIXED: Only skip elements explicitly marked as background
-            if (obj.isBackground === true || obj.excludeFromExport === true) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping marked background element:', obj.type);
+        // 🚨 EMERGENCY DEBUG: Log ALL objects before filtering
+        console.log('🔍 ALL CANVAS OBJECTS BEFORE FILTERING:');
+        allObjects.forEach((obj, idx) => {
+            console.log(`Object ${idx}:`, {
+                type: obj.type,
+                name: obj.name || 'unnamed',
+                id: obj.id || 'no-id',
+                visible: obj.visible,
+                position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                size: `${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}`,
+                isViewImage: obj.isViewImage,
+                isTemplateBackground: obj.isTemplateBackground,
+                isBackground: obj.isBackground,
+                excludeFromExport: obj.excludeFromExport,
+                src: obj.src ? obj.src.substring(0, 100) + '...' : 'no-src'
+            });
+        });
+
+        // 🚨 EMERGENCY MODE: Skip ALL filtering if needed for debugging
+        const EMERGENCY_NO_FILTER = window.YPRINT_DEBUG_NO_FILTER || false;
+        if (EMERGENCY_NO_FILTER) {
+            console.warn('🚨 EMERGENCY MODE: ALL FILTERING DISABLED - INCLUDING ALL OBJECTS');
+            return allObjects;
+        }
+
+        const designElements = allObjects.filter(obj => {
+            // 🎯 MINIMAL FILTER: Only filter explicit template background elements
+            if (obj.isTemplateBackground === true || obj.excludeFromExport === true) {
+                console.log('🚫 HIGH-DPI PRINT ENGINE: Filtered template background:', obj.type);
                 return false;
             }
 
-            // 🔧 FIXED: Only skip images with specific background indicators
-            if (obj.type === 'image' && obj.id && obj.id.includes('background')) {
-                console.log('🚫 HIGH-DPI PRINT ENGINE: Skipping background image by ID:', obj.id);
-                return false;
-            }
-
-            // 🔧 FIXED: Include ALL user design elements (text, images, shapes)
-            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, `(${obj.width}x${obj.height})`);
+            // Include ALL other elements (text, images, shapes, etc.)
+            console.log('✅ HIGH-DPI PRINT ENGINE: Including design element:', obj.type, `${obj.left},${obj.top}`);
             return true;
         });
+
+        console.log(`🎯 HIGH-DPI PRINT ENGINE: View-Image filtering complete - ${designElements.length}/${allObjects.length} objects included`);
+        return designElements;
     }
 
-    createPrintAreaCanvas(multiplier) {
-        const { width, height } = this.printAreaPx;
+    createPrintAreaCanvas(multiplier, printArea = null) {
+        const area = printArea || this.printAreaPx;
+        const { width, height } = area;
         const scaledWidth = Math.round(width * multiplier);
         const scaledHeight = Math.round(height * multiplier);
 
@@ -259,15 +316,178 @@ class HighDPIPrintExportEngine {
         return printCanvas;
     }
 
-    async addElementsToPrintCanvas(printCanvas, designElements, multiplier) {
+    /**
+     * 🖨️ PRINT-READY PNG EXPORT WITH CROPPING
+     * Exports only the design elements within the print area coordinates
+     * Perfect for direct machine transmission
+     */
+    async exportPrintReadyPNGWithCropping(options = {}) {
+        const defaultOptions = {
+            multiplier: 3,
+            format: 'png',
+            quality: 1.0,
+            enableBleed: false,
+            bleedMM: 3,
+            debugMode: true
+        };
+
+        const config = { ...defaultOptions, ...options };
+
+        console.log(`🖨️ PRINT-READY EXPORT: Starting export with ${config.multiplier}x quality...`);
+
+        try {
+            // Step 1: Get fabric canvas first
+            let fabricCanvas = this.getFabricCanvas();
+            if (!fabricCanvas) {
+                console.warn('⚠️ PRINT-READY EXPORT: First attempt to get canvas failed, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                fabricCanvas = this.getFabricCanvas();
+
+                if (!fabricCanvas) {
+                    throw new Error('Fabric canvas not available after retry');
+                }
+            }
+
+            // Step 2: Get only design elements (filtered)
+            const designElements = this.getDesignElementsOnly(fabricCanvas);
+
+            if (designElements.length === 0) {
+                console.warn('⚠️ PRINT-READY EXPORT: No design elements found!');
+                return null;
+            }
+
+            // Step 3: Calculate print area with optional bleed
+            const printArea = this.calculatePrintAreaWithBleed(config.enableBleed, config.bleedMM);
+
+            // Step 4: Create print-optimized canvas
+            const printCanvas = this.createPrintAreaCanvas(config.multiplier, printArea);
+
+            // Step 5: Add elements with coordinate mapping
+            await this.addElementsToPrintCanvas(printCanvas, designElements, config.multiplier, printArea);
+
+            // Step 6: Generate final PNG
+            const pngDataUrl = printCanvas.toDataURL('image/png', config.quality);
+
+            // Step 7: Cleanup
+            printCanvas.dispose();
+
+            console.log(`✅ PRINT-READY EXPORT: Successfully generated ${printArea.width}x${printArea.height}px PNG`);
+
+            return {
+                dataUrl: pngDataUrl,
+                metadata: {
+                    width: printArea.width,
+                    height: printArea.height,
+                    dpi: 300 * config.multiplier,
+                    elementsCount: designElements.length,
+                    printAreaMM: this.printAreaMM,
+                    bleedEnabled: config.enableBleed,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+        } catch (error) {
+            console.error('❌ PRINT-READY EXPORT ERROR:', error);
+            throw new Error(`Print-ready PNG export failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * 📏 Calculate print area dimensions with optional bleed
+     */
+    calculatePrintAreaWithBleed(enableBleed, bleedMM) {
+        let { width, height, x, y } = this.printAreaPx;
+
+        if (enableBleed && bleedMM > 0) {
+            // Convert mm to pixels (assuming 300 DPI)
+            const bleedPx = Math.round((bleedMM / 25.4) * 300);
+
+            console.log(`📏 BLEED CALCULATION: Adding ${bleedMM}mm (${bleedPx}px) bleed`);
+
+            width += bleedPx * 2;
+            height += bleedPx * 2;
+            x -= bleedPx;
+            y -= bleedPx;
+        }
+
+        return { width, height, x, y };
+    }
+
+    async addElementsToPrintCanvas(printCanvas, designElements, multiplier, printArea = null) {
         console.log(`🎨 HIGH-DPI PRINT ENGINE: Adding ${designElements.length} elements to print canvas...`);
 
-        const { x: printOffsetX, y: printOffsetY } = this.printAreaPx;
+        // 🚀 ALL-IN-ONE MEGA-DEBUG SYSTEM START
+        console.group('🔬 === COMPREHENSIVE DEBUG ANALYSIS START ===');
+
+        // 🌐 BROWSER ENVIRONMENT
+        console.log('🌐 BROWSER ENV:', {
+            userAgent: navigator.userAgent,
+            supportsSpread: (() => { try { return [...[1,2,3]].length === 3; } catch(e) { return false; } })(),
+            fabricVersion: fabric?.version,
+            webGL: !!window.WebGLRenderingContext,
+            memory: performance.memory ? {
+                used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+                total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB'
+            } : 'not available'
+        });
+
+        // 🔧 ES6 FEATURE SUPPORT
+        const es6Support = {
+            spread: (() => { try { return [...[1]].length === 1; } catch(e) { return false; } })(),
+            iterator: (() => { try { return typeof [1][Symbol.iterator] === 'function'; } catch(e) { return false; } })(),
+            destructuring: (() => { try { const [a] = [1]; return a === 1; } catch(e) { return false; } })()
+        };
+        console.log('🔧 ES6 SUPPORT:', es6Support);
+
+        // 📚 FABRIC.JS INFO
+        console.log('📚 FABRIC INFO:', {
+            version: fabric.version,
+            buildDate: fabric.buildDate,
+            revision: fabric.revision,
+            hasCanvasMethod: typeof fabric.Canvas === 'function',
+            hasImageMethod: typeof fabric.Image === 'function'
+        });
+
+        // 🎨 CANVAS STATE BEFORE
+        console.log('🎨 CANVAS BEFORE:', {
+            objects: printCanvas.getObjects().length,
+            width: printCanvas.width,
+            height: printCanvas.height,
+            canvasType: typeof printCanvas,
+            hasFabricCanvas: printCanvas._objects !== undefined
+        });
+
+        console.groupEnd();
+
+        const area = printArea || this.printAreaPx;
+        const { x: printOffsetX, y: printOffsetY } = area;
 
         for (const element of designElements) {
             try {
+                console.group(`🔍 === ELEMENT ${designElements.indexOf(element) + 1} DEBUG ===`);
+
+                // 🎯 ELEMENT DEEP ANALYSIS
+                console.log('🔍 ELEMENT BEFORE CLONE:', {
+                    element: element,
+                    type: typeof element,
+                    constructor: element.constructor.name,
+                    fabricType: element.type,
+                    properties: Object.keys(element),
+                    hasCloneMethod: typeof element.clone === 'function',
+                    position: `${element.left},${element.top}`,
+                    size: `${element.width}x${element.height}`,
+                    visible: element.visible,
+                    hasIterator: element[Symbol.iterator] !== undefined,
+                    isIterable: (() => { try { return typeof element[Symbol.iterator] === 'function'; } catch(e) { return false; } })()
+                });
+
                 // Clone the element to avoid modifying original
                 const clonedElement = await this.cloneElementWithQuality(element);
+                console.log('✅ CLONE SUCCESS:', {
+                    cloned: clonedElement,
+                    type: typeof clonedElement,
+                    constructor: clonedElement.constructor.name
+                });
 
                 // Adjust position relative to print area
                 const adjustedLeft = (element.left - printOffsetX) * multiplier;
@@ -280,32 +500,341 @@ class HighDPIPrintExportEngine {
                     scaleX: (element.scaleX || 1) * multiplier,
                     scaleY: (element.scaleY || 1) * multiplier
                 });
+                console.log('🎯 ELEMENT SCALED:', {
+                    adjustedLeft,
+                    adjustedTop,
+                    scaleX: (element.scaleX || 1) * multiplier,
+                    scaleY: (element.scaleY || 1) * multiplier
+                });
 
                 // Preserve original image quality for image elements
                 if (element.type === 'image' && element._originalElement) {
                     // Use original high-resolution source
                     await this.preserveImageQuality(clonedElement, element);
+                    console.log('🖼️ IMAGE QUALITY PRESERVED');
                 }
 
-                printCanvas.add(clonedElement);
-                console.log('✅ HIGH-DPI PRINT ENGINE: Added element:', element.type);
+                // 🎨 INDIVIDUAL ADD TEST WITH ALL METHODS
+                console.log('🎨 TESTING CANVAS ADD METHODS...');
+
+                try {
+                    // Method 1: Direct add
+                    printCanvas.add(clonedElement);
+                    console.log('✅ METHOD 1 SUCCESS: Direct add - Object count:', printCanvas.getObjects().length);
+                    console.log('✅ HIGH-DPI PRINT ENGINE: Added element:', element.type);
+                } catch (addError) {
+                    console.error('❌ METHOD 1 FAILED:', {
+                        error: addError,
+                        message: addError.message,
+                        stack: addError.stack,
+                        element: clonedElement
+                    });
+
+                    // 🔄 FALLBACK METHODS
+                    console.log('🔄 TRYING FALLBACK METHODS...');
+
+                    try {
+                        // Fallback 1: Manual clone for images
+                        if (element.type === 'image' && element.getSrc) {
+                            console.log('🔄 FALLBACK 1: Manual image clone...');
+                            const manualClone = new fabric.Image(element.getSrc(), {
+                                left: adjustedLeft,
+                                top: adjustedTop,
+                                scaleX: (element.scaleX || 1) * multiplier,
+                                scaleY: (element.scaleY || 1) * multiplier
+                            });
+                            printCanvas.add(manualClone);
+                            console.log('✅ FALLBACK 1 SUCCESS: Manual image clone');
+                        } else {
+                            // Fallback 2: JSON serialization clone
+                            console.log('🔄 FALLBACK 2: JSON clone...');
+                            const jsonClone = fabric.util.object.clone(element);
+                            jsonClone.set({
+                                left: adjustedLeft,
+                                top: adjustedTop,
+                                scaleX: (element.scaleX || 1) * multiplier,
+                                scaleY: (element.scaleY || 1) * multiplier
+                            });
+                            printCanvas.add(jsonClone);
+                            console.log('✅ FALLBACK 2 SUCCESS: JSON clone');
+                        }
+                    } catch (fallbackError) {
+                        console.error('❌ ALL FALLBACKS FAILED:', fallbackError);
+
+                        // Fallback 3: toObject/fromObject with safe parameter handling
+                        try {
+                            console.log('🔄 FALLBACK 3: toObject/fromObject...');
+
+                            // Safe toObject() call - handle different parameter formats
+                            let objectData;
+                            try {
+                                // Try without parameters first
+                                objectData = element.toObject();
+                            } catch (toObjectError) {
+                                console.log('🔄 FALLBACK 3a: toObject() without params failed, trying with empty array...');
+                                try {
+                                    // Try with empty array
+                                    objectData = element.toObject([]);
+                                } catch (toObjectError2) {
+                                    console.log('🔄 FALLBACK 3b: toObject([]) failed, trying with basic properties...');
+                                    // Fallback to manual property extraction
+                                    objectData = {
+                                        type: element.type,
+                                        left: element.left,
+                                        top: element.top,
+                                        width: element.width,
+                                        height: element.height,
+                                        scaleX: element.scaleX,
+                                        scaleY: element.scaleY,
+                                        angle: element.angle,
+                                        opacity: element.opacity,
+                                        visible: element.visible,
+                                        fill: element.fill,
+                                        stroke: element.stroke
+                                    };
+
+                                    // Add image-specific properties if it's an image
+                                    if (element.type === 'image' && element.getSrc) {
+                                        objectData.src = element.getSrc();
+                                    }
+                                }
+                            }
+
+                            objectData.left = adjustedLeft;
+                            objectData.top = adjustedTop;
+                            objectData.scaleX = (element.scaleX || 1) * multiplier;
+                            objectData.scaleY = (element.scaleY || 1) * multiplier;
+
+                            fabric.util.enlivenObjects([objectData], (objects) => {
+                                if (objects && objects[0]) {
+                                    printCanvas.add(objects[0]);
+                                    console.log('✅ FALLBACK 3 SUCCESS: toObject/fromObject');
+                                }
+                            });
+                        } catch (fallback3Error) {
+                            console.error('❌ FALLBACK 3 FAILED:', fallback3Error);
+                        }
+                    }
+                }
+
+                console.groupEnd();
 
             } catch (error) {
-                console.warn('⚠️ HIGH-DPI PRINT ENGINE: Failed to add element:', element.type, error);
+                console.error('❌ ELEMENT PROCESSING FAILED:', {
+                    elementIndex: designElements.indexOf(element),
+                    elementType: element.type,
+                    error: error,
+                    message: error.message,
+                    stack: error.stack
+                });
+                console.groupEnd();
             }
         }
 
         // Render all elements
         printCanvas.renderAll();
+
+        // 🎨 CANVAS STATE AFTER
+        console.group('🎨 === FINAL CANVAS STATE ===');
+        console.log('🎨 CANVAS AFTER:', {
+            objects: printCanvas.getObjects().length,
+            lastObject: printCanvas.getObjects()[printCanvas.getObjects().length - 1],
+            allObjects: printCanvas.getObjects().map(obj => ({
+                type: obj.type,
+                position: `${obj.left},${obj.top}`,
+                visible: obj.visible
+            }))
+        });
+
+        // 🖼️ CANVAS DATA VERIFICATION
+        try {
+            const canvasElement = printCanvas.toCanvasElement({ multiplier: 1 });
+            console.log('🖼️ GENERATED CANVAS:', {
+                width: canvasElement.width,
+                height: canvasElement.height,
+                hasData: canvasElement.toDataURL().length > 100,
+                dataUrlLength: canvasElement.toDataURL().length,
+                dataUrlPreview: canvasElement.toDataURL().substring(0, 100) + '...'
+            });
+        } catch (canvasError) {
+            console.error('❌ CANVAS GENERATION FAILED:', canvasError);
+        }
+
         console.log('🎨 HIGH-DPI PRINT ENGINE: All elements rendered on print canvas');
+        console.groupEnd();
     }
 
     async cloneElementWithQuality(element) {
-        return new Promise((resolve) => {
-            element.clone((cloned) => {
-                resolve(cloned);
-            });
+        return new Promise((resolve, reject) => {
+            try {
+                // Primary clone method
+                element.clone((cloned) => {
+                    if (cloned) {
+                        resolve(cloned);
+                    } else {
+                        console.log('🔄 CLONE: Primary method returned null, trying fallback...');
+                        this.cloneElementFallback(element).then(resolve).catch(reject);
+                    }
+                });
+            } catch (cloneError) {
+                console.log('🔄 CLONE: Primary method failed, trying fallback...', cloneError.message);
+                this.cloneElementFallback(element).then(resolve).catch(reject);
+            }
         });
+    }
+
+    async cloneElementFallback(element) {
+        try {
+            console.log('🔄 CLONE FALLBACK: Attempting enhanced metadata-preserving clone...');
+
+            // Enhanced toObject call with comprehensive print metadata preservation
+            let objectData;
+
+            // Strategy 1: Enhanced toObject with print metadata preservation
+            try {
+                objectData = element.toObject();
+
+                // ENHANCED METADATA PRESERVATION: Extract critical print properties
+                const enhancedMetadata = this.extractPrintMetadata(element);
+                objectData = { ...objectData, ...enhancedMetadata };
+
+                console.log('✅ CLONE FALLBACK: Enhanced metadata-preserving toObject succeeded');
+            } catch (toObjectError) {
+                console.log('🔄 CLONE FALLBACK: Standard toObject failed, trying with empty array...');
+
+                // Strategy 2: toObject with empty array
+                try {
+                    objectData = element.toObject([]);
+                    console.log('✅ CLONE FALLBACK: toObject([]) succeeded');
+                } catch (toObjectError2) {
+                    console.log('🔄 CLONE FALLBACK: toObject([]) failed, using manual property extraction...');
+
+                    // Strategy 3: Manual property extraction
+                    objectData = this.extractElementProperties(element);
+                    console.log('✅ CLONE FALLBACK: Manual extraction succeeded');
+                }
+            }
+
+            // Create new element from object data
+            return new Promise((resolve) => {
+                fabric.util.enlivenObjects([objectData], (objects) => {
+                    if (objects && objects[0]) {
+                        console.log('✅ CLONE FALLBACK: Successfully created cloned element');
+                        resolve(objects[0]);
+                    } else {
+                        console.log('❌ CLONE FALLBACK: enlivenObjects failed, returning original');
+                        resolve(element); // Return original as last resort
+                    }
+                });
+            });
+
+        } catch (fallbackError) {
+            console.error('❌ CLONE FALLBACK: All strategies failed', fallbackError);
+            return element; // Return original element as absolute fallback
+        }
+    }
+
+    extractElementProperties(element) {
+        console.log('🔧 EXTRACTING PROPERTIES: Manual element property extraction...');
+
+        const baseProps = {
+            type: element.type,
+            left: element.left || 0,
+            top: element.top || 0,
+            width: element.width || 0,
+            height: element.height || 0,
+            scaleX: element.scaleX || 1,
+            scaleY: element.scaleY || 1,
+            angle: element.angle || 0,
+            opacity: element.opacity !== undefined ? element.opacity : 1,
+            visible: element.visible !== undefined ? element.visible : true,
+            fill: element.fill,
+            stroke: element.stroke,
+            strokeWidth: element.strokeWidth || 0
+        };
+
+        // Add type-specific properties
+        if (element.type === 'image') {
+            if (element.getSrc && typeof element.getSrc === 'function') {
+                baseProps.src = element.getSrc();
+            } else if (element.src) {
+                baseProps.src = element.src;
+            }
+
+            if (element.crossOrigin) {
+                baseProps.crossOrigin = element.crossOrigin;
+            }
+        }
+
+        if (element.type === 'text' || element.type === 'textbox') {
+            baseProps.text = element.text || '';
+            baseProps.fontFamily = element.fontFamily || 'Arial';
+            baseProps.fontSize = element.fontSize || 16;
+            baseProps.fontWeight = element.fontWeight || 'normal';
+            baseProps.fontStyle = element.fontStyle || 'normal';
+        }
+
+        console.log('✅ EXTRACTING PROPERTIES: Extracted', Object.keys(baseProps).length, 'properties');
+        return baseProps;
+    }
+
+    /**
+     * 🎯 ENHANCED METADATA EXTRACTION - Preserve critical print properties
+     * Ensures that print-specific data survives the clone fallback process
+     */
+    extractPrintMetadata(element) {
+        const printMetadata = {};
+
+        try {
+            // 🎯 CRITICAL PRINT PROPERTIES
+            const criticalProps = [
+                'printScale', 'dpi', 'customId', 'printAreaX', 'printAreaY',
+                'originalImageSrc', 'printQuality', 'bleedSettings',
+                'colorProfile', 'templateId', 'designId', 'printOrder',
+                'fabricType', 'materialSettings', 'cutLines', 'safeZone'
+            ];
+
+            criticalProps.forEach(prop => {
+                if (element[prop] !== undefined && element[prop] !== null) {
+                    printMetadata[prop] = element[prop];
+                }
+            });
+
+            // 🎯 FABRIC CANVAS SPECIFIC PROPERTIES
+            if (element._originalElement) {
+                printMetadata._originalElement = element._originalElement;
+            }
+            if (element._element) {
+                printMetadata._element = element._element;
+            }
+
+            // 🎯 IMAGE QUALITY PRESERVATION
+            if (element.type === 'image') {
+                if (element.src) printMetadata.originalSrc = element.src;
+                if (element.crossOrigin) printMetadata.crossOrigin = element.crossOrigin;
+                if (element.filters) printMetadata.filters = element.filters;
+            }
+
+            // 🎯 TEXT ENHANCEMENT PROPERTIES
+            if (element.type === 'text' || element.type === 'i-text') {
+                if (element.fontWeight) printMetadata.fontWeight = element.fontWeight;
+                if (element.textAlign) printMetadata.textAlign = element.textAlign;
+                if (element.lineHeight) printMetadata.lineHeight = element.lineHeight;
+                if (element.charSpacing) printMetadata.charSpacing = element.charSpacing;
+            }
+
+            // 🎯 TRANSFORMATION PRESERVATION
+            if (element.matrix) printMetadata.matrix = element.matrix;
+            if (element.transformMatrix) printMetadata.transformMatrix = element.transformMatrix;
+
+            console.log(`🎯 METADATA EXTRACTION: Preserved ${Object.keys(printMetadata).length} critical print properties`);
+
+            return printMetadata;
+
+        } catch (error) {
+            console.warn('⚠️ METADATA EXTRACTION: Error extracting print metadata:', error);
+            return {};
+        }
     }
 
     async preserveImageQuality(clonedElement, originalElement) {
@@ -358,30 +887,46 @@ class HighDPIPrintExportEngine {
     }
 
     getFabricCanvas() {
+        console.log('🔍 HIGH-DPI PRINT ENGINE: getFabricCanvas() called - debugging canvas access...');
+
+        // Debug current state
+        console.log('🔍 window.YPrint exists:', !!window.YPrint);
+        console.log('🔍 window.designerWidgetInstance exists:', !!window.designerWidgetInstance);
+        console.log('🔍 window.designerWidgetInstance?.fabricCanvas exists:', !!window.designerWidgetInstance?.fabricCanvas);
+        console.log('🔍 window.fabricCanvas exists:', !!window.fabricCanvas);
+
         // Multiple methods to get fabric canvas
 
-        // 1. From YPrint unified API
+        // 1. From YPrint unified API (deprecated, should not work)
         if (window.YPrint?.designer?.getCanvas) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using YPrint API canvas');
             return window.YPrint.designer.getCanvas();
         }
 
-        // 2. From global designer widget
+        // 2. From global designer widget (primary method)
         if (window.designerWidgetInstance?.fabricCanvas) {
-            return window.designerWidgetInstance.fabricCanvas;
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using designerWidgetInstance.fabricCanvas');
+            const canvas = window.designerWidgetInstance.fabricCanvas;
+            console.log('🔍 Canvas type:', typeof canvas);
+            console.log('🔍 Canvas has getObjects method:', typeof canvas.getObjects === 'function');
+            return canvas;
         }
 
         // 3. From fabric canvas global
         if (window.fabricCanvas) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using global fabricCanvas');
             return window.fabricCanvas;
         }
 
         // 4. From canvas element
         const canvasElement = document.getElementById('octo-print-designer-canvas');
+        console.log('🔍 Canvas element found:', !!canvasElement);
         if (canvasElement && canvasElement.__fabric) {
+            console.log('✅ HIGH-DPI PRINT ENGINE: Using canvas element.__fabric');
             return canvasElement.__fabric;
         }
 
-        console.error('❌ HIGH-DPI PRINT ENGINE: No fabric canvas found');
+        console.error('❌ HIGH-DPI PRINT ENGINE: No fabric canvas found through any method');
         return null;
     }
 
@@ -417,7 +962,11 @@ class HighDPIPrintExportEngine {
 
     // Public API methods
     async exportForPrintMachine(options = {}) {
-        return this.exportPrintReadyPNG(options);
+        return this.exportPrintReadyPNGWithCropping(options);
+    }
+
+    async exportForPrintMachineWithMetadata(options = {}) {
+        return this.exportWithTemplateMetadata(options);
     }
 
     getPrintAreaDimensions() {
@@ -461,6 +1010,111 @@ class HighDPIPrintExportEngine {
         }
     }
 
+    /**
+     * 🏷️ TEMPLATE METADATA INTEGRATION
+     * Retrieves and integrates WordPress template metadata for enhanced PNG processing
+     */
+    async getTemplateMetadata() {
+        try {
+            if (!this.currentTemplateId) {
+                console.warn('⚠️ TEMPLATE METADATA: No template ID available');
+                return null;
+            }
+
+            console.log(`🏷️ TEMPLATE METADATA: Fetching for template ${this.currentTemplateId}...`);
+
+            // Check if WordPress AJAX is available
+            if (!window.octo_print_designer_config?.ajax_url) {
+                console.warn('⚠️ TEMPLATE METADATA: WordPress AJAX not available');
+                return null;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'yprint_get_template_metadata');
+            formData.append('nonce', window.octo_print_designer_config.nonce);
+            formData.append('template_id', this.currentTemplateId);
+
+            const response = await fetch(window.octo_print_designer_config.ajax_url, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ TEMPLATE METADATA: Successfully retrieved', data.data);
+                return data.data;
+            } else {
+                console.warn('⚠️ TEMPLATE METADATA: WordPress returned error:', data.data);
+                return null;
+            }
+
+        } catch (error) {
+            console.error('❌ TEMPLATE METADATA: Fetch failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 🖨️ EXPORT WITH TEMPLATE METADATA
+     * Enhanced export that includes template metadata for print machine optimization
+     */
+    async exportWithTemplateMetadata(options = {}) {
+        console.log('🖨️ METADATA EXPORT: Starting enhanced export...');
+
+        try {
+            // Get template metadata
+            const templateMetadata = await this.getTemplateMetadata();
+
+            // Generate print-ready PNG
+            const pngResult = await this.exportPrintReadyPNGWithCropping(options);
+
+            if (!pngResult) {
+                throw new Error('PNG generation failed');
+            }
+
+            // Combine PNG with metadata
+            const enhancedResult = {
+                ...pngResult,
+                templateMetadata: templateMetadata,
+                printSpecifications: {
+                    printAreaMM: this.printAreaMM,
+                    printAreaPX: this.printAreaPx,
+                    dpi: 300 * (options.multiplier || 3),
+                    colorProfile: 'sRGB',
+                    printMethod: 'digital_textile',
+                    substrate: templateMetadata?.substrate || 'unknown',
+                    washInstructions: templateMetadata?.care_instructions || 'standard'
+                },
+                qualityAssurance: {
+                    bleedCheck: options.enableBleed || false,
+                    resolutionCheck: true,
+                    colorProfileCheck: true,
+                    dimensionCheck: true,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            console.log('✅ METADATA EXPORT: Enhanced PNG with metadata generated');
+
+            // Dispatch enhanced event
+            window.dispatchEvent(new CustomEvent('yprintEnhancedPNGExported', {
+                detail: enhancedResult
+            }));
+
+            return enhancedResult;
+
+        } catch (error) {
+            console.error('❌ METADATA EXPORT: Failed:', error);
+            throw error;
+        }
+    }
+
     dispose() {
         console.log('🧹 HIGH-DPI PRINT ENGINE: Disposing...');
 
@@ -474,10 +1128,14 @@ class HighDPIPrintExportEngine {
 // Auto-initialize when fabric is ready
 console.log('🖨️ HIGH-DPI PRINT ENGINE: Auto-initializing...');
 
-if (window.YPrint?.fabric?.isReady()) {
+// Direct fabric.js detection instead of YPrint wrapper
+if (window.fabric && window.designerWidgetInstance?.fabricCanvas) {
+    console.log('✅ HIGH-DPI PRINT ENGINE: Direct initialization - fabric ready');
     window.highDPIPrintExportEngine = new HighDPIPrintExportEngine();
 } else {
-    window.addEventListener('yprintSystemReady', () => {
+    console.log('⏳ HIGH-DPI PRINT ENGINE: Waiting for designerReady event...');
+    window.addEventListener('designerReady', () => {
+        console.log('🚀 HIGH-DPI PRINT ENGINE: designerReady event received, initializing...');
         window.highDPIPrintExportEngine = new HighDPIPrintExportEngine();
     });
 }

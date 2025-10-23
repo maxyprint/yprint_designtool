@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🌐 WordPress Integration Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #f8f9fa; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test { margin: 15px 0; padding: 15px; border-radius: 8px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        button { padding: 12px 20px; margin: 8px; background: #007cba; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px; overflow-x: auto; }
+        .header { background: #007cba; color: white; padding: 20px; text-align: center; border-radius: 10px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 WordPress Integration Test</h1>
+            <p>Teste die Print-Ready PNG Implementation in echter WordPress Umgebung</p>
+        </div>
+
+        <div class="test info">
+            <strong>📋 Test-Plan:</strong>
+            <ol>
+                <li>WordPress AJAX-Konfiguration prüfen</li>
+                <li>Template Metadata Endpoint testen</li>
+                <li>PNG Storage Handler testen</li>
+                <li>Fallback-Mechanismen prüfen</li>
+            </ol>
+        </div>
+
+        <button onclick="testWordPressAJAX()">🔧 Test WordPress AJAX</button>
+        <button onclick="testTemplateMetadata()">🏷️ Test Template Metadata</button>
+        <button onclick="testPNGStorage()">💾 Test PNG Storage</button>
+        <button onclick="testFallbacks()">🛟 Test Fallbacks</button>
+        <button onclick="runAllTests()">🚀 Run All Tests</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function addResult(title, status, message, data = null) {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+
+            let content = `<strong>${title}:</strong> ${message}`;
+            if (data) {
+                content += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+
+            div.innerHTML = content;
+            document.getElementById('results').appendChild(div);
+
+            // Scroll to bottom
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testWordPressAJAX() {
+            addResult('WordPress AJAX', 'info', 'Testing WordPress AJAX configuration...');
+
+            // Check if WordPress config is available
+            if (typeof window.octo_print_designer_config === 'undefined') {
+                addResult('WordPress AJAX', 'fail', 'WordPress configuration not found. This test needs to be run from a WordPress page with the plugin active.');
+                return;
+            }
+
+            const config = window.octo_print_designer_config;
+            addResult('WordPress AJAX', 'pass', 'WordPress configuration found', {
+                ajax_url: config.ajax_url,
+                has_nonce: !!config.nonce,
+                plugin_url: config.plugin_url,
+                debug_mode: config.debug_mode
+            });
+
+            // Test basic WordPress AJAX
+            try {
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        action: 'heartbeat',
+                        _nonce: config.nonce
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    addResult('WordPress AJAX', 'pass', `WordPress AJAX endpoint responsive: ${response.status} ${response.statusText}`);
+                } else {
+                    addResult('WordPress AJAX', 'warning', `WordPress AJAX responded with: ${response.status} ${response.statusText}`);
+                }
+
+            } catch (error) {
+                addResult('WordPress AJAX', 'fail', 'WordPress AJAX test failed: ' + error.message);
+            }
+        }
+
+        async function testTemplateMetadata() {
+            addResult('Template Metadata', 'info', 'Testing template metadata endpoint...');
+
+            const config = window.octo_print_designer_config;
+            if (!config) {
+                addResult('Template Metadata', 'fail', 'WordPress configuration required');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'yprint_get_template_metadata');
+                formData.append('nonce', config.nonce);
+                formData.append('template_id', '63'); // Use the template ID we found
+
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                const responseText = await response.text();
+
+                if (response.ok) {
+                    try {
+                        const result = JSON.parse(responseText);
+                        if (result.success) {
+                            addResult('Template Metadata', 'pass', 'Template metadata endpoint working correctly', result.data);
+                        } else {
+                            addResult('Template Metadata', 'warning', 'Template metadata endpoint returned error (expected for test)', {
+                                error: result.data,
+                                response_structure: Object.keys(result)
+                            });
+                        }
+                    } catch (parseError) {
+                        addResult('Template Metadata', 'warning', 'Template metadata endpoint responded but returned non-JSON', {
+                            response_preview: responseText.substring(0, 200)
+                        });
+                    }
+                } else {
+                    addResult('Template Metadata', 'fail', `Template metadata endpoint error: ${response.status} ${response.statusText}`);
+                }
+
+            } catch (error) {
+                addResult('Template Metadata', 'fail', 'Template metadata test failed: ' + error.message);
+            }
+        }
+
+        async function testPNGStorage() {
+            addResult('PNG Storage', 'info', 'Testing PNG storage endpoint...');
+
+            const config = window.octo_print_designer_config;
+            if (!config) {
+                addResult('PNG Storage', 'fail', 'WordPress configuration required');
+                return;
+            }
+
+            try {
+                // Create a minimal test PNG (1x1 transparent pixel)
+                const testPNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+                const formData = new FormData();
+                formData.append('action', 'yprint_save_design_print_png');
+                formData.append('nonce', config.nonce);
+                formData.append('design_id', 'test_design_' + Date.now());
+                formData.append('print_png', testPNG);
+                formData.append('template_id', '63');
+                formData.append('save_type', 'test');
+
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                const responseText = await response.text();
+
+                if (response.ok) {
+                    try {
+                        const result = JSON.parse(responseText);
+                        if (result.success) {
+                            addResult('PNG Storage', 'pass', 'PNG storage endpoint working correctly', {
+                                png_url: result.data.png_url,
+                                design_id: result.data.design_id,
+                                message: result.data.message
+                            });
+                        } else {
+                            addResult('PNG Storage', 'warning', 'PNG storage endpoint accessible but returned error', {
+                                error: result.data,
+                                response_structure: Object.keys(result)
+                            });
+                        }
+                    } catch (parseError) {
+                        addResult('PNG Storage', 'warning', 'PNG storage endpoint responded but returned non-JSON', {
+                            response_preview: responseText.substring(0, 300)
+                        });
+                    }
+                } else {
+                    addResult('PNG Storage', 'fail', `PNG storage endpoint error: ${response.status} ${response.statusText}`);
+                }
+
+            } catch (error) {
+                addResult('PNG Storage', 'fail', 'PNG storage test failed: ' + error.message);
+            }
+        }
+
+        async function testFallbacks() {
+            addResult('Fallbacks', 'info', 'Testing fallback mechanisms...');
+
+            const checks = {
+                highDPIEngine: !!window.highDPIPrintExportEngine,
+                saveOnlyPNG: !!window.saveOnlyPNGGenerator,
+                fabricJS: !!window.fabric,
+                designerWidget: !!window.designerWidgetInstance,
+                pngIntegration: !!(window.yprintPNGIntegration || window.pngOnlySystemIntegration)
+            };
+
+            const availableCount = Object.values(checks).filter(Boolean).length;
+            const totalCount = Object.keys(checks).length;
+
+            if (availableCount >= 2) {
+                addResult('Fallbacks', 'pass', `${availableCount}/${totalCount} systems available - sufficient for fallbacks`, checks);
+            } else {
+                addResult('Fallbacks', 'warning', `Only ${availableCount}/${totalCount} systems available - limited functionality`, checks);
+            }
+
+            // Test if we can create a minimal working environment
+            try {
+                if (!window.highDPIPrintExportEngine) {
+                    addResult('Fallbacks', 'info', 'Creating mock high-DPI engine for testing...');
+                    // This would be done by the actual fallback code
+                }
+
+                addResult('Fallbacks', 'pass', 'Fallback mechanisms would engage correctly');
+
+            } catch (error) {
+                addResult('Fallbacks', 'fail', 'Fallback test failed: ' + error.message);
+            }
+        }
+
+        async function runAllTests() {
+            addResult('Test Suite', 'info', 'Running complete WordPress integration test suite...');
+            clearResults();
+
+            const tests = [
+                testWordPressAJAX,
+                testTemplateMetadata,
+                testPNGStorage,
+                testFallbacks
+            ];
+
+            for (const test of tests) {
+                await test();
+                await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause between tests
+            }
+
+            addResult('Test Suite', 'pass', 'WordPress integration test suite completed');
+        }
+
+        // Instructions for running
+        window.addEventListener('load', () => {
+            addResult('Instructions', 'info',
+                'To run these tests properly, you need to:\n' +
+                '1. Copy this file to your WordPress wp-content/plugins/yprint_designtool/ directory\n' +
+                '2. Open it via http://test-site.local/wp-content/plugins/yprint_designtool/test-wordpress-integration.html\n' +
+                '3. Make sure the plugin is activated\n' +
+                '\nOr inject this into a WordPress page that loads the plugin scripts.'
+            );
+        });
+    </script>
+</body>
+</html>

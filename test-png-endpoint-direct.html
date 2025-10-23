@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 PNG Endpoint Direct Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 10px; font-size: 14px; }
+        textarea { width: 100%; height: 200px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🔍 PNG Endpoint Direct Test</h1>
+
+    <p>Test the PNG save endpoint directly to isolate HTTP 400 errors</p>
+
+    <button onclick="testPngEndpoint()">🚀 Test PNG Save Endpoint</button>
+    <button onclick="testWithCurl()">📡 Generate cURL Command</button>
+
+    <div id="results"></div>
+
+    <h3>Generated cURL Command:</h3>
+    <textarea id="curlCommand" readonly></textarea>
+
+    <script>
+        function addResult(title, status, message) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${status}`;
+            resultDiv.innerHTML = `<strong>${title}:</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function testPngEndpoint() {
+            document.getElementById('results').innerHTML = '';
+
+            try {
+                // First check if we have WordPress config
+                if (!window.octo_print_designer_config) {
+                    addResult('Config', 'fail', 'WordPress config not found - open this from WordPress page');
+                    return;
+                }
+
+                const config = window.octo_print_designer_config;
+
+                // Create minimal test data
+                const testData = {
+                    action: 'yprint_save_design_print_png',
+                    nonce: config.nonce,
+                    design_id: 'test_' + Date.now(),
+                    print_png: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' // 1x1 transparent PNG
+                };
+
+                addResult('Test Data', 'info', `Design ID: ${testData.design_id}, Nonce: ${config.nonce ? 'Present' : 'Missing'}`);
+
+                // Test with FormData (current method)
+                const formData = new FormData();
+                Object.keys(testData).forEach(key => {
+                    formData.append(key, testData[key]);
+                });
+
+                addResult('Request', 'info', 'Sending FormData request...');
+
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                addResult('Response Status', response.ok ? 'pass' : 'fail',
+                    `HTTP ${response.status} ${response.statusText}`);
+
+                const responseText = await response.text();
+                addResult('Response Body', response.ok ? 'pass' : 'info',
+                    responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+
+                // Also test with URL-encoded data
+                addResult('Alternative Test', 'info', 'Testing with URL-encoded data...');
+
+                const urlencoded = new URLSearchParams(testData);
+                const response2 = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: urlencoded,
+                    credentials: 'same-origin'
+                });
+
+                addResult('Alt Response Status', response2.ok ? 'pass' : 'fail',
+                    `HTTP ${response2.status} ${response2.statusText}`);
+
+                const responseText2 = await response2.text();
+                addResult('Alt Response Body', response2.ok ? 'pass' : 'info',
+                    responseText2.substring(0, 500) + (responseText2.length > 500 ? '...' : ''));
+
+            } catch (error) {
+                addResult('Error', 'fail', error.message);
+                console.error('Test error:', error);
+            }
+        }
+
+        function testWithCurl() {
+            if (!window.octo_print_designer_config) {
+                addResult('cURL', 'fail', 'WordPress config not found');
+                return;
+            }
+
+            const config = window.octo_print_designer_config;
+            const curlCommand = `curl -X POST "${config.ajax_url}" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "action=yprint_save_design_print_png" \\
+  -d "nonce=${config.nonce}" \\
+  -d "design_id=test_curl_$(date +%s)" \\
+  -d "print_png=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" \\
+  -v`;
+
+            document.getElementById('curlCommand').value = curlCommand;
+            addResult('cURL', 'pass', 'cURL command generated - copy and run in terminal');
+        }
+    </script>
+</body>
+</html>
