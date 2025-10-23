@@ -83,6 +83,19 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🔍 FORENSIC DEBUGGING: Q1-Q4 Pipeline Analysis
+        $raw_input = file_get_contents('php://input');
+        $raw_length = strlen($raw_input);
+        error_log("🔬 Q1: Raw input transfer check - Length: {$raw_length} bytes");
+
+        error_log('🔬 Q2: POST array dump - Keys: ' . (empty($_POST) ? 'EMPTY' : implode(', ', array_keys($_POST))));
+        if (!empty($_POST['print_png'])) {
+            $png_preview = substr($_POST['print_png'], 0, 100) . '...';
+            error_log("🔬 Q3: PNG data preview - First 100 chars: {$png_preview}");
+        } else {
+            error_log('🔬 Q3: PNG data preview - NO PNG DATA FOUND');
+        }
+
         // 🔍 ULTRA-DETAILED DEBUG: Log everything about the incoming request
         error_log('🔍 PNG STORAGE: === INCOMING REQUEST START ===');
         error_log('🔍 PNG STORAGE: Request method: ' . $_SERVER['REQUEST_METHOD']);
@@ -138,7 +151,11 @@ class PNG_Storage_Handler {
 
             // 🔧 ENHANCED VALIDATION: Validate PNG data format
             error_log('🔍 PNG STORAGE: About to validate PNG data...');
-            if (!$this->validatePNGData($print_png)) {
+
+            // 🔬 Q4: PNG validation result
+            $png_validation = $this->validatePNGData($print_png);
+            error_log("🔬 Q4: PNG validation result - " . ($png_validation ? "VALID" : "INVALID"));
+            if (!$png_validation) {
                 error_log('❌ PNG STORAGE: Invalid PNG data format');
                 wp_send_json_error('Invalid PNG data format');
                 return;

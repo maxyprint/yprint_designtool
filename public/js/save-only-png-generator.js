@@ -1133,6 +1133,19 @@ class SaveOnlyPNGGenerator {
             ajax_url: config.ajax_url
         });
 
+        // 🔬 CLIENT-SIDE Q1-Q4 FORENSIC DEBUGGING
+        const serializedData = new URLSearchParams(requestData).toString();
+        const dataLength = serializedData.length;
+        console.log(`🔬 CLIENT Q1: Serialized data length - ${dataLength} bytes`);
+
+        if (requestData.print_png) {
+            const pngPreview = requestData.print_png.substring(0, 100) + '...';
+            console.log(`🔬 CLIENT Q2: PNG data preview - ${pngPreview}`);
+            console.log(`🔬 CLIENT Q3: PNG data starts with 'data:image' - ${requestData.print_png.startsWith('data:image')}`);
+        } else {
+            console.log('🔬 CLIENT Q2: NO PNG DATA IN REQUEST');
+        }
+
         const response = await fetch(config.ajax_url, {
             method: 'POST',
             headers: {
@@ -1148,6 +1161,12 @@ class SaveOnlyPNGGenerator {
 
         const result = await response.json();
         console.log('📡 SAVE-ONLY PNG: Server response:', result);
+
+        // 🔬 CLIENT Q4: Server response validation
+        console.log(`🔬 CLIENT Q4: Server success - ${result.success}`);
+        if (!result.success) {
+            console.log(`🔬 CLIENT Q4: Server error - ${result.data || 'No error message'}`);
+        }
 
         if (!result.success) {
             console.error('❌ SAVE-ONLY PNG: Server returned error:', result);
