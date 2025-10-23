@@ -137,11 +137,13 @@ class PNG_Storage_Handler {
             $print_png = $_POST['print_png'] ?? $_REQUEST['print_png'];
 
             // 🔧 ENHANCED VALIDATION: Validate PNG data format
+            error_log('🔍 PNG STORAGE: About to validate PNG data...');
             if (!$this->validatePNGData($print_png)) {
                 error_log('❌ PNG STORAGE: Invalid PNG data format');
                 wp_send_json_error('Invalid PNG data format');
                 return;
             }
+            error_log('✅ PNG STORAGE: PNG data validation passed');
             $print_area_px = stripslashes($_POST['print_area_px'] ?? $_REQUEST['print_area_px'] ?? '{}');
             $print_area_mm = stripslashes($_POST['print_area_mm'] ?? $_REQUEST['print_area_mm'] ?? '{}');
             $template_id = sanitize_text_field($_POST['template_id'] ?? $_REQUEST['template_id'] ?? 'default');
@@ -158,7 +160,9 @@ class PNG_Storage_Handler {
             }
 
             // Save print PNG file
+            error_log('🔍 PNG STORAGE: About to save PNG file...');
             $png_file_info = $this->save_print_png($print_png, $design_id, $template_id);
+            error_log('✅ PNG STORAGE: PNG file save completed');
 
             if (!$png_file_info) {
                 wp_send_json_error('Failed to save print PNG');
