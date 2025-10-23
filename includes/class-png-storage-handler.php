@@ -41,6 +41,10 @@ class PNG_Storage_Handler {
         add_action('wp_ajax_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
         add_action('wp_ajax_nopriv_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
 
+        // Register nonce refresh handler for session stability
+        add_action('wp_ajax_yprint_refresh_nonce', array($this, 'handle_refresh_nonce'));
+        add_action('wp_ajax_nopriv_yprint_refresh_nonce', array($this, 'handle_refresh_nonce'));
+
         // 📥 SAVE-ONLY PNG: Handler to retrieve existing PNGs (no generation)
         add_action('wp_ajax_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
         add_action('wp_ajax_nopriv_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
@@ -244,6 +248,28 @@ class PNG_Storage_Handler {
         } catch (Exception $e) {
             error_log('❌ PNG STORAGE: Save design PNG failed: ' . $e->getMessage());
             wp_send_json_error('Failed to save print PNG: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🔄 Nonce Refresh Handler
+     * Provides fresh nonces to prevent 403 errors during long design sessions
+     */
+    public function handle_refresh_nonce() {
+        try {
+            // Generate a fresh nonce
+            $fresh_nonce = wp_create_nonce('octo_print_designer_nonce');
+
+            error_log('🔄 NONCE REFRESH: Generated fresh nonce');
+
+            wp_send_json_success(array(
+                'nonce' => $fresh_nonce,
+                'message' => 'Nonce refreshed successfully'
+            ));
+
+        } catch (Exception $e) {
+            error_log('❌ NONCE REFRESH: Failed to refresh nonce: ' . $e->getMessage());
+            wp_send_json_error('Failed to refresh nonce: ' . $e->getMessage());
         }
     }
 
