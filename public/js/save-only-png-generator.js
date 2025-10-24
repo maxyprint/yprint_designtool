@@ -765,12 +765,18 @@ class SaveOnlyPNGGenerator {
             if (typeof this.pngEngine.exportEngine.exportWithTemplateMetadata === 'function') {
                 console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
 
-                const enhancedResult = await this.pngEngine.exportEngine.exportWithTemplateMetadata({
-                    multiplier: 3,
-                    quality: 1.0,
-                    enableBleed: false,
-                    debugMode: true
-                });
+                // Add timeout to prevent hanging
+                const enhancedResult = await Promise.race([
+                    this.pngEngine.exportEngine.exportWithTemplateMetadata({
+                        multiplier: 3,
+                        quality: 1.0,
+                        enableBleed: false,
+                        debugMode: true
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Enhanced PNG timeout')), 5000)
+                    )
+                ]);
 
                 if (enhancedResult) {
                     console.log('🎯 ENHANCED EXPORT SUCCESS:', {
@@ -808,6 +814,9 @@ class SaveOnlyPNGGenerator {
 
         } catch (error) {
             console.error('❌ ENHANCED PNG GENERATION: Failed:', error);
+            if (error.message === 'Enhanced PNG timeout') {
+                console.log('⏰ ENHANCED PNG: Timed out after 5 seconds, falling back to standard generation');
+            }
             return null;
         }
     }
