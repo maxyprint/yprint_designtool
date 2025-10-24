@@ -579,6 +579,10 @@ class SaveOnlyPNGGenerator {
         try {
             console.log(`🖨️ SAVE-ONLY PNG: Generating PNG for ${saveType}...`);
 
+            // 🚨 CRITICAL FIX: Restore missing server storage functionality
+            // This AJAX call was accidentally removed during the event-handler hotfix
+            console.log('🔍 PNG STORAGE: Starting server upload...');
+
             // 🔧 ENHANCED SAFETY: Check for any available export method
             if (!this.pngEngine || !this.pngEngine.exportEngine) {
                 throw new Error('Export engine not available');
@@ -588,7 +592,32 @@ class SaveOnlyPNGGenerator {
             const enhancedResult = await this.generateEnhancedPNG(designData, saveType, orderId);
             if (enhancedResult) {
                 console.log('✅ SAVE-ONLY PNG: Enhanced PNG with metadata completed successfully');
-                return enhancedResult;
+                // 🚨 CRITICAL FIX: Don't return early! We need to store in database!
+                console.log('🔍 PNG STORAGE: Enhanced PNG generated, now storing in database...');
+
+                // Use enhanced PNG as the print PNG and continue to storage
+                const enhancedPngData = {
+                    design_id: this.generateDesignId(designData),
+                    print_png: enhancedResult.dataUrl || enhancedResult.print_png,
+                    save_type: saveType,
+                    order_id: orderId,
+                    generated_at: new Date().toISOString(),
+                    print_area_px: JSON.stringify(enhancedResult.printAreaPx || { width: 800, height: 600 }),
+                    print_area_mm: JSON.stringify(enhancedResult.printAreaMm || { width: 200, height: 150 }),
+                    template_id: enhancedResult.templateId || 'enhanced'
+                };
+
+                // Store enhanced PNG in database
+                const saveResult = await this.storePNGInDatabase(enhancedPngData);
+
+                const duration = Date.now() - startTime;
+                console.log(`✅ SAVE-ONLY PNG: Enhanced PNG generated and stored in ${duration}ms`);
+
+                return {
+                    ...enhancedResult,
+                    ...saveResult,
+                    storage_method: 'enhanced_with_database'
+                };
             }
 
             // 🎯 PRIORITY 2: Try print-ready PNG with cropping
