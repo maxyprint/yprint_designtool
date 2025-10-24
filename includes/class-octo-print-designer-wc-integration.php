@@ -4453,8 +4453,8 @@ private function build_print_provider_email_content($order, $design_items, $note
             'timestamp' => time()
         );
 
-        // Add to all checkout scripts as 'data' global variable
-        wp_localize_script('yprint-address-ajax', 'data', $global_checkout_data);
+        // Add to all checkout scripts as 'yprint_checkout_data' global variable (fixed namespace collision)
+        wp_localize_script('yprint-address-ajax', 'yprint_checkout_data', $global_checkout_data);
 
         // Create Stripe configuration to fix yprint_stripe_vars undefined
         $stripe_data = array(
