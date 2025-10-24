@@ -621,46 +621,36 @@ class SaveOnlyPNGGenerator {
             }
 
             // 🎯 PRIORITY 2: Try print-ready PNG with cropping
-            console.log('🖨️ SAVE-ONLY PNG: Enhanced generation failed, falling back to standard PNG generation...');
-            console.log('🔍 PNG STORAGE: Starting fallback PNG generation process...');
+            console.log('🔍 PNG STORAGE: Enhanced generation failed, trying fallback PNG generation...');
             let printPNG;
 
-            try {
-                if (typeof this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping === 'function') {
-                    console.log('✅ SAVE-ONLY PNG: Using print-ready PNG with cropping');
-                    const pngResult = await this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
-                        multiplier: 3,
-                        quality: 1.0,
-                        enableBleed: false,
-                        debugMode: true
-                    });
+            if (typeof this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping === 'function') {
+                const pngResult = await this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
+                    multiplier: 3,
+                    quality: 1.0,
+                    enableBleed: false,
+                    debugMode: false
+                });
 
-                    printPNG = pngResult ? pngResult.dataUrl : null;
-                    console.log('🔍 PNG STORAGE: Print-ready PNG result:', printPNG ? `${printPNG.length} chars` : 'null');
+                printPNG = pngResult ? pngResult.dataUrl : null;
 
-                    // Log enhanced metadata
-                    if (pngResult && pngResult.metadata) {
-                        console.log('🎯 ENHANCED PNG METADATA:', pngResult.metadata);
-                    }
-
-                } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
-                    console.log('📦 SAVE-ONLY PNG: Using standard export (fallback)');
-                    printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
-                        dpi: 300,
-                        format: 'png',
-                        quality: 1.0
-                    });
-                    console.log('🔍 PNG STORAGE: Standard export result:', printPNG ? `${printPNG.length} chars` : 'null');
-                } else {
-                    throw new Error('No PNG export methods available');
+                // Log enhanced metadata
+                if (pngResult && pngResult.metadata) {
+                    console.log('🎯 ENHANCED PNG METADATA:', pngResult.metadata);
                 }
 
-                if (!printPNG) {
-                    throw new Error('PNG generation failed - no data returned');
-                }
-            } catch (exportError) {
-                console.error('❌ PNG EXPORT ERROR:', exportError);
-                throw new Error(`PNG export failed: ${exportError.message}`);
+            } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
+                printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
+                    dpi: 300,
+                    format: 'png',
+                    quality: 1.0
+                });
+            } else {
+                throw new Error('No PNG export methods available');
+            }
+
+            if (!printPNG) {
+                throw new Error('PNG generation failed - no data returned');
             }
 
             // Store PNG with metadata
@@ -676,11 +666,7 @@ class SaveOnlyPNGGenerator {
             };
 
             // Save to WordPress database
-            console.log('🔍 PNG STORAGE: About to call storePNGInDatabase with data:', {
-                design_id: pngData.design_id,
-                print_png_length: pngData.print_png ? pngData.print_png.length : 0,
-                save_type: pngData.save_type
-            });
+            console.log('🔍 PNG STORAGE: About to store PNG in database');
             const saveResult = await this.storePNGInDatabase(pngData);
 
             const duration = Date.now() - startTime;
