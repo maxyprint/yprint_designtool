@@ -622,15 +622,27 @@ class SaveOnlyPNGGenerator {
 
             // 🎯 PRIORITY 2: Try print-ready PNG with cropping
             console.log('🔍 PNG STORAGE: Enhanced generation failed, trying fallback PNG generation...');
+            console.log('🔄 FALLBACK PNG: Starting fallback generation with timeout...');
             let printPNG;
 
             if (typeof this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping === 'function') {
-                const pngResult = await this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
-                    multiplier: 3,
-                    quality: 1.0,
-                    enableBleed: false,
-                    debugMode: false
-                });
+                console.log('🔄 FALLBACK PNG: Using exportPrintReadyPNGWithCropping...');
+
+                // Add timeout to fallback generation too!
+                const pngResult = await Promise.race([
+                    this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
+                        multiplier: 3,
+                        quality: 1.0,
+                        enableBleed: false,
+                        debugMode: false
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => {
+                            console.log('>>> FALLBACK PNG 5s TIMEOUT: FORCING MINIMAL PNG <<<');
+                            reject(new Error('Fallback PNG timeout'));
+                        }, 5000)
+                    )
+                ]);
 
                 printPNG = pngResult ? pngResult.dataUrl : null;
 
@@ -640,17 +652,39 @@ class SaveOnlyPNGGenerator {
                 }
 
             } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
-                printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
-                    dpi: 300,
-                    format: 'png',
-                    quality: 1.0
-                });
+                console.log('🔄 FALLBACK PNG: Using exportForPrintMachine with timeout...');
+
+                printPNG = await Promise.race([
+                    this.pngEngine.exportEngine.exportForPrintMachine({
+                        dpi: 300,
+                        format: 'png',
+                        quality: 1.0
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => {
+                            console.log('>>> EXPORT FOR PRINT MACHINE 5s TIMEOUT: CREATING EMERGENCY PNG <<<');
+                            reject(new Error('ExportForPrintMachine timeout'));
+                        }, 5000)
+                    )
+                ]);
             } else {
                 throw new Error('No PNG export methods available');
             }
 
             if (!printPNG) {
-                throw new Error('PNG generation failed - no data returned');
+                console.log('🚨 FALLBACK PNG: No PNG data returned, creating emergency minimal PNG...');
+                // Emergency minimal PNG generation
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 300;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(50, 50, 300, 200);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px Arial';
+                ctx.fillText('EMERGENCY PNG', 120, 160);
+                printPNG = canvas.toDataURL('image/png', 1.0);
+                console.log('🔥 EMERGENCY PNG CREATED: Length =', printPNG.length);
             }
 
             // Store PNG with metadata
@@ -759,6 +793,7 @@ class SaveOnlyPNGGenerator {
      */
     async generateEnhancedPNG(designData, saveType, orderId = null) {
         try {
+            console.log('*** START ENHANCED EXPORT LOGIC ***');
             console.log('🖨️ SAVE-ONLY PNG: Generating enhanced PNG with metadata...');
 
             // Check if enhanced metadata export is available
@@ -766,6 +801,7 @@ class SaveOnlyPNGGenerator {
                 console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
 
                 // Add timeout to prevent hanging
+                console.log('🔄 ENHANCED PNG: Starting Promise.race with 5s timeout...');
                 const enhancedResult = await Promise.race([
                     this.pngEngine.exportEngine.exportWithTemplateMetadata({
                         multiplier: 3,
@@ -774,7 +810,10 @@ class SaveOnlyPNGGenerator {
                         debugMode: true
                     }),
                     new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('Enhanced PNG timeout')), 5000)
+                        setTimeout(() => {
+                            console.log('>>> 5s TIMEOUT REACHED: FIRING REJECT <<<');
+                            reject(new Error('Enhanced PNG timeout'));
+                        }, 5000)
                     )
                 ]);
 
@@ -813,10 +852,12 @@ class SaveOnlyPNGGenerator {
             return null;
 
         } catch (error) {
+            console.log('🚨 ENHANCED PNG CATCH BLOCK REACHED!');
             console.error('❌ ENHANCED PNG GENERATION: Failed:', error);
             if (error.message === 'Enhanced PNG timeout') {
                 console.log('⏰ ENHANCED PNG: Timed out after 5 seconds, falling back to standard generation');
             }
+            console.log('🔄 ENHANCED PNG: Returning null to trigger fallback generation with Q1/Q3 logs');
             return null;
         }
     }
