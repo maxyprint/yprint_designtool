@@ -87,6 +87,17 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🚨 ZWANGSANALYSE: Raw input logging (bypasses $_POST processing)
+        $raw_input = file_get_contents('php://input');
+        error_log('🚨 RAW INPUT LÄNGE: ' . strlen($raw_input) . ' bytes');
+        error_log('🚨 RAW INPUT PREVIEW: ' . substr($raw_input, 0, 200) . '...');
+
+        // 🚨 ZWANGSANALYSE: PHP Limits Check
+        $post_max_size = ini_get('post_max_size');
+        $upload_max_filesize = ini_get('upload_max_filesize');
+        $memory_limit = ini_get('memory_limit');
+        error_log('🚨 PHP LIMITS: post_max_size=' . $post_max_size . ', upload_max_filesize=' . $upload_max_filesize . ', memory_limit=' . $memory_limit);
+
         // 🔍 FORENSIC DEBUGGING: Q1-Q4 Pipeline Analysis
         error_log('🔍 PNG STORAGE: === FORENSIC DEBUGGING START ===');
 

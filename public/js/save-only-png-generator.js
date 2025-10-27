@@ -1160,6 +1160,19 @@ class SaveOnlyPNGGenerator {
 
         console.log('📡 SAVE-ONLY PNG: Sending to WordPress AJAX:', config.ajax_url);
 
+        // 🚨 ZWANGSANALYSE: Critical payload validation before AJAX
+        console.assert(pngData.print_png && pngData.print_png.length > 1000,
+            '🚨 KRITISCH: printPNG ist zu klein/leer!', {
+                printPNG_exists: !!pngData.print_png,
+                printPNG_type: typeof pngData.print_png,
+                printPNG_length: pngData.print_png ? pngData.print_png.length : 0,
+                printPNG_preview: pngData.print_png ? pngData.print_png.substring(0, 50) : 'NULL'
+            });
+
+        console.log(`🚨 DATENSTROM-BEWEIS: printPNG Größe = ${pngData.print_png ? pngData.print_png.length : 0} Zeichen`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Ist >500KB = ${pngData.print_png && pngData.print_png.length > 500000 ? 'JA' : 'NEIN'}`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Beginnt mit data:image = ${pngData.print_png && pngData.print_png.startsWith('data:image') ? 'JA' : 'NEIN'}`);
+
         // 🔍 ENHANCED DEBUG: Log the exact request being sent
         const requestData = {
             action: 'yprint_save_design_print_png',
