@@ -1192,12 +1192,20 @@ class SaveOnlyPNGGenerator {
         const dataLength = serializedData.length;
         console.log(`🔬 CLIENT Q1: Serialized data length - ${dataLength} bytes`);
 
+        // Q1-Beweis: PNG-Datenlänge
+        console.log('Q1-Beweis: PNG-Datenlänge:', requestData.print_png ? requestData.print_png.length : 0);
+
         if (requestData.print_png) {
             const pngPreview = requestData.print_png.substring(0, 100) + '...';
             console.log(`🔬 CLIENT Q2: PNG data preview - ${pngPreview}`);
             console.log(`🔬 CLIENT Q3: PNG data starts with 'data:image' - ${requestData.print_png.startsWith('data:image')}`);
+
+            // Q3-Beweis: PNG-Datenstart
+            console.log('Q3-Beweis: PNG-Datenstart:', requestData.print_png ? requestData.print_png.substring(0, 30) : 'NULL');
         } else {
             console.log('🔬 CLIENT Q2: NO PNG DATA IN REQUEST');
+            console.log('Q1-Beweis: PNG-Datenlänge:', 0);
+            console.log('Q3-Beweis: PNG-Datenstart:', 'NULL');
         }
 
         const response = await fetch(config.ajax_url, {

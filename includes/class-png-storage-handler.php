@@ -87,6 +87,9 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🚨 FORENSIC ENTRY POINT LOGGING
+        error_log("--- PNG Handler Reached: START VALIDATION ---");
+
         // 🚨 ZWANGSANALYSE: Raw input logging (bypasses $_POST processing)
         $raw_input = file_get_contents('php://input');
         error_log('🚨 RAW INPUT LÄNGE: ' . strlen($raw_input) . ' bytes');
