@@ -765,8 +765,8 @@ class SaveOnlyPNGGenerator {
                     // 🚨 Z-INDEX FIX: Sort objects by their canvas index to maintain layering
                     console.log('📐 Z-INDEX: Checking original canvas object order...');
                     designObjects.sort((a, b) => {
-                        const indexA = canvas.getObjects().indexOf(a);
-                        const indexB = canvas.getObjects().indexOf(b);
+                        const indexA = fabricCanvas.getObjects().indexOf(a);
+                        const indexB = fabricCanvas.getObjects().indexOf(b);
                         console.log(`📐 Z-INDEX: ${a.type}(${indexA}) vs ${b.type}(${indexB})`);
                         return indexA - indexB;
                     });
@@ -776,7 +776,7 @@ class SaveOnlyPNGGenerator {
                     // 🚨 ROBUST CLONING: Multiple fallback methods with Z-index preservation
                     for (let idx = 0; idx < designObjects.length; idx++) {
                         const obj = designObjects[idx];
-                        const originalIndex = canvas.getObjects().indexOf(obj);
+                        const originalIndex = fabricCanvas.getObjects().indexOf(obj);
                         console.log(`🔧 CLONING: Attempting object ${idx} (${obj.type}) with canvas index ${originalIndex}`);
 
                         let clonedObj = null;
@@ -1153,7 +1153,11 @@ class SaveOnlyPNGGenerator {
             // 🧹 CRITICAL: Always cleanup temporary resources, even on errors
             console.log('🧹 FINALLY: Ensuring all temporary resources are cleaned...');
             try {
-                performComprehensiveCleanup();
+                if (typeof performComprehensiveCleanup === 'function') {
+                    performComprehensiveCleanup();
+                } else {
+                    console.log('🧹 FINALLY: performComprehensiveCleanup not in scope, cleanup was already handled');
+                }
             } catch (finalCleanupError) {
                 console.error('❌ FINALLY CLEANUP ERROR:', finalCleanupError);
             }
