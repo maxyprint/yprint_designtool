@@ -97,6 +97,11 @@ function add_cors_headers_to_ajax() {
 require plugin_dir_path( __FILE__ ) . 'includes/class-octo-print-designer.php';
 
 /**
+ * Load PNG Storage AJAX Handler
+ */
+require plugin_dir_path( __FILE__ ) . 'png-storage-handler.php';
+
+/**
  * Begins execution of the plugin.
  *
  * Since everything within the plugin is registered via hooks,
