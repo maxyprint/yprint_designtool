@@ -781,10 +781,11 @@ class SaveOnlyPNGGenerator {
 
                         let clonedObj = null;
 
-                        // METHOD 1: Promise-based clone with timeout
+                        // METHOD 1: Promise-based clone with correct API signature
                         try {
                             clonedObj = await Promise.race([
                                 new Promise((resolve, reject) => {
+                                    // Use correct Fabric.js clone API with properties array
                                     obj.clone((result) => {
                                         if (result) {
                                             console.log(`✅ CLONE METHOD 1: Promise-based clone successful for object ${idx}`);
@@ -792,7 +793,7 @@ class SaveOnlyPNGGenerator {
                                         } else {
                                             reject(new Error(`Clone returned null for object ${idx}`));
                                         }
-                                    });
+                                    }, ['left', 'top', 'scaleX', 'scaleY', 'angle', 'opacity', 'flipX', 'flipY']);
                                 }),
                                 new Promise((_, reject) =>
                                     setTimeout(() => reject(new Error(`Clone timeout for object ${idx}`)), 2000)
@@ -802,16 +803,24 @@ class SaveOnlyPNGGenerator {
                             console.warn(`⚠️ CLONE METHOD 1 FAILED for object ${idx}:`, error.message);
                         }
 
-                        // METHOD 2: toObject/fromObject fallback
+                        // METHOD 2: Async enlivenObjects fallback
                         if (!clonedObj) {
                             try {
-                                console.log(`🔧 CLONE METHOD 2: Attempting toObject/fromObject for object ${idx}`);
+                                console.log(`🔧 CLONE METHOD 2: Attempting enlivenObjects for object ${idx}`);
                                 const objData = obj.toObject();
-                                if (objData && typeof fabric[obj.type] === 'function') {
-                                    clonedObj = new fabric[obj.type](objData);
-                                    console.log(`✅ CLONE METHOD 2: toObject/fromObject successful for object ${idx}`);
+                                if (objData) {
+                                    clonedObj = await new Promise((resolve, reject) => {
+                                        fabric.util.enlivenObjects([objData], (objects) => {
+                                            if (objects && objects[0]) {
+                                                console.log(`✅ CLONE METHOD 2: enlivenObjects successful for object ${idx}`);
+                                                resolve(objects[0]);
+                                            } else {
+                                                reject(new Error('enlivenObjects returned empty result'));
+                                            }
+                                        });
+                                    });
                                 } else {
-                                    console.warn(`⚠️ CLONE METHOD 2: Invalid object data or constructor for ${obj.type}`);
+                                    console.warn(`⚠️ CLONE METHOD 2: Invalid object data for ${obj.type}`);
                                 }
                             } catch (error) {
                                 console.warn(`⚠️ CLONE METHOD 2 FAILED for object ${idx}:`, error.message);
