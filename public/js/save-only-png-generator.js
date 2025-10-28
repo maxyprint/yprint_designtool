@@ -652,29 +652,91 @@ class SaveOnlyPNGGenerator {
                 }
 
             } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
-                console.log('🔄 FALLBACK PNG: Using exportForPrintMachine with timeout...');
+                try {
+                    console.log('🔄 FALLBACK PNG: Using exportForPrintMachine with timeout...');
 
-                printPNG = await Promise.race([
-                    this.pngEngine.exportEngine.exportForPrintMachine({
-                        dpi: 300,
-                        format: 'png',
-                        quality: 1.0
-                    }),
-                    new Promise((_, reject) =>
-                        setTimeout(() => {
-                            console.log('>>> EXPORT FOR PRINT MACHINE 5s TIMEOUT: CREATING EMERGENCY PNG <<<');
-                            reject(new Error('ExportForPrintMachine timeout'));
-                        }, 5000)
-                    )
-                ]);
+                    printPNG = await Promise.race([
+                        this.pngEngine.exportEngine.exportForPrintMachine({
+                            dpi: 300,
+                            format: 'png',
+                            quality: 1.0
+                        }),
+                        new Promise((_, reject) =>
+                            setTimeout(() => {
+                                console.log('>>> EXPORT FOR PRINT MACHINE 5s TIMEOUT: CREATING EMERGENCY PNG <<<');
+                                reject(new Error('ExportForPrintMachine timeout'));
+                            }, 5000)
+                        )
+                    ]);
+                } catch (e) {
+                    console.log('🔄 FALLBACK PNG: exportForPrintMachine failed:', e.message);
+                    printPNG = null;
+                }
             } else {
-                console.log('🚨 ULTIMATE FALLBACK: Using direct canvas extraction...');
-                const canvasElement = document.getElementById('octo-print-designer-canvas');
-                if (canvasElement) {
-                    printPNG = canvasElement.toDataURL('image/png', 1.0);
-                    console.log('🔥 DIRECT CANVAS PNG CREATED: Length =', printPNG.length);
+                console.log('🚨 ULTIMATE FALLBACK: Using design-only Fabric canvas extraction...');
+
+                // Step 1: Access Fabric canvas instance
+                const fabricCanvas = window.designerWidgetInstance?.fabricCanvas;
+
+                if (fabricCanvas) {
+                    console.log('✅ Fabric canvas found, extracting design-only PNG...');
+
+                    // Step 1: Initialisierung des temporären Canvas
+                    console.log('🎨 Creating temporary canvas for design-only extraction...');
+                    const tempCanvas = new window.fabric.Canvas();
+                    tempCanvas.setDimensions({ width: 1312, height: 840 });
+                    tempCanvas.backgroundColor = 'transparent';
+
+                    // Step 2: Objekt-Iteration - Alle Design-Objekte abrufen
+                    console.log('🔍 Getting all objects from main canvas...');
+                    const allObjects = fabricCanvas.getObjects();
+                    console.log(`📊 Found ${allObjects.length} objects on main canvas`);
+
+                    // Step 3: Filtern und Klonen - Nur Design-Elemente kopieren
+                    let designObjectCount = 0;
+                    allObjects.forEach((obj, idx) => {
+                        // Filter: Exclude background/mockup elements
+                        if (!obj.isBackground && !obj.isViewImage && !obj.isTemplateBackground) {
+                            console.log(`✅ Cloning design object ${idx} (${obj.type})`);
+
+                            // Clone the object and add to temporary canvas
+                            obj.clone((clonedObj) => {
+                                tempCanvas.add(clonedObj);
+                                designObjectCount++;
+                            });
+                        } else {
+                            console.log(`🚫 Skipping background object ${idx} (${obj.type})`);
+                        }
+                    });
+
+                    console.log(`🎯 Cloned ${designObjectCount} design objects to temporary canvas`);
+
+                    // Force render of temporary canvas
+                    tempCanvas.renderAll();
+
+                    // Step 4: Finale Zuweisung - Base64-String generieren
+                    console.log('🖼️ Generating final design-only PNG...');
+                    const exportOptions = {
+                        format: 'png',
+                        quality: 1.0,
+                        multiplier: 3.125 // 300 DPI scaling
+                    };
+
+                    printPNG = tempCanvas.toDataURL(exportOptions);
+                    console.log('🔥 DESIGN-ONLY PNG CREATED: Length =', printPNG.length);
+
+                    // Cleanup: Dispose temporary canvas
+                    tempCanvas.dispose();
+
                 } else {
-                    throw new Error('No PNG export methods available');
+                    console.log('❌ No Fabric canvas available, falling back to DOM extraction...');
+                    const canvasElement = document.getElementById('octo-print-designer-canvas');
+                    if (canvasElement) {
+                        printPNG = canvasElement.toDataURL('image/png', 1.0);
+                        console.log('🔥 DOM CANVAS PNG CREATED: Length =', printPNG.length);
+                    } else {
+                        throw new Error('No PNG export methods available');
+                    }
                 }
             }
 
