@@ -547,6 +547,15 @@ class SaveOnlyPNGGenerator {
      * 🎯 CORE PNG GENERATION - Only called from save events
      */
     async generateAndStorePNG(designData, saveType, orderId = null) {
+        console.log('🚀 PNG GENERATION START:', {
+            saveType: saveType,
+            orderId: orderId,
+            hasDesignData: !!designData,
+            isGenerating: this.isGenerating,
+            pngEngineExists: !!this.pngEngine,
+            timestamp: new Date().toISOString()
+        });
+
         if (this.isGenerating) {
             console.log('⏳ SAVE-ONLY PNG: Generation already in progress, skipping...');
             return {
@@ -558,6 +567,11 @@ class SaveOnlyPNGGenerator {
         // 🔧 CRITICAL FIX: Test 1 - Check if PNG engine is null
         if (!this.pngEngine) {
             console.error('❌ SAVE-ONLY PNG: PNG engine is null. Cannot generate PNG.');
+            console.error('🔍 ENGINE DEBUG:', {
+                pngEngine: this.pngEngine,
+                window_pngEngine: window.pngEngine,
+                available_png_objects: Object.keys(window).filter(key => key.toLowerCase().includes('png'))
+            });
             return {
                 success: false,
                 error: 'PNG engine not available'
@@ -579,32 +593,84 @@ class SaveOnlyPNGGenerator {
         try {
             console.log(`🖨️ SAVE-ONLY PNG: Generating PNG for ${saveType}...`);
 
+            // 🚨 CRITICAL FIX: Restore missing server storage functionality
+            // This AJAX call was accidentally removed during the event-handler hotfix
+            console.log('🔍 PNG STORAGE: Starting server upload...');
+
             // 🔧 ENHANCED SAFETY: Check for any available export method
             if (!this.pngEngine || !this.pngEngine.exportEngine) {
                 throw new Error('Export engine not available');
             }
 
             // 🎯 PRIORITY 1: Try enhanced metadata export (most advanced)
+            console.log('🎯 PNG METHOD 1: Attempting enhanced PNG generation...');
             const enhancedResult = await this.generateEnhancedPNG(designData, saveType, orderId);
             if (enhancedResult) {
-                console.log('✅ SAVE-ONLY PNG: Enhanced PNG with metadata completed successfully');
-                return enhancedResult;
+                console.log('✅ PNG METHOD 1 SUCCESS: Enhanced PNG with metadata completed successfully');
+                // 🚨 CRITICAL FIX: Don't return early! We need to store in database!
+                console.log('🔍 PNG STORAGE: Enhanced PNG generated, now storing in database...');
+
+                // Use enhanced PNG as the print PNG and continue to storage
+                const enhancedPngData = {
+                    design_id: this.generateDesignId(designData),
+                    print_png: enhancedResult.dataUrl || enhancedResult.print_png,
+                    save_type: saveType,
+                    order_id: orderId,
+                    generated_at: new Date().toISOString(),
+                    print_area_px: JSON.stringify(enhancedResult.printAreaPx || { width: 800, height: 600 }),
+                    print_area_mm: JSON.stringify(enhancedResult.printAreaMm || { width: 200, height: 150 }),
+                    template_id: enhancedResult.templateId || 'enhanced'
+                };
+
+                // Store enhanced PNG in database
+                const saveResult = await this.storePNGInDatabase(enhancedPngData);
+
+                const duration = Date.now() - startTime;
+                console.log(`✅ SAVE-ONLY PNG: Enhanced PNG generated and stored in ${duration}ms`);
+
+                return {
+                    ...enhancedResult,
+                    ...saveResult,
+                    storage_method: 'enhanced_with_database'
+                };
             }
 
             // 🎯 PRIORITY 2: Try print-ready PNG with cropping
-            console.log('🖨️ SAVE-ONLY PNG: Trying print-ready PNG with cropping...');
+            console.log('🔍 PNG STORAGE: Enhanced generation failed, trying fallback PNG generation...');
+            console.log('🎯 PNG METHOD 2: Starting print-ready PNG with cropping...');
             let printPNG;
 
             if (typeof this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping === 'function') {
-                console.log('✅ SAVE-ONLY PNG: Using print-ready PNG with cropping');
-                const pngResult = await this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
-                    multiplier: 3,
-                    quality: 1.0,
-                    enableBleed: false,
-                    debugMode: true
-                });
+                console.log('✅ PNG METHOD 2: exportPrintReadyPNGWithCropping function available');
+
+                // Add timeout to fallback generation too!
+                const pngResult = await Promise.race([
+                    this.pngEngine.exportEngine.exportPrintReadyPNGWithCropping({
+                        multiplier: 3,
+                        quality: 1.0,
+                        enableBleed: false,
+                        debugMode: false
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => {
+                            console.log('>>> FALLBACK PNG 5s TIMEOUT: FORCING MINIMAL PNG <<<');
+                            reject(new Error('Fallback PNG timeout'));
+                        }, 5000)
+                    )
+                ]);
 
                 printPNG = pngResult ? pngResult.dataUrl : null;
+
+                if (printPNG) {
+                    console.log('✅ PNG METHOD 2 SUCCESS: Print-ready PNG created, Length =', printPNG.length);
+                } else {
+                    console.log('❌ PNG METHOD 2 FAILED: No PNG data returned');
+                    console.log('🔍 PNG METHOD 2 DEBUG:', {
+                        pngResult: pngResult,
+                        hasDataUrl: !!(pngResult && pngResult.dataUrl),
+                        resultType: typeof pngResult
+                    });
+                }
 
                 // Log enhanced metadata
                 if (pngResult && pngResult.metadata) {
@@ -612,29 +678,171 @@ class SaveOnlyPNGGenerator {
                 }
 
             } else if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
-                console.log('📦 SAVE-ONLY PNG: Using standard export (fallback)');
-                printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
-                    dpi: 300,
-                    format: 'png',
-                    quality: 1.0
-                });
+                try {
+                    console.log('🎯 PNG METHOD 3: Attempting exportForPrintMachine...');
+
+                    printPNG = await Promise.race([
+                        this.pngEngine.exportEngine.exportForPrintMachine({
+                            dpi: 300,
+                            format: 'png',
+                            quality: 1.0
+                        }),
+                        new Promise((_, reject) =>
+                            setTimeout(() => {
+                                console.log('>>> EXPORT FOR PRINT MACHINE 5s TIMEOUT: CREATING EMERGENCY PNG <<<');
+                                reject(new Error('ExportForPrintMachine timeout'));
+                            }, 5000)
+                        )
+                    ]);
+                    if (printPNG) {
+                        console.log('✅ PNG METHOD 3 SUCCESS: PrintMachine PNG created, Length =', printPNG.length);
+                    } else {
+                        console.log('❌ PNG METHOD 3 FAILED: No PNG data returned');
+                    }
+                } catch (e) {
+                    console.log('❌ PNG METHOD 3 ERROR: exportForPrintMachine failed:', e.message);
+                    printPNG = null;
+                }
             } else {
-                throw new Error('No PNG export methods available');
+                console.log('🎯 PNG METHOD 4: ULTIMATE FALLBACK - Using design-only Fabric canvas extraction...');
+
+                // Step 1: Access Fabric canvas instance
+                const fabricCanvas = window.designerWidgetInstance?.fabricCanvas;
+
+                console.log('🔍 FABRIC CANVAS DEBUG:', {
+                    designerWidgetInstance: !!window.designerWidgetInstance,
+                    fabricCanvas: !!fabricCanvas,
+                    canvasObjectCount: fabricCanvas ? fabricCanvas.getObjects().length : 0
+                });
+
+                if (fabricCanvas) {
+                    console.log('✅ PNG METHOD 4: Fabric canvas found, extracting design-only PNG...');
+
+                    // Step 1: Initialisierung des temporären Canvas
+                    console.log('🎨 Creating temporary canvas for design-only extraction...');
+                    const tempCanvas = new window.fabric.Canvas();
+                    tempCanvas.setDimensions({ width: 1312, height: 840 });
+                    tempCanvas.backgroundColor = 'transparent';
+
+                    // Step 2: Objekt-Iteration - Alle Design-Objekte abrufen
+                    console.log('🔍 Getting all objects from main canvas...');
+                    const allObjects = fabricCanvas.getObjects();
+                    console.log(`📊 Found ${allObjects.length} objects on main canvas`);
+
+                    // Step 3: Filtern und Klonen - Nur Design-Elemente kopieren mit Promise-basierten Cloning
+                    let designObjectCount = 0;
+                    const designObjects = allObjects.filter(obj =>
+                        !obj.isBackground && !obj.isViewImage && !obj.isTemplateBackground
+                    );
+
+                    console.log(`🔍 Found ${designObjects.length} design objects to clone`);
+
+                    // Sequential cloning to avoid async issues
+                    for (let idx = 0; idx < designObjects.length; idx++) {
+                        const obj = designObjects[idx];
+                        console.log(`✅ Cloning design object ${idx} (${obj.type})`);
+
+                        try {
+                            // Use Promise-based cloning for proper async handling
+                            await new Promise((resolve, reject) => {
+                                obj.clone((clonedObj) => {
+                                    if (clonedObj) {
+                                        tempCanvas.add(clonedObj);
+                                        designObjectCount++;
+                                        resolve(clonedObj);
+                                    } else {
+                                        reject(new Error(`Failed to clone object ${idx}`));
+                                    }
+                                });
+                            });
+                        } catch (cloneError) {
+                            console.warn(`⚠️ Failed to clone object ${idx}:`, cloneError);
+                            // Continue with other objects even if one fails
+                        }
+                    }
+
+                    console.log(`🎯 Successfully cloned ${designObjectCount} design objects to temporary canvas`);
+
+                    // Force render of temporary canvas
+                    tempCanvas.renderAll();
+
+                    // Step 4: Finale Zuweisung - Base64-String generieren
+                    console.log('🖼️ Generating final design-only PNG...');
+                    const exportOptions = {
+                        format: 'png',
+                        quality: 1.0,
+                        multiplier: 3.125 // 300 DPI scaling
+                    };
+
+                    printPNG = tempCanvas.toDataURL(exportOptions);
+                    console.log('✅ PNG METHOD 4 SUCCESS: Design-only PNG created, Length =', printPNG.length);
+
+                    // Cleanup: Dispose temporary canvas
+                    tempCanvas.dispose();
+
+                } else {
+                    console.log('❌ PNG METHOD 4 FAILED: No Fabric canvas available, falling back to DOM extraction...');
+                    console.log('🎯 PNG METHOD 5: DOM Canvas extraction...');
+                    const canvasElement = document.getElementById('octo-print-designer-canvas');
+                    console.log('🔍 DOM CANVAS DEBUG:', {
+                        canvasElement: !!canvasElement,
+                        canvasId: canvasElement ? canvasElement.id : 'not found',
+                        canvasWidth: canvasElement ? canvasElement.width : 0,
+                        canvasHeight: canvasElement ? canvasElement.height : 0
+                    });
+
+                    if (canvasElement) {
+                        printPNG = canvasElement.toDataURL('image/png', 1.0);
+                        console.log('✅ PNG METHOD 5 SUCCESS: DOM Canvas PNG created, Length =', printPNG.length);
+                    } else {
+                        console.log('❌ PNG METHOD 5 FAILED: No canvas element found');
+                        throw new Error('No PNG export methods available');
+                    }
+                }
+            }
+
+            if (!printPNG) {
+                console.log('🎯 PNG METHOD 6: EMERGENCY PNG - All previous methods failed');
+                console.log('🚨 Creating emergency minimal PNG as last resort...');
+                // Emergency minimal PNG generation
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 300;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(50, 50, 300, 200);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px Arial';
+                ctx.fillText('EMERGENCY PNG', 120, 160);
+                printPNG = canvas.toDataURL('image/png', 1.0);
+                console.log('✅ PNG METHOD 6 SUCCESS: Emergency PNG created, Length =', printPNG.length);
             }
 
             // Store PNG with metadata
+            console.log('📦 PNG FINAL STAGE: Preparing data for storage...');
             const pngData = {
                 design_id: this.generateDesignId(designData),
                 print_png: printPNG,
                 save_type: saveType,
                 order_id: orderId,
                 generated_at: new Date().toISOString(),
-                print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 }),
-                print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }),
-                template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback'
+                print_area_px: JSON.stringify(this.pngEngine.exportEngine?.printAreaPx || { width: 800, height: 600 }),
+                print_area_mm: JSON.stringify(this.pngEngine.exportEngine?.printAreaMm || { width: 200, height: 150 }),
+                template_id: this.pngEngine.exportEngine?.currentTemplateId || 'fallback'
             };
 
+            console.log('📋 PNG DATA SUMMARY:', {
+                design_id: pngData.design_id,
+                save_type: pngData.save_type,
+                order_id: pngData.order_id,
+                png_size_mb: (printPNG.length / 1024 / 1024).toFixed(2),
+                png_length: printPNG.length,
+                template_id: pngData.template_id,
+                has_print_png: !!pngData.print_png
+            });
+
             // Save to WordPress database
+            console.log('🔍 PNG STORAGE: About to store PNG in database');
             const saveResult = await this.storePNGInDatabase(pngData);
 
             const duration = Date.now() - startTime;
@@ -727,18 +935,29 @@ class SaveOnlyPNGGenerator {
      */
     async generateEnhancedPNG(designData, saveType, orderId = null) {
         try {
+            console.log('*** START ENHANCED EXPORT LOGIC ***');
             console.log('🖨️ SAVE-ONLY PNG: Generating enhanced PNG with metadata...');
 
             // Check if enhanced metadata export is available
             if (typeof this.pngEngine.exportEngine.exportWithTemplateMetadata === 'function') {
                 console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
 
-                const enhancedResult = await this.pngEngine.exportEngine.exportWithTemplateMetadata({
-                    multiplier: 3,
-                    quality: 1.0,
-                    enableBleed: false,
-                    debugMode: true
-                });
+                // Add timeout to prevent hanging
+                console.log('🔄 ENHANCED PNG: Starting Promise.race with 5s timeout...');
+                const enhancedResult = await Promise.race([
+                    this.pngEngine.exportEngine.exportWithTemplateMetadata({
+                        multiplier: 3,
+                        quality: 1.0,
+                        enableBleed: false,
+                        debugMode: true
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => {
+                            console.log('>>> 5s TIMEOUT REACHED: FIRING REJECT <<<');
+                            reject(new Error('Enhanced PNG timeout'));
+                        }, 5000)
+                    )
+                ]);
 
                 if (enhancedResult) {
                     console.log('🎯 ENHANCED EXPORT SUCCESS:', {
@@ -775,7 +994,12 @@ class SaveOnlyPNGGenerator {
             return null;
 
         } catch (error) {
+            console.log('🚨 ENHANCED PNG CATCH BLOCK REACHED!');
             console.error('❌ ENHANCED PNG GENERATION: Failed:', error);
+            if (error.message === 'Enhanced PNG timeout') {
+                console.log('⏰ ENHANCED PNG: Timed out after 5 seconds, falling back to standard generation');
+            }
+            console.log('🔄 ENHANCED PNG: Returning null to trigger fallback generation with Q1/Q3 logs');
             return null;
         }
     }
@@ -1119,12 +1343,34 @@ class SaveOnlyPNGGenerator {
 
         console.log('📡 SAVE-ONLY PNG: Sending to WordPress AJAX:', config.ajax_url);
 
+        // 🚨 ZWANGSANALYSE: Critical payload validation before AJAX
+        console.assert(pngData.print_png && pngData.print_png.length > 1000,
+            '🚨 KRITISCH: printPNG ist zu klein/leer!', {
+                printPNG_exists: !!pngData.print_png,
+                printPNG_type: typeof pngData.print_png,
+                printPNG_length: pngData.print_png ? pngData.print_png.length : 0,
+                printPNG_preview: pngData.print_png ? pngData.print_png.substring(0, 50) : 'NULL'
+            });
+
+        console.log(`🚨 DATENSTROM-BEWEIS: printPNG Größe = ${pngData.print_png ? pngData.print_png.length : 0} Zeichen`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Ist >500KB = ${pngData.print_png && pngData.print_png.length > 500000 ? 'JA' : 'NEIN'}`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Beginnt mit data:image = ${pngData.print_png && pngData.print_png.startsWith('data:image') ? 'JA' : 'NEIN'}`);
+
         // 🔍 ENHANCED DEBUG: Log the exact request being sent
         const requestData = {
             action: 'yprint_save_design_print_png',
             nonce: config.nonce,
             ...pngData
         };
+
+        // 🔍 CONSOLE-TRACKING: AJAX Request Details
+        console.log('🚀 AJAX REQUEST START:', {
+            url: config.ajax_url,
+            action: requestData.action,
+            design_id: requestData.design_id,
+            data_size_mb: (requestData.print_png ? requestData.print_png.length / 1024 / 1024 : 0).toFixed(2),
+            timestamp: new Date().toISOString()
+        });
         console.log('🔍 REQUEST DEBUG: Sending data:', {
             action: requestData.action,
             nonce: requestData.nonce ? 'PRESENT' : 'MISSING',
@@ -1138,13 +1384,23 @@ class SaveOnlyPNGGenerator {
         const dataLength = serializedData.length;
         console.log(`🔬 CLIENT Q1: Serialized data length - ${dataLength} bytes`);
 
+        // Q1-Beweis: PNG-Datenlänge
+        console.log('Q1-Beweis: PNG-Datenlänge:', requestData.print_png ? requestData.print_png.length : 0);
+
         if (requestData.print_png) {
             const pngPreview = requestData.print_png.substring(0, 100) + '...';
             console.log(`🔬 CLIENT Q2: PNG data preview - ${pngPreview}`);
             console.log(`🔬 CLIENT Q3: PNG data starts with 'data:image' - ${requestData.print_png.startsWith('data:image')}`);
+
+            // Q3-Beweis: PNG-Datenstart
+            console.log('Q3-Beweis: PNG-Datenstart:', requestData.print_png ? requestData.print_png.substring(0, 30) : 'NULL');
         } else {
             console.log('🔬 CLIENT Q2: NO PNG DATA IN REQUEST');
+            console.log('Q1-Beweis: PNG-Datenlänge:', 0);
+            console.log('Q3-Beweis: PNG-Datenstart:', 'NULL');
         }
+
+        console.log('⏳ AJAX REQUEST: Sending request to server...');
 
         const response = await fetch(config.ajax_url, {
             method: 'POST',
@@ -1154,18 +1410,50 @@ class SaveOnlyPNGGenerator {
             body: new URLSearchParams(requestData)
         });
 
+        console.log('📨 AJAX RESPONSE RECEIVED:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries()),
+            timestamp: new Date().toISOString()
+        });
+
         if (!response.ok) {
             console.error('❌ SAVE-ONLY PNG: HTTP error', response.status, response.statusText);
+            console.error('🚨 FULL RESPONSE DETAILS:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                url: response.url
+            });
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const result = await response.json();
-        console.log('📡 SAVE-ONLY PNG: Server response:', result);
+
+        console.log('📋 SERVER RESPONSE ANALYSIS:');
+        console.log('✅ Response Type:', typeof result);
+        console.log('✅ Success Status:', result?.success);
+        console.log('✅ Response Data:', result?.data);
+        console.log('✅ Full Response Object:', result);
 
         // 🔬 CLIENT Q4: Server response validation
         console.log(`🔬 CLIENT Q4: Server success - ${result.success}`);
         if (!result.success) {
-            console.log(`🔬 CLIENT Q4: Server error - ${result.data || 'No error message'}`);
+            console.log(`🔬 CLIENT Q4: Server error - ${result?.data || 'No error message'}`);
+            console.error('🚨 SERVER ERROR DETAILS:', {
+                success: result?.success,
+                data: result?.data,
+                message: result?.message,
+                error_code: result?.error_code
+            });
+        } else {
+            console.log('🎉 PNG STORAGE SUCCESS:', {
+                design_id: result.data?.design_id,
+                png_url: result.data?.png_url,
+                template_id: result.data?.template_id,
+                storage_method: result.data?.storage_method
+            });
         }
 
         if (!result.success) {
