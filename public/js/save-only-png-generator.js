@@ -602,6 +602,31 @@ class SaveOnlyPNGGenerator {
                 throw new Error('Export engine not available');
             }
 
+            // 🧹 MEMORY SAFETY: Track all temporary canvases for cleanup
+            const tempCanvases = [];
+            const addTempCanvas = (canvas) => {
+                tempCanvases.push(canvas);
+                return canvas;
+            };
+
+            // 🧹 CLEANUP FUNCTION: Comprehensive cleanup for all temp resources
+            const performComprehensiveCleanup = () => {
+                console.log('🧹 EMERGENCY CLEANUP: Cleaning all temporary resources...');
+                tempCanvases.forEach((canvas, idx) => {
+                    try {
+                        if (canvas && typeof canvas.dispose === 'function') {
+                            console.log(`🧹 EMERGENCY: Disposing temp canvas ${idx}`);
+                            canvas.clear();
+                            canvas.dispose();
+                        }
+                    } catch (cleanupError) {
+                        console.warn(`⚠️ EMERGENCY CLEANUP: Error disposing canvas ${idx}:`, cleanupError.message);
+                    }
+                });
+                tempCanvases.length = 0; // Clear array
+                console.log('✅ EMERGENCY CLEANUP: All temporary resources cleaned');
+            };
+
             // 🎯 PRIORITY 1: Try enhanced metadata export (most advanced)
             console.log('🎯 PNG METHOD 1: Attempting enhanced PNG generation...');
             const enhancedResult = await this.generateEnhancedPNG(designData, saveType, orderId);
@@ -720,7 +745,7 @@ class SaveOnlyPNGGenerator {
 
                     // Step 1: Initialisierung des temporären Canvas
                     console.log('🎨 Creating temporary canvas for design-only extraction...');
-                    const tempCanvas = new window.fabric.Canvas();
+                    const tempCanvas = addTempCanvas(new window.fabric.Canvas());
                     tempCanvas.setDimensions({ width: 1312, height: 840 });
                     tempCanvas.backgroundColor = 'transparent';
 
@@ -737,37 +762,239 @@ class SaveOnlyPNGGenerator {
 
                     console.log(`🔍 Found ${designObjects.length} design objects to clone`);
 
-                    // Sequential cloning to avoid async issues
+                    // 🚨 Z-INDEX FIX: Sort objects by their canvas index to maintain layering
+                    console.log('📐 Z-INDEX: Checking original canvas object order...');
+                    designObjects.sort((a, b) => {
+                        const indexA = canvas.getObjects().indexOf(a);
+                        const indexB = canvas.getObjects().indexOf(b);
+                        console.log(`📐 Z-INDEX: ${a.type}(${indexA}) vs ${b.type}(${indexB})`);
+                        return indexA - indexB;
+                    });
+
+                    console.log('✅ Z-INDEX: Objects sorted by canvas layer order');
+
+                    // 🚨 ROBUST CLONING: Multiple fallback methods with Z-index preservation
                     for (let idx = 0; idx < designObjects.length; idx++) {
                         const obj = designObjects[idx];
-                        console.log(`✅ Cloning design object ${idx} (${obj.type})`);
+                        const originalIndex = canvas.getObjects().indexOf(obj);
+                        console.log(`🔧 CLONING: Attempting object ${idx} (${obj.type}) with canvas index ${originalIndex}`);
 
+                        let clonedObj = null;
+
+                        // METHOD 1: Promise-based clone with timeout
                         try {
-                            // Use Promise-based cloning for proper async handling
-                            await new Promise((resolve, reject) => {
-                                obj.clone((clonedObj) => {
-                                    if (clonedObj) {
-                                        tempCanvas.add(clonedObj);
-                                        designObjectCount++;
-                                        resolve(clonedObj);
-                                    } else {
-                                        reject(new Error(`Failed to clone object ${idx}`));
-                                    }
-                                });
+                            clonedObj = await Promise.race([
+                                new Promise((resolve, reject) => {
+                                    obj.clone((result) => {
+                                        if (result) {
+                                            console.log(`✅ CLONE METHOD 1: Promise-based clone successful for object ${idx}`);
+                                            resolve(result);
+                                        } else {
+                                            reject(new Error(`Clone returned null for object ${idx}`));
+                                        }
+                                    });
+                                }),
+                                new Promise((_, reject) =>
+                                    setTimeout(() => reject(new Error(`Clone timeout for object ${idx}`)), 2000)
+                                )
+                            ]);
+                        } catch (error) {
+                            console.warn(`⚠️ CLONE METHOD 1 FAILED for object ${idx}:`, error.message);
+                        }
+
+                        // METHOD 2: toObject/fromObject fallback
+                        if (!clonedObj) {
+                            try {
+                                console.log(`🔧 CLONE METHOD 2: Attempting toObject/fromObject for object ${idx}`);
+                                const objData = obj.toObject();
+                                if (objData && typeof fabric[obj.type] === 'function') {
+                                    clonedObj = new fabric[obj.type](objData);
+                                    console.log(`✅ CLONE METHOD 2: toObject/fromObject successful for object ${idx}`);
+                                } else {
+                                    console.warn(`⚠️ CLONE METHOD 2: Invalid object data or constructor for ${obj.type}`);
+                                }
+                            } catch (error) {
+                                console.warn(`⚠️ CLONE METHOD 2 FAILED for object ${idx}:`, error.message);
+                            }
+                        }
+
+                        // METHOD 3: Canvas-level clone using loadFromJSON
+                        if (!clonedObj) {
+                            try {
+                                console.log(`🔧 CLONE METHOD 3: Attempting canvas JSON clone for object ${idx}`);
+                                const singleObjectCanvas = addTempCanvas(new fabric.Canvas());
+                                singleObjectCanvas.add(obj);
+                                const canvasJSON = singleObjectCanvas.toJSON();
+
+                                if (canvasJSON.objects && canvasJSON.objects[0]) {
+                                    const objectJSON = canvasJSON.objects[0];
+                                    clonedObj = await new Promise((resolve, reject) => {
+                                        try {
+                                            fabric.util.enlivenObjects([objectJSON], (objects) => {
+                                                if (objects && objects[0]) {
+                                                    resolve(objects[0]);
+                                                } else {
+                                                    reject(new Error('enlivenObjects returned empty result'));
+                                                }
+                                            });
+                                        } catch (enlivenError) {
+                                            reject(enlivenError);
+                                        }
+                                    });
+                                    console.log(`✅ CLONE METHOD 3: Canvas JSON clone successful for object ${idx}`);
+                                }
+
+                                // 🧹 CLEANUP: Properly dispose single object canvas
+                                console.log(`🧹 CLONE CLEANUP: Disposing single object canvas for object ${idx}`);
+                                singleObjectCanvas.clear();
+                                singleObjectCanvas.dispose();
+                            } catch (error) {
+                                console.warn(`⚠️ CLONE METHOD 3 FAILED for object ${idx}:`, error.message);
+                            }
+                        }
+
+                        // METHOD 4: Last resort - manual property copying for basic objects
+                        if (!clonedObj && (obj.type === 'rect' || obj.type === 'circle' || obj.type === 'text')) {
+                            try {
+                                console.log(`🔧 CLONE METHOD 4: Manual property copy for basic ${obj.type}`);
+                                const basicProps = {
+                                    left: obj.left,
+                                    top: obj.top,
+                                    width: obj.width,
+                                    height: obj.height,
+                                    fill: obj.fill,
+                                    stroke: obj.stroke,
+                                    strokeWidth: obj.strokeWidth,
+                                    opacity: obj.opacity,
+                                    angle: obj.angle,
+                                    scaleX: obj.scaleX,
+                                    scaleY: obj.scaleY
+                                };
+
+                                if (obj.type === 'text') {
+                                    basicProps.text = obj.text;
+                                    basicProps.fontFamily = obj.fontFamily;
+                                    basicProps.fontSize = obj.fontSize;
+                                }
+
+                                clonedObj = new fabric[obj.type](basicProps);
+                                console.log(`✅ CLONE METHOD 4: Manual property copy successful for object ${idx}`);
+                            } catch (error) {
+                                console.warn(`⚠️ CLONE METHOD 4 FAILED for object ${idx}:`, error.message);
+                            }
+                        }
+
+                        // Add successfully cloned object to temp canvas with Z-index preservation
+                        if (clonedObj) {
+                            // 🚨 Z-INDEX PRESERVATION: Copy critical layering properties
+                            if (obj.zIndex !== undefined) clonedObj.zIndex = obj.zIndex;
+                            if (obj.moveCursor !== undefined) clonedObj.moveCursor = obj.moveCursor;
+
+                            // Add to temp canvas
+                            tempCanvas.add(clonedObj);
+
+                            // 🚨 CRITICAL: Ensure proper layering on temp canvas
+                            // Move to correct position if we have index information
+                            const targetIndex = originalIndex;
+                            if (targetIndex >= 0 && targetIndex < tempCanvas.getObjects().length - 1) {
+                                console.log(`📐 Z-INDEX: Moving object to index ${targetIndex}`);
+                                tempCanvas.moveTo(clonedObj, targetIndex);
+                            }
+
+                            designObjectCount++;
+                            console.log(`✅ CLONE SUCCESS: Object ${idx} added to temp canvas at index ${targetIndex} (total: ${designObjectCount})`);
+                        } else {
+                            console.error(`❌ CLONE FAILURE: All methods failed for object ${idx} (${obj.type})`);
+                            console.log(`🔍 CLONE DEBUG: Object properties:`, {
+                                type: obj.type,
+                                visible: obj.visible,
+                                width: obj.width,
+                                height: obj.height,
+                                hasToObject: typeof obj.toObject === 'function',
+                                hasClone: typeof obj.clone === 'function'
                             });
-                        } catch (cloneError) {
-                            console.warn(`⚠️ Failed to clone object ${idx}:`, cloneError);
-                            // Continue with other objects even if one fails
+
+                            // 🚨 GRACEFUL DEGRADATION: Continue with other objects
+                            console.log(`🎯 CLONE: Continuing with remaining objects despite failure...`);
                         }
                     }
 
                     console.log(`🎯 Successfully cloned ${designObjectCount} design objects to temporary canvas`);
 
-                    // Force render of temporary canvas
+                    // 🚨 CRITICAL FIX: Wait for complete rendering before export
+                    console.log('⏳ RENDERING: Waiting for complete canvas rendering...');
+
+                    // Step 1: Force initial render
                     tempCanvas.renderAll();
 
-                    // Step 4: Finale Zuweisung - Base64-String generieren
+                    // Step 2: Wait for all async rendering to complete
+                    await new Promise(resolve => {
+                        // Check if canvas has image objects that need loading
+                        const imageObjects = tempCanvas.getObjects().filter(obj =>
+                            obj.type === 'image' || obj.type === 'Image'
+                        );
+
+                        if (imageObjects.length > 0) {
+                            console.log(`🖼️ RENDERING: Found ${imageObjects.length} image objects, waiting for load...`);
+
+                            let loadedCount = 0;
+                            const checkAllLoaded = () => {
+                                loadedCount++;
+                                console.log(`🖼️ RENDERING: Image ${loadedCount}/${imageObjects.length} loaded`);
+                                if (loadedCount >= imageObjects.length) {
+                                    // Additional render after all images loaded
+                                    tempCanvas.renderAll();
+                                    // Wait additional time for render completion
+                                    setTimeout(resolve, 100);
+                                }
+                            };
+
+                            // Check if images are already loaded or wait for load
+                            imageObjects.forEach(img => {
+                                if (img._element && img._element.complete) {
+                                    checkAllLoaded();
+                                } else if (img._element) {
+                                    img._element.onload = checkAllLoaded;
+                                    img._element.onerror = checkAllLoaded; // Count errors as "loaded"
+                                } else {
+                                    checkAllLoaded(); // No element, count as loaded
+                                }
+                            });
+                        } else {
+                            console.log('🖼️ RENDERING: No image objects, proceeding with standard render wait...');
+                            // Wait for standard rendering completion
+                            setTimeout(resolve, 50);
+                        }
+                    });
+
+                    console.log('✅ RENDERING: Canvas rendering completed, ready for export');
+
+                    // 🚨 Z-INDEX VALIDATION: Final layering check before export
+                    console.log('📐 Z-INDEX VALIDATION: Final canvas layer order check...');
+                    const finalObjects = tempCanvas.getObjects();
+                    finalObjects.forEach((obj, idx) => {
+                        console.log(`📐 Layer ${idx}: ${obj.type} at (${Math.round(obj.left)},${Math.round(obj.top)}) visible:${obj.visible}`);
+                    });
+
+                    // Check for empty or transparent canvas
+                    if (finalObjects.length === 0) {
+                        console.error('❌ Z-INDEX VALIDATION: No objects on temp canvas! This will create empty PNG');
+                        throw new Error('Empty canvas - no objects to export');
+                    }
+
+                    // Check for invisible objects
+                    const visibleObjects = finalObjects.filter(obj => obj.visible !== false);
+                    if (visibleObjects.length === 0) {
+                        console.error('❌ Z-INDEX VALIDATION: No visible objects on temp canvas!');
+                        throw new Error('No visible objects - will create empty PNG');
+                    }
+
+                    console.log(`✅ Z-INDEX VALIDATION: ${visibleObjects.length}/${finalObjects.length} objects are visible and ready for export`);
+
+                    // Step 3: Final render and export
                     console.log('🖼️ Generating final design-only PNG...');
+                    tempCanvas.renderAll(); // Final render call
+
                     const exportOptions = {
                         format: 'png',
                         quality: 1.0,
@@ -777,8 +1004,48 @@ class SaveOnlyPNGGenerator {
                     printPNG = tempCanvas.toDataURL(exportOptions);
                     console.log('✅ PNG METHOD 4 SUCCESS: Design-only PNG created, Length =', printPNG.length);
 
-                    // Cleanup: Dispose temporary canvas
+                    // 🚨 CRITICAL: Comprehensive memory cleanup
+                    console.log('🧹 COMPREHENSIVE CLEANUP: Starting complete memory cleanup...');
+
+                    // Step 1: Clear all object references from temp canvas
+                    const tempObjects = tempCanvas.getObjects();
+                    console.log(`🧹 CLEANUP: Removing ${tempObjects.length} objects from temp canvas...`);
+
+                    tempObjects.forEach((obj, idx) => {
+                        try {
+                            // Clear image element references to prevent memory leaks
+                            if (obj._element) {
+                                obj._element.onload = null;
+                                obj._element.onerror = null;
+                                obj._element = null;
+                            }
+
+                            // Clear any cached filters or patterns
+                            if (obj.filters) obj.filters = [];
+                            if (obj.shadow) obj.shadow = null;
+
+                            // Remove from temp canvas
+                            tempCanvas.remove(obj);
+                            console.log(`🧹 CLEANUP: Removed object ${idx} (${obj.type})`);
+                        } catch (cleanupError) {
+                            console.warn(`⚠️ CLEANUP: Error cleaning object ${idx}:`, cleanupError.message);
+                        }
+                    });
+
+                    // Step 2: Force garbage collection hints
+                    tempCanvas.clear();
                     tempCanvas.dispose();
+
+                    // Step 3: Clear all references
+                    tempCanvas = null;
+
+                    // Step 4: Force browser garbage collection (if available)
+                    if (window.gc) {
+                        console.log('🧹 CLEANUP: Triggering browser garbage collection...');
+                        window.gc();
+                    }
+
+                    console.log('✅ CLEANUP: Comprehensive cleanup completed');
 
                 } else {
                     console.log('❌ PNG METHOD 4 FAILED: No Fabric canvas available, falling back to DOM extraction...');
@@ -883,7 +1150,16 @@ class SaveOnlyPNGGenerator {
                 error: error.message || 'PNG generation failed'
             };
         } finally {
+            // 🧹 CRITICAL: Always cleanup temporary resources, even on errors
+            console.log('🧹 FINALLY: Ensuring all temporary resources are cleaned...');
+            try {
+                performComprehensiveCleanup();
+            } catch (finalCleanupError) {
+                console.error('❌ FINALLY CLEANUP ERROR:', finalCleanupError);
+            }
+
             this.isGenerating = false;
+            console.log('✅ FINALLY: Generation state reset, ready for next operation');
         }
     }
 
