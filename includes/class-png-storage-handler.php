@@ -903,10 +903,7 @@ class PNG_Storage_Handler {
     }
 }
 
-// Initialize if WooCommerce is active
-if (class_exists('WooCommerce')) {
-    new PNG_Storage_Handler('octo-print-designer', '1.0.0');
-} else {
-    error_log('⚠️ PNG STORAGE HANDLER: WooCommerce not active, skipping initialization');
-}
+// Initialize PNG Storage Handler (WooCommerce dependency removed)
+error_log('🚀 PNG STORAGE HANDLER: Initializing without WooCommerce dependency');
+new PNG_Storage_Handler('octo-print-designer', '1.0.0');
 ?>
