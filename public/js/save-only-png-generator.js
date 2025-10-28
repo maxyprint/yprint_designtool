@@ -668,7 +668,14 @@ class SaveOnlyPNGGenerator {
                     )
                 ]);
             } else {
-                throw new Error('No PNG export methods available');
+                console.log('🚨 ULTIMATE FALLBACK: Using direct canvas extraction...');
+                const canvasElement = document.getElementById('octo-print-designer-canvas');
+                if (canvasElement) {
+                    printPNG = canvasElement.toDataURL('image/png', 1.0);
+                    console.log('🔥 DIRECT CANVAS PNG CREATED: Length =', printPNG.length);
+                } else {
+                    throw new Error('No PNG export methods available');
+                }
             }
 
             if (!printPNG) {
