@@ -626,9 +626,11 @@ class SaveOnlyPNGGenerator {
 
             // 🎯 PRIORITY 1: Try enhanced metadata export (most advanced)
             const enhancedResult = await this.generateEnhancedPNG(designData, saveType, orderId);
-            if (enhancedResult) {
+
+            // 💡 CRITICAL DATA VALIDATION: Check if PNG data is actually valid before proceeding
+            if (enhancedResult && enhancedResult.dataUrl && enhancedResult.dataUrl.length > 100) {
                 console.log('✅ SAVE-ONLY PNG: Enhanced PNG with metadata completed successfully');
-                // 🚨 CRITICAL FIX: Don't return early! We need to store in database!
+                console.log('🔍 PNG DATA VALIDATION: dataUrl length:', enhancedResult.dataUrl.length);
                 console.log('🔍 PNG STORAGE: Enhanced PNG generated, now storing in database...');
 
                 // Use enhanced PNG as the print PNG and continue to storage
@@ -654,6 +656,15 @@ class SaveOnlyPNGGenerator {
                     ...saveResult,
                     storage_method: 'enhanced_with_database'
                 };
+            } else {
+                // 🚨 ENHANCED PNG FAILED: Empty dataUrl detected
+                console.error('❌ ENHANCED PNG VALIDATION FAILED:', {
+                    enhancedResult_exists: !!enhancedResult,
+                    dataUrl_exists: !!(enhancedResult?.dataUrl),
+                    dataUrl_length: enhancedResult?.dataUrl?.length || 0,
+                    dataUrl_preview: enhancedResult?.dataUrl?.substring(0, 50) + '...'
+                });
+                console.log('🔄 SAVE-ONLY PNG: Enhanced PNG failed validation, proceeding to fallback generation...');
             }
 
             // 🎯 PRIORITY 2: Try print-ready PNG with cropping
@@ -1074,12 +1085,14 @@ class SaveOnlyPNGGenerator {
                     )
                 ]);
 
-                if (enhancedResult) {
+                // 💡 TEMPLATE METADATA VALIDATION: Ensure PNG data is valid before storing
+                if (enhancedResult && enhancedResult.dataUrl && enhancedResult.dataUrl.length > 100) {
                     console.log('🎯 ENHANCED EXPORT SUCCESS:', {
                         dimensions: `${enhancedResult.metadata.width}x${enhancedResult.metadata.height}px`,
                         dpi: enhancedResult.metadata.dpi,
                         elements: enhancedResult.metadata.elementsCount,
-                        template: enhancedResult.templateMetadata?.template_name || 'unknown'
+                        template: enhancedResult.templateMetadata?.template_name || 'unknown',
+                        dataUrl_length: enhancedResult.dataUrl.length
                     });
 
                     // Store enhanced PNG with all metadata
@@ -1101,6 +1114,12 @@ class SaveOnlyPNGGenerator {
                     };
 
                     return await this.storePNGInDatabase(enhancedPngData);
+                } else {
+                    console.error('❌ TEMPLATE METADATA VALIDATION FAILED:', {
+                        enhancedResult_exists: !!enhancedResult,
+                        dataUrl_exists: !!(enhancedResult?.dataUrl),
+                        dataUrl_length: enhancedResult?.dataUrl?.length || 0
+                    });
                 }
             }
 
