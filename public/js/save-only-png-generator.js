@@ -32,6 +32,8 @@ class SaveOnlyPNGGenerator {
         this.pngEngine = null;
         this.isGenerating = false;
         this.lastSaveTimestamp = 0;
+        this.saveQueue = [];
+        this.activeGeneration = null;
 
         console.log('🎯 SAVE-ONLY PNG: Initializing clean PNG generation system...');
         this.init();
@@ -494,13 +496,14 @@ class SaveOnlyPNGGenerator {
         try {
             console.log('🎨 SAVE-ONLY PNG: Designer shortcode save event received');
 
-            // Check if already generating to prevent spam
+            const designData = event.detail?.designData || this.getCurrentDesignData();
+
+            // ROBUST QUEUE SYSTEM: Handle multiple saves gracefully
             if (this.isGenerating) {
-                console.log('ℹ️ SAVE-ONLY PNG: Generation in progress, skipping');
+                console.log('🔄 SAVE-ONLY PNG: Adding to queue (generation in progress)');
+                this.saveQueue.push({ designData, saveType: 'designer_shortcode_save' });
                 return;
             }
-
-            const designData = event.detail?.designData || this.getCurrentDesignData();
 
             if (this.shouldGeneratePNG('designerShortcodeSave', designData)) {
                 await this.generateAndStorePNG(designData, 'designer_shortcode_save');
@@ -928,6 +931,35 @@ class SaveOnlyPNGGenerator {
             };
         } finally {
             this.isGenerating = false;
+            this.activeGeneration = null;
+
+            // Process queued saves
+            this.processNextInQueue();
+        }
+    }
+
+    /**
+     * 🔄 PROCESS NEXT QUEUED SAVE - Handles multiple save requests gracefully
+     */
+    async processNextInQueue() {
+        if (this.saveQueue.length === 0) {
+            console.log('📋 SAVE-ONLY PNG: Queue empty, no pending saves');
+            return;
+        }
+
+        if (this.isGenerating) {
+            console.log('🔄 SAVE-ONLY PNG: Still generating, queue processing delayed');
+            return;
+        }
+
+        const nextSave = this.saveQueue.shift();
+        console.log(`🚀 SAVE-ONLY PNG: Processing queued save (${this.saveQueue.length} remaining)`);
+
+        try {
+            // Process the queued save
+            await this.generatePNG(nextSave.designData, nextSave.saveType);
+        } catch (error) {
+            console.error('❌ SAVE-ONLY PNG: Queued save failed:', error);
         }
     }
 
@@ -987,7 +1019,13 @@ class SaveOnlyPNGGenerator {
                 console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
 
                 // Add timeout to prevent hanging
-                console.log('🔄 ENHANCED PNG: Starting Promise.race with 5s timeout...');
+                console.log('🔄 ENHANCED PNG: Starting Promise.race with 10s timeout (increased for complex designs)...');
+                this.activeGeneration = {
+                    type: 'enhanced_png',
+                    startTime: Date.now(),
+                    designData: designData
+                };
+
                 const enhancedResult = await Promise.race([
                     this.pngEngine.exportEngine.exportWithTemplateMetadata({
                         multiplier: 3,
@@ -997,9 +1035,9 @@ class SaveOnlyPNGGenerator {
                     }),
                     new Promise((_, reject) =>
                         setTimeout(() => {
-                            console.log('>>> 5s TIMEOUT REACHED: FIRING REJECT <<<');
-                            reject(new Error('Enhanced PNG timeout'));
-                        }, 5000)
+                            console.log('>>> 10s TIMEOUT REACHED: Enhanced PNG generation too slow <<<');
+                            reject(new Error('Enhanced PNG timeout - try reducing design complexity'));
+                        }, 10000)
                     )
                 ]);
 
@@ -1065,9 +1103,9 @@ class SaveOnlyPNGGenerator {
             return false;
         }
 
-        // Don't generate if already in progress
+        // Don't generate if already in progress - queue instead
         if (this.isGenerating) {
-            console.log('ℹ️ SAVE-ONLY PNG: Generation in progress, skipping');
+            console.log('🔄 SAVE-ONLY PNG: Adding to queue (generation in progress)');
             return false;
         }
 
