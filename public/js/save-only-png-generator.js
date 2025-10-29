@@ -695,9 +695,25 @@ class SaveOnlyPNGGenerator {
                     console.log('✅ PNG METHOD 4: Fabric canvas found, extracting design-only PNG...');
 
                     // Step 1: Initialisierung des temporären Canvas
+                    // Get print area for proper dimensioning with validation
+                    let printArea = await this.getTemplatePrintArea();
+                    if (!printArea) {
+                        console.log('⚠️ No print area found, using fallback');
+                        printArea = { x: 100, y: 100, width: 600, height: 400 };
+                    }
+
+                    // Validate print area coordinates before proceeding
+                    if (!this.validatePrintAreaCoordinates(printArea, fabricCanvas)) {
+                        console.log('⚠️ Invalid print area detected, using validated fallback');
+                        printArea = { x: 100, y: 100, width: 600, height: 400 };
+                    }
+
+                    console.log('🎯 EMERGENCY FALLBACK: Using validated print area:', printArea);
+
                     console.log('🎨 Creating temporary canvas for design-only extraction...');
                     const tempCanvas = new window.fabric.Canvas();
-                    tempCanvas.setDimensions({ width: 1312, height: 840 });
+                    // FIX B-1: Set canvas to print area dimensions, not fixed size
+                    tempCanvas.setDimensions({ width: printArea.width, height: printArea.height });
                     tempCanvas.backgroundColor = 'transparent';
 
                     // Step 2: Objekt-Iteration - Alle Design-Objekte abrufen
@@ -708,21 +724,101 @@ class SaveOnlyPNGGenerator {
                     // Step 3: Filtern und Klonen - Nur Design-Elemente kopieren
                     console.log(`🔍 Found ${allObjects.length} design objects to clone`);
 
+                    // Add printArea validation function
+                    const validatePrintArea = (area) => {
+                        return area &&
+                               typeof area.x === 'number' && area.x >= 0 &&
+                               typeof area.y === 'number' && area.y >= 0 &&
+                               typeof area.width === 'number' && area.width > 0 &&
+                               typeof area.height === 'number' && area.height > 0 &&
+                               (area.x + area.width <= fabricCanvas.width) &&
+                               (area.y + area.height <= fabricCanvas.height);
+                    };
+
+                    // Robust object exclusion function
+                    const shouldExcludeObject = (obj, printArea, fabricCanvas) => {
+                        const bounds = obj.getBoundingRect();
+
+                        // Layer 1: Explicit flags (highest confidence)
+                        if (obj.isBackground || obj.isViewImage || obj.isTemplateBackground) {
+                            return { exclude: true, reason: 'explicit-flag' };
+                        }
+
+                        // Layer 2: Position-based (outside design area)
+                        const isOutsideDesignArea = (obj.left + obj.width < printArea.x) ||
+                                                   (obj.top + obj.height < printArea.y) ||
+                                                   (obj.left > printArea.x + printArea.width) ||
+                                                   (obj.top > printArea.y + printArea.height);
+
+                        if (isOutsideDesignArea && obj.width > printArea.width * 0.8) {
+                            return { exclude: true, reason: 'outside-design-area' };
+                        }
+
+                        // Layer 3: Smart filename analysis (only if also outside design area)
+                        if (obj.src && isOutsideDesignArea) {
+                            const filename = obj.src.toLowerCase();
+                            const mockupKeywords = ['mockup', 'template', 'product-view', 'shirt-template'];
+                            const isMockupFile = mockupKeywords.some(keyword => filename.includes(keyword));
+                            if (isMockupFile) {
+                                return { exclude: true, reason: 'mockup-filename' };
+                            }
+                        }
+
+                        // Layer 4: Adaptive size filter (prevents oversized elements outside design area)
+                        const adaptiveThreshold = Math.max(printArea.width * 2, printArea.height * 2, 1000);
+                        if (obj.width > adaptiveThreshold && obj.height > adaptiveThreshold && isOutsideDesignArea) {
+                            return { exclude: true, reason: 'adaptive-oversized' };
+                        }
+
+                        return { exclude: false, reason: 'include' };
+                    };
+
                     // Promise-based cloning (fixes async callback race condition)
                     console.log('🔄 Starting Promise-based object cloning...');
                     const clonePromises = allObjects.map((obj, idx) => {
-                        // Filter: Exclude background/mockup elements
-                        if (!obj.isBackground && !obj.isViewImage && !obj.isTemplateBackground) {
-                            console.log(`✅ Cloning design object ${idx} (${obj.type})`);
+                        const bounds = obj.getBoundingRect();
+
+                        // Debug log object properties
+                        console.log(`🔍 Object ${idx}: type=${obj.type}, size=${Math.round(obj.width || 0)}x${Math.round(obj.height || 0)}, bounds=${Math.round(bounds.width)}x${Math.round(bounds.height)}, position=(${Math.round(obj.left)}, ${Math.round(obj.top)}), src=${obj.src ? obj.src.substring(obj.src.lastIndexOf('/')) : 'none'}`);
+
+                        // VALIDATED FILTER LOGIC: Contextual filtering
+                        const filterResult = shouldExcludeObject(obj, printArea, fabricCanvas);
+
+                        if (!filterResult.exclude) {
+                            console.log(`✅ Object ${idx} (${obj.type}): INCLUDED - ${filterResult.reason}`);
 
                             return new Promise((resolve) => {
                                 obj.clone((clonedObj) => {
+                                    // VALIDATED TRANSFORMATION: Complete object state preservation
+                                    const originalTransforms = {
+                                        scaleX: obj.scaleX || 1,
+                                        scaleY: obj.scaleY || 1,
+                                        angle: obj.angle || 0,
+                                        flipX: obj.flipX || false,
+                                        flipY: obj.flipY || false,
+                                        skewX: obj.skewX || 0,
+                                        skewY: obj.skewY || 0,
+                                        opacity: obj.opacity !== undefined ? obj.opacity : 1
+                                    };
+
+                                    // VALIDATED COORDINATE TRANSFORMATION: Relative positioning
+                                    const newLeft = obj.left - printArea.x;
+                                    const newTop = obj.top - printArea.y;
+
+                                    clonedObj.set({
+                                        ...originalTransforms,
+                                        left: newLeft,
+                                        top: newTop
+                                    });
+
+                                    console.log(`📍 Object ${idx}: Repositioned from (${Math.round(obj.left)}, ${Math.round(obj.top)}) to (${Math.round(newLeft)}, ${Math.round(newTop)}) with transforms: scale(${originalTransforms.scaleX}, ${originalTransforms.scaleY}), angle=${originalTransforms.angle}°`);
+
                                     tempCanvas.add(clonedObj);
                                     resolve(clonedObj);
                                 });
                             });
                         } else {
-                            console.log(`🚫 Skipping background object ${idx} (${obj.type})`);
+                            console.log(`🚫 Object ${idx} (${obj.type}): EXCLUDED - ${filterResult.reason}`);
                             return Promise.resolve(null);
                         }
                     });
@@ -1188,6 +1284,62 @@ class SaveOnlyPNGGenerator {
             console.error('❌ INTELLIGENT FALLBACK: Error calculating print area:', error);
             console.log('❌ FALLBACK: Using emergency default area');
             return { x: 100, y: 100, width: 600, height: 400 };
+        }
+    }
+
+    /**
+     * Validates print area coordinates for production safety
+     */
+    validatePrintAreaCoordinates(area, fabricCanvas) {
+        try {
+            if (!area) {
+                console.log('⚠️ VALIDATION: Print area is null/undefined');
+                return false;
+            }
+
+            if (typeof area.x !== 'number' || area.x < 0) {
+                console.log('⚠️ VALIDATION: Invalid x coordinate:', area.x);
+                return false;
+            }
+
+            if (typeof area.y !== 'number' || area.y < 0) {
+                console.log('⚠️ VALIDATION: Invalid y coordinate:', area.y);
+                return false;
+            }
+
+            if (typeof area.width !== 'number' || area.width <= 0) {
+                console.log('⚠️ VALIDATION: Invalid width:', area.width);
+                return false;
+            }
+
+            if (typeof area.height !== 'number' || area.height <= 0) {
+                console.log('⚠️ VALIDATION: Invalid height:', area.height);
+                return false;
+            }
+
+            if (fabricCanvas) {
+                const canvasWidth = fabricCanvas.width || 1312;
+                const canvasHeight = fabricCanvas.height || 840;
+
+                if (area.x + area.width > canvasWidth) {
+                    console.log('⚠️ VALIDATION: Print area extends beyond canvas width:',
+                        `${area.x} + ${area.width} > ${canvasWidth}`);
+                    return false;
+                }
+
+                if (area.y + area.height > canvasHeight) {
+                    console.log('⚠️ VALIDATION: Print area extends beyond canvas height:',
+                        `${area.y} + ${area.height} > ${canvasHeight}`);
+                    return false;
+                }
+            }
+
+            console.log('✅ VALIDATION: Print area coordinates are valid');
+            return true;
+
+        } catch (error) {
+            console.error('❌ VALIDATION: Error validating print area:', error);
+            return false;
         }
     }
 
