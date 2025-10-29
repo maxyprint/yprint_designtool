@@ -448,10 +448,28 @@ class PNG_Storage_Handler {
             $wp_upload_dir = wp_upload_dir();
             $file_url = $wp_upload_dir['baseurl'] . '/yprint-print-pngs/' . $filename;
 
+            // 🔍 URL DIAGNOSTIC: Validate file accessibility
+            error_log('🔍 URL DIAGNOSTIC: WordPress upload config: ' . print_r($wp_upload_dir, true));
+            error_log('🔍 URL DIAGNOSTIC: Generated file URL: ' . $file_url);
+            error_log('🔍 URL DIAGNOSTIC: Physical file path: ' . $file_path);
+            error_log('🔍 URL DIAGNOSTIC: File exists: ' . (file_exists($file_path) ? 'YES' : 'NO'));
+
             // Validate saved file
             if (!file_exists($file_path) || filesize($file_path) === 0) {
+                error_log('❌ FILE VALIDATION FAILED: File missing or empty');
                 throw new Exception('PNG file validation failed');
             }
+
+            // 🔍 ADDITIONAL DIAGNOSTICS: File details
+            $file_size = filesize($file_path);
+            error_log('🔍 FILE VALIDATION: File size: ' . $file_size . ' bytes');
+            error_log('🔍 FILE VALIDATION: File permissions: ' . substr(sprintf('%o', fileperms($file_path)), -4));
+
+            // 🔍 URL ACCESSIBILITY TEST: Check if URL construction is correct
+            $expected_web_path = str_replace($wp_upload_dir['basedir'], $wp_upload_dir['baseurl'], $file_path);
+            error_log('🔍 URL RECONSTRUCTION: Expected URL: ' . $expected_web_path);
+            error_log('🔍 URL RECONSTRUCTION: Generated URL: ' . $file_url);
+            error_log('🔍 URL RECONSTRUCTION: URLs match: ' . ($expected_web_path === $file_url ? 'YES' : 'NO'));
 
             error_log('💾 PNG STORAGE: Saved print PNG - Size: ' . filesize($file_path) . ' bytes');
 
