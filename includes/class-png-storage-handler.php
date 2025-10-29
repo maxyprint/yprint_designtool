@@ -216,6 +216,28 @@ class PNG_Storage_Handler {
                 return;
             }
 
+            // 🚨 CRITICAL DIAGNOSTIC: Test filesystem write permissions
+            $test_file = $this->upload_dir . 'write_test_' . uniqid() . '.txt';
+            $can_write = is_writable($this->upload_dir);
+            error_log('🚨 WRITE PERMISSION TEST: Directory writable: ' . ($can_write ? 'YES' : 'NO'));
+            error_log('🚨 WRITE PERMISSION TEST: Directory path: ' . $this->upload_dir);
+
+            if (!$can_write) {
+                error_log('❌ FATAL: Upload directory is NOT writable. File saving will fail!');
+                wp_send_json_error('Write permissions failed. Please check folder permissions: ' . $this->upload_dir);
+                return;
+            }
+
+            // Optional: Test writing a dummy file
+            if (@file_put_contents($test_file, 'test')) {
+                @unlink($test_file);
+                error_log('✅ WRITE TEST: Dummy file successfully created and deleted.');
+            } else {
+                error_log('❌ WRITE TEST: Dummy file creation FAILED, even if is_writable was YES. Check memory/disk space.');
+                wp_send_json_error('Filesystem write test failed. Check server permissions and disk space.');
+                return;
+            }
+
             // Save print PNG file
             error_log('🔍 PNG STORAGE: About to save PNG file...');
             $png_file_info = $this->save_print_png($print_png, $design_id, $template_id);
