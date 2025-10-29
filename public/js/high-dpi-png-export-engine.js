@@ -46,6 +46,17 @@ class HighDPIPrintExportEngine {
     }
 
     /**
+     * Print machine export method - required by PNG-only integration
+     */
+    exportForPrintMachine(options) {
+        console.log('--- PRINT MACHINE METHOD: FORCING FAILURE ---');
+        console.log('🧪 Print machine options received:', options);
+
+        // Immediate forced failure to trigger fallback
+        throw new Error('Print Machine Export: Forced Failure for Testing');
+    }
+
+    /**
      * Validation method to confirm engine is loaded
      */
     isEngineReady() {
