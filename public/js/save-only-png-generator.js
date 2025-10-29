@@ -557,6 +557,32 @@ class SaveOnlyPNGGenerator {
      * 🎯 CORE PNG GENERATION - Only called from save events
      */
     async generateAndStorePNG(designData, saveType, orderId = null) {
+        // 🚨 SCOPE-FIX: Cleanup-Ressourcen in Haupt-Scope für finally-Block Zugriff
+        const tempCanvases = [];
+        const addTempCanvas = (canvas) => {
+            tempCanvases.push(canvas);
+            return canvas;
+        };
+
+        // 🚨 SCOPE-FIX: Cleanup-Funktion in Haupt-Scope verschieben
+        const performComprehensiveCleanup = () => {
+            console.log('🧹 SCOPE-SAFE CLEANUP: Cleaning all temporary resources...');
+            tempCanvases.forEach((canvas, idx) => {
+                try {
+                    if (canvas && typeof canvas.dispose === 'function') {
+                        console.log(`🧹 SCOPE-SAFE: Disposing temp canvas ${idx}`);
+                        canvas.getObjects().forEach(obj => canvas.remove(obj));
+                        canvas.clear();
+                        canvas.dispose();
+                    }
+                } catch (cleanupError) {
+                    console.warn(`⚠️ SCOPE-SAFE CLEANUP: Error disposing canvas ${idx}:`, cleanupError.message);
+                }
+            });
+            tempCanvases.length = 0; // Array leeren
+            console.log('✅ SCOPE-SAFE CLEANUP: All temporary resources cleaned');
+        };
+
         if (this.isGenerating) {
             console.log('⏳ SAVE-ONLY PNG: Generation already in progress, skipping...');
             return {
@@ -714,7 +740,7 @@ class SaveOnlyPNGGenerator {
                     console.log('🎯 EMERGENCY FALLBACK: Using validated print area:', printArea);
 
                     console.log('🎨 Creating temporary canvas for design-only extraction...');
-                    const tempCanvas = new window.fabric.Canvas();
+                    const tempCanvas = addTempCanvas(new window.fabric.Canvas());
                     // FIX B-1: Set canvas to print area dimensions, not fixed size
                     tempCanvas.setDimensions({ width: printArea.width, height: printArea.height });
                     tempCanvas.backgroundColor = 'transparent';
@@ -845,8 +871,7 @@ class SaveOnlyPNGGenerator {
                     printPNG = tempCanvas.toDataURL(exportOptions);
                     console.log('🔥 DESIGN-ONLY PNG CREATED: Length =', printPNG.length);
 
-                    // Cleanup: Dispose temporary canvas
-                    tempCanvas.dispose();
+                    // 🚨 SCOPE-FIX: Cleanup wird jetzt im finally-Block gemacht
 
                 } else {
                     console.log('❌ No Fabric canvas available, falling back to DOM extraction...');
@@ -930,6 +955,14 @@ class SaveOnlyPNGGenerator {
                 error: error.message || 'PNG generation failed'
             };
         } finally {
+            // 🧹 SCOPE-SAFE: Finally-Block mit garantiertem Cleanup-Zugriff
+            console.log('🧹 SCOPE-SAFE FINALLY: Cleanup ist jetzt 100% zuverlässig...');
+            try {
+                performComprehensiveCleanup(); // KEIN typeof-Check mehr nötig!
+            } catch (finalCleanupError) {
+                console.error('❌ SCOPE-SAFE FINALLY CLEANUP ERROR:', finalCleanupError);
+            }
+
             this.isGenerating = false;
             this.activeGeneration = null;
 
