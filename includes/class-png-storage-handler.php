@@ -999,7 +999,7 @@ class PNG_Storage_Handler {
             error_log('🗄️ DATABASE SAVE: Table exists check result: ' . ($table_exists ? 'EXISTS' : 'NOT_FOUND'));
 
             if (!$table_exists) {
-                error_log('❌ DATABASE SAVE: Table ' . $table_name . ' does not exist - attempting to create it');
+                error_log('❌ DATABASE SAVE: Table ' . $table_name . ' does not exist');
 
                 // Try to find similar table names
                 $similar_tables = $wpdb->get_results($wpdb->prepare(
@@ -1008,35 +1008,7 @@ class PNG_Storage_Handler {
                 ), ARRAY_A);
                 error_log('🔍 DATABASE SAVE: Similar tables found: ' . print_r(array_column($similar_tables, 'Tables_in_' . $wpdb->dbname), true));
 
-                // Create the table
-                $sql = "CREATE TABLE {$table_name} (
-                    id int(11) NOT NULL AUTO_INCREMENT,
-                    design_id varchar(255) NOT NULL,
-                    print_png LONGBLOB NOT NULL,
-                    save_type varchar(100) DEFAULT 'standard',
-                    order_id varchar(255) DEFAULT NULL,
-                    generated_at datetime DEFAULT CURRENT_TIMESTAMP,
-                    template_id varchar(100) DEFAULT 'default',
-                    metadata_json TEXT DEFAULT NULL,
-                    PRIMARY KEY (id),
-                    KEY design_id (design_id),
-                    KEY save_type (save_type),
-                    KEY generated_at (generated_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
-
-                require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-                $result = dbDelta($sql);
-
-                error_log('🗄️ DATABASE SAVE: Table creation result: ' . print_r($result, true));
-
-                // Verify table was created
-                $table_exists_after_create = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name));
-                if (!$table_exists_after_create) {
-                    error_log('❌ DATABASE SAVE: Failed to create table ' . $table_name);
-                    return false;
-                }
-
-                error_log('✅ DATABASE SAVE: Table ' . $table_name . ' created successfully');
+                return false;
             }
 
             // Prepare data for database
