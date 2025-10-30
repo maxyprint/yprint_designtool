@@ -293,6 +293,17 @@ class PNG_Storage_Handler {
 
             error_log('💾 PNG STORAGE: Design print PNG saved - Design: ' . $design_id);
 
+            // 🗄️ CRITICAL: Save to yprint_design_pngs database table
+            error_log('🗄️ PNG DATABASE: Starting database table storage...');
+            $database_result = $this->save_to_database_table($design_id, $print_png, $save_type, $order_id, $template_id, $design_meta);
+
+            if (!$database_result) {
+                error_log('❌ PNG DATABASE: Failed to save to database table');
+                wp_send_json_error('Failed to save PNG to database table');
+                return;
+            }
+            error_log('✅ PNG DATABASE: Successfully saved to database table');
+
             // 🏷️ Prepare response with enhanced metadata support
             $response_data = array(
                 'png_url' => $png_file_info['url'],
@@ -940,6 +951,96 @@ class PNG_Storage_Handler {
 
         error_log('✅ PNG VALIDATION: PNG data is valid (' . strlen($binary_data) . ' bytes)');
         return true;
+    }
+
+    /**
+     * 🗄️ CRITICAL: Save PNG to database table
+     * Fixes the missing database storage issue
+     */
+    private function save_to_database_table($design_id, $print_png, $save_type, $order_id, $template_id, $design_meta) {
+        global $wpdb;
+
+        try {
+            // Extract base64 data from data URL
+            $base64_data = substr($print_png, strpos($print_png, ',') + 1);
+            $binary_data = base64_decode($base64_data);
+
+            if (!$binary_data) {
+                error_log('❌ DATABASE SAVE: Failed to decode PNG data');
+                return false;
+            }
+
+            // Prepare table name
+            $table_name = $wpdb->prefix . 'yprint_design_pngs';
+
+            // Check if table exists
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name));
+            if (!$table_exists) {
+                error_log('❌ DATABASE SAVE: Table ' . $table_name . ' does not exist');
+                return false;
+            }
+
+            // Prepare data for database
+            $insert_data = array(
+                'design_id' => $design_id,
+                'print_png' => $binary_data,
+                'generated_at' => current_time('mysql'),
+                'save_type' => $save_type ?: 'standard',
+                'order_id' => $order_id,
+                'template_id' => $template_id ?: 'default'
+            );
+
+            // Add enhanced metadata if available
+            if (isset($design_meta['enhanced_metadata'])) {
+                $insert_data['metadata_json'] = json_encode($design_meta['enhanced_metadata']);
+            }
+
+            error_log('🗄️ DATABASE SAVE: Inserting into table: ' . $table_name);
+            error_log('🗄️ DATABASE SAVE: Design ID: ' . $design_id);
+            error_log('🗄️ DATABASE SAVE: PNG size: ' . strlen($binary_data) . ' bytes');
+
+            // Insert into database
+            $result = $wpdb->insert(
+                $table_name,
+                $insert_data,
+                array(
+                    '%s', // design_id
+                    '%s', // print_png (binary)
+                    '%s', // generated_at
+                    '%s', // save_type
+                    '%s', // order_id
+                    '%s', // template_id
+                    '%s'  // metadata_json (if present)
+                )
+            );
+
+            if ($result === false) {
+                error_log('❌ DATABASE SAVE: Insert failed. Error: ' . $wpdb->last_error);
+                return false;
+            }
+
+            $insert_id = $wpdb->insert_id;
+            error_log('✅ DATABASE SAVE: Successfully inserted with ID: ' . $insert_id);
+
+            // Verify the insert
+            $verify_query = $wpdb->prepare(
+                "SELECT design_id, LENGTH(print_png) as png_size FROM {$table_name} WHERE id = %d",
+                $insert_id
+            );
+            $verify_result = $wpdb->get_row($verify_query);
+
+            if ($verify_result) {
+                error_log('✅ DATABASE VERIFY: Record confirmed - Design: ' . $verify_result->design_id . ', Size: ' . $verify_result->png_size . ' bytes');
+                return true;
+            } else {
+                error_log('❌ DATABASE VERIFY: Failed to verify inserted record');
+                return false;
+            }
+
+        } catch (Exception $e) {
+            error_log('❌ DATABASE SAVE: Exception occurred: ' . $e->getMessage());
+            return false;
+        }
     }
 }
 
