@@ -1052,6 +1052,23 @@ class PNG_Storage_Handler {
             error_log('🗄️ DATABASE SAVE: PNG size: ' . strlen($binary_data) . ' bytes');
             error_log('🗄️ DATABASE SAVE: Data fields: ' . count($insert_data) . ', Format fields: ' . count($format_array));
 
+            // 🔍 ENHANCED DIAGNOSTICS: Check MySQL limits and table structure
+            $max_allowed_packet = $wpdb->get_var("SHOW VARIABLES LIKE 'max_allowed_packet'");
+            error_log('🗄️ DATABASE SAVE: MySQL max_allowed_packet: ' . print_r($max_allowed_packet, true));
+
+            // Check table structure
+            $table_structure = $wpdb->get_results("DESCRIBE {$table_name}");
+            error_log('🗄️ DATABASE SAVE: Table structure: ' . print_r($table_structure, true));
+
+            // Check specific column type for print_png
+            $print_png_column = $wpdb->get_row($wpdb->prepare(
+                "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_NAME = %s AND COLUMN_NAME = 'print_png'",
+                str_replace($wpdb->prefix, '', $table_name)
+            ));
+            error_log('🗄️ DATABASE SAVE: print_png column info: ' . print_r($print_png_column, true));
+
             // Insert into database
             $result = $wpdb->insert(
                 $table_name,
