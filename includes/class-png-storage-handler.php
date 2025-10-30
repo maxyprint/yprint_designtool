@@ -37,9 +37,14 @@ class PNG_Storage_Handler {
         // Create upload directory if it doesn't exist
         $this->ensure_upload_directory();
 
+        // 🔥 CRITICAL TEST: Log AJAX action registration
+        error_log('🔥 PNG STORAGE: About to register AJAX action: wp_ajax_yprint_save_design_print_png');
+
         // Register AJAX handlers for PNG storage (NOT cart integration)
         add_action('wp_ajax_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
         add_action('wp_ajax_nopriv_yprint_save_design_print_png', array($this, 'handle_save_design_print_png'));
+
+        error_log('🔥 PNG STORAGE: AJAX actions registered successfully!');
 
         // Register nonce refresh handler for session stability
         add_action('wp_ajax_yprint_refresh_nonce', array($this, 'handle_refresh_nonce'));
@@ -87,6 +92,9 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🔥 ULTRA-EARLY ERROR TEST: First line that should execute
+        error_log('🔥 PNG HANDLER: === FIRST LINE EXECUTED ===');
+
         // 🔥 HANDLER ENTRY POINT - CRITICAL LOG
         error_log('🔥🔥🔥 PNG STORAGE: === HANDLER ENTRY POINT === Method called successfully!');
         error_log('🔥🔥🔥 PNG STORAGE: POST keys: ' . print_r(array_keys($_POST), true));
