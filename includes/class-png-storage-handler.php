@@ -87,6 +87,11 @@ class PNG_Storage_Handler {
      * Handle AJAX request to save design print PNG (for 'Designdaten laden')
      */
     public function handle_save_design_print_png() {
+        // 🔥 HANDLER ENTRY POINT - CRITICAL LOG
+        error_log('🔥🔥🔥 PNG STORAGE: === HANDLER ENTRY POINT === Method called successfully!');
+        error_log('🔥🔥🔥 PNG STORAGE: POST keys: ' . print_r(array_keys($_POST), true));
+        error_log('🔥🔥🔥 PNG STORAGE: REQUEST method: ' . $_SERVER['REQUEST_METHOD']);
+
         // 🚨 FORENSIC ENTRY POINT LOGGING
         error_log("--- PNG Handler Reached: START VALIDATION ---");
 
