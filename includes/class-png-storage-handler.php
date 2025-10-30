@@ -961,9 +961,13 @@ class PNG_Storage_Handler {
         global $wpdb;
 
         try {
+            error_log('🗄️ DATABASE SAVE: Starting save_to_database_table method');
+
             // Extract base64 data from data URL
             $base64_data = substr($print_png, strpos($print_png, ',') + 1);
             $binary_data = base64_decode($base64_data);
+
+            error_log('🗄️ DATABASE SAVE: PNG data processing - Input size: ' . strlen($print_png) . ', Base64 size: ' . strlen($base64_data) . ', Binary size: ' . strlen($binary_data));
 
             if (!$binary_data) {
                 error_log('❌ DATABASE SAVE: Failed to decode PNG data');
@@ -972,11 +976,25 @@ class PNG_Storage_Handler {
 
             // Prepare table name
             $table_name = $wpdb->prefix . 'yprint_design_pngs';
+            error_log('🗄️ DATABASE SAVE: Target table name: ' . $table_name);
 
-            // Check if table exists
+            // Check if table exists with detailed diagnostics
+            $all_tables = $wpdb->get_results("SHOW TABLES", ARRAY_A);
+            error_log('🗄️ DATABASE SAVE: All tables in database: ' . print_r(array_column($all_tables, 'Tables_in_' . $wpdb->dbname), true));
+
             $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name));
+            error_log('🗄️ DATABASE SAVE: Table exists check result: ' . ($table_exists ? 'EXISTS' : 'NOT_FOUND'));
+
             if (!$table_exists) {
                 error_log('❌ DATABASE SAVE: Table ' . $table_name . ' does not exist');
+
+                // Try to find similar table names
+                $similar_tables = $wpdb->get_results($wpdb->prepare(
+                    "SHOW TABLES LIKE %s",
+                    '%yprint%'
+                ), ARRAY_A);
+                error_log('🔍 DATABASE SAVE: Similar tables found: ' . print_r(array_column($similar_tables, 'Tables_in_' . $wpdb->dbname), true));
+
                 return false;
             }
 
