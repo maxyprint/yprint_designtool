@@ -152,11 +152,10 @@ class PNG_Storage_Handler {
         error_log('🔍 PNG STORAGE: Nonce verification result: ' . ($nonce_valid ? 'VALID' : 'INVALID'));
         error_log('🔍 PNG STORAGE: === INCOMING REQUEST END ===');
 
-        // 🔧 TEMPORARY DEBUG: Bypass nonce validation to isolate issue
         if (!$nonce_valid) {
-            error_log('⚠️ PNG STORAGE: Nonce verification failed - BUT CONTINUING FOR DEBUG');
-            // wp_send_json_error('Invalid nonce');
-            // return;
+            error_log('❌ PNG STORAGE: Nonce verification failed - sending error response');
+            wp_send_json_error('Invalid nonce');
+            return;
         }
 
         try {
@@ -1090,7 +1089,6 @@ class PNG_Storage_Handler {
     }
 }
 
-// Initialize PNG Storage Handler (WooCommerce dependency removed)
-error_log('🚀 PNG STORAGE HANDLER: Initializing without WooCommerce dependency');
-new PNG_Storage_Handler('octo-print-designer', '1.0.0');
+// PNG Storage Handler is initialized in class-octo-print-designer.php
+// Removed duplicate instantiation to prevent AJAX handler conflicts
 ?>
