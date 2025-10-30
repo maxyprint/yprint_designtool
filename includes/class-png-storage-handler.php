@@ -1000,10 +1000,20 @@ class PNG_Storage_Handler {
                 '%s'  // template_id
             );
 
-            // Add enhanced metadata if available
-            if (isset($design_meta['enhanced_metadata'])) {
+            // Add enhanced metadata if available (only if field exists in table)
+            $table_has_metadata_field = false;
+            $table_columns = $wpdb->get_col("DESCRIBE {$table_name}");
+            if (in_array('metadata_json', $table_columns)) {
+                $table_has_metadata_field = true;
+                error_log('✅ DATABASE SAVE: Table has metadata_json field');
+            } else {
+                error_log('⚠️ DATABASE SAVE: Table missing metadata_json field');
+            }
+
+            if ($table_has_metadata_field && isset($design_meta['enhanced_metadata'])) {
                 $insert_data['metadata_json'] = json_encode($design_meta['enhanced_metadata']);
                 $format_array[] = '%s'; // metadata_json format
+                error_log('✅ DATABASE SAVE: Enhanced metadata will be saved');
             }
 
             error_log('🗄️ DATABASE SAVE: Inserting into table: ' . $table_name);
