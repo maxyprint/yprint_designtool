@@ -990,28 +990,32 @@ class PNG_Storage_Handler {
                 'template_id' => $template_id ?: 'default'
             );
 
+            // Prepare format array to match data fields
+            $format_array = array(
+                '%s', // design_id
+                '%s', // print_png (binary)
+                '%s', // generated_at
+                '%s', // save_type
+                '%s', // order_id
+                '%s'  // template_id
+            );
+
             // Add enhanced metadata if available
             if (isset($design_meta['enhanced_metadata'])) {
                 $insert_data['metadata_json'] = json_encode($design_meta['enhanced_metadata']);
+                $format_array[] = '%s'; // metadata_json format
             }
 
             error_log('🗄️ DATABASE SAVE: Inserting into table: ' . $table_name);
             error_log('🗄️ DATABASE SAVE: Design ID: ' . $design_id);
             error_log('🗄️ DATABASE SAVE: PNG size: ' . strlen($binary_data) . ' bytes');
+            error_log('🗄️ DATABASE SAVE: Data fields: ' . count($insert_data) . ', Format fields: ' . count($format_array));
 
             // Insert into database
             $result = $wpdb->insert(
                 $table_name,
                 $insert_data,
-                array(
-                    '%s', // design_id
-                    '%s', // print_png (binary)
-                    '%s', // generated_at
-                    '%s', // save_type
-                    '%s', // order_id
-                    '%s', // template_id
-                    '%s'  // metadata_json (if present)
-                )
+                $format_array
             );
 
             if ($result === false) {
