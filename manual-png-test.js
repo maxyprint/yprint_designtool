@@ -47,7 +47,7 @@ async function manualPNGTest() {
         // Prepare the data exactly like the real system does
         const formData = new FormData();
         formData.append('action', 'yprint_save_design_print_png');
-        formData.append('nonce', window.yprint_ajax?.nonce || window.yprint_save_png_ajax?.nonce || 'test-nonce');
+        formData.append('nonce', window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce || 'test-nonce');
         formData.append('design_id', `manual_test_${Date.now()}`);
         formData.append('design_data', JSON.stringify(designData));
         formData.append('print_png', pngResult.dataUrl);
@@ -55,7 +55,7 @@ async function manualPNGTest() {
         console.log('📡 Sending to server...', {
             url: window.yprint_ajax?.ajax_url || 'https://yprint.de/wp-admin/admin-ajax.php',
             action: 'yprint_save_design_print_png',
-            nonce: window.yprint_ajax?.nonce || 'test-nonce',
+            nonce: window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce || 'test-nonce',
             png_size: pngResult.dataUrl.length,
             png_size_mb: (pngResult.dataUrl.length / 1024 / 1024).toFixed(2)
         });
