@@ -1513,12 +1513,23 @@ class SaveOnlyPNGGenerator {
 
     async storePNGInDatabase(pngData) {
         // 🔧 CRITICAL FIX: Check if WordPress config is available
-        const config = window.octo_print_designer_config;
+        let config = window.octo_print_designer_config;
+
+        // 🚀 FALLBACK: Use yprint_ajax if octo_print_designer_config is not available
+        if (!config || !config.ajax_url || !config.nonce) {
+            console.log('🔄 SAVE-ONLY PNG: octo_print_designer_config missing, trying yprint_ajax fallback...');
+            if (window.yprint_ajax && window.yprint_ajax.ajax_url && window.yprint_ajax.nonce) {
+                config = window.yprint_ajax;
+                console.log('✅ SAVE-ONLY PNG: Using yprint_ajax configuration');
+            }
+        }
+
         if (!config || !config.ajax_url || !config.nonce) {
             console.error('❌ SAVE-ONLY PNG: WordPress AJAX configuration missing', {
-                config_exists: !!config,
-                ajax_url: config?.ajax_url,
-                nonce_exists: !!config?.nonce,
+                octo_config_exists: !!window.octo_print_designer_config,
+                yprint_ajax_exists: !!window.yprint_ajax,
+                config_ajax_url: config?.ajax_url,
+                config_nonce_exists: !!config?.nonce,
                 available_globals: Object.keys(window).filter(key => key.includes('octo') || key.includes('yprint'))
             });
 
