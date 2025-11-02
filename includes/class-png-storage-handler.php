@@ -1008,6 +1008,15 @@ class PNG_Storage_Handler {
                 ), ARRAY_A);
                 error_log('🔍 DATABASE SAVE: Similar tables found: ' . print_r(array_column($similar_tables, 'Tables_in_' . $wpdb->dbname), true));
 
+                // 🚨 TEMPORARY DEBUG: Send debug info in response instead of error.log
+                $debug_info = array(
+                    'searched_table' => $table_name,
+                    'wpdb_prefix' => $wpdb->prefix,
+                    'wpdb_dbname' => $wpdb->dbname,
+                    'similar_tables' => array_column($similar_tables, 'Tables_in_' . $wpdb->dbname),
+                    'all_tables_count' => count($wpdb->get_results("SHOW TABLES", ARRAY_A))
+                );
+                wp_send_json_error('TABLE NOT FOUND - DEBUG: ' . json_encode($debug_info));
                 return false;
             }
 
