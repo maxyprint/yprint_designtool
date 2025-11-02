@@ -702,7 +702,7 @@ class SaveOnlyPNGGenerator {
                 try {
                     console.log('🔄 FALLBACK PNG: Using exportWithTemplateMetadata with timeout...');
 
-                    printPNG = await Promise.race([
+                    const pngResult = await Promise.race([
                         this.pngEngine.exportEngine.exportWithTemplateMetadata({
                             dpi: 300,
                             format: 'png',
@@ -715,6 +715,9 @@ class SaveOnlyPNGGenerator {
                             }, 5000)
                         )
                     ]);
+
+                    // Extract dataUrl from result object
+                    printPNG = pngResult && pngResult.dataUrl ? pngResult.dataUrl : null;
                 } catch (e) {
                     console.log('🔄 FALLBACK PNG: exportWithTemplateMetadata failed:', e.message);
                     printPNG = null;
@@ -1539,12 +1542,12 @@ class SaveOnlyPNGGenerator {
                 printPNG_exists: !!pngData.print_png,
                 printPNG_type: typeof pngData.print_png,
                 printPNG_length: pngData.print_png ? pngData.print_png.length : 0,
-                printPNG_preview: pngData.print_png ? pngData.print_png.substring(0, 50) : 'NULL'
+                printPNG_preview: pngData.print_png && typeof pngData.print_png === 'string' ? pngData.print_png.substring(0, 50) : 'INVALID_TYPE'
             });
 
-        console.log(`🚨 DATENSTROM-BEWEIS: printPNG Größe = ${pngData.print_png ? pngData.print_png.length : 0} Zeichen`);
-        console.log(`🚨 DATENSTROM-BEWEIS: Ist >500KB = ${pngData.print_png && pngData.print_png.length > 500000 ? 'JA' : 'NEIN'}`);
-        console.log(`🚨 DATENSTROM-BEWEIS: Beginnt mit data:image = ${pngData.print_png && pngData.print_png.startsWith('data:image') ? 'JA' : 'NEIN'}`);
+        console.log(`🚨 DATENSTROM-BEWEIS: printPNG Größe = ${pngData.print_png && typeof pngData.print_png === 'string' ? pngData.print_png.length : 0} Zeichen`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Ist >500KB = ${pngData.print_png && typeof pngData.print_png === 'string' && pngData.print_png.length > 500000 ? 'JA' : 'NEIN'}`);
+        console.log(`🚨 DATENSTROM-BEWEIS: Beginnt mit data:image = ${pngData.print_png && typeof pngData.print_png === 'string' && pngData.print_png.startsWith('data:image') ? 'JA' : 'NEIN'}`);
 
         // 🔍 ENHANCED DEBUG: Log the exact request being sent
         const requestData = {
