@@ -1,0 +1,36 @@
+# PNG Upload Fix - Maximum Compatibility
+# Test each section individually if errors occur
+
+# Method 1: Standard PHP Values (most common)
+<IfModule mod_php7.c>
+php_value post_max_size 64M
+php_value upload_max_filesize 64M
+php_value max_execution_time 300
+php_value memory_limit 512M
+php_value max_input_time 300
+</IfModule>
+
+# Method 2: PHP8 Support
+<IfModule mod_php8.c>
+php_value post_max_size 64M
+php_value upload_max_filesize 64M
+php_value max_execution_time 300
+php_value memory_limit 512M
+php_value max_input_time 300
+</IfModule>
+
+# Method 3: CGI/FastCGI Alternative
+<IfModule mod_fcgid.c>
+FcgidInitialEnv PHP_VALUE "post_max_size=64M"
+FcgidInitialEnv PHP_VALUE "upload_max_filesize=64M"
+FcgidInitialEnv PHP_VALUE "max_execution_time=300"
+FcgidInitialEnv PHP_VALUE "memory_limit=512M"
+</IfModule>
+
+# Method 4: Generic Fallback
+<Files "*.php">
+php_value post_max_size 64M
+php_value upload_max_filesize 64M
+php_value max_execution_time 300
+php_value memory_limit 512M
+</Files>
