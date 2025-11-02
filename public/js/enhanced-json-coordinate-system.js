@@ -170,12 +170,19 @@
             }
 
             // Method 4: Check window.designerWidgetInstance
-            if (window.designerWidgetInstance && window.designerWidgetInstance.canvas) {
-                const canvas = window.designerWidgetInstance.canvas;
-                const element = canvas.lowerCanvasEl || document.querySelector('#octo-print-designer-canvas');
-                if (element) {
-                    this.debugLog('info', '✅ Found canvas via designerWidgetInstance');
-                    return { success: true, canvas, canvasElement: element };
+            console.log('🔍 JSON DEBUG: designerWidgetInstance exists:', !!window.designerWidgetInstance);
+            if (window.designerWidgetInstance) {
+                console.log('🔍 JSON DEBUG: designerWidgetInstance properties:', Object.keys(window.designerWidgetInstance));
+                console.log('🔍 JSON DEBUG: fabricCanvas exists:', !!window.designerWidgetInstance.fabricCanvas);
+                console.log('🔍 JSON DEBUG: canvas exists:', !!window.designerWidgetInstance.canvas);
+
+                if (window.designerWidgetInstance.fabricCanvas) {
+                    const canvas = window.designerWidgetInstance.fabricCanvas;
+                    const element = canvas.lowerCanvasEl || document.querySelector('#octo-print-designer-canvas');
+                    if (element) {
+                        this.debugLog('info', '✅ Found canvas via designerWidgetInstance.fabricCanvas');
+                        return { success: true, canvas, canvasElement: element };
+                    }
                 }
             }
 
