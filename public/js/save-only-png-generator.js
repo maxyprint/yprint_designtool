@@ -1001,7 +1001,7 @@ class SaveOnlyPNGGenerator {
 
         try {
             // Process the queued save
-            await this.generatePNG(nextSave.designData, nextSave.saveType);
+            await this.generateAndStorePNG(nextSave.designData, nextSave.saveType);
         } catch (error) {
             console.error('❌ SAVE-ONLY PNG: Queued save failed:', error);
         }
