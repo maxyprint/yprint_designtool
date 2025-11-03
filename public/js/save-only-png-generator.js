@@ -1547,8 +1547,54 @@ class SaveOnlyPNGGenerator {
     }
 
     async storePNGInDatabase(pngData) {
-        // 🧪 DEBUG: Display PNG instead of storing it
-        console.log('🎨 DEBUG MODE: Displaying PNG instead of storing...');
+        // 🧪 DEBUG: Test the new print area export system first
+        console.log('🧪 DEBUG MODE: Testing new print area export system...');
+
+        try {
+            // Test the new export system
+            if (window.highDPIPrintExportEngine && typeof window.highDPIPrintExportEngine.exportWithTemplateMetadata === 'function') {
+                console.log('🎯 DEBUG: Using new export system...');
+
+                const improvedResult = await window.highDPIPrintExportEngine.exportWithTemplateMetadata({
+                    dpi: 300,
+                    format: 'png',
+                    quality: 1.0,
+                    multiplier: 3.125
+                });
+
+                if (improvedResult && improvedResult.dataUrl) {
+                    console.log('✅ NEW SYSTEM SUCCESS:', improvedResult);
+
+                    // Get the actual print area that was used
+                    const actualPrintArea = await window.highDPIPrintExportEngine.fetchTemplatePrintArea();
+
+                    // Update pngData with improved results
+                    const improvedPngData = {
+                        ...pngData,
+                        print_png: improvedResult.dataUrl,
+                        print_area_px: JSON.stringify(actualPrintArea || improvedResult.metadata),
+                        template_id: improvedResult.templateMetadata?.template_id || await window.highDPIPrintExportEngine.getCurrentTemplateId() || 'improved',
+                        export_method: 'print_area_optimized',
+                        actual_dimensions: `${improvedResult.metadata.width}x${improvedResult.metadata.height}px`
+                    };
+
+                    this.displayPNGDebugModal(improvedPngData);
+
+                    return {
+                        success: true,
+                        png_url: 'debug://improved-export',
+                        design_id: improvedPngData.design_id,
+                        debug_mode: true,
+                        export_method: 'improved'
+                    };
+                }
+            }
+        } catch (error) {
+            console.log('🔄 DEBUG: New system failed, showing original:', error.message);
+        }
+
+        // Fallback: show original
+        console.log('🎨 DEBUG MODE: Displaying original PNG...');
         this.displayPNGDebugModal(pngData);
 
         // Return mock success to prevent errors
@@ -1558,7 +1604,12 @@ class SaveOnlyPNGGenerator {
             design_id: pngData.design_id,
             debug_mode: true
         };
+    }
 
+    /**
+     * 🔧 ORIGINAL STORAGE METHOD (kept for reference)
+     */
+    async storePNGInDatabaseOriginal(pngData) {
         // 🔧 CRITICAL FIX: Check if WordPress config is available
         let config = window.octo_print_designer_config;
 
@@ -1759,6 +1810,8 @@ class SaveOnlyPNGGenerator {
         <p><strong>Save Type:</strong> ${pngData.save_type || 'unknown'}</p>
         <p><strong>Generated At:</strong> ${pngData.generated_at || 'unknown'}</p>
         <p><strong>Template ID:</strong> ${pngData.template_id || 'unknown'}</p>
+        <p><strong>Export Method:</strong> ${pngData.export_method || 'legacy'}</p>
+        <p><strong>Actual Dimensions:</strong> ${pngData.actual_dimensions || 'unknown'}</p>
         <p><strong>Data Size:</strong> ${(pngData.print_png?.length || 0).toLocaleString()} characters</p>
         <p><strong>Data Size (MB):</strong> ${((pngData.print_png?.length || 0) / 1024 / 1024).toFixed(2)} MB</p>
         <p><strong>Print Area PX:</strong> ${pngData.print_area_px || 'unknown'}</p>
@@ -1772,6 +1825,8 @@ class SaveOnlyPNGGenerator {
             <p><strong>Save Type:</strong> ${pngData.save_type || 'unknown'}</p>
             <p><strong>Generated At:</strong> ${pngData.generated_at || new Date().toISOString()}</p>
             <p><strong>Template ID:</strong> ${pngData.template_id || 'unknown'}</p>
+            <p><strong>Export Method:</strong> ${pngData.export_method || 'legacy'}</p>
+            <p><strong>Actual Dimensions:</strong> ${pngData.actual_dimensions || 'unknown'}</p>
             <p><strong>Data Size:</strong> ${(pngData.print_png?.length || 0).toLocaleString()} characters</p>
             <p><strong>Data Size (MB):</strong> ${((pngData.print_png?.length || 0) / 1024 / 1024).toFixed(2)} MB</p>
             <p><strong>Print Area PX:</strong> ${pngData.print_area_px || 'unknown'}</p>
