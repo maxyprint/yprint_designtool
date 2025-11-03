@@ -1168,16 +1168,51 @@ class SaveOnlyPNGGenerator {
     }
 
     /**
+     * 🎯 Get current template ID from various sources
+     */
+    getCurrentTemplateId() {
+        // Method 1: From URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        let templateId = urlParams.get('template_id') || urlParams.get('template');
+        if (templateId) {
+            console.log('🎯 Template ID from URL:', templateId);
+            return templateId;
+        }
+
+        // Method 2: From DOM data attributes
+        const templateElement = document.querySelector('[data-template-id]');
+        if (templateElement) {
+            templateId = templateElement.dataset.templateId;
+            console.log('🎯 Template ID from DOM:', templateId);
+            return templateId;
+        }
+
+        // Method 3: From global variables
+        if (window.currentTemplateId) {
+            console.log('🎯 Template ID from global var:', window.currentTemplateId);
+            return window.currentTemplateId;
+        }
+
+        // Method 4: From designer config
+        if (window.octo_print_designer_config?.template_id) {
+            console.log('🎯 Template ID from config:', window.octo_print_designer_config.template_id);
+            return window.octo_print_designer_config.template_id;
+        }
+
+        console.warn('⚠️ No template ID found in any source');
+        return null;
+    }
+
+    /**
      * 🎯 PRINT AREA DETECTION - Get template print area from WordPress
      */
     async getTemplatePrintArea() {
         try {
-            // Method 1: Try to get from URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const templateId = urlParams.get('template_id');
+            // Method 1: Try to get template ID from multiple sources
+            const templateId = this.getCurrentTemplateId();
 
             if (templateId) {
-                console.log('🔍 PRINT AREA: Found template ID in URL:', templateId);
+                console.log('🔍 PRINT AREA: Found template ID:', templateId);
 
                 // Try to get template data from WordPress
                 const config = window.octo_print_designer_config;
@@ -1188,7 +1223,7 @@ class SaveOnlyPNGGenerator {
                             'Content-Type': 'application/x-www-form-urlencoded',
                         },
                         body: new URLSearchParams({
-                            action: 'yprint_get_template_data',
+                            action: 'yprint_get_template_print_area',
                             nonce: config.nonce,
                             template_id: templateId
                         })

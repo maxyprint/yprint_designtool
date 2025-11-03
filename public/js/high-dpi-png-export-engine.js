@@ -96,7 +96,7 @@ class HighDPIPrintExportEngine {
     /**
      * Alternative export method with template metadata
      */
-    exportWithTemplateMetadata(options) {
+    async exportWithTemplateMetadata(options) {
         console.log('🎯 ENGINE: Template metadata export starting...');
         console.log('🎯 Export options received:', options);
 
@@ -107,25 +107,22 @@ class HighDPIPrintExportEngine {
                 throw new Error('No fabric canvas available for export');
             }
 
+            // 🎯 STEP 1: Get dynamic print area from template database
+            const printArea = await this.fetchTemplatePrintArea();
+            console.log('🎯 PRINT AREA FETCHED:', printArea);
+
             const exportMultiplier = options.multiplier || 3.125;
             const quality = options.quality || 1.0;
 
-            // Generate export with template metadata
-            const exportOptions = {
-                format: options.format || 'png',
-                quality: quality,
-                multiplier: exportMultiplier,
-                enableRetinaScaling: true
-            };
+            // 🎯 STEP 2: Export only the print area with correct dimensions
+            const croppedDataUrl = await this.exportPrintAreaOnly(fabricCanvas, printArea, exportMultiplier, quality, options.format || 'png');
 
-            const dataUrl = fabricCanvas.toDataURL(exportOptions);
-
-            console.log('✅ ENGINE: Template metadata export completed');
+            console.log('✅ ENGINE: Template metadata export completed with print area cropping');
             return {
-                dataUrl: dataUrl,
+                dataUrl: croppedDataUrl,
                 metadata: {
-                    width: Math.round(fabricCanvas.width * exportMultiplier),
-                    height: Math.round(fabricCanvas.height * exportMultiplier),
+                    width: Math.round(printArea.width * exportMultiplier),
+                    height: Math.round(printArea.height * exportMultiplier),
                     dpi: Math.round(96 * exportMultiplier),
                     quality: quality,
                     elementsCount: fabricCanvas.getObjects().length
@@ -234,6 +231,216 @@ class HighDPIPrintExportEngine {
         window.dispatchEvent(new CustomEvent('yprintPrintEngineReady', {
             detail: { instance: this }
         }));
+    }
+
+    /**
+     * 🎯 Fetch template print area from database
+     */
+    async fetchTemplatePrintArea() {
+        try {
+            console.log('🎯 FETCHING TEMPLATE PRINT AREA...');
+
+            // Method 1: Try to get current template ID
+            const templateId = this.getCurrentTemplateId();
+            if (!templateId) {
+                console.warn('⚠️ No template ID found, using fallback print area');
+                return this.getFallbackPrintArea();
+            }
+
+            // Method 2: AJAX call to get template print area
+            const formData = new FormData();
+            formData.append('action', 'yprint_get_template_print_area');
+            formData.append('template_id', templateId);
+            formData.append('nonce', window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce || 'fallback-nonce');
+
+            const response = await fetch(window.yprint_ajax?.ajax_url || '/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data.printable_area_px) {
+                    console.log('✅ TEMPLATE PRINT AREA FETCHED:', result.data.printable_area_px);
+                    return result.data.printable_area_px;
+                }
+            }
+
+            console.warn('⚠️ Template print area fetch failed, using fallback');
+            return this.getFallbackPrintArea();
+
+        } catch (error) {
+            console.error('❌ Error fetching template print area:', error);
+            return this.getFallbackPrintArea();
+        }
+    }
+
+    /**
+     * 🎯 Get current template ID from various sources
+     */
+    getCurrentTemplateId() {
+        // Try multiple methods to get template ID
+
+        // Method 1: From URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        let templateId = urlParams.get('template_id') || urlParams.get('template');
+        if (templateId) {
+            console.log('🎯 Template ID from URL:', templateId);
+            return templateId;
+        }
+
+        // Method 2: From DOM data attributes
+        const templateElement = document.querySelector('[data-template-id]');
+        if (templateElement) {
+            templateId = templateElement.dataset.templateId;
+            console.log('🎯 Template ID from DOM:', templateId);
+            return templateId;
+        }
+
+        // Method 3: From global variables
+        if (window.currentTemplateId) {
+            console.log('🎯 Template ID from global var:', window.currentTemplateId);
+            return window.currentTemplateId;
+        }
+
+        // Method 4: From designer config
+        if (window.octo_print_designer_config?.template_id) {
+            console.log('🎯 Template ID from config:', window.octo_print_designer_config.template_id);
+            return window.octo_print_designer_config.template_id;
+        }
+
+        console.warn('⚠️ No template ID found in any source');
+        return null;
+    }
+
+    /**
+     * 🎯 Fallback print area when template data unavailable
+     */
+    getFallbackPrintArea() {
+        return {
+            x: 100,
+            y: 100,
+            width: 600,
+            height: 400
+        };
+    }
+
+    /**
+     * 🎯 Export only the print area with correct dimensions and alignment
+     */
+    async exportPrintAreaOnly(fabricCanvas, printArea, multiplier, quality, format) {
+        console.log('🎯 EXPORTING PRINT AREA ONLY:', printArea);
+
+        try {
+            // Step 1: Hide non-design elements (backgrounds, mockups, etc.)
+            const hiddenObjects = [];
+            const allObjects = fabricCanvas.getObjects();
+
+            allObjects.forEach(obj => {
+                if (this.shouldHideFromExport(obj)) {
+                    hiddenObjects.push(obj);
+                    obj.visible = false;
+                }
+            });
+
+            // Step 2: Export full canvas at high resolution
+            const fullCanvasDataURL = fabricCanvas.toDataURL({
+                format: format,
+                quality: quality,
+                multiplier: multiplier
+            });
+
+            // Step 3: Crop to print area
+            const croppedDataURL = await this.cropToArea(fullCanvasDataURL, printArea, multiplier);
+
+            // Step 4: Restore visibility of hidden objects
+            hiddenObjects.forEach(obj => {
+                obj.visible = true;
+            });
+
+            return croppedDataURL;
+
+        } catch (error) {
+            console.error('❌ Error in print area export:', error);
+            // Fallback: return full canvas export
+            return fabricCanvas.toDataURL({
+                format: format,
+                quality: quality,
+                multiplier: multiplier
+            });
+        }
+    }
+
+    /**
+     * 🎯 Determine if object should be hidden from export
+     */
+    shouldHideFromExport(obj) {
+        // Hide backgrounds and mockup elements
+        return !!(
+            obj.isBackground ||
+            obj.isViewImage ||
+            obj.isTemplateBackground ||
+            obj.excludeFromExport ||
+            (obj.type === 'image' && this.isLikelyBackground(obj))
+        );
+    }
+
+    /**
+     * 🎯 Detect if image is likely a background by size/position
+     */
+    isLikelyBackground(obj) {
+        if (obj.type !== 'image') return false;
+
+        const bounds = obj.getBoundingRect();
+        const canvas = window.designerWidgetInstance?.fabricCanvas;
+        if (!canvas) return false;
+
+        const canvasWidth = canvas.width || 656;
+        const canvasHeight = canvas.height || 420;
+
+        // Check if image covers most of the canvas (likely background)
+        const coverageX = bounds.width / canvasWidth;
+        const coverageY = bounds.height / canvasHeight;
+
+        return (coverageX > 0.8 && coverageY > 0.8);
+    }
+
+    /**
+     * 🎯 Crop image to specific area using canvas
+     */
+    async cropToArea(dataURL, printArea, multiplier) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Calculate crop area with multiplier
+                const cropArea = {
+                    x: printArea.x * multiplier,
+                    y: printArea.y * multiplier,
+                    width: printArea.width * multiplier,
+                    height: printArea.height * multiplier
+                };
+
+                // Set canvas to exact print area size
+                canvas.width = cropArea.width;
+                canvas.height = cropArea.height;
+
+                // Draw cropped portion
+                ctx.drawImage(
+                    img,
+                    cropArea.x, cropArea.y, cropArea.width, cropArea.height,
+                    0, 0, cropArea.width, cropArea.height
+                );
+
+                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
+                console.log('✅ Image cropped to print area successfully');
+                resolve(croppedDataURL);
+            };
+            img.src = dataURL;
+        });
     }
 }
 
