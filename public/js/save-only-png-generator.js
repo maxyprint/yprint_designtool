@@ -1512,6 +1512,18 @@ class SaveOnlyPNGGenerator {
     }
 
     async storePNGInDatabase(pngData) {
+        // 🧪 DEBUG: Display PNG instead of storing it
+        console.log('🎨 DEBUG MODE: Displaying PNG instead of storing...');
+        this.displayPNGDebugModal(pngData);
+
+        // Return mock success to prevent errors
+        return {
+            success: true,
+            png_url: 'debug://local-display',
+            design_id: pngData.design_id,
+            debug_mode: true
+        };
+
         // 🔧 CRITICAL FIX: Check if WordPress config is available
         let config = window.octo_print_designer_config;
 
@@ -1628,6 +1640,130 @@ class SaveOnlyPNGGenerator {
         });
 
         return result.data;
+    }
+
+    /**
+     * 🧪 DEBUG: Display PNG in modal instead of storing
+     */
+    displayPNGDebugModal(pngData) {
+        // Create modal backdrop
+        const backdrop = document.createElement('div');
+        backdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+        `;
+
+        // Create modal content
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: #2d2d2d;
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
+        `;
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '✕ Close';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        `;
+        closeBtn.onclick = () => document.body.removeChild(backdrop);
+
+        // PNG Image
+        const img = document.createElement('img');
+        img.src = pngData.print_png;
+        img.style.cssText = `
+            max-width: 800px;
+            max-height: 600px;
+            border: 2px solid #4CAF50;
+            border-radius: 5px;
+            display: block;
+            margin: 20px auto;
+        `;
+
+        // Debug info
+        const debugInfo = document.createElement('div');
+        debugInfo.style.cssText = `
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 12px;
+            line-height: 1.4;
+        `;
+
+        const htmlCode = `
+<div class="png-debug-display">
+    <h3>🎨 Generated PNG Debug Display</h3>
+    <img src="${pngData.print_png}" alt="Generated PNG" style="max-width: 100%; border: 2px solid #4CAF50;">
+    <div class="debug-info">
+        <h4>📊 PNG Data:</h4>
+        <p><strong>Design ID:</strong> ${pngData.design_id}</p>
+        <p><strong>Save Type:</strong> ${pngData.save_type || 'unknown'}</p>
+        <p><strong>Generated At:</strong> ${pngData.generated_at || 'unknown'}</p>
+        <p><strong>Template ID:</strong> ${pngData.template_id || 'unknown'}</p>
+        <p><strong>Data Size:</strong> ${(pngData.print_png?.length || 0).toLocaleString()} characters</p>
+        <p><strong>Data Size (MB):</strong> ${((pngData.print_png?.length || 0) / 1024 / 1024).toFixed(2)} MB</p>
+        <p><strong>Print Area PX:</strong> ${pngData.print_area_px || 'unknown'}</p>
+        <p><strong>Print Area MM:</strong> ${pngData.print_area_mm || 'unknown'}</p>
+    </div>
+</div>`;
+
+        debugInfo.innerHTML = `
+            <h3>🧪 PNG Debug Information</h3>
+            <p><strong>Design ID:</strong> ${pngData.design_id}</p>
+            <p><strong>Save Type:</strong> ${pngData.save_type || 'unknown'}</p>
+            <p><strong>Generated At:</strong> ${pngData.generated_at || new Date().toISOString()}</p>
+            <p><strong>Template ID:</strong> ${pngData.template_id || 'unknown'}</p>
+            <p><strong>Data Size:</strong> ${(pngData.print_png?.length || 0).toLocaleString()} characters</p>
+            <p><strong>Data Size (MB):</strong> ${((pngData.print_png?.length || 0) / 1024 / 1024).toFixed(2)} MB</p>
+            <p><strong>Print Area PX:</strong> ${pngData.print_area_px || 'unknown'}</p>
+            <p><strong>Print Area MM:</strong> ${pngData.print_area_mm || 'unknown'}</p>
+
+            <h4>📋 HTML Code for this display:</h4>
+            <textarea readonly style="width: 100%; height: 200px; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 11px;">${htmlCode}</textarea>
+
+            <h4>🔍 Raw PNG Data (first 200 chars):</h4>
+            <div style="background: #000; color: #0f0; padding: 10px; border-radius: 3px; font-size: 10px; word-break: break-all;">
+                ${(pngData.print_png || '').substring(0, 200)}...
+            </div>
+        `;
+
+        // Assemble modal
+        modal.appendChild(closeBtn);
+        modal.appendChild(img);
+        modal.appendChild(debugInfo);
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+
+        // Log to console as well
+        console.log('🎨 PNG DEBUG MODAL: Displayed PNG with data:', {
+            design_id: pngData.design_id,
+            data_size_mb: ((pngData.print_png?.length || 0) / 1024 / 1024).toFixed(2),
+            html_code: htmlCode
+        });
     }
 
     /**
