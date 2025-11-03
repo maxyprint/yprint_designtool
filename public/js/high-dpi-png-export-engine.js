@@ -248,20 +248,28 @@ class HighDPIPrintExportEngine {
      */
     async fetchTemplatePrintArea() {
         try {
-            console.log('🎯 FETCHING TEMPLATE PRINT AREA...');
+            console.log('🎯 FETCHING REAL TEMPLATE PRINT AREA FROM DATABASE...');
 
-            // Method 1: Try to get current template ID
+            // ECHTE Template ID finden - KEIN FALLBACK!
             const templateId = this.getCurrentTemplateId();
             if (!templateId) {
-                console.warn('⚠️ No template ID found, using fallback print area');
-                return this.getFallbackPrintArea();
+                throw new Error('CRITICAL: No template ID found - cannot proceed without real template data');
             }
 
-            // Method 2: AJAX call to get template print area
+            console.log('🔍 Requesting print area for template ID:', templateId);
+
+            // AJAX call zu WordPress Backend für echte Meta-Field Daten
             const formData = new FormData();
             formData.append('action', 'yprint_get_template_print_area');
             formData.append('template_id', templateId);
-            formData.append('nonce', window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce || 'fallback-nonce');
+            formData.append('nonce', window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce);
+
+            console.log('📡 AJAX Request Details:', {
+                action: 'yprint_get_template_print_area',
+                template_id: templateId,
+                ajax_url: window.yprint_ajax?.ajax_url || '/wp-admin/admin-ajax.php',
+                nonce: window.octo_print_designer_config?.nonce || window.yprint_ajax?.nonce
+            });
 
             const response = await fetch(window.yprint_ajax?.ajax_url || '/wp-admin/admin-ajax.php', {
                 method: 'POST',
@@ -269,20 +277,39 @@ class HighDPIPrintExportEngine {
                 credentials: 'same-origin'
             });
 
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success && result.data.printable_area_px) {
-                    console.log('✅ TEMPLATE PRINT AREA FETCHED:', result.data.printable_area_px);
-                    return result.data.printable_area_px;
-                }
+            console.log('📊 Server Response Status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            console.warn('⚠️ Template print area fetch failed, using fallback');
-            return this.getFallbackPrintArea();
+            const result = await response.json();
+            console.log('📋 Complete Server Response:', result);
+
+            if (result.success) {
+                if (result.data && result.data.printable_area_px) {
+                    console.log('✅ REAL TEMPLATE PRINT AREA LOADED FROM DATABASE:', {
+                        template_id: templateId,
+                        printable_area_px: result.data.printable_area_px,
+                        printable_area_mm: result.data.printable_area_mm || 'not provided',
+                        source: 'WordPress Meta-Fields (deo6_postmeta)'
+                    });
+                    return result.data.printable_area_px;
+                } else {
+                    console.error('❌ Server returned success but no printable_area_px data:', result.data);
+                    throw new Error('Template print area data missing from response');
+                }
+            } else {
+                console.error('❌ Server returned error:', result.data || result);
+                throw new Error(`Server error: ${result.data || 'Unknown error'}`);
+            }
 
         } catch (error) {
-            console.error('❌ Error fetching template print area:', error);
-            return this.getFallbackPrintArea();
+            console.error('❌ CRITICAL: Failed to fetch real template print area:', error);
+            console.error('❌ System MUST use real data - no fallbacks allowed!');
+
+            // KEIN FALLBACK - System muss repariert werden!
+            throw new Error(`Template print area fetch failed: ${error.message}. System must be fixed to use real data.`);
         }
     }
 
@@ -290,37 +317,81 @@ class HighDPIPrintExportEngine {
      * 🎯 Get current template ID from various sources
      */
     getCurrentTemplateId() {
-        // Try multiple methods to get template ID
+        console.log('🔍 TEMPLATE ID DETECTION - Checking all sources...');
 
         // Method 1: From URL params
         const urlParams = new URLSearchParams(window.location.search);
-        let templateId = urlParams.get('template_id') || urlParams.get('template');
+        let templateId = urlParams.get('template_id') || urlParams.get('template') || urlParams.get('tid');
         if (templateId) {
-            console.log('🎯 Template ID from URL:', templateId);
+            console.log('✅ Template ID from URL:', templateId);
             return templateId;
         }
 
-        // Method 2: From DOM data attributes
-        const templateElement = document.querySelector('[data-template-id]');
-        if (templateElement) {
-            templateId = templateElement.dataset.templateId;
-            console.log('🎯 Template ID from DOM:', templateId);
+        // Method 2: From DOM data attributes (multiple selectors)
+        const templateSelectors = [
+            '[data-template-id]',
+            '[data-template]',
+            '.template-container[data-id]',
+            '#template-data[data-template-id]',
+            '.designer-canvas[data-template-id]'
+        ];
+
+        for (const selector of templateSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                templateId = element.dataset.templateId || element.dataset.template || element.dataset.id;
+                if (templateId) {
+                    console.log('✅ Template ID from DOM selector', selector + ':', templateId);
+                    return templateId;
+                }
+            }
+        }
+
+        // Method 3: From global variables (multiple sources)
+        const globalSources = [
+            'currentTemplateId',
+            'templateId',
+            'TEMPLATE_ID',
+            'yprint_template_id'
+        ];
+
+        for (const source of globalSources) {
+            if (window[source]) {
+                console.log('✅ Template ID from window.' + source + ':', window[source]);
+                return window[source];
+            }
+        }
+
+        // Method 4: From various config objects
+        const configSources = [
+            () => window.octo_print_designer_config?.template_id,
+            () => window.yprint_config?.template_id,
+            () => window.designerConfig?.templateId,
+            () => window.designerWidgetInstance?.templateId,
+            () => window.designerWidgetInstance?.config?.templateId
+        ];
+
+        for (const configGetter of configSources) {
+            try {
+                templateId = configGetter();
+                if (templateId) {
+                    console.log('✅ Template ID from config:', templateId);
+                    return templateId;
+                }
+            } catch (e) {
+                // Ignore config access errors
+            }
+        }
+
+        // Method 5: From URL path (e.g., /designer/123)
+        const pathMatch = window.location.pathname.match(/\/designer\/(\d+)/);
+        if (pathMatch) {
+            templateId = pathMatch[1];
+            console.log('✅ Template ID from URL path:', templateId);
             return templateId;
         }
 
-        // Method 3: From global variables
-        if (window.currentTemplateId) {
-            console.log('🎯 Template ID from global var:', window.currentTemplateId);
-            return window.currentTemplateId;
-        }
-
-        // Method 4: From designer config
-        if (window.octo_print_designer_config?.template_id) {
-            console.log('🎯 Template ID from config:', window.octo_print_designer_config.template_id);
-            return window.octo_print_designer_config.template_id;
-        }
-
-        console.warn('⚠️ No template ID found in any source');
+        console.warn('⚠️ No template ID found in any source - checked URL, DOM, globals, configs, and path');
         return null;
     }
 
@@ -328,12 +399,24 @@ class HighDPIPrintExportEngine {
      * 🎯 Fallback print area when template data unavailable
      */
     getFallbackPrintArea() {
-        return {
-            x: 100,
-            y: 100,
-            width: 600,
-            height: 400
-        };
+        const canvas = window.designerWidgetInstance?.fabricCanvas;
+        const canvasWidth = canvas ? canvas.getWidth() : 656;
+        const canvasHeight = canvas ? canvas.getHeight() : 420;
+
+        // Create a centered print area that fits within canvas bounds
+        const margin = 50;
+        const width = Math.max(200, canvasWidth - (margin * 2));
+        const height = Math.max(150, canvasHeight - (margin * 2));
+        const x = Math.max(0, (canvasWidth - width) / 2);
+        const y = Math.max(0, (canvasHeight - height) / 2);
+
+        console.log('🔄 FALLBACK PRINT AREA calculated:', {
+            canvas_dimensions: `${canvasWidth}x${canvasHeight}px`,
+            fallback_area: { x, y, width, height },
+            fits_within_canvas: (x + width <= canvasWidth && y + height <= canvasHeight)
+        });
+
+        return { x, y, width, height };
     }
 
     /**
@@ -477,11 +560,36 @@ class HighDPIPrintExportEngine {
         const canvasWidth = canvas.width || 656;
         const canvasHeight = canvas.height || 420;
 
-        // Check if image covers most of the canvas (likely background)
+        // Enhanced detection for T-shirt mockups and backgrounds
         const coverageX = bounds.width / canvasWidth;
         const coverageY = bounds.height / canvasHeight;
 
-        return (coverageX > 0.8 && coverageY > 0.8);
+        // Check image source/name patterns for mockups
+        const imageSrc = obj.getSrc ? obj.getSrc() : (obj.src || '');
+        const isLikelyMockup = imageSrc.toLowerCase().includes('t-shirt') ||
+                              imageSrc.toLowerCase().includes('tshirt') ||
+                              imageSrc.toLowerCase().includes('mockup') ||
+                              imageSrc.toLowerCase().includes('template') ||
+                              imageSrc.toLowerCase().includes('background');
+
+        // Check if positioned like a background (near 0,0 and large)
+        const isPositionedLikeBackground = bounds.left < 50 && bounds.top < 50;
+
+        // Check if large enough to be background (relaxed threshold)
+        const isLargeEnough = (coverageX > 0.6 && coverageY > 0.6);
+
+        console.log('🔍 MOCKUP DETECTION DETAILS:', {
+            object_id: obj.id || 'unknown',
+            bounds: `${bounds.width}x${bounds.height}px at ${bounds.left},${bounds.top}`,
+            coverage: `${(coverageX*100).toFixed(1)}% x ${(coverageY*100).toFixed(1)}%`,
+            image_src: imageSrc.substring(imageSrc.lastIndexOf('/') + 1),
+            is_likely_mockup: isLikelyMockup,
+            is_positioned_like_bg: isPositionedLikeBackground,
+            is_large_enough: isLargeEnough,
+            RESULT: isLikelyMockup || (isPositionedLikeBackground && isLargeEnough)
+        });
+
+        return isLikelyMockup || (isPositionedLikeBackground && isLargeEnough);
     }
 
     /**
