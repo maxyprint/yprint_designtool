@@ -111,6 +111,16 @@ class HighDPIPrintExportEngine {
             const printArea = await this.fetchTemplatePrintArea();
             console.log('🎯 PRINT AREA FETCHED:', printArea);
 
+            // 🔍 PFLICHT 1: Daten-Validierung - Absolute Canvas-Koordinaten prüfen
+            console.log('📊 PRINT AREA VALIDATION:', {
+                printArea_coordinates: `x:${printArea.x}, y:${printArea.y}, w:${printArea.width}, h:${printArea.height}`,
+                canvas_dimensions: `${fabricCanvas.getWidth()}x${fabricCanvas.getHeight()}px`,
+                is_printArea_within_canvas: (printArea.x >= 0 && printArea.y >= 0 &&
+                    (printArea.x + printArea.width) <= fabricCanvas.getWidth() &&
+                    (printArea.y + printArea.height) <= fabricCanvas.getHeight()),
+                printArea_percentage_of_canvas: `${((printArea.width * printArea.height) / (fabricCanvas.getWidth() * fabricCanvas.getHeight()) * 100).toFixed(1)}%`
+            });
+
             const exportMultiplier = options.multiplier || 3.125;
             const quality = options.quality || 1.0;
 
@@ -341,9 +351,31 @@ class HighDPIPrintExportEngine {
         };
 
         try {
+            // 🔍 PFLICHT 2: Mockup-Identifikation - Alle Canvas-Objekte analysieren
+            const allObjects = fabricCanvas.getObjects();
+            console.log('📊 CANVAS OBJECTS ANALYSIS:');
+            allObjects.forEach((obj, index) => {
+                const bounds = obj.getBoundingRect ? obj.getBoundingRect() : {};
+                console.log(`Object ${index}:`, {
+                    type: obj.type,
+                    name: obj.name || 'unnamed',
+                    id: obj.id || 'no-id',
+                    visible: obj.visible,
+                    position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
+                    size: `${Math.round(bounds.width || 0)}x${Math.round(bounds.height || 0)}`,
+                    flags: {
+                        isBackground: !!obj.isBackground,
+                        isViewImage: !!obj.isViewImage,
+                        isTemplateBackground: !!obj.isTemplateBackground,
+                        excludeFromExport: !!obj.excludeFromExport
+                    },
+                    src_preview: obj.src ? obj.src.substring(obj.src.lastIndexOf('/') + 1, obj.src.lastIndexOf('/') + 30) + '...' : 'no-src',
+                    mockup_detection: this.shouldHideFromExport(obj) ? '❌ HIDE' : '✅ KEEP'
+                });
+            });
+
             // Step 1: Hide non-design elements (backgrounds, mockups, etc.)
             const hiddenObjects = [];
-            const allObjects = fabricCanvas.getObjects();
 
             allObjects.forEach(obj => {
                 if (this.shouldHideFromExport(obj)) {
@@ -351,6 +383,8 @@ class HighDPIPrintExportEngine {
                     obj.visible = false;
                 }
             });
+
+            console.log(`🔍 MOCKUP HIDING: ${hiddenObjects.length} objects hidden, ${allObjects.length - hiddenObjects.length} objects kept`);
 
             // Step 2: Restrict canvas to print area dimensions
             console.log('🎯 Setting canvas dimensions to print area:', `${printArea.width}x${printArea.height}`);
