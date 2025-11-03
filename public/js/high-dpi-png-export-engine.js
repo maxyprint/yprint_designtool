@@ -327,10 +327,18 @@ class HighDPIPrintExportEngine {
     }
 
     /**
-     * 🎯 Export only the print area with correct dimensions and alignment
+     * 🎯 Export only the print area with correct dimensions by restricting canvas viewport
      */
     async exportPrintAreaOnly(fabricCanvas, printArea, multiplier, quality, format) {
-        console.log('🎯 EXPORTING PRINT AREA ONLY:', printArea);
+        console.log('🎯 EXPORTING PRINT AREA ONLY via canvas viewport restriction:', printArea);
+
+        // Store original canvas state
+        const originalState = {
+            width: fabricCanvas.getWidth(),
+            height: fabricCanvas.getHeight(),
+            viewportTransform: fabricCanvas.viewportTransform.slice(),
+            clipPath: fabricCanvas.clipPath
+        };
 
         try {
             // Step 1: Hide non-design elements (backgrounds, mockups, etc.)
@@ -344,25 +352,61 @@ class HighDPIPrintExportEngine {
                 }
             });
 
-            // Step 2: Export full canvas at high resolution
-            const fullCanvasDataURL = fabricCanvas.toDataURL({
+            // Step 2: Restrict canvas to print area dimensions
+            console.log('🎯 Setting canvas dimensions to print area:', `${printArea.width}x${printArea.height}`);
+            fabricCanvas.setWidth(printArea.width);
+            fabricCanvas.setHeight(printArea.height);
+
+            // Step 3: Adjust viewport to show only print area content
+            console.log('🎯 Adjusting viewport transform to print area offset:', `x:${-printArea.x}, y:${-printArea.y}`);
+            fabricCanvas.setViewportTransform([1, 0, 0, 1, -printArea.x, -printArea.y]);
+
+            // Step 4: Apply clipping to ensure nothing outside print area is rendered
+            if (typeof fabric !== 'undefined' && fabric.Rect) {
+                fabricCanvas.clipPath = new fabric.Rect({
+                    left: 0,
+                    top: 0,
+                    width: printArea.width,
+                    height: printArea.height,
+                    absolutePositioned: true,
+                    fill: 'transparent'
+                });
+                console.log('🎯 Clipping path applied');
+            } else {
+                console.log('⚠️ Fabric.js not available for clipping, relying on viewport transform only');
+            }
+
+            // Step 5: Export the restricted canvas - now automatically correct size!
+            console.log('🎯 Exporting restricted canvas at', `${printArea.width}x${printArea.height}px`);
+            const printAreaDataURL = fabricCanvas.toDataURL({
                 format: format,
                 quality: quality,
                 multiplier: multiplier
             });
 
-            // Step 3: Crop to print area
-            const croppedDataURL = await this.cropToArea(fullCanvasDataURL, printArea, multiplier);
+            // Step 6: Restore original canvas state
+            fabricCanvas.setWidth(originalState.width);
+            fabricCanvas.setHeight(originalState.height);
+            fabricCanvas.setViewportTransform(originalState.viewportTransform);
+            fabricCanvas.clipPath = originalState.clipPath;
 
-            // Step 4: Restore visibility of hidden objects
+            // Step 7: Restore visibility of hidden objects
             hiddenObjects.forEach(obj => {
                 obj.visible = true;
             });
 
-            return croppedDataURL;
+            console.log('✅ Print area export completed, canvas state restored');
+            return printAreaDataURL;
 
         } catch (error) {
-            console.error('❌ Error in print area export:', error);
+            console.error('❌ Error in print area viewport export:', error);
+
+            // Restore original canvas state in case of error
+            fabricCanvas.setWidth(originalState.width);
+            fabricCanvas.setHeight(originalState.height);
+            fabricCanvas.setViewportTransform(originalState.viewportTransform);
+            fabricCanvas.clipPath = originalState.clipPath;
+
             // Fallback: return full canvas export
             return fabricCanvas.toDataURL({
                 format: format,
@@ -407,41 +451,9 @@ class HighDPIPrintExportEngine {
     }
 
     /**
-     * 🎯 Crop image to specific area using canvas
+     * 🎯 Note: cropToArea method removed - now using canvas viewport restriction instead
+     * This approach is more efficient and accurate for print area exports
      */
-    async cropToArea(dataURL, printArea, multiplier) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                // Calculate crop area with multiplier
-                const cropArea = {
-                    x: printArea.x * multiplier,
-                    y: printArea.y * multiplier,
-                    width: printArea.width * multiplier,
-                    height: printArea.height * multiplier
-                };
-
-                // Set canvas to exact print area size
-                canvas.width = cropArea.width;
-                canvas.height = cropArea.height;
-
-                // Draw cropped portion
-                ctx.drawImage(
-                    img,
-                    cropArea.x, cropArea.y, cropArea.width, cropArea.height,
-                    0, 0, cropArea.width, cropArea.height
-                );
-
-                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
-                console.log('✅ Image cropped to print area successfully');
-                resolve(croppedDataURL);
-            };
-            img.src = dataURL;
-        });
-    }
 }
 
 // Production engine also available in OctoPrintDesigner namespace
