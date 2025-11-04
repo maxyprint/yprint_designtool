@@ -1453,8 +1453,8 @@ class SaveOnlyPNGGenerator {
             }
 
             if (fabricCanvas) {
-                const canvasWidth = fabricCanvas.width || 1312;
-                const canvasHeight = fabricCanvas.height || 840;
+                const canvasWidth = fabricCanvas.width || 656;
+                const canvasHeight = fabricCanvas.height || 420;
 
                 if (area.x + area.width > canvasWidth) {
                     console.log('⚠️ VALIDATION: Print area extends beyond canvas width:',
