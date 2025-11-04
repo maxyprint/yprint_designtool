@@ -1171,9 +1171,16 @@ class SaveOnlyPNGGenerator {
      * 🎯 Get current template ID from various sources
      */
     getCurrentTemplateId() {
+        // Method 0: Check designerWidgetInstance first (highest priority)
+        let templateId = window.designerWidgetInstance?.activeTemplateId;
+        if (templateId) {
+            console.log('✅ Template ID from designerWidget:', templateId);
+            return templateId;
+        }
+
         // Method 1: From URL params
         const urlParams = new URLSearchParams(window.location.search);
-        let templateId = urlParams.get('template_id') || urlParams.get('template');
+        templateId = urlParams.get('template_id') || urlParams.get('template');
         if (templateId) {
             console.log('🎯 Template ID from URL:', templateId);
             return templateId;
