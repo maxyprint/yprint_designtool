@@ -362,7 +362,13 @@ class HighDPIPrintExportEngine {
             }
         }
 
-        // Method 4: From various config objects
+        // Method 4: From designerWidgetInstance (MOST RELIABLE after URL cleaning)
+        if (window.designerWidgetInstance?.activeTemplateId) {
+            console.log('✅ Template ID from designerWidgetInstance.activeTemplateId:', window.designerWidgetInstance.activeTemplateId);
+            return window.designerWidgetInstance.activeTemplateId;
+        }
+
+        // Method 5: From various config objects
         const configSources = [
             () => window.octo_print_designer_config?.template_id,
             () => window.yprint_config?.template_id,
@@ -383,7 +389,7 @@ class HighDPIPrintExportEngine {
             }
         }
 
-        // Method 5: From URL path (e.g., /designer/123)
+        // Method 6: From URL path (e.g., /designer/123)
         const pathMatch = window.location.pathname.match(/\/designer\/(\d+)/);
         if (pathMatch) {
             templateId = pathMatch[1];
