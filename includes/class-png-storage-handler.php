@@ -602,6 +602,49 @@ class PNG_Storage_Handler {
             $printable_area_px = $printable_area_px ? json_decode($printable_area_px, true) : null;
             $printable_area_mm = $printable_area_mm ? json_decode($printable_area_mm, true) : null;
 
+            // If printable_area_px is empty, try to extract from _template_view_print_areas
+            if (!$printable_area_px) {
+                $view_print_areas = get_post_meta($template_id, '_template_view_print_areas', true);
+
+                if ($view_print_areas) {
+                    error_log('📐 PNG STORAGE: Found _template_view_print_areas data, parsing...');
+
+                    // Unserialize PHP data
+                    $view_data = maybe_unserialize($view_print_areas);
+
+                    if (is_array($view_data)) {
+                        // Find view with measurements
+                        foreach ($view_data as $view_id => $view_info) {
+                            if (isset($view_info['measurements']) && !empty($view_info['measurements'])) {
+                                $measurement = $view_info['measurements'][0]; // Take first measurement
+
+                                if (isset($measurement['points']) && count($measurement['points']) >= 2) {
+                                    $points = $measurement['points'];
+
+                                    // Calculate print area from measurement points
+                                    $min_x = min($points[0]['x'], $points[1]['x']);
+                                    $min_y = min($points[0]['y'], $points[1]['y']);
+                                    $max_x = max($points[0]['x'], $points[1]['x']);
+                                    $max_y = max($points[0]['y'], $points[1]['y']);
+
+                                    // Create print area with some padding
+                                    $padding = 50;
+                                    $printable_area_px = array(
+                                        'x' => max(0, $min_x - $padding),
+                                        'y' => max(0, $min_y - $padding),
+                                        'width' => ($max_x - $min_x) + (2 * $padding),
+                                        'height' => ($max_y - $min_y) + (2 * $padding)
+                                    );
+
+                                    error_log('📐 PNG STORAGE: Calculated print area from measurements: ' . json_encode($printable_area_px));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Default fallback
             if (!$printable_area_px) {
                 $printable_area_px = array('x' => 0, 'y' => 0, 'width' => 800, 'height' => 600);
