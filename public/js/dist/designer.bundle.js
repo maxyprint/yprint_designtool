@@ -1,5 +1,19 @@
+console.log('🎯 SCRIPT START: designer.bundle.js is loading...');
+
 // Using global fabric object instead of ES6 imports
-const { Canvas, Image, Rect, ActiveSelection, filters, Group } = fabric;
+console.log('🎯 FABRIC CHECK: fabric object available:', typeof fabric);
+console.log('🎯 FABRIC CHECK: fabric object value:', fabric);
+
+let Canvas, Image, Rect, ActiveSelection, filters, Group;
+
+try {
+    ({ Canvas, Image, Rect, ActiveSelection, filters, Group } = fabric);
+    console.log('🎯 FABRIC DESTRUCTURE: Successfully destructured fabric components');
+} catch (error) {
+    console.error('❌ FABRIC DESTRUCTURE: Error destructuring fabric:', error);
+    console.error('❌ FABRIC DESTRUCTURE: fabric object:', fabric);
+    throw error;
+}
 
 // ToastManager class (inlined from ToastManager.js)
 class ToastManager {
@@ -1902,9 +1916,12 @@ class DesignerWidget {
 }
 
 // Make DesignerWidget globally available
+console.log('🎯 GLOBAL ASSIGNMENT: Making DesignerWidget globally available...');
 window.DesignerWidget = DesignerWidget;
+console.log('🎯 GLOBAL ASSIGNMENT: DesignerWidget assigned to window');
 
 // Initialize the designer widget when DOM is ready
+console.log('🎯 EVENT REGISTRATION: About to register DOMContentLoaded event handler...');
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 DESIGNER WIDGET: DOMContentLoaded fired, creating DesignerWidget...');
     try {
@@ -1914,6 +1931,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('❌ DESIGNER WIDGET: Error creating instance:', error);
     }
 });
+console.log('🎯 EVENT REGISTRATION: DOMContentLoaded event handler registered successfully');
 
 // Trigger designer ready event for external scripts
 window.addEventListener('load', () => {
@@ -1929,3 +1947,5 @@ window.addEventListener('load', () => {
         console.error('❌ DESIGNER WIDGET: No designerInstance available for designerReady event');
     }
 });
+
+console.log('🎯 SCRIPT END: designer.bundle.js execution completed successfully');
