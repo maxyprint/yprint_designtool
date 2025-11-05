@@ -102,8 +102,14 @@ class ToastManager {
 class DesignerWidget {
 
     constructor() {
+        console.log('🎯 DESIGNER WIDGET: Constructor called');
         this.container = document.querySelector('.octo-print-designer');
-        if (!this.container) return;
+        console.log('🎯 DESIGNER WIDGET: Container element found:', !!this.container);
+        if (!this.container) {
+            console.error('❌ DESIGNER WIDGET: No .octo-print-designer element found on page');
+            return;
+        }
+        console.log('🎯 DESIGNER WIDGET: Proceeding with initialization...');
 
         this.currentDesignId = null;
         this.templates = new Map();
@@ -129,6 +135,7 @@ class DesignerWidget {
         this.toastManager = new ToastManager(this.toastContainer);
 
         this.init();
+        console.log('✅ DESIGNER WIDGET: Constructor completed successfully');
     }
 
     initializeToolbar() {
@@ -1899,14 +1906,26 @@ window.DesignerWidget = DesignerWidget;
 
 // Initialize the designer widget when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.designerInstance = new DesignerWidget();
+    console.log('🎯 DESIGNER WIDGET: DOMContentLoaded fired, creating DesignerWidget...');
+    try {
+        window.designerInstance = new DesignerWidget();
+        console.log('🎯 DESIGNER WIDGET: Instance created:', !!window.designerInstance);
+    } catch (error) {
+        console.error('❌ DESIGNER WIDGET: Error creating instance:', error);
+    }
 });
 
 // Trigger designer ready event for external scripts
 window.addEventListener('load', () => {
+    console.log('🎯 DESIGNER WIDGET: Window load event fired');
+    console.log('🎯 DESIGNER WIDGET: designerInstance exists:', !!window.designerInstance);
     if (window.designerInstance) {
+        console.log('🎯 DESIGNER WIDGET: Dispatching designerReady event');
         window.dispatchEvent(new CustomEvent('designerReady', {
             detail: { designer: window.designerInstance }
         }));
+        console.log('✅ DESIGNER WIDGET: designerReady event dispatched');
+    } else {
+        console.error('❌ DESIGNER WIDGET: No designerInstance available for designerReady event');
     }
 });
