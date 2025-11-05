@@ -475,96 +475,125 @@ class HighDPIPrintExportEngine {
     }
 
     /**
-     * 🎯 Export only the print area using existing clipMask (cleanest approach)
+     * 🎯 Export print area using snapshot approach (clean, non-invasive)
      */
     async exportPrintAreaOnly(fabricCanvas, printArea, multiplier, quality, format) {
-        console.log('🎯 EXPORTING PRINT AREA ONLY via existing clipMask (cleanest approach)');
-
-        // Store original canvas state
-        const originalState = {
-            clipPath: fabricCanvas.clipPath
-        };
+        console.log('🎯 ENHANCED PRINT AREA EXPORT: Using snapshot approach without modifying core clipMask');
 
         try {
-            // 🔍 PFLICHT 2: Mockup-Identifikation - Alle Canvas-Objekte analysieren
+            // Step 1: Analyze all canvas objects for proper export filtering
             const allObjects = fabricCanvas.getObjects();
             console.log('📊 CANVAS OBJECTS ANALYSIS:');
+
+            const designElements = [];
+            const backgroundElements = [];
+
             allObjects.forEach((obj, index) => {
                 const bounds = obj.getBoundingRect ? obj.getBoundingRect() : {};
-                console.log(`Object ${index}:`, {
+                const objInfo = {
                     type: obj.type,
                     name: obj.name || 'unnamed',
-                    id: obj.id || 'no-id',
                     visible: obj.visible,
                     position: `${Math.round(obj.left || 0)},${Math.round(obj.top || 0)}`,
                     size: `${Math.round(bounds.width || 0)}x${Math.round(bounds.height || 0)}`,
-                    flags: {
-                        isBackground: !!obj.isBackground,
-                        isViewImage: !!obj.isViewImage,
-                        isTemplateBackground: !!obj.isTemplateBackground,
-                        excludeFromExport: !!obj.excludeFromExport
-                    },
-                    src_preview: obj.src ? obj.src.substring(obj.src.lastIndexOf('/') + 1, obj.src.lastIndexOf('/') + 30) + '...' : 'no-src',
-                    mockup_detection: this.shouldHideFromExport(obj) ? '❌ HIDE' : '✅ KEEP'
-                });
-            });
+                    bounds: bounds
+                };
 
-            // Step 1: Hide non-design elements (backgrounds, mockups, etc.)
-            const hiddenObjects = [];
+                console.log(`Object ${index}:`, objInfo);
 
-            allObjects.forEach(obj => {
                 if (this.shouldHideFromExport(obj)) {
-                    hiddenObjects.push(obj);
-                    obj.visible = false;
+                    backgroundElements.push(obj);
+                    console.log(`  → ${index}: ❌ BACKGROUND/MOCKUP (hidden from export)`);
+                } else {
+                    designElements.push(obj);
+                    console.log(`  → ${index}: ✅ DESIGN ELEMENT (included in export)`);
                 }
             });
 
-            console.log(`🔍 MOCKUP HIDING: ${hiddenObjects.length} objects hidden, ${allObjects.length - hiddenObjects.length} objects kept`);
+            console.log(`🔍 EXPORT FILTERING: ${designElements.length} design elements, ${backgroundElements.length} background elements`);
 
-            // Step 2: Apply existing clipMask for clean print area export (cleanest approach)
-            const clipMask = this.getExistingClipMask();
-            if (clipMask) {
-                console.log('✅ Applying existing clipMask for print area export');
-                fabricCanvas.clipPath = clipMask;
-            } else {
-                console.warn('⚠️ No clipMask found, exporting without clipping');
+            // Step 2: Create temporary canvas for print area snapshot
+            const tempCanvas = new window.fabric.Canvas();
+            tempCanvas.setDimensions({
+                width: printArea.width,
+                height: printArea.height
+            });
+            tempCanvas.backgroundColor = 'transparent';
+
+            console.log('🎯 TEMPORARY CANVAS: Created for print area snapshot', {
+                printArea_dimensions: `${printArea.width}x${printArea.height}px`,
+                printArea_position: `x:${printArea.x}, y:${printArea.y}`
+            });
+
+            // Step 3: Clone and position design elements within print area bounds
+            const clonedElements = [];
+            for (const obj of designElements) {
+                if (!obj.visible) continue;
+
+                try {
+                    const clonedObj = await this.cloneObjectAsync(obj);
+                    if (clonedObj) {
+                        // Adjust position relative to print area origin
+                        const adjustedLeft = (obj.left || 0) - printArea.x;
+                        const adjustedTop = (obj.top || 0) - printArea.y;
+
+                        clonedObj.set({
+                            left: adjustedLeft,
+                            top: adjustedTop
+                        });
+
+                        clonedElements.push(clonedObj);
+                        tempCanvas.add(clonedObj);
+
+                        console.log(`✅ CLONED ELEMENT:`, {
+                            type: obj.type,
+                            original_pos: `${obj.left || 0},${obj.top || 0}`,
+                            adjusted_pos: `${adjustedLeft},${adjustedTop}`,
+                            within_print_area: (adjustedLeft >= 0 && adjustedTop >= 0 &&
+                                              adjustedLeft < printArea.width && adjustedTop < printArea.height)
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Could not clone object ${obj.type}:`, error.message);
+                }
             }
 
-            // Step 3: Force re-render to apply clipping
-            fabricCanvas.renderAll();
+            // Step 4: Render and export the temporary canvas
+            tempCanvas.renderAll();
 
-            // Step 4: Export the clipped canvas (normal dimensions with clipPath)
-            console.log('🎯 Exporting canvas with clipMask applied');
-            const printAreaDataURL = fabricCanvas.toDataURL({
+            console.log('🎯 SNAPSHOT EXPORT: Generating PNG from temporary canvas');
+            const printAreaDataURL = tempCanvas.toDataURL({
                 format: format,
                 quality: quality,
                 multiplier: multiplier
             });
 
-            // Step 5: Restore original canvas state (only clipPath needs restoration)
-            fabricCanvas.clipPath = originalState.clipPath;
+            // Step 5: Cleanup temporary canvas
+            tempCanvas.dispose();
 
-            // Step 6: Restore visibility of hidden objects
-            hiddenObjects.forEach(obj => {
-                obj.visible = true;
-            });
-
-            console.log('✅ Print area export completed, canvas state restored');
+            console.log('✅ SNAPSHOT EXPORT COMPLETED: Print area captured successfully without modifying original canvas');
             return printAreaDataURL;
 
         } catch (error) {
-            console.error('❌ Error in clipMask-based export:', error);
-
-            // Restore original canvas state in case of error
-            fabricCanvas.clipPath = originalState.clipPath;
-
-            // Fallback: return full canvas export
-            return fabricCanvas.toDataURL({
-                format: format,
-                quality: quality,
-                multiplier: multiplier
-            });
+            console.error('❌ Error in snapshot export:', error);
+            throw error;
         }
+    }
+
+    /**
+     * 🎯 Clone Fabric.js object asynchronously (handles images properly)
+     */
+    async cloneObjectAsync(obj) {
+        return new Promise((resolve) => {
+            try {
+                obj.clone((clonedObj) => {
+                    resolve(clonedObj);
+                }, ['id', 'name', 'customId']);
+            } catch (error) {
+                console.warn(`⚠️ Clone failed for ${obj.type}:`, error.message);
+                resolve(null);
+            }
+        });
     }
 
     /**
