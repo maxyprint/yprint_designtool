@@ -1,19 +1,35 @@
 console.log('🎯 SCRIPT START: designer.bundle.js is loading...');
 
-// Using global fabric object instead of ES6 imports
-console.log('🎯 FABRIC CHECK: fabric object available:', typeof fabric);
-console.log('🎯 FABRIC CHECK: fabric object value:', fabric);
+// Wait for fabric.js to be available before continuing
+function waitForFabric() {
+    console.log('🎯 FABRIC CHECK: fabric object available:', typeof fabric);
 
-let Canvas, Image, Rect, ActiveSelection, filters, Group;
-
-try {
-    ({ Canvas, Image, Rect, ActiveSelection, filters, Group } = fabric);
-    console.log('🎯 FABRIC DESTRUCTURE: Successfully destructured fabric components');
-} catch (error) {
-    console.error('❌ FABRIC DESTRUCTURE: Error destructuring fabric:', error);
-    console.error('❌ FABRIC DESTRUCTURE: fabric object:', fabric);
-    throw error;
+    if (typeof fabric !== 'undefined') {
+        console.log('🎯 FABRIC AVAILABLE: fabric.js is ready, initializing components...');
+        initializeDesignerComponents();
+    } else {
+        console.log('🎯 FABRIC WAITING: fabric.js not yet available, retrying in 100ms...');
+        setTimeout(waitForFabric, 100);
+    }
 }
+
+function initializeDesignerComponents() {
+    let Canvas, Image, Rect, ActiveSelection, filters, Group;
+
+    try {
+        ({ Canvas, Image, Rect, ActiveSelection, filters, Group } = fabric);
+        console.log('🎯 FABRIC DESTRUCTURE: Successfully destructured fabric components');
+
+        // Continue with the rest of the script
+        loadDesignerWidget(Canvas, Image, Rect, ActiveSelection, filters, Group);
+    } catch (error) {
+        console.error('❌ FABRIC DESTRUCTURE: Error destructuring fabric:', error);
+        console.error('❌ FABRIC DESTRUCTURE: fabric object:', fabric);
+        throw error;
+    }
+}
+
+function loadDesignerWidget(Canvas, Image, Rect, ActiveSelection, filters, Group) {
 
 // ToastManager class (inlined from ToastManager.js)
 class ToastManager {
@@ -1948,4 +1964,10 @@ window.addEventListener('load', () => {
     }
 });
 
+} // End of loadDesignerWidget function
+
 console.log('🎯 SCRIPT END: designer.bundle.js execution completed successfully');
+
+// Start waiting for fabric.js
+console.log('🎯 FABRIC INIT: Starting fabric.js detection...');
+waitForFabric();
