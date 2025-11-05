@@ -8,8 +8,28 @@ function waitForFabric() {
         console.log('🎯 FABRIC AVAILABLE: fabric.js is ready, initializing components...');
         initializeDesignerComponents();
     } else {
-        console.log('🎯 FABRIC WAITING: fabric.js not yet available, retrying in 100ms...');
-        setTimeout(waitForFabric, 100);
+        console.log('🎯 FABRIC WAITING: Setting up event listener for fabricGlobalReady...');
+        // Listen for the fabricGlobalReady event instead of polling
+        window.addEventListener('fabricGlobalReady', function(event) {
+            console.log('🎯 FABRIC EVENT: fabricGlobalReady received, source:', event.detail?.source);
+            console.log('🎯 FABRIC AVAILABLE: fabric.js is ready via event, initializing components...');
+            initializeDesignerComponents();
+        }, { once: true });
+
+        // Also keep polling as backup for 3 seconds
+        let attempts = 0;
+        const pollBackup = () => {
+            attempts++;
+            if (typeof fabric !== 'undefined') {
+                console.log('🎯 FABRIC AVAILABLE: fabric.js ready via polling backup, initializing components...');
+                initializeDesignerComponents();
+            } else if (attempts < 30) { // 30 * 100ms = 3 seconds
+                setTimeout(pollBackup, 100);
+            } else {
+                console.error('❌ FABRIC TIMEOUT: fabric.js not available after 3 seconds');
+            }
+        };
+        setTimeout(pollBackup, 100);
     }
 }
 
