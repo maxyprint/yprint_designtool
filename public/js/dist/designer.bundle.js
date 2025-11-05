@@ -781,8 +781,8 @@ var DesignerWidget = /*#__PURE__*/function () {
       this.clipMask = new fabric__WEBPACK_IMPORTED_MODULE_1__.Rect({
         left: view.safeZone.left * this.fabricCanvas.width / 100,
         top: view.safeZone.top * this.fabricCanvas.height / 100,
-        width: view.safeZone.width,
-        height: view.safeZone.height,
+        width: view.safeZone.width * this.fabricCanvas.width / 100,
+        height: view.safeZone.height * this.fabricCanvas.height / 100,
         absolutePositioned: true,
         fill: 'transparent',
         selectable: false,
