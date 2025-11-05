@@ -7,30 +7,44 @@ function waitForFabric() {
     if (typeof fabric !== 'undefined') {
         console.log('🎯 FABRIC AVAILABLE: fabric.js is ready, initializing components...');
         initializeDesignerComponents();
-    } else {
-        console.log('🎯 FABRIC WAITING: Setting up event listener for fabricGlobalReady...');
-        // Listen for the fabricGlobalReady event instead of polling
-        window.addEventListener('fabricGlobalReady', function(event) {
-            console.log('🎯 FABRIC EVENT: fabricGlobalReady received, source:', event.detail?.source);
-            console.log('🎯 FABRIC AVAILABLE: fabric.js is ready via event, initializing components...');
-            initializeDesignerComponents();
-        }, { once: true });
-
-        // Also keep polling as backup for 3 seconds
-        let attempts = 0;
-        const pollBackup = () => {
-            attempts++;
-            if (typeof fabric !== 'undefined') {
-                console.log('🎯 FABRIC AVAILABLE: fabric.js ready via polling backup, initializing components...');
-                initializeDesignerComponents();
-            } else if (attempts < 30) { // 30 * 100ms = 3 seconds
-                setTimeout(pollBackup, 100);
-            } else {
-                console.error('❌ FABRIC TIMEOUT: fabric.js not available after 3 seconds');
-            }
-        };
-        setTimeout(pollBackup, 100);
+        return;
     }
+
+    console.log('🎯 FABRIC WAITING: Setting up event listener for fabricGlobalReady...');
+
+    // Set up event listener for fabricGlobalReady
+    const handleFabricReady = (event) => {
+        console.log('🎯 FABRIC EVENT: fabricGlobalReady received, source:', event.detail?.source);
+        console.log('🎯 FABRIC AVAILABLE: fabric.js is ready via event, initializing components...');
+        window.removeEventListener('fabricGlobalReady', handleFabricReady);
+        clearTimeout(timeoutId);
+        initializeDesignerComponents();
+    };
+
+    window.addEventListener('fabricGlobalReady', handleFabricReady);
+
+    // Keep polling as backup with timeout
+    let attempts = 0;
+    const maxAttempts = 100; // 10 seconds
+
+    const pollBackup = () => {
+        attempts++;
+        console.log(`🎯 FABRIC POLL: Attempt ${attempts}/${maxAttempts}, fabric available:`, typeof fabric);
+
+        if (typeof fabric !== 'undefined') {
+            console.log('🎯 FABRIC AVAILABLE: fabric.js ready via polling backup, initializing components...');
+            window.removeEventListener('fabricGlobalReady', handleFabricReady);
+            clearTimeout(timeoutId);
+            initializeDesignerComponents();
+        } else if (attempts < maxAttempts) {
+            setTimeout(pollBackup, 100);
+        } else {
+            console.error('❌ FABRIC TIMEOUT: fabric.js not available after 10 seconds');
+            window.removeEventListener('fabricGlobalReady', handleFabricReady);
+        }
+    };
+
+    const timeoutId = setTimeout(pollBackup, 100);
 }
 
 function initializeDesignerComponents() {
