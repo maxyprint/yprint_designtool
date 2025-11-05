@@ -426,16 +426,62 @@ class HighDPIPrintExportEngine {
     }
 
     /**
-     * 🎯 Export only the print area with correct dimensions by restricting canvas viewport
+     * 🎯 Get existing clipMask from designer (cleanest approach)
+     */
+    getExistingClipMask() {
+        // Priorität 1: Designer Widget clipMask
+        const designerClipMask = window.designerWidgetInstance?.clipMask;
+        if (designerClipMask) {
+            console.log('✅ Using existing designer clipMask');
+            return designerClipMask;
+        }
+
+        // Priorität 2: Canvas clipPath (falls bereits gesetzt)
+        const canvasClipPath = this.fabricCanvas?.clipPath;
+        if (canvasClipPath) {
+            console.log('✅ Using existing canvas clipPath');
+            return canvasClipPath;
+        }
+
+        // Priorität 3: Aus Template safeZone rekonstruieren
+        console.log('🔄 Reconstructing clipMask from template safeZone');
+        return this.reconstructClipMaskFromSafeZone();
+    }
+
+    /**
+     * 🎯 Reconstruct clipMask from template safeZone data
+     */
+    reconstructClipMaskFromSafeZone() {
+        try {
+            const template = window.designerWidgetInstance?.templates?.[window.designerWidgetInstance?.activeTemplateId];
+            const view = template?.views?.[window.designerWidgetInstance?.currentView];
+            const safeZone = view?.safeZone;
+
+            if (safeZone && window.fabric?.Rect) {
+                console.log('🔧 Creating clipMask from safeZone:', safeZone);
+                return new window.fabric.Rect({
+                    left: safeZone.left * this.fabricCanvas.width / 100,
+                    top: safeZone.top * this.fabricCanvas.height / 100,
+                    width: safeZone.width,
+                    height: safeZone.height,
+                    absolutePositioned: true,
+                    fill: 'transparent'
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not reconstruct clipMask from safeZone:', error);
+        }
+        return null;
+    }
+
+    /**
+     * 🎯 Export only the print area using existing clipMask (cleanest approach)
      */
     async exportPrintAreaOnly(fabricCanvas, printArea, multiplier, quality, format) {
-        console.log('🎯 EXPORTING PRINT AREA ONLY via canvas viewport restriction:', printArea);
+        console.log('🎯 EXPORTING PRINT AREA ONLY via existing clipMask (cleanest approach)');
 
         // Store original canvas state
         const originalState = {
-            width: fabricCanvas.getWidth(),
-            height: fabricCanvas.getHeight(),
-            viewportTransform: fabricCanvas.viewportTransform.slice(),
             clipPath: fabricCanvas.clipPath
         };
 
@@ -475,45 +521,30 @@ class HighDPIPrintExportEngine {
 
             console.log(`🔍 MOCKUP HIDING: ${hiddenObjects.length} objects hidden, ${allObjects.length - hiddenObjects.length} objects kept`);
 
-            // Step 2: Restrict canvas to print area dimensions
-            console.log('🎯 Setting canvas dimensions to print area:', `${printArea.width}x${printArea.height}`);
-            fabricCanvas.setWidth(printArea.width);
-            fabricCanvas.setHeight(printArea.height);
-
-            // Step 3: Adjust viewport to show only print area content
-            console.log('🎯 Adjusting viewport transform to print area offset:', `x:${-printArea.x}, y:${-printArea.y}`);
-            fabricCanvas.setViewportTransform([1, 0, 0, 1, -printArea.x, -printArea.y]);
-
-            // Step 4: Apply clipping to ensure nothing outside print area is rendered
-            if (typeof fabric !== 'undefined' && fabric.Rect) {
-                fabricCanvas.clipPath = new fabric.Rect({
-                    left: 0,
-                    top: 0,
-                    width: printArea.width,
-                    height: printArea.height,
-                    absolutePositioned: true,
-                    fill: 'transparent'
-                });
-                console.log('🎯 Clipping path applied');
+            // Step 2: Apply existing clipMask for clean print area export (cleanest approach)
+            const clipMask = this.getExistingClipMask();
+            if (clipMask) {
+                console.log('✅ Applying existing clipMask for print area export');
+                fabricCanvas.clipPath = clipMask;
             } else {
-                console.log('⚠️ Fabric.js not available for clipping, relying on viewport transform only');
+                console.warn('⚠️ No clipMask found, exporting without clipping');
             }
 
-            // Step 5: Export the restricted canvas - now automatically correct size!
-            console.log('🎯 Exporting restricted canvas at', `${printArea.width}x${printArea.height}px`);
+            // Step 3: Force re-render to apply clipping
+            fabricCanvas.renderAll();
+
+            // Step 4: Export the clipped canvas (normal dimensions with clipPath)
+            console.log('🎯 Exporting canvas with clipMask applied');
             const printAreaDataURL = fabricCanvas.toDataURL({
                 format: format,
                 quality: quality,
                 multiplier: multiplier
             });
 
-            // Step 6: Restore original canvas state
-            fabricCanvas.setWidth(originalState.width);
-            fabricCanvas.setHeight(originalState.height);
-            fabricCanvas.setViewportTransform(originalState.viewportTransform);
+            // Step 5: Restore original canvas state (only clipPath needs restoration)
             fabricCanvas.clipPath = originalState.clipPath;
 
-            // Step 7: Restore visibility of hidden objects
+            // Step 6: Restore visibility of hidden objects
             hiddenObjects.forEach(obj => {
                 obj.visible = true;
             });
@@ -522,12 +553,9 @@ class HighDPIPrintExportEngine {
             return printAreaDataURL;
 
         } catch (error) {
-            console.error('❌ Error in print area viewport export:', error);
+            console.error('❌ Error in clipMask-based export:', error);
 
             // Restore original canvas state in case of error
-            fabricCanvas.setWidth(originalState.width);
-            fabricCanvas.setHeight(originalState.height);
-            fabricCanvas.setViewportTransform(originalState.viewportTransform);
             fabricCanvas.clipPath = originalState.clipPath;
 
             // Fallback: return full canvas export
@@ -576,26 +604,37 @@ class HighDPIPrintExportEngine {
                               imageSrc.toLowerCase().includes('tshirt') ||
                               imageSrc.toLowerCase().includes('mockup') ||
                               imageSrc.toLowerCase().includes('template') ||
-                              imageSrc.toLowerCase().includes('background');
+                              imageSrc.toLowerCase().includes('background') ||
+                              imageSrc.toLowerCase().includes('front.webp') ||
+                              imageSrc.toLowerCase().includes('back.webp') ||
+                              imageSrc.toLowerCase().includes('shirt');
 
-        // Check if positioned like a background (near 0,0 and large)
-        const isPositionedLikeBackground = bounds.left < 50 && bounds.top < 50;
+        // Check if positioned like a background (relaxed position threshold)
+        const isPositionedLikeBackground = bounds.left < 150 && bounds.top < 150;
 
         // Check if large enough to be background (relaxed threshold)
-        const isLargeEnough = (coverageX > 0.6 && coverageY > 0.6);
+        const isLargeEnough = (coverageX > 0.5 && coverageY > 0.8);
+
+        // Determine if this is a background/mockup object
+        const isMockupByFilename = isLikelyMockup;
+        const isMockupByPositionAndSize = isPositionedLikeBackground && isLargeEnough;
+        const isMockupByCoverage = coverageX > 0.6 && coverageY > 1.0; // Very tall objects are likely T-shirts
+
+        const finalResult = isMockupByFilename || isMockupByPositionAndSize || isMockupByCoverage;
 
         console.log('🔍 MOCKUP DETECTION DETAILS:', {
             object_id: obj.id || 'unknown',
             bounds: `${bounds.width}x${bounds.height}px at ${bounds.left},${bounds.top}`,
             coverage: `${(coverageX*100).toFixed(1)}% x ${(coverageY*100).toFixed(1)}%`,
             image_src: imageSrc.substring(imageSrc.lastIndexOf('/') + 1),
-            is_likely_mockup: isLikelyMockup,
+            is_likely_mockup_filename: isMockupByFilename,
             is_positioned_like_bg: isPositionedLikeBackground,
             is_large_enough: isLargeEnough,
-            RESULT: isLikelyMockup || (isPositionedLikeBackground && isLargeEnough)
+            is_mockup_by_coverage: isMockupByCoverage,
+            FINAL_RESULT: finalResult
         });
 
-        return isLikelyMockup || (isPositionedLikeBackground && isLargeEnough);
+        return finalResult;
     }
 
     /**
