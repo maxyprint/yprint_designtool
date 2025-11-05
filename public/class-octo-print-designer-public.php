@@ -531,44 +531,15 @@ class Octo_Print_Designer_Public {
             'png_only_system' => true
         ]);
 
-        // 🎯 PRODUCTION-OPTIMIZED STAGED LOADING: Environment-aware script loading
+        // 🎯 MINIMAL CLEAN SYSTEM: Only 4 essential scripts
         $staged_loading_scripts = [
-            // Stage 0: Emergency Fallback Loader (FIRST)
-            'yprint-fallback-loader',            // PNG emergency loader - no dependencies
+            // Stage 1: Designer Bundle (SINGLE INITIALIZATION)
+            'octo-print-designer-designer',                  // designer.bundle.js - ONLY DesignerWidget creation
 
-            // Stage 1: Webpack Foundation (ESSENTIAL)
-            'octo-webpack-readiness-detector',   // Load first in HEAD
-
-            // Stage 2: Core Bundles & Fabric Foundation (ESSENTIAL)
-            'octo-print-designer-vendor',        // webpack chunks
-            'octo-fabric-readiness-detector',    // fabric extraction
-            'octo-webpack-fabric-extractor',     // legacy extractor
-            'octo-fabric-canvas-singleton-public', // canvas singleton
-            'octo-canvas-initialization-controller-public',
-            'octo-script-load-coordinator-public',
-
-            // Stage 2.5: Pre-Designer Dependencies (THADDÄUS FIX)
-            'octo-canvas-creation-blocker',                    // Must load before designer bundle
-            'octo-print-designer-products-listing-common',    // Common bundle dependency
-            // 'octo-print-designer-stripe-service' - REMOVED: Conditional loading prevents checkout interference
-
-            // Stage 3: Designer Foundation (ESSENTIAL)
-            'octo-print-designer-designer',      // designer bundle (includes THADDÄUS fix inline script)
-            'octo-designer-readiness-detector',  // designer detection
-            'octo-staged-script-coordinator',    // coordinator
-
-            // Stage 4: Event-driven dependent scripts (ESSENTIAL)
-            'octo-print-designer-optimized-capture',      // data capture (1/3)
-            'octo-print-designer-yprint-capture',         // THADDÄUS FIX: yprint coordinate system (2/3)
-            // 'octo-print-designer-production-capture' - DELETED: viewport contamination eliminated
-            'octo-print-designer-permanent-save-fix',     // save fixes
-            'octo-print-designer-enhanced-json',          // coordinate system
-            'octo-print-designer-safezone-validator',     // validation
-
-            // Stage 5: PNG-Only System (Save-Only PNG generation)
-            'yprint-high-dpi-export',                     // PNG export engine
-            'yprint-png-integration',                     // PNG system integration
-            'yprint-save-only-png',                       // Save-only PNG generator
+            // Stage 2: PNG Export System
+            'yprint-high-dpi-export',                        // high-dpi-png-export-engine.js
+            'yprint-save-only-png',                          // save-only-png-generator.js
+            'yprint-png-integration'                         // png-only-system-integration.js
         ];
 
         // 🔧 CONDITIONAL DEBUG SCRIPTS: Only add to staging when in debug mode
