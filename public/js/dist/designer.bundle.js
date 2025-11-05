@@ -1,5 +1,8 @@
 console.log('🎯 SCRIPT START: designer.bundle.js is loading...');
 
+// Global flag to prevent double initialization
+let designerInitialized = false;
+
 // Wait for fabric.js to be available before continuing
 function waitForFabric() {
     console.log('🎯 FABRIC CHECK: fabric object available:', typeof fabric);
@@ -48,6 +51,15 @@ function waitForFabric() {
 }
 
 function initializeDesignerComponents() {
+    // Prevent double initialization
+    if (designerInitialized) {
+        console.log('🎯 ALREADY INITIALIZED: Designer components already initialized, skipping...');
+        return;
+    }
+
+    designerInitialized = true;
+    console.log('🎯 INITIALIZATION: Starting designer components initialization...');
+
     let Canvas, Image, Rect, ActiveSelection, filters, Group;
 
     try {
