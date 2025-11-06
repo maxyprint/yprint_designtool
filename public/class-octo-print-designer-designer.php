@@ -59,60 +59,62 @@ class Octo_Print_Designer_Designer {
     }
 
     public function shortcode($atts) {
+        error_log("🔍 DEBUG CHECKPOINT 3: Shortcode execution starting");
+        error_log("🔍 SHORTCODE: [ops-designer] encountered");
 
         $atts = shortcode_atts([
             'template_id' => null
         ], $atts);
-    
-        wp_enqueue_script('octo-print-designer-designer');
 
-        // 🚨 WEBPACK DESIGNER PATCH: Enqueue aggressive webpack intervention
-        wp_enqueue_script('octo-print-designer-webpack-patch');
+        error_log("🔍 SHORTCODE ATTRS: " . print_r($atts, true));
 
-        // 🔧 FABRIC CANVAS ELEMENT FIX: Enqueue Safari toCanvasElement bug fix
-        wp_enqueue_script('octo-print-designer-fabric-canvas-fix');
+        // 🎯 CLEAN SHORTCODE: Only enqueue the 5 essential scripts
+        // All scripts are automatically enqueued in proper order via enqueue_scripts()
+        // Just need to ensure the PNG integration script is loaded for design saving
+        error_log("🔍 DEBUG: Enqueueing yprint-png-integration for shortcode");
+        wp_enqueue_script('yprint-png-integration');
 
-        // 🎯 DESIGNER GLOBAL EXPOSER: Enqueue DesignerWidget class exposure
-        wp_enqueue_script('octo-print-designer-global-exposer');
-
-        // 🎯 GLOBAL WIDGET INSTANCE: Enqueue global DesignerWidget instance creation
-        wp_enqueue_script('octo-print-designer-global-instance');
-
-        // 🏆 PERMANENT SAVE FIX: Enqueue permanent AJAX interceptor for save functionality
-        wp_enqueue_script('octo-print-designer-permanent-save-fix');
-
-        // 🚨 DELETED: PRODUCTION-READY DESIGN DATA CAPTURE (VIEWPORT CONTAMINATION ELIMINATED)
-        // wp_enqueue_script('octo-print-designer-production-capture'); // File deleted
-
-        // 🔍 SAFEZONE COORDINATE VALIDATOR: Enqueue SafeZone validation fix
-        wp_enqueue_script('octo-print-designer-safezone-validator');
-
-        // 🎯 DESIGN DATA CAPTURE: Enqueue canvas data extraction system (LEGACY)
-        // wp_enqueue_script('octo-print-designer-data-capture');
-
-        // 🎯 COMPREHENSIVE DESIGN DATA CAPTURE: Enqueue advanced capture system (DEPRECATED)
-        // wp_enqueue_script('octo-print-designer-comprehensive-capture');
-
-
-// Fabric.js global verfügbar machen NACH dem Designer Bundle
-// Einfache window.fabric Verfügbarkeitsprüfung
-wp_add_inline_script('octo-print-designer-designer', '
-    // Optimized fabric availability check
-    if (typeof window.fabric !== "undefined") {
-        if (typeof console !== "undefined" && console.log) {
-            console.log("✅ window.fabric ready");
+        // Verify enqueue success
+        if (wp_script_is('yprint-png-integration', 'enqueued')) {
+            error_log("✅ SHORTCODE: yprint-png-integration enqueued successfully");
+        } else {
+            error_log("❌ SHORTCODE ERROR: Failed to enqueue yprint-png-integration");
         }
-    } else {
-        // Non-blocking fabric availability listener
-        document.addEventListener("fabricGlobalReady", function() {
-            if (typeof console !== "undefined" && console.log) {
-                console.log("✅ window.fabric ready via event");
-            }
-        });
-    }
-', 'after');
 
-$this->enqueue_design_loader();
+        // 🎯 CLEAN FABRIC CHECK: Simple fabric.js availability verification
+        wp_add_inline_script('yprint-png-integration', '
+            console.log("🔍 DEBUG CHECKPOINT 4: Script loading sequence starting");
+            console.log("🔍 SHORTCODE: Setting up fabric.js event listeners");
+
+            // Wait for fabric.js from CDN loader
+            document.addEventListener("fabricGlobalReady", function(event) {
+                console.log("✅ CLEAN SHORTCODE: fabric.js ready for designer");
+                console.log("🔍 DEBUG: Fabric ready event details:", event.detail);
+                console.log("🔍 DEBUG CHECKPOINT 5 COMPLETE: Fabric.js available");
+            });
+
+            // Immediate check if already loaded
+            if (typeof window.fabric !== "undefined") {
+                console.log("✅ CLEAN SHORTCODE: fabric.js already available");
+                console.log("🔍 DEBUG: Fabric version:", window.fabric.version);
+            } else {
+                console.log("🔍 DEBUG: Fabric not yet loaded, waiting for event...");
+            }
+
+            // Monitor designer initialization
+            document.addEventListener("DOMContentLoaded", function() {
+                console.log("🔍 DEBUG CHECKPOINT 6: DOM loaded, checking designer elements");
+                const canvas = document.getElementById("octo-print-designer-canvas");
+                console.log("🔍 DEBUG: Canvas element found:", !!canvas);
+
+                if (canvas) {
+                    console.log("🔍 DEBUG: Canvas dimensions:", canvas.offsetWidth + "x" + canvas.offsetHeight);
+                }
+            });
+        ', 'after');
+
+// 🎯 CLEAN SHORTCODE: Design loading handled directly by designer.bundle.js
+        // No separate design-loader script needed in clean system
         
         wp_enqueue_style('octo-print-designer-toast-style');
         wp_enqueue_style('octo-print-designer-designer-style');
@@ -158,10 +160,23 @@ wp_add_inline_script('octo-print-designer-designer', '
     console.log("Auto-load data prepared:", window.octoPrintDesignerAutoLoad);
 ', 'before');
     
+        error_log("🔍 DEBUG: Starting template rendering");
+        error_log("🔍 TEMPLATE PATH: " . OCTO_PRINT_DESIGNER_PATH . 'public/partials/designer/widget.php');
+
+        if (!file_exists(OCTO_PRINT_DESIGNER_PATH . 'public/partials/designer/widget.php')) {
+            error_log("❌ TEMPLATE ERROR: widget.php not found");
+            return '<div class="error">Designer template not found</div>';
+        }
+
         ob_start();
         extract($atts);
         include OCTO_PRINT_DESIGNER_PATH . 'public/partials/designer/widget.php';
-        return ob_get_clean();
+        $template_output = ob_get_clean();
+
+        error_log("🔍 TEMPLATE: Rendered successfully (" . strlen($template_output) . " chars)");
+        error_log("✅ DEBUG CHECKPOINT 3 COMPLETE: Shortcode execution finished");
+
+        return $template_output;
     
     }
 
@@ -911,27 +926,6 @@ wp_add_inline_script('octo-print-designer-designer', '
         return $url;
     }
 
-    /**
- * Enqueue design loader script
- */
-private function enqueue_design_loader() {
-    wp_enqueue_script(
-        'octo-print-designer-loader',
-        OCTO_PRINT_DESIGNER_URL . 'public/js/design-loader.js',
-        array('octo-print-designer-designer'), // Abhängigkeit zu Designer
-        OCTO_PRINT_DESIGNER_VERSION,
-        true // Im Footer laden
-    );
-    
-    // Optimized fabric check for design loader
-    wp_add_inline_script('octo-print-designer-loader', '
-        if (typeof window.fabric === "undefined" || !window.fabric.Canvas) {
-            document.addEventListener("fabricGlobalReady", function() {
-                window.dispatchEvent(new CustomEvent("designLoaderReady"));
-            });
-        } else {
-            window.dispatchEvent(new CustomEvent("designLoaderReady"));
-        }
-    ', 'before');
-}
+    // 🎯 CLEAN SYSTEM: Design loading functionality moved to designer.bundle.js
+    // No separate design-loader script needed in clean 5-script architecture
 }
