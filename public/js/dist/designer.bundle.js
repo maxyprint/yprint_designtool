@@ -660,7 +660,7 @@ class DesignerWidget {
 
         if (!view) return;
 
-        fabric.Image.fromURL(view.image_url).then(img => {
+        fabric.Image.fromURL(view.image_url, (img) => {
             this.renderTemplateView(view, img);
         });
     }
@@ -741,16 +741,16 @@ class DesignerWidget {
         preview.addEventListener('click', () => {
             if (this.isMobile) this.sectionItemsContainer.classList.toggle('hidden', true);
         
-            fabric.Image.fromURL(imageUrl).then(img => {
+            fabric.Image.fromURL(imageUrl, (img) => {
                 const template = this.templates.get(this.activeTemplateId);
                 const variation = template.variations.get(this.currentVariation.toString());
                 const view = variation.views.get(this.currentView);
                 const safeZone = view.safeZone;
-        
+
                 const scaleX = safeZone.width / img.width;
                 const scaleY = safeZone.height / img.height;
-                const scale = Math.min(scaleX, scaleY, 1);  
-        
+                const scale = Math.min(scaleX, scaleY, 1);
+
                 img.set({
                     left: this.fabricCanvas.width / 2,
                     top: this.fabricCanvas.height / 2,
@@ -760,23 +760,23 @@ class DesignerWidget {
                     scaleY: scale,
                     // Remove other styling properties that will be set in configureAndLoadFabricImage
                 });
-        
+
                 // Generate unique ID for the image
                 const imageId = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 img.data = { imageId };
-        
+
                 // Store the image in our data structure
                 this.storeViewImage(imageUrl, img);
-                
+
                 // Instead of adding directly to canvas, use our loading method
                 // which will properly apply all styles, filters, and clipping
                 this.loadViewImage();
-        
+
                 // After loading, find and select this image
                 const key = `${this.currentVariation}_${this.currentView}`;
                 const imagesArray = this.variationImages.get(key) || [];
                 const addedImageData = imagesArray.find(data => data.id === imageId);
-                
+
                 if (addedImageData && addedImageData.fabricImage) {
                     this.fabricCanvas.setActiveObject(addedImageData.fabricImage);
                     this.fabricCanvas.renderAll();
@@ -991,10 +991,10 @@ class DesignerWidget {
             
             // If we have a URL but no fabric instance, create one
             if (imageData.url && !imageData.fabricImage) {
-                fabric.Image.fromURL(imageData.url).then(img => {
+                fabric.Image.fromURL(imageData.url, (img) => {
                     // Store the fabricImage reference
                     imageData.fabricImage = img;
-                    
+
                     // Apply common settings and load the image
                     this.configureAndLoadFabricImage(imageData, isDarkShirt);
                 });
