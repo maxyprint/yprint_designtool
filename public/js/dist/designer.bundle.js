@@ -725,6 +725,11 @@ class DesignerWidget {
 
         this.fabricCanvas.add(fabricImage);
 
+        // Create print zone element if it doesn't exist
+        if (!this.printingZoneElement) {
+            this.createPrintZoneElement();
+        }
+
         console.log('🔍 DEBUG renderTemplateView: isPrintingVisible:', this.isPrintingVisible);
         console.log('🔍 DEBUG renderTemplateView: printingZoneElement exists:', !!this.printingZoneElement);
 
@@ -1425,6 +1430,46 @@ class DesignerWidget {
                 this.fabricCanvas.remove(this.printingZoneElement);
             }
             this.fabricCanvas.renderAll();
+        });
+    }
+
+    createPrintZoneElement() {
+        // Get template dimensions to create print zone
+        const template = this.templates.get(this.activeTemplateId);
+        if (!template || !this.currentView) {
+            console.error('Cannot create print zone: No active template or view');
+            return;
+        }
+
+        const view = template.views.find(v => v.id === this.currentView.id);
+        if (!view || !view.printZone) {
+            console.error('Cannot create print zone: View has no print zone data');
+            return;
+        }
+
+        const printZone = view.printZone;
+
+        // Create fabric.js Rectangle for the print zone
+        this.printingZoneElement = new fabric.Rect({
+            left: printZone.x,
+            top: printZone.y,
+            width: printZone.width,
+            height: printZone.height,
+            fill: 'transparent',
+            stroke: '#007cba',
+            strokeWidth: 2,
+            strokeDashArray: [10, 5],
+            selectable: false,
+            evented: false,
+            excludeFromExport: true,
+            name: 'printZone'
+        });
+
+        console.log('✅ Print Zone Element created:', {
+            x: printZone.x,
+            y: printZone.y,
+            width: printZone.width,
+            height: printZone.height
         });
     }
 
