@@ -726,8 +726,13 @@ class DesignerWidget {
         this.fabricCanvas.add(fabricImage);
 
         // Create print zone element if it doesn't exist
+        console.log('🚨 DEBUG: Checking if printingZoneElement exists:', !!this.printingZoneElement);
         if (!this.printingZoneElement) {
+            console.log('🚨 DEBUG: printingZoneElement is undefined, calling createPrintZoneElement');
             this.createPrintZoneElement();
+            console.log('🚨 DEBUG: After createPrintZoneElement, exists now:', !!this.printingZoneElement);
+        } else {
+            console.log('🚨 DEBUG: printingZoneElement already exists:', this.printingZoneElement);
         }
 
         console.log('🔍 DEBUG renderTemplateView: isPrintingVisible:', this.isPrintingVisible);
@@ -1434,43 +1439,66 @@ class DesignerWidget {
     }
 
     createPrintZoneElement() {
+        console.log('🚨 DEBUG: createPrintZoneElement CALLED');
+        console.log('🚨 DEBUG: activeTemplateId:', this.activeTemplateId);
+        console.log('🚨 DEBUG: currentView:', this.currentView);
+        console.log('🚨 DEBUG: templates Map:', this.templates);
+
         // Get template dimensions to create print zone
         const template = this.templates.get(this.activeTemplateId);
+        console.log('🚨 DEBUG: Found template:', !!template, template);
+
         if (!template || !this.currentView) {
-            console.error('Cannot create print zone: No active template or view');
+            console.error('🚨 DEBUG: Cannot create print zone: No active template or view');
+            console.error('🚨 DEBUG: template exists:', !!template);
+            console.error('🚨 DEBUG: currentView exists:', !!this.currentView);
             return;
         }
 
         const view = template.views.find(v => v.id === this.currentView.id);
+        console.log('🚨 DEBUG: Found view:', !!view, view);
+
         if (!view || !view.printZone) {
-            console.error('Cannot create print zone: View has no print zone data');
+            console.error('🚨 DEBUG: Cannot create print zone: View has no print zone data');
+            console.error('🚨 DEBUG: view exists:', !!view);
+            console.error('🚨 DEBUG: view.printZone exists:', !!(view && view.printZone));
+            if (view) {
+                console.error('🚨 DEBUG: view structure:', Object.keys(view));
+                console.error('🚨 DEBUG: view data:', view);
+            }
             return;
         }
 
         const printZone = view.printZone;
+        console.log('🚨 DEBUG: Print zone data:', printZone);
 
         // Create fabric.js Rectangle for the print zone
-        this.printingZoneElement = new fabric.Rect({
-            left: printZone.x,
-            top: printZone.y,
-            width: printZone.width,
-            height: printZone.height,
-            fill: 'transparent',
-            stroke: '#007cba',
-            strokeWidth: 2,
-            strokeDashArray: [10, 5],
-            selectable: false,
-            evented: false,
-            excludeFromExport: true,
-            name: 'printZone'
-        });
+        try {
+            this.printingZoneElement = new fabric.Rect({
+                left: printZone.x,
+                top: printZone.y,
+                width: printZone.width,
+                height: printZone.height,
+                fill: 'transparent',
+                stroke: '#007cba',
+                strokeWidth: 2,
+                strokeDashArray: [10, 5],
+                selectable: false,
+                evented: false,
+                excludeFromExport: true,
+                name: 'printZone'
+            });
 
-        console.log('✅ Print Zone Element created:', {
-            x: printZone.x,
-            y: printZone.y,
-            width: printZone.width,
-            height: printZone.height
-        });
+            console.log('🚨 DEBUG: ✅ Print Zone Element SUCCESSFULLY created:', {
+                x: printZone.x,
+                y: printZone.y,
+                width: printZone.width,
+                height: printZone.height,
+                element: this.printingZoneElement
+            });
+        } catch (error) {
+            console.error('🚨 DEBUG: ❌ Error creating print zone element:', error);
+        }
     }
 
     setupZoomControls() {
