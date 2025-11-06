@@ -1982,31 +1982,45 @@ console.log('🎯 GLOBAL ASSIGNMENT: Making DesignerWidget globally available...
 window.DesignerWidget = DesignerWidget;
 console.log('🎯 GLOBAL ASSIGNMENT: DesignerWidget assigned to window');
 
-// Initialize the designer widget when DOM is ready
-console.log('🎯 EVENT REGISTRATION: About to register DOMContentLoaded event handler...');
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 DESIGNER WIDGET: DOMContentLoaded fired, creating DesignerWidget...');
+// Initialize the designer widget when DOM is ready (or immediately if already ready)
+console.log('🎯 DESIGNER INITIALIZATION: Starting designer widget initialization...');
+
+function initializeDesignerWidget() {
+    console.log('🎯 DESIGNER WIDGET: Initializing DesignerWidget...');
     try {
         window.designerInstance = new DesignerWidget();
-        console.log('🎯 DESIGNER WIDGET: Instance created:', !!window.designerInstance);
+        console.log('🎯 DESIGNER WIDGET: Instance created successfully:', !!window.designerInstance);
+
+        // Dispatch designer ready event
+        window.dispatchEvent(new CustomEvent('designerReady', {
+            detail: { instance: window.designerInstance }
+        }));
+        console.log('🎯 DESIGNER WIDGET: designerReady event dispatched');
     } catch (error) {
         console.error('❌ DESIGNER WIDGET: Error creating instance:', error);
     }
-});
-console.log('🎯 EVENT REGISTRATION: DOMContentLoaded event handler registered successfully');
+}
 
-// Trigger designer ready event for external scripts
+// Check if DOM is already loaded or wait for it
+if (document.readyState === 'loading') {
+    console.log('🎯 DOM STATUS: DOM still loading, waiting for DOMContentLoaded...');
+    document.addEventListener('DOMContentLoaded', initializeDesignerWidget);
+} else {
+    console.log('🎯 DOM STATUS: DOM already ready, initializing immediately...');
+    initializeDesignerWidget();
+}
+
+// Additional load event for debugging and fallback
 window.addEventListener('load', () => {
-    console.log('🎯 DESIGNER WIDGET: Window load event fired');
-    console.log('🎯 DESIGNER WIDGET: designerInstance exists:', !!window.designerInstance);
-    if (window.designerInstance) {
-        console.log('🎯 DESIGNER WIDGET: Dispatching designerReady event');
-        window.dispatchEvent(new CustomEvent('designerReady', {
-            detail: { designer: window.designerInstance }
-        }));
-        console.log('✅ DESIGNER WIDGET: designerReady event dispatched');
+    console.log('🎯 WINDOW LOAD: Window load event fired');
+    console.log('🎯 WINDOW LOAD: designerInstance exists:', !!window.designerInstance);
+
+    if (!window.designerInstance) {
+        console.error('❌ WINDOW LOAD: Designer instance missing, attempting recovery...');
+        // Try to initialize again as fallback
+        setTimeout(initializeDesignerWidget, 100);
     } else {
-        console.error('❌ DESIGNER WIDGET: No designerInstance available for designerReady event');
+        console.log('✅ WINDOW LOAD: Designer instance ready and available');
     }
 });
 
