@@ -370,7 +370,6 @@ class DesignerWidget {
 
         //Designer Toolbar
         this.togglePrintZoneButton = this.container.querySelector('#toggle-print-zone');
-        console.log('🔍 DEBUG: togglePrintZoneButton found:', !!this.togglePrintZoneButton, this.togglePrintZoneButton);
 
         this.toastContainer = this.container.querySelector('.toast-container');
     }
@@ -694,16 +693,24 @@ class DesignerWidget {
             originY: 'center',
         });
 
+        // Use printZone data if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
+
+        console.log('🔍 Print Zone Data:', {
+            printZone: view.printZone,
+            safeZone: view.safeZone,
+            using: zoneData
+        });
+
         this.printingZoneElement = new fabric.Rect({
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
-            width: view.safeZone.width * this.fabricCanvas.width / 100,
-            height: view.safeZone.height * this.fabricCanvas.height / 100,
-            // fill: 'rgba(0, 124, 186, 0.2)',
-            fill: 'transparent',
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
+            fill: 'rgba(0, 124, 186, 0.1)', // Slight fill to make it more visible
             stroke: '#007cba',
-            strokeWidth: 2,
-            strokeDashArray: [5, 5],
+            strokeWidth: 3, // Thicker stroke
+            strokeDashArray: [10, 5], // More visible dash pattern
             selectable: false,
             evented: false,
             originX: 'center',
@@ -725,24 +732,9 @@ class DesignerWidget {
 
         this.fabricCanvas.add(fabricImage);
 
-        // Create print zone element if it doesn't exist
-        console.log('🚨 DEBUG: Checking if printingZoneElement exists:', !!this.printingZoneElement);
-        if (!this.printingZoneElement) {
-            console.log('🚨 DEBUG: printingZoneElement is undefined, calling createPrintZoneElement');
-            this.createPrintZoneElement();
-            console.log('🚨 DEBUG: After createPrintZoneElement, exists now:', !!this.printingZoneElement);
-        } else {
-            console.log('🚨 DEBUG: printingZoneElement already exists:', this.printingZoneElement);
-        }
-
-        console.log('🔍 DEBUG renderTemplateView: isPrintingVisible:', this.isPrintingVisible);
-        console.log('🔍 DEBUG renderTemplateView: printingZoneElement exists:', !!this.printingZoneElement);
 
         if( this.isPrintingVisible ) {
-            console.log('🔍 DEBUG: Adding print zone to canvas (initial render)');
             this.fabricCanvas.add(this.printingZoneElement);
-        } else {
-            console.log('🔍 DEBUG: Print zone not added (isPrintingVisible is false)');
         }
 
         // Aktiviere Clipping für Design-Elemente außerhalb der Print Zone
@@ -1415,8 +1407,6 @@ class DesignerWidget {
     }
 
     setupDesignerToolbar(){
-        console.log('🔍 DEBUG setupDesignerToolbar: togglePrintZoneButton exists:', !!this.togglePrintZoneButton);
-        console.log('🔍 DEBUG setupDesignerToolbar: isPrintingVisible:', this.isPrintingVisible);
 
         if (!this.togglePrintZoneButton) {
             console.error('ERROR: togglePrintZoneButton not found! Cannot setup print zone toggle.');
@@ -1426,80 +1416,25 @@ class DesignerWidget {
         this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
 
         this.togglePrintZoneButton.addEventListener('click', () => {
+            console.log('🔍 Print Zone toggle clicked');
             this.isPrintingVisible = !this.isPrintingVisible;
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
 
+            console.log('🔍 isPrintingVisible now:', this.isPrintingVisible);
+
             if( this.isPrintingVisible ) {
+                console.log('✅ Showing print zone and enabling clipping');
                 this.fabricCanvas.add(this.printingZoneElement);
+                this.enablePrintZoneClipping();
             } else {
+                console.log('❌ Hiding print zone and disabling clipping');
                 this.fabricCanvas.remove(this.printingZoneElement);
+                this.disablePrintZoneClipping();
             }
             this.fabricCanvas.renderAll();
         });
     }
 
-    createPrintZoneElement() {
-        console.log('🚨 DEBUG: createPrintZoneElement CALLED');
-        console.log('🚨 DEBUG: activeTemplateId:', this.activeTemplateId);
-        console.log('🚨 DEBUG: currentView:', this.currentView);
-        console.log('🚨 DEBUG: templates Map:', this.templates);
-
-        // Get template dimensions to create print zone
-        const template = this.templates.get(this.activeTemplateId);
-        console.log('🚨 DEBUG: Found template:', !!template, template);
-
-        if (!template || !this.currentView) {
-            console.error('🚨 DEBUG: Cannot create print zone: No active template or view');
-            console.error('🚨 DEBUG: template exists:', !!template);
-            console.error('🚨 DEBUG: currentView exists:', !!this.currentView);
-            return;
-        }
-
-        const view = template.views.find(v => v.id === this.currentView.id);
-        console.log('🚨 DEBUG: Found view:', !!view, view);
-
-        if (!view || !view.printZone) {
-            console.error('🚨 DEBUG: Cannot create print zone: View has no print zone data');
-            console.error('🚨 DEBUG: view exists:', !!view);
-            console.error('🚨 DEBUG: view.printZone exists:', !!(view && view.printZone));
-            if (view) {
-                console.error('🚨 DEBUG: view structure:', Object.keys(view));
-                console.error('🚨 DEBUG: view data:', view);
-            }
-            return;
-        }
-
-        const printZone = view.printZone;
-        console.log('🚨 DEBUG: Print zone data:', printZone);
-
-        // Create fabric.js Rectangle for the print zone
-        try {
-            this.printingZoneElement = new fabric.Rect({
-                left: printZone.x,
-                top: printZone.y,
-                width: printZone.width,
-                height: printZone.height,
-                fill: 'transparent',
-                stroke: '#007cba',
-                strokeWidth: 2,
-                strokeDashArray: [10, 5],
-                selectable: false,
-                evented: false,
-                excludeFromExport: true,
-                name: 'printZone'
-            });
-
-            console.log('🚨 DEBUG: ✅ Print Zone Element SUCCESSFULLY created:', {
-                x: printZone.x,
-                y: printZone.y,
-                width: printZone.width,
-                height: printZone.height,
-                element: this.printingZoneElement
-            });
-        } catch (error) {
-            console.error('🚨 DEBUG: ❌ Error creating print zone element:', error);
-        }
-    }
 
     setupZoomControls() {
         let zoomTimeout;
@@ -2076,43 +2011,110 @@ class DesignerWidget {
     }
 
     enablePrintZoneClipping() {
-        // Erstelle einen Clip-Path basierend auf der aktuellen Safe Zone
+        console.log('🔍 enablePrintZoneClipping called');
+
+        // Erstelle einen Clip-Path basierend auf der Print Zone
         const template = this.templates.get(this.activeTemplateId);
-        if (!template) return;
+        if (!template) {
+            console.log('❌ No template found for clipping');
+            return;
+        }
 
         const variation = template.variations.get(this.currentVariation.toString());
-        if (!variation) return;
+        if (!variation) {
+            console.log('❌ No variation found for clipping');
+            return;
+        }
 
         const view = variation.views.get(this.currentView);
-        if (!view || !view.safeZone) return;
+        if (!view) {
+            console.log('❌ No view found for clipping');
+            return;
+        }
+
+        // Use printZone if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
+        if (!zoneData) {
+            console.log('❌ No zone data (printZone or safeZone) found for clipping');
+            return;
+        }
+
+        console.log('🔍 Clipping zone data:', zoneData);
 
         // Erstelle Clipping-Rechteck für die Print Zone
         const clipRect = new fabric.Rect({
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
-            width: view.safeZone.width * this.fabricCanvas.width / 100,
-            height: view.safeZone.height * this.fabricCanvas.height / 100,
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
             originX: 'center',
             originY: 'center',
             absolutePositioned: true
         });
 
-        // Setze Clipping für alle hinzugefügten Objekte (nicht für Hintergrund-Bild)
-        this.fabricCanvas.on('object:added', (e) => {
+        console.log('🔍 Created clip rect:', {
+            left: clipRect.left,
+            top: clipRect.top,
+            width: clipRect.width,
+            height: clipRect.height
+        });
+
+        // Store the clip rect for later use
+        this.printZoneClipRect = clipRect;
+
+        // Remove any existing listeners to avoid duplicates
+        this.fabricCanvas.off('object:added', this.handleObjectAdded);
+
+        // Set up clipping for newly added objects
+        this.handleObjectAdded = (e) => {
             const obj = e.target;
-            // Wende Clipping nur auf Benutzer-Bilder an, nicht auf Hintergrund oder Print Zone
-            if (obj !== this.printingZoneElement && obj.data && obj.data.imageId) {
-                obj.clipPath = clipRect;
-            }
-        });
+            console.log('🔍 Object added:', obj.type, obj.name);
 
-        // Wende Clipping auf bereits existierende Objekte an
+            // Apply clipping to user images, but not background or print zone
+            if (obj !== this.printingZoneElement &&
+                obj.name !== 'backgroundImage' &&
+                obj.type === 'image') {
+                console.log('✅ Applying clipping to:', obj.name || obj.type);
+                obj.clipPath = clipRect.clone();
+                this.fabricCanvas.renderAll();
+            } else {
+                console.log('⏭️ Skipping clipping for:', obj.name || obj.type);
+            }
+        };
+
+        this.fabricCanvas.on('object:added', this.handleObjectAdded);
+
+        // Apply clipping to existing objects
         this.fabricCanvas.getObjects().forEach(obj => {
-            if (obj !== this.printingZoneElement && obj.data && obj.data.imageId) {
-                obj.clipPath = clipRect;
+            if (obj !== this.printingZoneElement &&
+                obj.name !== 'backgroundImage' &&
+                obj.type === 'image') {
+                console.log('✅ Applying clipping to existing object:', obj.name || obj.type);
+                obj.clipPath = clipRect.clone();
             }
         });
 
+        console.log('🔍 Print zone clipping enabled');
+        this.fabricCanvas.renderAll();
+    }
+
+    disablePrintZoneClipping() {
+        console.log('🔍 disablePrintZoneClipping called');
+
+        // Remove event listener for new objects
+        if (this.handleObjectAdded) {
+            this.fabricCanvas.off('object:added', this.handleObjectAdded);
+        }
+
+        // Remove clipping from existing objects
+        this.fabricCanvas.getObjects().forEach(obj => {
+            if (obj.clipPath) {
+                console.log('🔍 Removing clipping from:', obj.name || obj.type);
+                obj.clipPath = null;
+            }
+        });
+
+        console.log('🔍 Print zone clipping disabled');
         this.fabricCanvas.renderAll();
     }
 
