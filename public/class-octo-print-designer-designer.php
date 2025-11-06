@@ -68,17 +68,19 @@ class Octo_Print_Designer_Designer {
 
         error_log("🔍 SHORTCODE ATTRS: " . print_r($atts, true));
 
-        // 🎯 CLEAN SHORTCODE: Only enqueue the 5 essential scripts
-        // All scripts are automatically enqueued in proper order via enqueue_scripts()
-        // Just need to ensure the PNG integration script is loaded for design saving
-        error_log("🔍 DEBUG: Enqueueing yprint-png-integration for shortcode");
-        wp_enqueue_script('yprint-png-integration');
+        // 🎯 CLEAN SHORTCODE: Enqueue main designer script (which triggers the dependency chain)
+        error_log("🔍 DEBUG: Enqueueing main designer script for shortcode");
+        wp_enqueue_script('octo-print-designer-designer');
+
+        // 🎯 CLEAN STYLES: Enqueue required stylesheets
+        wp_enqueue_style('octo-print-designer-toast-style');
+        wp_enqueue_style('octo-print-designer-designer-style');
 
         // Verify enqueue success
-        if (wp_script_is('yprint-png-integration', 'enqueued')) {
-            error_log("✅ SHORTCODE: yprint-png-integration enqueued successfully");
+        if (wp_script_is('octo-print-designer-designer', 'enqueued')) {
+            error_log("✅ SHORTCODE: octo-print-designer-designer enqueued successfully");
         } else {
-            error_log("❌ SHORTCODE ERROR: Failed to enqueue yprint-png-integration");
+            error_log("❌ SHORTCODE ERROR: Failed to enqueue octo-print-designer-designer");
         }
 
         // 🎯 CLEAN FABRIC CHECK: Simple fabric.js availability verification

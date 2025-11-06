@@ -183,15 +183,9 @@ class Octo_Print_Designer_Public {
             'yprint-png-integration'
         ];
 
-        // 🎯 ENQUEUE CLEAN SCRIPTS: Sequential loading
-        foreach ($clean_scripts as $script_handle) {
-            if (wp_script_is($script_handle, 'registered')) {
-                wp_enqueue_script($script_handle);
-                error_log("✅ CLEAN ENQUEUE: {$script_handle} enqueued successfully");
-            } else {
-                error_log("❌ CLEAN ERROR: {$script_handle} not registered");
-            }
-        }
+        // 🎯 REGISTRATION COMPLETE: Scripts registered and ready for selective enqueueing
+        // Note: Scripts are NOT auto-enqueued - they load only when explicitly needed (e.g., shortcode)
+        error_log("🔍 SCRIPT REGISTRATION: All clean scripts registered, ready for selective loading");
 
         // 🎯 ESSENTIAL CONFIG: Only critical configuration
         wp_localize_script('yprint-save-only-png', 'octo_print_designer_config', [
@@ -212,7 +206,7 @@ class Octo_Print_Designer_Public {
 
         error_log("🔧 DATABASE FIX: octoPrintDesigner config added for template loading");
 
-        error_log("✅ CLEAN SYSTEM: All 5 essential scripts processed");
+        error_log("✅ CLEAN SYSTEM: All 5 essential scripts registered (not auto-enqueued)");
         error_log("🔍 DEBUG CHECKPOINT 2 COMPLETE: Script registration phase finished");
 
         // 🔍 FINAL VERIFICATION: Log all registered scripts

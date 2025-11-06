@@ -452,7 +452,7 @@ class DesignerWidget {
     }
 
     initializeCanvas() {
-        this.fabricCanvas = new Canvas('octo-print-designer-canvas', {
+        this.fabricCanvas = new fabric.Canvas('octo-print-designer-canvas', {
             width: this.canvas.offsetWidth,
             height: this.canvas.offsetHeight,
             backgroundColor: '#fff',
@@ -669,7 +669,7 @@ class DesignerWidget {
         // Clear existing canvas
         this.fabricCanvas.clear();
 
-        this.clipMask = new Rect({
+        this.clipMask = new fabric.Rect({
             left: view.safeZone.left * this.fabricCanvas.width / 100,
             top: view.safeZone.top * this.fabricCanvas.height / 100,
             width: view.safeZone.width * this.fabricCanvas.width / 100,
@@ -692,7 +692,7 @@ class DesignerWidget {
             originY: 'center',
         });
 
-        this.printingZoneElement = new Rect({
+        this.printingZoneElement = new fabric.Rect({
             left: view.safeZone.left * this.fabricCanvas.width / 100,
             top: view.safeZone.top * this.fabricCanvas.height / 100,
             width: view.safeZone.width * this.fabricCanvas.width / 100,
@@ -713,7 +713,7 @@ class DesignerWidget {
             const template = this.templates.get(this.activeTemplateId);
             const variation = template.variations.get(this.currentVariation.toString());
 
-            fabricImage.filters.push(new filters.BlendColor({
+            fabricImage.filters.push(new fabric.filters.BlendColor({
                 color: variation?.color,
                 mode: 'multiply',
                 alpha: view.overlayOpacity || 0.5
@@ -1014,8 +1014,8 @@ class DesignerWidget {
         if (isDarkShirt) {
             // Settings for dark shirts (keep existing logic)
             img.filters.push(
-                new filters.Contrast({ contrast: 0.15 }),
-                new filters.BlendColor({
+                new fabric.filters.Contrast({ contrast: 0.15 }),
+                new fabric.filters.BlendColor({
                     color: '#ffffff',
                     mode: 'screen',
                     alpha: 0.1
@@ -1042,9 +1042,9 @@ class DesignerWidget {
         } else {
             // Settings for light shirts (keep existing logic)
             img.filters.push(
-                new filters.Brightness({ brightness: -0.05 }),
-                new filters.Contrast({ contrast: 0.1 }),
-                new filters.BlendColor({
+                new fabric.filters.Brightness({ brightness: -0.05 }),
+                new fabric.filters.Contrast({ contrast: 0.1 }),
+                new fabric.filters.BlendColor({
                     color: '#ffffff',
                     mode: 'multiply',
                     alpha: 0.9
@@ -1811,7 +1811,7 @@ class DesignerWidget {
     async captureCanvasPreview() {
         // Create temporary canvas for preview 
         const tempCanvasElement = document.createElement('canvas');
-        const tempCanvas = new Canvas(tempCanvasElement, {
+        const tempCanvas = new fabric.Canvas(tempCanvasElement, {
             width: 500,
             height: 500,
             backgroundColor: 'white'
@@ -1837,7 +1837,7 @@ class DesignerWidget {
     
             // Add color overlay if enabled
             if (view.colorOverlayEnabled) {
-                backgroundImage.filters.push(new filters.BlendColor({
+                backgroundImage.filters.push(new fabric.filters.BlendColor({
                     color: variation?.color,
                     mode: 'multiply',
                     alpha: view.overlayOpacity || 0.5
@@ -1856,7 +1856,7 @@ class DesignerWidget {
             const heightRatio = tempCanvas.height / this.fabricCanvas.height;
     
             // Create clipPath with adjusted dimensions
-            const clipPath = new Rect({
+            const clipPath = new fabric.Rect({
                 left: view.safeZone.left * tempCanvas.width / 100,
                 top: view.safeZone.top * tempCanvas.height / 100,
                 width: view.safeZone.width * tempCanvas.width / 100,
@@ -1892,8 +1892,8 @@ class DesignerWidget {
                 const isDarkShirt = variation.is_dark_shirt === true;
                 if (isDarkShirt) {
                     userImage.filters.push(
-                        new filters.Contrast({ contrast: 0.15 }),
-                        new filters.BlendColor({
+                        new fabric.filters.Contrast({ contrast: 0.15 }),
+                        new fabric.filters.BlendColor({
                             color: '#ffffff',
                             mode: 'screen',
                             alpha: 0.1
@@ -1905,9 +1905,9 @@ class DesignerWidget {
                     });
                 } else {
                     userImage.filters.push(
-                        new filters.Brightness({ brightness: -0.05 }),
-                        new filters.Contrast({ contrast: 0.1 }),
-                        new filters.BlendColor({
+                        new fabric.filters.Brightness({ brightness: -0.05 }),
+                        new fabric.filters.Contrast({ contrast: 0.1 }),
+                        new fabric.filters.BlendColor({
                             color: '#ffffff',
                             mode: 'multiply',
                             alpha: 0.9
