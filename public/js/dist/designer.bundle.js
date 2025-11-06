@@ -713,7 +713,7 @@ class DesignerWidget {
             const template = this.templates.get(this.activeTemplateId);
             const variation = template.variations.get(this.currentVariation.toString());
 
-            fabricImage.filters.push(new fabric.filters.BlendColor({
+            fabricImage.filters.push(new fabric.Image.filters.BlendColor({
                 color: variation?.color,
                 mode: 'multiply',
                 alpha: view.overlayOpacity || 0.5
@@ -1014,8 +1014,8 @@ class DesignerWidget {
         if (isDarkShirt) {
             // Settings for dark shirts (keep existing logic)
             img.filters.push(
-                new fabric.filters.Contrast({ contrast: 0.15 }),
-                new fabric.filters.BlendColor({
+                new fabric.Image.filters.Contrast({ contrast: 0.15 }),
+                new fabric.Image.filters.BlendColor({
                     color: '#ffffff',
                     mode: 'screen',
                     alpha: 0.1
@@ -1042,9 +1042,9 @@ class DesignerWidget {
         } else {
             // Settings for light shirts (keep existing logic)
             img.filters.push(
-                new fabric.filters.Brightness({ brightness: -0.05 }),
-                new fabric.filters.Contrast({ contrast: 0.1 }),
-                new fabric.filters.BlendColor({
+                new fabric.Image.filters.Brightness({ brightness: -0.05 }),
+                new fabric.Image.filters.Contrast({ contrast: 0.1 }),
+                new fabric.Image.filters.BlendColor({
                     color: '#ffffff',
                     mode: 'multiply',
                     alpha: 0.9
@@ -1837,7 +1837,7 @@ class DesignerWidget {
     
             // Add color overlay if enabled
             if (view.colorOverlayEnabled) {
-                backgroundImage.filters.push(new fabric.filters.BlendColor({
+                backgroundImage.filters.push(new fabric.Image.filters.BlendColor({
                     color: variation?.color,
                     mode: 'multiply',
                     alpha: view.overlayOpacity || 0.5
@@ -1892,8 +1892,8 @@ class DesignerWidget {
                 const isDarkShirt = variation.is_dark_shirt === true;
                 if (isDarkShirt) {
                     userImage.filters.push(
-                        new fabric.filters.Contrast({ contrast: 0.15 }),
-                        new fabric.filters.BlendColor({
+                        new fabric.Image.filters.Contrast({ contrast: 0.15 }),
+                        new fabric.Image.filters.BlendColor({
                             color: '#ffffff',
                             mode: 'screen',
                             alpha: 0.1
@@ -1905,9 +1905,9 @@ class DesignerWidget {
                     });
                 } else {
                     userImage.filters.push(
-                        new fabric.filters.Brightness({ brightness: -0.05 }),
-                        new fabric.filters.Contrast({ contrast: 0.1 }),
-                        new fabric.filters.BlendColor({
+                        new fabric.Image.filters.Brightness({ brightness: -0.05 }),
+                        new fabric.Image.filters.Contrast({ contrast: 0.1 }),
+                        new fabric.Image.filters.BlendColor({
                             color: '#ffffff',
                             mode: 'multiply',
                             alpha: 0.9
