@@ -1409,32 +1409,23 @@ class DesignerWidget {
         console.log('🔍 DEBUG setupDesignerToolbar: isPrintingVisible:', this.isPrintingVisible);
 
         if (!this.togglePrintZoneButton) {
-            console.error('❌ ERROR: togglePrintZoneButton not found! Cannot setup print zone toggle.');
+            console.error('ERROR: togglePrintZoneButton not found! Cannot setup print zone toggle.');
             return;
         }
 
-        // Button initial auf aktiv setzen, da isPrintingVisible standardmäßig true ist
         this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
-        console.log('🔍 DEBUG: Initial button state set, active:', this.isPrintingVisible);
 
         this.togglePrintZoneButton.addEventListener('click', () => {
-            console.log('🔍 DEBUG: Print zone button clicked!');
             this.isPrintingVisible = !this.isPrintingVisible;
-            console.log('🔍 DEBUG: isPrintingVisible toggled to:', this.isPrintingVisible);
-
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
 
             if( this.isPrintingVisible ) {
-                console.log('🔍 DEBUG: Adding print zone to canvas');
                 this.fabricCanvas.add(this.printingZoneElement);
             } else {
-                console.log('🔍 DEBUG: Removing print zone from canvas');
                 this.fabricCanvas.remove(this.printingZoneElement);
             }
             this.fabricCanvas.renderAll();
         });
-
-        console.log('✅ DEBUG: Print zone button event listener attached');
     }
 
     setupZoomControls() {
