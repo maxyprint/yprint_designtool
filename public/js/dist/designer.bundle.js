@@ -200,6 +200,7 @@ class DesignerWidget {
         this.tempImages = [];
         this.tempImageCounter = 0;
         this.isLoggedIn = window.octoPrintDesigner?.isLoggedIn || false;
+        this.isPrintingVisible = true; // Print Zone standardmäßig sichtbar
         
         window.addEventListener('resize', () => this.handleResize());
 
@@ -723,6 +724,9 @@ class DesignerWidget {
 
         this.fabricCanvas.add(fabricImage);
         if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
+
+        // Aktiviere Clipping für Design-Elemente außerhalb der Print Zone
+        this.enablePrintZoneClipping();
 
         // Load saved image for this view if it exists
         this.loadViewImage();
@@ -1391,9 +1395,11 @@ class DesignerWidget {
     }
 
     setupDesignerToolbar(){
+        // Button initial auf aktiv setzen, da isPrintingVisible standardmäßig true ist
+        this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
 
         this.togglePrintZoneButton.addEventListener('click', () => {
-            this.isPrintingVisible = !this.isPrintingVisible || false;
+            this.isPrintingVisible = !this.isPrintingVisible;
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
             if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
             else this.fabricCanvas.remove(this.printingZoneElement);
@@ -1971,8 +1977,49 @@ class DesignerWidget {
         
         // Restore the original view
         this.currentView = originalView;
-        
+
         return previews;
+    }
+
+    enablePrintZoneClipping() {
+        // Erstelle einen Clip-Path basierend auf der aktuellen Safe Zone
+        const template = this.templates.get(this.activeTemplateId);
+        if (!template) return;
+
+        const variation = template.variations.get(this.currentVariation.toString());
+        if (!variation) return;
+
+        const view = variation.views.get(this.currentView);
+        if (!view || !view.safeZone) return;
+
+        // Erstelle Clipping-Rechteck für die Print Zone
+        const clipRect = new fabric.Rect({
+            left: view.safeZone.left * this.fabricCanvas.width / 100,
+            top: view.safeZone.top * this.fabricCanvas.height / 100,
+            width: view.safeZone.width * this.fabricCanvas.width / 100,
+            height: view.safeZone.height * this.fabricCanvas.height / 100,
+            originX: 'center',
+            originY: 'center',
+            absolutePositioned: true
+        });
+
+        // Setze Clipping für alle hinzugefügten Objekte (nicht für Hintergrund-Bild)
+        this.fabricCanvas.on('object:added', (e) => {
+            const obj = e.target;
+            // Wende Clipping nur auf Benutzer-Bilder an, nicht auf Hintergrund oder Print Zone
+            if (obj !== this.printingZoneElement && obj.data && obj.data.imageId) {
+                obj.clipPath = clipRect;
+            }
+        });
+
+        // Wende Clipping auf bereits existierende Objekte an
+        this.fabricCanvas.getObjects().forEach(obj => {
+            if (obj !== this.printingZoneElement && obj.data && obj.data.imageId) {
+                obj.clipPath = clipRect;
+            }
+        });
+
+        this.fabricCanvas.renderAll();
     }
 
 }
