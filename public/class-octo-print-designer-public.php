@@ -202,6 +202,16 @@ class Octo_Print_Designer_Public {
             'clean_system' => true
         ]);
 
+        // 🚨 CRITICAL FIX: Add missing octoPrintDesigner config for template loading
+        wp_localize_script('octo-print-designer-designer', 'octoPrintDesigner', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('octo_print_designer_nonce'),
+            'isLoggedIn' => is_user_logged_in(),
+            'loginUrl' => class_exists('Octo_Print_Designer_Settings') ? Octo_Print_Designer_Settings::get_login_url() : wp_login_url(),
+        ]);
+
+        error_log("🔧 DATABASE FIX: octoPrintDesigner config added for template loading");
+
         error_log("✅ CLEAN SYSTEM: All 5 essential scripts processed");
         error_log("🔍 DEBUG CHECKPOINT 2 COMPLETE: Script registration phase finished");
 
