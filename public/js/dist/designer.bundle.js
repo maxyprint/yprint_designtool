@@ -660,8 +660,8 @@ class DesignerWidget {
 
         if (!view) return;
 
-        Image.fromURL(view.image_url).then(img => {
-            this.renderTemplateView(view, img); 
+        fabric.Image.fromURL(view.image_url).then(img => {
+            this.renderTemplateView(view, img);
         });
     }
 
@@ -741,7 +741,7 @@ class DesignerWidget {
         preview.addEventListener('click', () => {
             if (this.isMobile) this.sectionItemsContainer.classList.toggle('hidden', true);
         
-            Image.fromURL(imageUrl).then(img => {
+            fabric.Image.fromURL(imageUrl).then(img => {
                 const template = this.templates.get(this.activeTemplateId);
                 const variation = template.variations.get(this.currentVariation.toString());
                 const view = variation.views.get(this.currentView);
@@ -991,7 +991,7 @@ class DesignerWidget {
             
             // If we have a URL but no fabric instance, create one
             if (imageData.url && !imageData.fabricImage) {
-                Image.fromURL(imageData.url).then(img => {
+                fabric.Image.fromURL(imageData.url).then(img => {
                     // Store the fabricImage reference
                     imageData.fabricImage = img;
                     
