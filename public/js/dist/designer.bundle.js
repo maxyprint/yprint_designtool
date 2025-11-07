@@ -730,10 +730,10 @@ class DesignerWidget {
         });
 
         this.printingZoneElement = new fabric.Rect({
-            left: zoneData.left * this.fabricCanvas.width / 100,
-            top: zoneData.top * this.fabricCanvas.height / 100,
-            width: zoneData.width * this.fabricCanvas.width / 100,
-            height: zoneData.height * this.fabricCanvas.height / 100,
+            left: zoneData.left,
+            top: zoneData.top,
+            width: zoneData.width,
+            height: zoneData.height,
             fill: 'rgba(0, 124, 186, 0.1)', // Slight fill to make it more visible
             stroke: '#007cba',
             strokeWidth: 3, // Thicker stroke
@@ -2068,12 +2068,12 @@ class DesignerWidget {
 
         console.log('🔍 Clipping zone data:', zoneData);
 
-        // Erstelle Clipping-Rechteck für die Print Zone
+        // Erstelle Clipping-Rechteck für die Print Zone (Zone-Daten sind bereits Pixel-Werte)
         const clipRect = new fabric.Rect({
-            left: zoneData.left * this.fabricCanvas.width / 100,
-            top: zoneData.top * this.fabricCanvas.height / 100,
-            width: zoneData.width * this.fabricCanvas.width / 100,
-            height: zoneData.height * this.fabricCanvas.height / 100,
+            left: zoneData.left,
+            top: zoneData.top,
+            width: zoneData.width,
+            height: zoneData.height,
             originX: 'center',
             originY: 'center',
             absolutePositioned: true

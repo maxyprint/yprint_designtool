@@ -542,10 +542,10 @@ export class DesignerWidget {
         });
 
         this.printingZoneElement = new Rect({
-            left: zoneData.left * this.fabricCanvas.width / 100,
-            top: zoneData.top * this.fabricCanvas.height / 100,
-            width: zoneData.width * this.fabricCanvas.width / 100,
-            height: zoneData.height * this.fabricCanvas.height / 100,
+            left: zoneData.left,
+            top: zoneData.top,
+            width: zoneData.width,
+            height: zoneData.height,
             // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
