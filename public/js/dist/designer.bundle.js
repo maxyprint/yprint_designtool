@@ -702,6 +702,33 @@ class DesignerWidget {
             using: zoneData
         });
 
+        // 🔍 DEBUG: Detailed Print Zone Analysis
+        console.log('🔍 CANVAS DIMENSIONS:', {
+            canvasWidth: this.fabricCanvas.width,
+            canvasHeight: this.fabricCanvas.height
+        });
+
+        console.log('🔍 RAW ZONE DATA:', {
+            safeZone: view.safeZone,
+            printZone: view.printZone || 'nicht vorhanden'
+        });
+
+        console.log('🔍 VERWENDETE ZONE DATA:', zoneData);
+
+        console.log('🔍 BERECHNUNGEN (AKTUELL - MIT /100):', {
+            left_calculated: zoneData.left * this.fabricCanvas.width / 100,
+            top_calculated: zoneData.top * this.fabricCanvas.height / 100,
+            width_calculated: zoneData.width * this.fabricCanvas.width / 100,
+            height_calculated: zoneData.height * this.fabricCanvas.height / 100
+        });
+
+        console.log('🔍 BERECHNUNGEN (TEST - OHNE /100):', {
+            left_direct: zoneData.left,
+            top_direct: zoneData.top,
+            width_direct: zoneData.width,
+            height_direct: zoneData.height
+        });
+
         this.printingZoneElement = new fabric.Rect({
             left: zoneData.left * this.fabricCanvas.width / 100,
             top: zoneData.top * this.fabricCanvas.height / 100,

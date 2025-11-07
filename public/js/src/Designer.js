@@ -511,11 +511,41 @@ export class DesignerWidget {
             originY: 'center',
         });
 
+        // 🔍 DEBUG: Detailed Print Zone Analysis
+        console.log('🔍 CANVAS DIMENSIONS:', {
+            canvasWidth: this.fabricCanvas.width,
+            canvasHeight: this.fabricCanvas.height
+        });
+
+        console.log('🔍 RAW ZONE DATA:', {
+            safeZone: view.safeZone,
+            printZone: view.printZone || 'nicht vorhanden'
+        });
+
+        // Use printZone data if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
+
+        console.log('🔍 VERWENDETE ZONE DATA:', zoneData);
+
+        console.log('🔍 BERECHNUNGEN (AKTUELL - MIT /100):', {
+            left_calculated: zoneData.left * this.fabricCanvas.width / 100,
+            top_calculated: zoneData.top * this.fabricCanvas.height / 100,
+            width_calculated: zoneData.width * this.fabricCanvas.width / 100,
+            height_calculated: zoneData.height * this.fabricCanvas.height / 100
+        });
+
+        console.log('🔍 BERECHNUNGEN (TEST - OHNE /100):', {
+            left_direct: zoneData.left,
+            top_direct: zoneData.top,
+            width_direct: zoneData.width,
+            height_direct: zoneData.height
+        });
+
         this.printingZoneElement = new Rect({
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
-            width: view.safeZone.width * this.fabricCanvas.width / 100,
-            height: view.safeZone.height * this.fabricCanvas.height / 100,
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
             // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
