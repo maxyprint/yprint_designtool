@@ -509,6 +509,7 @@ export class DesignerWidget {
             top: view.imageZone.top * this.fabricCanvas.height / 100,
             originX: 'center',
             originY: 'center',
+            name: 'backgroundImage'  // ← WICHTIG für spätere Erkennung
         });
 
         // 🔍 DEBUG: Detailed Print Zone Analysis
@@ -577,9 +578,15 @@ export class DesignerWidget {
             console.log('📋 All objects:', objects.map(obj => ({type: obj.type, left: obj.left, top: obj.top})));
         }
 
+        // ✅ Korrekte Print Zone Berechnung relativ zum Mockup-Bild
+        const imageBounds = {
+            left: fabricImage.left - (fabricImage.width * fabricImage.scaleX) / 2,
+            top: fabricImage.top - (fabricImage.height * fabricImage.scaleY) / 2
+        };
+
         this.printingZoneElement = new Rect({
-            left: zoneData.left,
-            top: zoneData.top,
+            left: imageBounds.left + zoneData.left,    // ✅ Relativ zum Mockup
+            top: imageBounds.top + zoneData.top,       // ✅ Relativ zum Mockup
             width: zoneData.width,
             height: zoneData.height,
             // fill: 'rgba(0, 124, 186, 0.2)',
