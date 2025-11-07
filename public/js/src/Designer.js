@@ -1280,10 +1280,74 @@ export class DesignerWidget {
         this.togglePrintZoneButton.addEventListener('click', () => {
             this.isPrintingVisible = !this.isPrintingVisible || false;
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
-            if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
-            else this.fabricCanvas.remove(this.printingZoneElement);
+
+            if (this.isPrintingVisible) {
+                this.fabricCanvas.add(this.printingZoneElement);
+                this.showPrintZoneOverlay();
+            } else {
+                this.fabricCanvas.remove(this.printingZoneElement);
+                this.hidePrintZoneOverlay();
+            }
         });
 
+    }
+
+    showPrintZoneOverlay() {
+        if (!this.printingZoneElement) return;
+
+        // Convert Fabric.js center-based coordinates to CSS top-left
+        const zone = {
+            left: this.printingZoneElement.left - (this.printingZoneElement.width / 2),
+            top: this.printingZoneElement.top - (this.printingZoneElement.height / 2),
+            width: this.printingZoneElement.width,
+            height: this.printingZoneElement.height
+        };
+
+        // Create CSS clip-path that dims everything except Print Zone
+        const clipPath = `polygon(
+            0% 0%,
+            0% 100%,
+            ${zone.left}px 100%,
+            ${zone.left}px ${zone.top}px,
+            ${zone.left + zone.width}px ${zone.top}px,
+            ${zone.left + zone.width}px ${zone.top + zone.height}px,
+            ${zone.left}px ${zone.top + zone.height}px,
+            ${zone.left}px 100%,
+            100% 100%,
+            100% 0%
+        )`;
+
+        const container = this.fabricCanvas.lowerCanvasEl.parentElement;
+        if (!container) return;
+
+        // Remove existing overlay
+        this.hidePrintZoneOverlay();
+
+        // Create new overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            pointer-events: none;
+            z-index: 10;
+            clip-path: ${clipPath};
+            transition: opacity 0.3s ease;
+        `;
+        overlay.id = 'print-zone-overlay';
+        overlay.className = 'print-zone-overlay';
+
+        container.appendChild(overlay);
+    }
+
+    hidePrintZoneOverlay() {
+        const overlay = document.getElementById('print-zone-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
     }
 
     setupZoomControls() {
