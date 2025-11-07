@@ -729,6 +729,42 @@ class DesignerWidget {
             height_direct: zoneData.height
         });
 
+        // 🔍 IMAGE vs CANVAS POSITIONING ANALYSIS
+        console.log('=== 🖼️ IMAGE vs CANVAS POSITIONING ===');
+        const objects = this.fabricCanvas.getObjects();
+        const backgroundImage = objects.find(obj => obj.type === 'image');
+
+        if (backgroundImage) {
+            console.log('🖼️ Background Image:', {
+                left: backgroundImage.left,
+                top: backgroundImage.top,
+                width: backgroundImage.width,
+                height: backgroundImage.height,
+                scaleX: backgroundImage.scaleX,
+                scaleY: backgroundImage.scaleY,
+                actualWidth: backgroundImage.width * backgroundImage.scaleX,
+                actualHeight: backgroundImage.height * backgroundImage.scaleY
+            });
+
+            const imageBounds = {
+                left: backgroundImage.left - (backgroundImage.width * backgroundImage.scaleX) / 2,
+                top: backgroundImage.top - (backgroundImage.height * backgroundImage.scaleY) / 2,
+                right: backgroundImage.left + (backgroundImage.width * backgroundImage.scaleX) / 2,
+                bottom: backgroundImage.top + (backgroundImage.height * backgroundImage.scaleY) / 2
+            };
+
+            console.log('📦 Image bounds:', imageBounds);
+            console.log('🎯 Zone relative to image would be:', {
+                left: imageBounds.left + zoneData.left,
+                top: imageBounds.top + zoneData.top,
+                width: zoneData.width,
+                height: zoneData.height
+            });
+        } else {
+            console.log('❌ No background image found');
+            console.log('📋 All objects:', objects.map(obj => ({type: obj.type, left: obj.left, top: obj.top})));
+        }
+
         this.printingZoneElement = new fabric.Rect({
             left: zoneData.left,
             top: zoneData.top,
