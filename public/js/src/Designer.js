@@ -578,17 +578,10 @@ export class DesignerWidget {
             console.log('📋 All objects:', objects.map(obj => ({type: obj.type, left: obj.left, top: obj.top})));
         }
 
-        // ✅ Korrekte Print Zone Berechnung relativ zum Mockup-Bild
-        const imageBounds = {
-            left: fabricImage.left - (fabricImage.width * fabricImage.scaleX) / 2,
-            top: fabricImage.top - (fabricImage.height * fabricImage.scaleY) / 2
-        };
-
         this.printingZoneElement = new Rect({
-            left: imageBounds.left + zoneData.left,    // ✅ Relativ zum Mockup
-            top: imageBounds.top + zoneData.top,       // ✅ Relativ zum Mockup
-            width: zoneData.width,
-            height: zoneData.height,
+            ...view.safeZone,
+            left: view.safeZone.left * this.fabricCanvas.width / 100,
+            top: view.safeZone.top * this.fabricCanvas.height / 100,
             // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
