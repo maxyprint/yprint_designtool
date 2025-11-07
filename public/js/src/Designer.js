@@ -20,7 +20,6 @@ export class DesignerWidget {
         this.tempImages = [];
         this.tempImageCounter = 0;
         this.isLoggedIn = window.octoPrintDesigner?.isLoggedIn || false;
-        this.isPrintingVisible = false;
         
         window.addEventListener('resize', () => this.handleResize());
 
