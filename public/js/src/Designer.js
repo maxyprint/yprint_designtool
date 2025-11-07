@@ -1280,14 +1280,8 @@ export class DesignerWidget {
         this.togglePrintZoneButton.addEventListener('click', () => {
             this.isPrintingVisible = !this.isPrintingVisible || false;
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
-
-            if (this.isPrintingVisible) {
-                this.fabricCanvas.add(this.printingZoneElement);
-                this.showPrintZoneOverlay();
-            } else {
-                this.fabricCanvas.remove(this.printingZoneElement);
-                this.hidePrintZoneOverlay();
-            }
+            if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
+            else this.fabricCanvas.remove(this.printingZoneElement);
         });
 
     }
