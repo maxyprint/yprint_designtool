@@ -20,6 +20,7 @@ export class DesignerWidget {
         this.tempImages = [];
         this.tempImageCounter = 0;
         this.isLoggedIn = window.octoPrintDesigner?.isLoggedIn || false;
+        this.isPrintingVisible = false;
         
         window.addEventListener('resize', () => this.handleResize());
 
@@ -518,65 +519,6 @@ export class DesignerWidget {
             canvasHeight: this.fabricCanvas.height
         });
 
-        console.log('🔍 RAW ZONE DATA:', {
-            safeZone: view.safeZone,
-            printZone: view.printZone || 'nicht vorhanden'
-        });
-
-        // Use printZone data if available, fallback to safeZone
-        const zoneData = view.printZone || view.safeZone;
-
-        console.log('🔍 VERWENDETE ZONE DATA:', zoneData);
-
-        console.log('🔍 BERECHNUNGEN (AKTUELL - MIT /100):', {
-            left_calculated: zoneData.left * this.fabricCanvas.width / 100,
-            top_calculated: zoneData.top * this.fabricCanvas.height / 100,
-            width_calculated: zoneData.width * this.fabricCanvas.width / 100,
-            height_calculated: zoneData.height * this.fabricCanvas.height / 100
-        });
-
-        console.log('🔍 BERECHNUNGEN (TEST - OHNE /100):', {
-            left_direct: zoneData.left,
-            top_direct: zoneData.top,
-            width_direct: zoneData.width,
-            height_direct: zoneData.height
-        });
-
-        // 🔍 IMAGE vs CANVAS POSITIONING ANALYSIS
-        console.log('=== 🖼️ IMAGE vs CANVAS POSITIONING ===');
-        const objects = this.fabricCanvas.getObjects();
-        const backgroundImage = objects.find(obj => obj.type === 'image');
-
-        if (backgroundImage) {
-            console.log('🖼️ Background Image:', {
-                left: backgroundImage.left,
-                top: backgroundImage.top,
-                width: backgroundImage.width,
-                height: backgroundImage.height,
-                scaleX: backgroundImage.scaleX,
-                scaleY: backgroundImage.scaleY,
-                actualWidth: backgroundImage.width * backgroundImage.scaleX,
-                actualHeight: backgroundImage.height * backgroundImage.scaleY
-            });
-
-            const imageBounds = {
-                left: backgroundImage.left - (backgroundImage.width * backgroundImage.scaleX) / 2,
-                top: backgroundImage.top - (backgroundImage.height * backgroundImage.scaleY) / 2,
-                right: backgroundImage.left + (backgroundImage.width * backgroundImage.scaleX) / 2,
-                bottom: backgroundImage.top + (backgroundImage.height * backgroundImage.scaleY) / 2
-            };
-
-            console.log('📦 Image bounds:', imageBounds);
-            console.log('🎯 Zone relative to image would be:', {
-                left: imageBounds.left + zoneData.left,
-                top: imageBounds.top + zoneData.top,
-                width: zoneData.width,
-                height: zoneData.height
-            });
-        } else {
-            console.log('❌ No background image found');
-            console.log('📋 All objects:', objects.map(obj => ({type: obj.type, left: obj.left, top: obj.top})));
-        }
 
         this.printingZoneElement = new Rect({
             ...view.safeZone,
@@ -1286,63 +1228,6 @@ export class DesignerWidget {
 
     }
 
-    showPrintZoneOverlay() {
-        if (!this.printingZoneElement) return;
-
-        // Convert Fabric.js center-based coordinates to CSS top-left
-        const zone = {
-            left: this.printingZoneElement.left - (this.printingZoneElement.width / 2),
-            top: this.printingZoneElement.top - (this.printingZoneElement.height / 2),
-            width: this.printingZoneElement.width,
-            height: this.printingZoneElement.height
-        };
-
-        // Create CSS clip-path that dims everything except Print Zone
-        const clipPath = `polygon(
-            0% 0%,
-            0% 100%,
-            ${zone.left}px 100%,
-            ${zone.left}px ${zone.top}px,
-            ${zone.left + zone.width}px ${zone.top}px,
-            ${zone.left + zone.width}px ${zone.top + zone.height}px,
-            ${zone.left}px ${zone.top + zone.height}px,
-            ${zone.left}px 100%,
-            100% 100%,
-            100% 0%
-        )`;
-
-        const container = this.fabricCanvas.lowerCanvasEl.parentElement;
-        if (!container) return;
-
-        // Remove existing overlay
-        this.hidePrintZoneOverlay();
-
-        // Create new overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            pointer-events: none;
-            z-index: 10;
-            clip-path: ${clipPath};
-            transition: opacity 0.3s ease;
-        `;
-        overlay.id = 'print-zone-overlay';
-        overlay.className = 'print-zone-overlay';
-
-        container.appendChild(overlay);
-    }
-
-    hidePrintZoneOverlay() {
-        const overlay = document.getElementById('print-zone-overlay');
-        if (overlay) {
-            overlay.remove();
-        }
-    }
 
     setupZoomControls() {
         let zoomTimeout;
