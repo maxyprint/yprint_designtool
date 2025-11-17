@@ -519,11 +519,33 @@ export class DesignerWidget {
         });
 
 
+        // 🔍 PRINT ZONE DEBUGGING SYSTEM
+        console.log('🎯 PRINT ZONE CREATION DEBUG:', {
+            viewData: view,
+            safeZone: view.safeZone,
+            printZone: view.printZone,
+            canvasWidth: this.fabricCanvas.width,
+            canvasHeight: this.fabricCanvas.height,
+            zoneUsed: view.printZone || view.safeZone
+        });
+
+        // Use printZone if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
+
+        console.log('🔍 ZONE CALCULATIONS:', {
+            zoneData: zoneData,
+            calculatedLeft: zoneData.left * this.fabricCanvas.width / 100,
+            calculatedTop: zoneData.top * this.fabricCanvas.height / 100,
+            calculatedWidth: zoneData.width * this.fabricCanvas.width / 100,
+            calculatedHeight: zoneData.height * this.fabricCanvas.height / 100
+        });
+
         this.printingZoneElement = new Rect({
-            ...view.safeZone,
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
-            // fill: 'rgba(0, 124, 186, 0.2)',
+            ...zoneData,
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
             fill: 'transparent',
             stroke: '#007cba',
             strokeWidth: 2,
@@ -532,6 +554,14 @@ export class DesignerWidget {
             evented: false,
             originX: 'center',
             originY: 'center',
+        });
+
+        console.log('✅ PRINT ZONE ELEMENT CREATED:', {
+            element: this.printingZoneElement,
+            finalLeft: this.printingZoneElement.left,
+            finalTop: this.printingZoneElement.top,
+            finalWidth: this.printingZoneElement.width,
+            finalHeight: this.printingZoneElement.height
         });
 
         if (view.colorOverlayEnabled) {
