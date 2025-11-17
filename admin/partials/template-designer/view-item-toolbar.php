@@ -8,6 +8,10 @@
             <span class="dashicons dashicons-marker"></span>
             <?php esc_html_e('Edit Safe Zone', 'octo-print-designer'); ?>
         </button>
+        <button type="button" class="button mode-select" data-mode="printzone">
+            <span class="dashicons dashicons-admin-print"></span>
+            <?php esc_html_e('Edit Print Zone', 'octo-print-designer'); ?>
+        </button>
         <button type="button" class="button mode-select measurement-definition-mode" data-mode="measurement">
             <span class="dashicons dashicons-admin-tools"></span>
             <?php esc_html_e('Define Measurement', 'octo-print-designer'); ?>
@@ -31,6 +35,9 @@
         </button>
         <button type="button" class="button resetSafeZone">
             <?php esc_html_e('Reset Safe Zone', 'octo-print-designer'); ?>
+        </button>
+        <button type="button" class="button resetPrintZone">
+            <?php esc_html_e('Reset Print Zone', 'octo-print-designer'); ?>
         </button>
     </div>
 

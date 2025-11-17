@@ -490,7 +490,18 @@ class Octo_Print_Designer_Template {
                             'height' => floatval($safeZone['height'])
                         );
                     }
-    
+
+                    // Sanitize print zone
+                    if (isset($view['print_zone'])) {
+                        $printZone = json_decode(stripslashes($view['print_zone']), true);
+                        $sanitized_view['printZone'] = array(
+                            'left' => floatval($printZone['left']),
+                            'top' => floatval($printZone['top']),
+                            'width' => floatval($printZone['width']),
+                            'height' => floatval($printZone['height'])
+                        );
+                    }
+
                     // Sanitize overlay settings
                     $sanitized_view['colorOverlayEnabled'] = $view['colorOverlayEnabled'] == 1;
                     if (isset($view['overlay_opacity'])) $sanitized_view['overlayOpacity'] = floatval($view['overlay_opacity']);

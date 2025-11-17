@@ -690,7 +690,8 @@ wp_add_inline_script('octo-print-designer-designer', '
                 'overlayOpacity' => (float) (isset($view['overlayOpacity']) ? $view['overlayOpacity'] : 0),
                 'overlayColor' => sanitize_hex_color(isset($view['overlayColor']) ? $view['overlayColor'] : ''),
                 'safeZone' => $this->sanitize_zone_data(isset($view['safeZone']) ? $view['safeZone'] : array()),
-                'imageZone' => $this->sanitize_zone_data(isset($view['imageZone']) ? $view['imageZone'] : array())
+                'imageZone' => $this->sanitize_zone_data(isset($view['imageZone']) ? $view['imageZone'] : array()),
+                'printZone' => $this->sanitize_zone_data(isset($view['printZone']) ? $view['printZone'] : array())
             );
         }
 
