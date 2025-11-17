@@ -1,5 +1,5 @@
-import { Canvas, Image, Rect, ActiveSelection, filters, Group } from 'fabric';
-import { ToastManager } from './ToastManager';
+
+
 
 export class DesignerWidget {
 
@@ -29,11 +29,6 @@ export class DesignerWidget {
         this.setupModalEvents();
 
         this.toastManager = new ToastManager(this.toastContainer);
-
-        // Print Zone Editing Mode
-        this.editingMode = 'image'; // 'image', 'safezone', 'printzone'
-        this.printZoneRect = null;
-        this.safeZoneRect = null;
 
         this.init();
     }
@@ -214,7 +209,6 @@ export class DesignerWidget {
         ]);
         
         this.setupNavigationEvents();
-        this.setupModeSelectionEvents();
         this.setupUploadEvents();
         this.setupZoomControls();
         this.setupDesignerToolbar();
@@ -515,7 +509,6 @@ export class DesignerWidget {
             top: view.imageZone.top * this.fabricCanvas.height / 100,
             originX: 'center',
             originY: 'center',
-            name: 'backgroundImage'  // ← WICHTIG für spätere Erkennung
         });
 
         // 🔍 DEBUG: Detailed Print Zone Analysis
@@ -524,34 +517,36 @@ export class DesignerWidget {
             canvasHeight: this.fabricCanvas.height
         });
 
-
-        // 🔍 PRINT ZONE DEBUGGING SYSTEM
-        console.log('🎯 PRINT ZONE CREATION DEBUG:', {
-            viewData: view,
+        console.log('🔍 RAW ZONE DATA:', {
             safeZone: view.safeZone,
-            printZone: view.printZone,
-            canvasWidth: this.fabricCanvas.width,
-            canvasHeight: this.fabricCanvas.height,
-            zoneUsed: view.printZone || view.safeZone
+            printZone: view.printZone || 'nicht vorhanden'
         });
 
-        // Use printZone if available and not empty, fallback to safeZone
-        const zoneData = (view.printZone && view.printZone.left !== undefined) ? view.printZone : view.safeZone;
+        // Use printZone data if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
 
-        console.log('🔍 ZONE CALCULATIONS:', {
-            zoneData: zoneData,
-            calculatedLeft: zoneData.left * this.fabricCanvas.width / 100,
-            calculatedTop: zoneData.top * this.fabricCanvas.height / 100,
-            calculatedWidth: zoneData.width * this.fabricCanvas.width / 100,
-            calculatedHeight: zoneData.height * this.fabricCanvas.height / 100
+        console.log('🔍 VERWENDETE ZONE DATA:', zoneData);
+
+        console.log('🔍 BERECHNUNGEN (AKTUELL - MIT /100):', {
+            left_calculated: zoneData.left * this.fabricCanvas.width / 100,
+            top_calculated: zoneData.top * this.fabricCanvas.height / 100,
+            width_calculated: zoneData.width * this.fabricCanvas.width / 100,
+            height_calculated: zoneData.height * this.fabricCanvas.height / 100
+        });
+
+        console.log('🔍 BERECHNUNGEN (TEST - OHNE /100):', {
+            left_direct: zoneData.left,
+            top_direct: zoneData.top,
+            width_direct: zoneData.width,
+            height_direct: zoneData.height
         });
 
         this.printingZoneElement = new Rect({
-            ...zoneData,
             left: zoneData.left * this.fabricCanvas.width / 100,
             top: zoneData.top * this.fabricCanvas.height / 100,
             width: zoneData.width * this.fabricCanvas.width / 100,
             height: zoneData.height * this.fabricCanvas.height / 100,
+            // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
             strokeWidth: 2,
@@ -560,14 +555,6 @@ export class DesignerWidget {
             evented: false,
             originX: 'center',
             originY: 'center',
-        });
-
-        console.log('✅ PRINT ZONE ELEMENT CREATED:', {
-            element: this.printingZoneElement,
-            finalLeft: this.printingZoneElement.left,
-            finalTop: this.printingZoneElement.top,
-            finalWidth: this.printingZoneElement.width,
-            finalHeight: this.printingZoneElement.height
         });
 
         if (view.colorOverlayEnabled) {
@@ -1263,7 +1250,6 @@ export class DesignerWidget {
 
     }
 
-
     setupZoomControls() {
         let zoomTimeout;
         const minZoom = 10;  // 10%
@@ -1836,273 +1822,6 @@ export class DesignerWidget {
         this.currentView = originalView;
         
         return previews;
-    }
-
-    // 🖨️ PRINT ZONE EDITING SYSTEM
-    setupModeSelectionEvents() {
-        // Listen for mode selection buttons
-        document.addEventListener('click', (e) => {
-            const modeButton = e.target.closest('[data-mode]');
-            if (!modeButton) return;
-
-            const mode = modeButton.getAttribute('data-mode');
-            this.switchEditingMode(mode);
-
-            // Update button states
-            document.querySelectorAll('[data-mode]').forEach(btn => btn.classList.remove('active'));
-            modeButton.classList.add('active');
-        });
-
-        // Listen for reset buttons
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('.resetPrintZone')) {
-                e.preventDefault();
-                this.resetPrintZone();
-            }
-        });
-    }
-
-    switchEditingMode(mode) {
-        console.log(`🔄 Switching to ${mode} mode`);
-        this.editingMode = mode;
-
-        // Clear existing zone overlays
-        this.clearZoneOverlays();
-
-        // Set up new editing mode
-        switch (mode) {
-            case 'image':
-                this.enableImageEditing();
-                break;
-            case 'safezone':
-                this.enableSafeZoneEditing();
-                break;
-            case 'printzone':
-                this.enablePrintZoneEditing();
-                break;
-        }
-    }
-
-    enableImageEditing() {
-        // Default image editing mode - objects are selectable and movable
-        this.fabricCanvas.selection = true;
-        this.fabricCanvas.getObjects().forEach(obj => {
-            if (obj.type !== 'rect' || (!obj.isPrintZone && !obj.isSafeZone)) {
-                obj.selectable = true;
-                obj.evented = true;
-            }
-        });
-        this.fabricCanvas.renderAll();
-    }
-
-    enableSafeZoneEditing() {
-        this.fabricCanvas.selection = false;
-
-        // Hide other objects
-        this.fabricCanvas.getObjects().forEach(obj => {
-            if (!obj.isSafeZone) {
-                obj.selectable = false;
-                obj.evented = false;
-            }
-        });
-
-        this.showSafeZoneOverlay();
-        this.fabricCanvas.renderAll();
-    }
-
-    enablePrintZoneEditing() {
-        this.fabricCanvas.selection = false;
-
-        // Hide other objects
-        this.fabricCanvas.getObjects().forEach(obj => {
-            if (!obj.isPrintZone) {
-                obj.selectable = false;
-                obj.evented = false;
-            }
-        });
-
-        this.showPrintZoneOverlay();
-        this.fabricCanvas.renderAll();
-    }
-
-    showPrintZoneOverlay() {
-        if (this.printZoneRect) {
-            this.fabricCanvas.remove(this.printZoneRect);
-        }
-
-        const view = this.getCurrentViewData();
-        if (!view) return;
-
-        // Use existing printZone data or create default based on safeZone
-        const printZoneData = view.printZone || {
-            left: view.safeZone?.left || 45,
-            top: view.safeZone?.top || 40,
-            width: (view.safeZone?.width || 240) + 20, // Slightly larger than safe zone
-            height: (view.safeZone?.height || 320) + 40
-        };
-
-        this.printZoneRect = new Rect({
-            left: printZoneData.left * this.fabricCanvas.width / 100,
-            top: printZoneData.top * this.fabricCanvas.height / 100,
-            width: printZoneData.width * this.fabricCanvas.width / 100,
-            height: printZoneData.height * this.fabricCanvas.height / 100,
-            fill: 'rgba(255, 0, 0, 0.2)',
-            stroke: '#ff0000',
-            strokeWidth: 2,
-            strokeDashArray: [5, 5],
-            selectable: true,
-            evented: true,
-            isPrintZone: true
-        });
-
-        this.fabricCanvas.add(this.printZoneRect);
-        this.fabricCanvas.setActiveObject(this.printZoneRect);
-
-        // Listen for modifications
-        this.printZoneRect.on('modified', () => this.onPrintZoneModified());
-
-        this.fabricCanvas.renderAll();
-
-        console.log('🖨️ Print Zone Overlay created:', printZoneData);
-    }
-
-    showSafeZoneOverlay() {
-        if (this.safeZoneRect) {
-            this.fabricCanvas.remove(this.safeZoneRect);
-        }
-
-        const view = this.getCurrentViewData();
-        if (!view || !view.safeZone) return;
-
-        this.safeZoneRect = new Rect({
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
-            width: view.safeZone.width * this.fabricCanvas.width / 100,
-            height: view.safeZone.height * this.fabricCanvas.height / 100,
-            fill: 'rgba(0, 255, 0, 0.2)',
-            stroke: '#00ff00',
-            strokeWidth: 2,
-            strokeDashArray: [5, 5],
-            selectable: true,
-            evented: true,
-            isSafeZone: true
-        });
-
-        this.fabricCanvas.add(this.safeZoneRect);
-        this.fabricCanvas.setActiveObject(this.safeZoneRect);
-
-        this.fabricCanvas.renderAll();
-    }
-
-    clearZoneOverlays() {
-        if (this.printZoneRect) {
-            this.fabricCanvas.remove(this.printZoneRect);
-            this.printZoneRect = null;
-        }
-        if (this.safeZoneRect) {
-            this.fabricCanvas.remove(this.safeZoneRect);
-            this.safeZoneRect = null;
-        }
-    }
-
-    onPrintZoneModified() {
-        if (!this.printZoneRect) return;
-
-        const printZoneData = {
-            left: (this.printZoneRect.left / this.fabricCanvas.width) * 100,
-            top: (this.printZoneRect.top / this.fabricCanvas.height) * 100,
-            width: (this.printZoneRect.width * this.printZoneRect.scaleX / this.fabricCanvas.width) * 100,
-            height: (this.printZoneRect.height * this.printZoneRect.scaleY / this.fabricCanvas.height) * 100
-        };
-
-        console.log('🖨️ Print Zone Modified:', printZoneData);
-
-        // Save print zone data to view
-        this.savePrintZoneToView(printZoneData);
-    }
-
-    savePrintZoneToView(printZoneData) {
-        const template = this.templates.get(this.activeTemplateId);
-        if (!template) return;
-
-        const variation = template.variations.get(this.currentVariation.toString());
-        if (!variation) return;
-
-        const view = variation.views.get(this.currentView.toString());
-        if (!view) return;
-
-        // Update view with print zone data
-        view.printZone = printZoneData;
-
-        console.log('💾 Print Zone saved to view:', view.name, printZoneData);
-
-        // Trigger save to database
-        this.savePrintZoneToDatabase(printZoneData);
-    }
-
-    async savePrintZoneToDatabase(printZoneData) {
-        try {
-            const response = await fetch(window.octoPrintDesigner.ajaxurl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    action: 'save_template_print_zone',
-                    nonce: window.octoPrintDesigner.nonce,
-                    template_id: this.activeTemplateId,
-                    variation_id: this.currentVariation,
-                    view_id: this.currentView,
-                    print_zone: JSON.stringify(printZoneData)
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.toastManager.show('Print Zone saved successfully!', 'success');
-                console.log('✅ Print Zone saved to database');
-            } else {
-                this.toastManager.show('Failed to save Print Zone: ' + result.data, 'error');
-                console.error('❌ Failed to save Print Zone:', result.data);
-            }
-        } catch (error) {
-            console.error('❌ Error saving Print Zone:', error);
-            this.toastManager.show('Error saving Print Zone', 'error');
-        }
-    }
-
-    resetPrintZone() {
-        const view = this.getCurrentViewData();
-        if (!view) return;
-
-        // Reset to default based on safe zone
-        const defaultPrintZone = {
-            left: view.safeZone?.left || 45,
-            top: view.safeZone?.top || 40,
-            width: (view.safeZone?.width || 240) + 20,
-            height: (view.safeZone?.height || 320) + 40
-        };
-
-        console.log('🔄 Resetting Print Zone to default:', defaultPrintZone);
-
-        this.savePrintZoneToView(defaultPrintZone);
-
-        if (this.editingMode === 'printzone') {
-            this.showPrintZoneOverlay(); // Refresh overlay
-        }
-
-        this.toastManager.show('Print Zone reset to default', 'info');
-    }
-
-    getCurrentViewData() {
-        const template = this.templates.get(this.activeTemplateId);
-        if (!template) return null;
-
-        const variation = template.variations.get(this.currentVariation.toString());
-        if (!variation) return null;
-
-        return variation.views.get(this.currentView.toString());
     }
 
 }

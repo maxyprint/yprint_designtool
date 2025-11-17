@@ -15,6 +15,10 @@ class Octo_Print_Designer_Designer {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_design', $this, 'handle_save_design');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_load_design', $this, 'handle_load_design');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_user_designs', $this, 'get_user_designs');
+
+        // Print Zone AJAX handlers
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_template_print_zone', $this, 'handle_save_template_print_zone');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_nopriv_save_template_print_zone', $this, 'handle_save_template_print_zone');
     }
 
     
@@ -931,4 +935,97 @@ wp_add_inline_script('octo-print-designer-designer', '
 
     // 🎯 CLEAN SYSTEM: Design loading functionality moved to designer.bundle.js
     // No separate design-loader script needed in clean 5-script architecture
+
+    /**
+     * Handle AJAX request to save Print Zone data to template variations
+     */
+    public function handle_save_template_print_zone() {
+        // Verify nonce
+        if (!check_ajax_referer('octo_print_designer_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        // Get and validate parameters
+        $template_id = intval($_POST['template_id']);
+        $variation_id = intval($_POST['variation_id']);
+        $view_id = intval($_POST['view_id']);
+        $print_zone_json = sanitize_text_field($_POST['print_zone']);
+
+        if (!$template_id || !$variation_id || !$view_id || !$print_zone_json) {
+            wp_send_json_error('Missing required parameters');
+            return;
+        }
+
+        // Decode and validate print zone data
+        $print_zone_data = json_decode($print_zone_json, true);
+        if (!$print_zone_data || !is_array($print_zone_data)) {
+            wp_send_json_error('Invalid print zone data');
+            return;
+        }
+
+        // Validate print zone structure
+        $required_fields = ['left', 'top', 'width', 'height'];
+        foreach ($required_fields as $field) {
+            if (!isset($print_zone_data[$field]) || !is_numeric($print_zone_data[$field])) {
+                wp_send_json_error("Missing or invalid field: {$field}");
+                return;
+            }
+        }
+
+        // Sanitize print zone data
+        $sanitized_print_zone = [
+            'left' => floatval($print_zone_data['left']),
+            'top' => floatval($print_zone_data['top']),
+            'width' => floatval($print_zone_data['width']),
+            'height' => floatval($print_zone_data['height'])
+        ];
+
+        // Get current template variations
+        $variations = get_post_meta($template_id, '_template_variations', true);
+        if (!$variations || !is_array($variations)) {
+            wp_send_json_error('Template variations not found');
+            return;
+        }
+
+        // Update the specific view with print zone data
+        $updated = false;
+        foreach ($variations as $var_id => $variation) {
+            if ($var_id == $variation_id && isset($variation['views'][$view_id])) {
+                $variations[$var_id]['views'][$view_id]['printZone'] = $sanitized_print_zone;
+                $updated = true;
+                break;
+            }
+        }
+
+        if (!$updated) {
+            wp_send_json_error('View not found in template variations');
+            return;
+        }
+
+        // Save updated variations to database
+        $result = update_post_meta($template_id, '_template_variations', $variations);
+
+        if ($result === false) {
+            wp_send_json_error('Failed to save print zone to database');
+            return;
+        }
+
+        // Log success
+        error_log("✅ Print Zone saved: Template {$template_id}, Variation {$variation_id}, View {$view_id}");
+
+        wp_send_json_success([
+            'message' => 'Print zone saved successfully',
+            'print_zone' => $sanitized_print_zone,
+            'template_id' => $template_id,
+            'variation_id' => $variation_id,
+            'view_id' => $view_id
+        ]);
+    }
 }
