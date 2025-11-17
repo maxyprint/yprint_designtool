@@ -201,6 +201,7 @@ class DesignerWidget {
         this.tempImageCounter = 0;
         this.isLoggedIn = window.octoPrintDesigner?.isLoggedIn || false;
         this.isPrintingVisible = true; // Print Zone standardmäßig sichtbar
+        console.log('🎯 INITIAL isPrintingVisible set to:', this.isPrintingVisible);
         
         window.addEventListener('resize', () => this.handleResize());
 
@@ -771,10 +772,29 @@ class DesignerWidget {
             console.log('📋 All objects:', objects.map(obj => ({type: obj.type, left: obj.left, top: obj.top})));
         }
 
+        // 🔍 PRINT ZONE DEBUG - Canvas & Template Data
+        console.log('🔍 PRINT ZONE DEBUG START:');
+        console.log('📐 Canvas dimensions:', this.fabricCanvas.width, 'x', this.fabricCanvas.height);
+        console.log('📊 SafeZone data:', view.safeZone);
+        console.log('🏗️ Current template ID:', this.activeTemplateId);
+        console.log('🔢 Current variation:', this.currentVariation);
+        console.log('👀 Current view:', this.currentView);
+        console.log('🎨 Fabric version:', fabric.version);
+        console.log('📏 Canvas zoom:', this.fabricCanvas.getZoom());
+
+        // Calculate coordinates
+        const calculatedLeft = view.safeZone.left * this.fabricCanvas.width / 100;
+        const calculatedTop = view.safeZone.top * this.fabricCanvas.height / 100;
+        console.log('🧮 Calculated coordinates:');
+        console.log('  - left:', calculatedLeft, '(from', view.safeZone.left + '%)');
+        console.log('  - top:', calculatedTop, '(from', view.safeZone.top + '%)');
+        console.log('  - width from spread:', view.safeZone.width, '(should be %)');
+        console.log('  - height from spread:', view.safeZone.height, '(should be %)');
+
         this.printingZoneElement = new Rect({
             ...view.safeZone,
-            left: view.safeZone.left * this.fabricCanvas.width / 100,
-            top: view.safeZone.top * this.fabricCanvas.height / 100,
+            left: calculatedLeft,
+            top: calculatedTop,
             // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
@@ -784,6 +804,17 @@ class DesignerWidget {
             evented: false,
             excludeFromExport: true
         });
+
+        // Debug the created element
+        console.log('✅ Print zone element created:');
+        console.log('  - Final position:', this.printingZoneElement.left, ',', this.printingZoneElement.top);
+        console.log('  - Final size:', this.printingZoneElement.width, 'x', this.printingZoneElement.height);
+        console.log('  - Style properties:', {
+            fill: this.printingZoneElement.fill,
+            stroke: this.printingZoneElement.stroke,
+            strokeWidth: this.printingZoneElement.strokeWidth
+        });
+        console.log('🔍 PRINT ZONE DEBUG END');
 
         if (view.colorOverlayEnabled) {
 
@@ -1483,11 +1514,30 @@ class DesignerWidget {
         this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
 
         this.togglePrintZoneButton.addEventListener('click', () => {
+            console.log('🔘 PRINT ZONE TOGGLE DEBUG START:');
+            console.log('  - Before toggle: isPrintingVisible =', this.isPrintingVisible);
+
             this.isPrintingVisible = !this.isPrintingVisible || false;
+
+            console.log('  - After toggle: isPrintingVisible =', this.isPrintingVisible);
+            console.log('  - printingZoneElement exists:', !!this.printingZoneElement);
+            console.log('  - Canvas objects before:', this.fabricCanvas.getObjects().length);
+
             this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
-            if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
-            else this.fabricCanvas.remove(this.printingZoneElement);
+
+            if( this.isPrintingVisible ) {
+                console.log('  ✅ Adding print zone to canvas');
+                this.fabricCanvas.add(this.printingZoneElement);
+                console.log('  - Print zone position on canvas:', this.printingZoneElement.left, ',', this.printingZoneElement.top);
+                console.log('  - Print zone size on canvas:', this.printingZoneElement.width, 'x', this.printingZoneElement.height);
+            } else {
+                console.log('  ❌ Removing print zone from canvas');
+                this.fabricCanvas.remove(this.printingZoneElement);
+            }
+
+            console.log('  - Canvas objects after:', this.fabricCanvas.getObjects().length);
             this.fabricCanvas.renderAll();
+            console.log('🔘 PRINT ZONE TOGGLE DEBUG END');
         });
     }
 
