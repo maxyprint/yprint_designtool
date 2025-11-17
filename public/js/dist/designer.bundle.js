@@ -2379,12 +2379,12 @@ class DesignerWidget {
 
         console.log('🔍 Clipping zone data:', zoneData);
 
-        // Erstelle Clipping-Rechteck für die Print Zone (Zone-Daten sind bereits Pixel-Werte)
+        // Erstelle Clipping-Rechteck für die Print Zone (Konvertiere % zu Pixel)
         const clipRect = new fabric.Rect({
-            left: zoneData.left,
-            top: zoneData.top,
-            width: zoneData.width,
-            height: zoneData.height,
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
             originX: 'center',
             originY: 'center',
             absolutePositioned: true
