@@ -529,8 +529,8 @@ export class DesignerWidget {
             zoneUsed: view.printZone || view.safeZone
         });
 
-        // Use printZone if available, fallback to safeZone
-        const zoneData = view.printZone || view.safeZone;
+        // Use printZone if available and not empty, fallback to safeZone
+        const zoneData = (view.printZone && view.printZone.left !== undefined) ? view.printZone : view.safeZone;
 
         console.log('🔍 ZONE CALCULATIONS:', {
             zoneData: zoneData,
