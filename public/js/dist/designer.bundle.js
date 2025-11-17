@@ -775,16 +775,13 @@ class DesignerWidget {
             ...view.safeZone,
             left: view.safeZone.left * this.fabricCanvas.width / 100,
             top: view.safeZone.top * this.fabricCanvas.height / 100,
-            width: view.safeZone.width * this.fabricCanvas.width / 100,
-            height: view.safeZone.height * this.fabricCanvas.height / 100,
+            // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
             strokeWidth: 2,
             strokeDashArray: [10, 5],
             selectable: false,
             evented: false,
-            hoverCursor: 'default',
-            moveCursor: 'default',
             excludeFromExport: true
         });
 
