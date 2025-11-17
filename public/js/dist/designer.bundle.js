@@ -2385,8 +2385,8 @@ class DesignerWidget {
             top: zoneData.top * this.fabricCanvas.height / 100,
             width: zoneData.width * this.fabricCanvas.width / 100,
             height: zoneData.height * this.fabricCanvas.height / 100,
-            originX: 'center',
-            originY: 'center',
+            originX: 'left',
+            originY: 'top',
             absolutePositioned: true
         });
 
