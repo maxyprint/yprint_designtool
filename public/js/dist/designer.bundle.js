@@ -782,19 +782,127 @@ class DesignerWidget {
         console.log('🎨 Fabric version:', fabric.version);
         console.log('📏 Canvas zoom:', this.fabricCanvas.getZoom());
 
+        // 🔍 COMPREHENSIVE PRINT ZONE DEBUGGING - EXTENDED ANALYSIS
+        console.log('=== 🔍 EXTENDED PRINT ZONE ANALYSIS START ===');
+
+        // 1. RAW DATA ANALYSIS
+        console.log('📊 RAW SAFEZONE DATA:', view.safeZone);
+        console.log('📊 RAW PRINTZONE DATA:', view.printZone);
+        console.log('📊 CANVAS DIMENSIONS:', {
+            width: this.fabricCanvas.width,
+            height: this.fabricCanvas.height,
+            viewportTransform: this.fabricCanvas.viewportTransform
+        });
+
+        // 2. DATA TYPE DETECTION
+        console.log('🔍 DATA TYPE ANALYSIS:');
+        console.log('  - safeZone.left type:', typeof view.safeZone.left, 'value:', view.safeZone.left);
+        console.log('  - safeZone.top type:', typeof view.safeZone.top, 'value:', view.safeZone.top);
+        console.log('  - safeZone.width type:', typeof view.safeZone.width, 'value:', view.safeZone.width);
+        console.log('  - safeZone.height type:', typeof view.safeZone.height, 'value:', view.safeZone.height);
+
+        // 3. PERCENTAGE vs PIXEL DETECTION
+        const isLikelyPercent = (value, dimension) => {
+            if (value <= 1) return 'DECIMAL_PERCENT (0-1)';
+            if (value <= 100) return 'PERCENT (0-100)';
+            if (value < dimension) return 'PIXEL (absolute)';
+            return 'UNKNOWN/INVALID';
+        };
+
+        console.log('🔍 VALUE FORMAT DETECTION:');
+        console.log('  - left format:', isLikelyPercent(view.safeZone.left, this.fabricCanvas.width));
+        console.log('  - top format:', isLikelyPercent(view.safeZone.top, this.fabricCanvas.height));
+        console.log('  - width format:', isLikelyPercent(view.safeZone.width, this.fabricCanvas.width));
+        console.log('  - height format:', isLikelyPercent(view.safeZone.height, this.fabricCanvas.height));
+
+        // 4. DIFFERENT CALCULATION SCENARIOS
+        console.log('🧮 CALCULATION SCENARIOS:');
+
+        // Scenario A: Current logic (treat as percent)
+        const scenarioA = {
+            left: view.safeZone.left * this.fabricCanvas.width / 100,
+            top: view.safeZone.top * this.fabricCanvas.height / 100,
+            width: view.safeZone.width * this.fabricCanvas.width / 100,
+            height: view.safeZone.height * this.fabricCanvas.height / 100
+        };
+        console.log('  A (current/percent):', scenarioA);
+
+        // Scenario B: Treat as pixels
+        const scenarioB = {
+            left: view.safeZone.left,
+            top: view.safeZone.top,
+            width: view.safeZone.width,
+            height: view.safeZone.height
+        };
+        console.log('  B (direct/pixel):', scenarioB);
+
+        // Scenario C: Treat as decimal percent (0-1)
+        const scenarioC = {
+            left: view.safeZone.left * this.fabricCanvas.width,
+            top: view.safeZone.top * this.fabricCanvas.height,
+            width: view.safeZone.width * this.fabricCanvas.width,
+            height: view.safeZone.height * this.fabricCanvas.height
+        };
+        console.log('  C (decimal percent):', scenarioC);
+
+        // 5. BOUNDS CHECKING
+        console.log('🔍 BOUNDS VALIDATION:');
+        const checkBounds = (scenario, name) => {
+            const valid = {
+                left: scenario.left >= 0 && scenario.left <= this.fabricCanvas.width,
+                top: scenario.top >= 0 && scenario.top <= this.fabricCanvas.height,
+                right: (scenario.left + scenario.width) <= this.fabricCanvas.width,
+                bottom: (scenario.top + scenario.height) <= this.fabricCanvas.height
+            };
+            const allValid = Object.values(valid).every(v => v);
+            console.log(`  ${name}: valid=${allValid}`, valid);
+            return allValid;
+        };
+
+        const validA = checkBounds(scenarioA, 'Scenario A');
+        const validB = checkBounds(scenarioB, 'Scenario B');
+        const validC = checkBounds(scenarioC, 'Scenario C');
+
+        // 6. SMART SELECTION
+        console.log('🎯 SMART SELECTION LOGIC:');
+        let selectedScenario;
+        let selectionReason;
+
+        if (validB && !validA && !validC) {
+            selectedScenario = scenarioB;
+            selectionReason = 'Only Scenario B (pixels) has valid bounds';
+        } else if (validA && !validB && !validC) {
+            selectedScenario = scenarioA;
+            selectionReason = 'Only Scenario A (percent) has valid bounds';
+        } else if (validC && !validA && !validB) {
+            selectedScenario = scenarioC;
+            selectionReason = 'Only Scenario C (decimal) has valid bounds';
+        } else {
+            // Multiple valid scenarios - use heuristics
+            if (view.safeZone.left <= 100 && view.safeZone.width <= 100) {
+                selectedScenario = scenarioA;
+                selectionReason = 'Values ≤100 suggest percentage format';
+            } else {
+                selectedScenario = scenarioB;
+                selectionReason = 'Values >100 suggest pixel format';
+            }
+        }
+
+        console.log('✅ SELECTED:', selectionReason);
+        console.log('📍 FINAL COORDINATES:', selectedScenario);
+        console.log('=== 🔍 EXTENDED PRINT ZONE ANALYSIS END ===');
+
         // Calculate coordinates
-        const calculatedLeft = view.safeZone.left * this.fabricCanvas.width / 100;
-        const calculatedTop = view.safeZone.top * this.fabricCanvas.height / 100;
-        console.log('🧮 Calculated coordinates:');
-        console.log('  - left:', calculatedLeft, '(from', view.safeZone.left + '%)');
-        console.log('  - top:', calculatedTop, '(from', view.safeZone.top + '%)');
-        console.log('  - width from spread:', view.safeZone.width, '(should be %)');
-        console.log('  - height from spread:', view.safeZone.height, '(should be %)');
+        const calculatedLeft = selectedScenario.left;
+        const calculatedTop = selectedScenario.top;
+        const calculatedWidth = selectedScenario.width;
+        const calculatedHeight = selectedScenario.height;
 
         this.printingZoneElement = new Rect({
-            ...view.safeZone,
             left: calculatedLeft,
             top: calculatedTop,
+            width: calculatedWidth,
+            height: calculatedHeight,
             // fill: 'rgba(0, 124, 186, 0.2)',
             fill: 'transparent',
             stroke: '#007cba',
