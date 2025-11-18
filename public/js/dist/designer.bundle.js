@@ -832,8 +832,71 @@ class DesignerWidget {
             }
         });
 
+        console.log('🎯 VISUAL POSITION EXPECTATIONS:');
+        console.log('  - Current position creates box from:', calculatedLeft,
+        'to', (calculatedLeft + calculatedWidth));
+        console.log('  - Current position creates box from:', calculatedTop, 'to',
+         (calculatedTop + calculatedHeight));
+        console.log('  - Expected center position (for ~50% left):',
+        this.fabricCanvas.width * 0.5);
+        console.log('  - Expected center position (for ~45% top):',
+        this.fabricCanvas.height * 0.45);
+        console.log('  - Distance from expected center:', {
+            leftOffset: calculatedLeft - (this.fabricCanvas.width * 0.5),
+            topOffset: calculatedTop - (this.fabricCanvas.height * 0.45)
+        });
+
+        // Test alternative positioning approaches
+        console.log('🧪 ALTERNATIVE POSITIONING TESTS:');
+        console.log('  - A) Centered approach:', {
+            left: (this.fabricCanvas.width - calculatedWidth) * (49.625/100),
+            top: (this.fabricCanvas.height - calculatedHeight) * (45.4/100)
+        });
+        console.log('  - B) Container relative:', {
+            left: this.fabricCanvas.width * (49.625/100) - (calculatedWidth/2),
+            top: this.fabricCanvas.height * (45.4/100) - (calculatedHeight/2)
+        });
+
         if (!boundsValid) {
             console.warn('⚠️ WARNING: Print zone extends outside canvas boundaries!');
+        }
+
+        console.log('🔍 FABRIC CANVAS COORDINATE SYSTEM ANALYSIS:');
+        console.log('  - Canvas element position:',
+        this.fabricCanvas.getElement().getBoundingClientRect());
+        console.log('  - Canvas offset parent:',
+        this.fabricCanvas.getElement().offsetParent);
+        console.log('  - Canvas transform matrix:',
+        this.fabricCanvas.viewportTransform);
+        console.log('  - Canvas center point:', this.fabricCanvas.getCenter());
+        console.log('  - Canvas absolute dimensions:', {
+            width: this.fabricCanvas.width,
+            height: this.fabricCanvas.height,
+            getWidth: this.fabricCanvas.getWidth(),
+            getHeight: this.fabricCanvas.getHeight()
+        });
+
+        const backgroundObjects = this.fabricCanvas.getObjects().filter(obj =>
+        obj.type === 'image');
+        console.log('🖼️ BACKGROUND IMAGE ANALYSIS:');
+        console.log('  - Found background images:', backgroundObjects.length);
+        if (backgroundObjects.length > 0) {
+            const bgImg = backgroundObjects[0];
+            console.log('  - Image position:', {left: bgImg.left, top:
+        bgImg.top});
+            console.log('  - Image dimensions:', {width: bgImg.width, height:
+        bgImg.height});
+            console.log('  - Image scale:', {scaleX: bgImg.scaleX, scaleY:
+        bgImg.scaleY});
+            console.log('  - Image bounds:', bgImg.getBoundingRect());
+            console.log('  - Should print zone be relative to image?', {
+                imageLeft: bgImg.left,
+                imageTop: bgImg.top,
+                zoneShouldBe: {
+                    left: bgImg.left + (49.625/100 * bgImg.width * bgImg.scaleX),
+                    top: bgImg.top + (45.4/100 * bgImg.height * bgImg.scaleY)
+                }
+            });
         }
 
         console.log('=== 🎯 SSOT CALCULATION COMPLETE ===');
