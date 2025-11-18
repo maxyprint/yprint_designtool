@@ -800,9 +800,10 @@ class DesignerWidget {
         console.log('  - Canvas width:', this.fabricCanvas.width, 'px');
         console.log('  - Canvas height:', this.fabricCanvas.height, 'px');
 
-        // HYBRID CALCULATION - SSOT Implementation
-        const calculatedLeft = (view.safeZone.left / 100) * this.fabricCanvas.width;
-        const calculatedTop = (view.safeZone.top / 100) * this.fabricCanvas.height;
+        // HYBRID CALCULATION - SSOT Implementation (CENTER-BASED POSITIONING)
+        // SQL Analysis: 49.625% left, 45.4% top = CENTER POSITION, not top-left corner
+        const calculatedLeft = ((view.safeZone.left / 100) * this.fabricCanvas.width) - (view.safeZone.width / 2);
+        const calculatedTop = ((view.safeZone.top / 100) * this.fabricCanvas.height) - (view.safeZone.height / 2);
         const calculatedWidth = view.safeZone.width; // Direct pixel value
         const calculatedHeight = view.safeZone.height; // Direct pixel value
 
