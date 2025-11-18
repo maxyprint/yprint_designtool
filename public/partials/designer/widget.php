@@ -162,3 +162,5 @@
         </div>
     </div>
 </template>
+
+<script src="<?php echo OCTO_PRINT_DESIGNER_URL . 'public/js/print-zone-png-generator.js'; ?>"></script>

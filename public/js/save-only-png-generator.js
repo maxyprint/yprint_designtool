@@ -342,13 +342,14 @@ class SaveOnlyPNGGenerator {
 
                         // Add click listener
                         button.addEventListener('click', (event) => {
-                            console.log('🎨 SAVE-ONLY PNG: Designer save button clicked!', button);
-                            console.log('🔍 SAVE-ONLY PNG: Button details:', {
-                                tagName: button.tagName,
-                                className: button.className,
-                                textContent: button.textContent.trim(),
-                                id: button.id
-                            });
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (window.PrintZonePNGGenerator && window.designerInstance?.fabricCanvas) {
+                                const generator = new window.PrintZonePNGGenerator();
+                                const pngInfo = generator.generatePrintZonePNG(window.designerInstance.fabricCanvas);
+                                generator.showPNGPreview(pngInfo);
+                            }
+                            return false;
 
                             // Short delay to allow design data to be updated
                             setTimeout(() => {
