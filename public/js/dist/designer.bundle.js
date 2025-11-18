@@ -899,6 +899,117 @@ class DesignerWidget {
             });
         }
 
+        // 🔍 ENHANCED CANVAS STATE ANALYSIS
+        console.log('=== 🔍 ENHANCED CANVAS STATE ANALYSIS ===');
+
+        // 1. Complete Canvas Object Analysis
+        const allCanvasObjects = this.fabricCanvas.getObjects();
+        console.log('📋 COMPLETE CANVAS INVENTORY:');
+        console.log(`  - Total objects: ${allCanvasObjects.length}`);
+
+        allCanvasObjects.forEach((obj, index) => {
+            const boundingRect = obj.getBoundingRect();
+            console.log(`  📦 Object ${index + 1}: ${obj.type} at (${obj.left}, ${obj.top})`, {
+                width: obj.width,
+                height: obj.height,
+                scaleX: obj.scaleX,
+                scaleY: obj.scaleY,
+                visible: obj.visible,
+                selectable: obj.selectable,
+                evented: obj.evented,
+                boundingRect: boundingRect,
+                isFabricImage: obj.type === 'image',
+                hasSourceProperty: !!(obj.src || obj._element),
+                data: obj.data || 'none'
+            });
+        });
+
+        // 2. Canvas Background Analysis
+        console.log('🖼️ DETAILED CANVAS BACKGROUND ANALYSIS:');
+        console.log('  - backgroundImage exists:', !!this.fabricCanvas.backgroundImage);
+        console.log('  - backgroundColor:', this.fabricCanvas.backgroundColor);
+        console.log('  - overlayImage exists:', !!this.fabricCanvas.overlayImage);
+
+        if (this.fabricCanvas.backgroundImage) {
+            const bgImg = this.fabricCanvas.backgroundImage;
+            console.log('  🖼️ Canvas Background Image Details:', {
+                src: (bgImg.src || '').substring(0, 100) + '...',
+                left: bgImg.left,
+                top: bgImg.top,
+                width: bgImg.width,
+                height: bgImg.height,
+                scaleX: bgImg.scaleX,
+                scaleY: bgImg.scaleY,
+                originX: bgImg.originX,
+                originY: bgImg.originY,
+                visible: bgImg.visible,
+                bounds: bgImg.getBoundingRect()
+            });
+        }
+
+        // 3. Template View Background Analysis
+        console.log('🖼️ TEMPLATE VIEW BACKGROUND ANALYSIS:');
+        console.log('  - Template ID:', this.activeTemplateId);
+        console.log('  - Current variation:', this.currentVariation);
+        console.log('  - Current view:', this.currentView);
+        console.log('  - View imageZone:', view.imageZone);
+
+        // 4. Actual Rendered Print Zone Analysis
+        console.log('🎯 RENDERED PRINT ZONE VERIFICATION:');
+        const printZoneObjects = allCanvasObjects.filter(obj =>
+            obj.stroke === '#007cba' ||
+            (obj.fill && obj.fill.includes('rgba')) ||
+            obj.isPrintZone === true
+        );
+
+        console.log(`  - Found print zone objects: ${printZoneObjects.length}`);
+        printZoneObjects.forEach((zone, index) => {
+            console.log(`  🎯 Print Zone ${index + 1}:`, {
+                left: zone.left,
+                top: zone.top,
+                width: zone.width,
+                height: zone.height,
+                actualBounds: zone.getBoundingRect(),
+                stroke: zone.stroke,
+                fill: zone.fill
+            });
+        });
+
+        // 5. Position Verification vs Expected
+        console.log('🔍 POSITION VERIFICATION ANALYSIS:');
+        console.log('  📊 Expected position (SSOT calculation):');
+        console.log(`    Left: ${calculatedLeft}px (${view.safeZone.left}% of ${this.fabricCanvas.width}px)`);
+        console.log(`    Top: ${calculatedTop}px (${view.safeZone.top}% of ${this.fabricCanvas.height}px)`);
+        console.log(`    Width: ${calculatedWidth}px (direct pixel value)`);
+        console.log(`    Height: ${calculatedHeight}px (direct pixel value)`);
+
+        if (printZoneObjects.length > 0) {
+            const actualZone = printZoneObjects[0];
+            const leftDiff = actualZone.left - calculatedLeft;
+            const topDiff = actualZone.top - calculatedTop;
+            console.log('  📏 Position difference (actual vs expected):');
+            console.log(`    Left diff: ${leftDiff}px`);
+            console.log(`    Top diff: ${topDiff}px`);
+            console.log(`    ${leftDiff === 0 && topDiff === 0 ? '✅ Position matches' : '❌ Position mismatch'}`);
+        }
+
+        // 6. Canvas Context Analysis
+        console.log('🖼️ CANVAS CONTEXT VERIFICATION:');
+        const canvasElement = this.fabricCanvas.getElement();
+        const canvasRect = canvasElement.getBoundingClientRect();
+        console.log('  - Canvas DOM position:', {
+            left: canvasRect.left,
+            top: canvasRect.top,
+            width: canvasRect.width,
+            height: canvasRect.height
+        });
+        console.log('  - Fabric canvas dimensions:', {
+            width: this.fabricCanvas.width,
+            height: this.fabricCanvas.height
+        });
+        console.log('  - Canvas viewport transform:', this.fabricCanvas.viewportTransform);
+
+        console.log('=== END ENHANCED CANVAS STATE ANALYSIS ===');
         console.log('=== 🎯 SSOT CALCULATION COMPLETE ===');
 
         this.printingZoneElement = new Rect({
