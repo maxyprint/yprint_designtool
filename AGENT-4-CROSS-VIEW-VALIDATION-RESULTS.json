@@ -1,0 +1,185 @@
+{
+    "data_structure_analysis": {
+        "status": "PASSED",
+        "execution_time_ms": 0.34,
+        "analysis_results": {
+            "total_views": 3,
+            "total_lines": 4,
+            "measurement_keys": {
+                "0": "A",
+                "1": "C",
+                "3": "D"
+            },
+            "bridge_versions": {
+                "0": "2.1",
+                "2": "2.0"
+            },
+            "consistency_score": 78
+        },
+        "views_detected": 3,
+        "total_reference_lines": 4,
+        "measurement_keys_found": {
+            "0": "A",
+            "1": "C",
+            "3": "D"
+        }
+    },
+    "cross_view_validation": {
+        "status": "PASSED",
+        "execution_time_ms": 0,
+        "validation_results": {
+            "validation_data": {
+                "front_view": {
+                    "validated": true,
+                    "score": 90,
+                    "conflicts": [],
+                    "sync_status": "synchronized"
+                },
+                "side_view": {
+                    "validated": false,
+                    "score": 65,
+                    "conflicts": [
+                        {
+                            "type": "length_inconsistency",
+                            "severity": "high",
+                            "description": "Length variance 5px exceeds threshold 1.8px",
+                            "view_id": "side_view",
+                            "measurement_key": "A"
+                        },
+                        {
+                            "type": "precision_inconsistency",
+                            "severity": "medium",
+                            "description": "Precision level variance: 0.2",
+                            "view_id": "side_view",
+                            "measurement_key": "A"
+                        },
+                        {
+                            "type": "version_mismatch",
+                            "severity": "low",
+                            "description": "Mixed bridge versions: 2.1, 2.0",
+                            "view_id": "side_view",
+                            "measurement_key": "A"
+                        }
+                    ],
+                    "sync_status": "partially_synchronized"
+                }
+            },
+            "conflicts": [
+                {
+                    "type": "length_inconsistency",
+                    "severity": "high",
+                    "description": "Length variance 5px exceeds threshold 1.8px",
+                    "view_id": "side_view",
+                    "measurement_key": "A"
+                },
+                {
+                    "type": "precision_inconsistency",
+                    "severity": "medium",
+                    "description": "Precision level variance: 0.2",
+                    "view_id": "side_view",
+                    "measurement_key": "A"
+                },
+                {
+                    "type": "version_mismatch",
+                    "severity": "low",
+                    "description": "Mixed bridge versions: 2.1, 2.0",
+                    "view_id": "side_view",
+                    "measurement_key": "A"
+                }
+            ],
+            "overall_score": 77.5,
+            "synchronization_health": {
+                "health_percentage": 50,
+                "overall_health": "poor"
+            }
+        },
+        "conflicts_detected": 3,
+        "overall_validation_score": 77.5,
+        "synchronization_health": {
+            "health_percentage": 50,
+            "overall_health": "poor"
+        }
+    },
+    "conflict_resolution": {
+        "status": "PASSED",
+        "execution_time_ms": 0,
+        "total_conflicts_tested": 3,
+        "conflicts_resolved": 3,
+        "success_rate": 100,
+        "resolution_results": {
+            "precision_inconsistency": {
+                "resolved": true,
+                "method": "precision_inconsistency_resolution",
+                "execution_time_ms": 23
+            },
+            "length_inconsistency": {
+                "resolved": true,
+                "method": "length_inconsistency_resolution",
+                "execution_time_ms": 15
+            },
+            "version_mismatch": {
+                "resolved": true,
+                "method": "version_mismatch_resolution",
+                "execution_time_ms": 24
+            }
+        }
+    },
+    "performance_optimization": {
+        "status": "PASSED",
+        "execution_time_ms": 0.75,
+        "processing_time_ms": 0.65,
+        "dataset_size": {
+            "views": 50,
+            "total_lines": 500
+        },
+        "memory_metrics": {
+            "memory_impact_kb": 0.37,
+            "peak_memory_impact_kb": 0.37,
+            "final_memory_kb": 720.77
+        },
+        "throughput_metrics": {
+            "lines_per_second": 769032.64,
+            "views_per_second": 76903.26
+        }
+    },
+    "synchronization_tools": {
+        "status": "PASSED",
+        "execution_time_ms": 0,
+        "modes_tested": 4,
+        "sync_results": {
+            "full": {
+                "success": true,
+                "lines_processed": 306,
+                "conflicts_resolved": 3,
+                "views_synchronized": 12,
+                "method": "full_synchronization",
+                "sync_time_ms": 0
+            },
+            "selective": {
+                "success": true,
+                "lines_processed": 3,
+                "conflicts_resolved": 0,
+                "views_synchronized": 11,
+                "method": "selective_synchronization",
+                "sync_time_ms": 0
+            },
+            "precision_only": {
+                "success": true,
+                "lines_processed": 108,
+                "conflicts_resolved": 2,
+                "views_synchronized": 4,
+                "method": "precision_only_synchronization",
+                "sync_time_ms": 0
+            },
+            "validation_repair": {
+                "success": true,
+                "lines_processed": 454,
+                "conflicts_resolved": 5,
+                "views_synchronized": 15,
+                "method": "validation_repair_synchronization",
+                "sync_time_ms": 0
+            }
+        },
+        "average_sync_time": 0
+    }
+}

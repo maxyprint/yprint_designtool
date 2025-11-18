@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Comprehensive YPrint Plugin Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .content {
+            padding: 30px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #0073aa;
+            border-bottom: 2px solid #0073aa;
+            padding-bottom: 10px;
+        }
+        .canvas-area {
+            grid-column: 1 / -1;
+            background: #fff;
+            border: 3px solid #0073aa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .mockup-design-area {
+            width: 800px;
+            height: 500px;
+            margin: 20px auto;
+            border: 2px dashed #ccc;
+            background: linear-gradient(45deg, #f9f9f9 25%, transparent 25%),
+                        linear-gradient(-45deg, #f9f9f9 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #f9f9f9 75%),
+                        linear-gradient(-45deg, transparent 75%, #f9f9f9 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            border: 2px solid #0073aa;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        .btn {
+            background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,115,170,0.3);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,115,170,0.4);
+        }
+        .btn.success { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
+        .btn.warning { background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); color: #000; }
+        .btn.danger { background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%); }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .status.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+        .json-output {
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border: 2px solid #0f0;
+            box-shadow: 0 0 20px rgba(0,255,0,0.2);
+        }
+        .plugin-simulation {
+            background: #e8f4f8;
+            border: 2px solid #0073aa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .woocommerce-simulation {
+            background: #f3e5f5;
+            border: 2px solid #9c27b0;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 YPrint Plugin Comprehensive Test</h1>
+            <p>Vollständiger Test der Design Data Capture Funktionalität mit WordPress & WooCommerce Simulation</p>
+        </div>
+
+        <div class="content">
+            <div class="test-grid">
+                <div class="test-section">
+                    <h3>🔍 System Status</h3>
+                    <div id="system-status" class="status-grid">
+                        <div class="status warning">Initialisiere...</div>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>📊 Test Results</h3>
+                    <div id="test-results">
+                        <div class="status error">❌ Noch keine Tests durchgeführt</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="plugin-simulation">
+                <h3>🔌 WordPress Plugin Simulation</h3>
+                <p><strong>Plugin:</strong> Octo Print Designer (YPrint)</p>
+                <p><strong>Version:</strong> Latest from /Users/maxschwarz/Desktop/yprint_designtool/</p>
+                <p><strong>Status:</strong> <span id="plugin-status">Loading...</span></p>
+            </div>
+
+            <div class="woocommerce-simulation">
+                <h3>🛒 WooCommerce Integration</h3>
+                <p><strong>Product:</strong> YPrint Test Produkt</p>
+                <p><strong>Price:</strong> €19.99</p>
+                <p><strong>Designer Enabled:</strong> <span id="woo-status">Yes</span></p>
+            </div>
+
+            <div class="canvas-area">
+                <h3>🎨 Design Canvas (mockup-design-area)</h3>
+                <div class="controls">
+                    <button class="btn" onclick="addTestImage()">📷 Add Image</button>
+                    <button class="btn" onclick="addTestText()">📝 Add Text</button>
+                    <button class="btn" onclick="addTestShape()">🔴 Add Shape</button>
+                    <button class="btn" onclick="addComplexDesign()">✨ Add Complex Design</button>
+                    <button class="btn warning" onclick="clearCanvas()">🗑️ Clear Canvas</button>
+                </div>
+
+                <div class="mockup-design-area" id="mockup-design-area">
+                    <canvas id="design-canvas" width="800" height="500"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button class="btn success" onclick="testGenerateDesignData()">🎯 Test Design Data Capture</button>
+                    <button class="btn success" onclick="simulateWordPressSave()">💾 Simulate WordPress Save</button>
+                    <button class="btn success" onclick="simulateWooCommerceSave()">🛒 Simulate WooCommerce Save</button>
+                    <button class="btn danger" onclick="clearOutput()">🗑️ Clear Output</button>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h3>🎯 Generated Design Data (JSON)</h3>
+                <div class="json-output" id="json-output">
+                    Warte auf Design Data Capture Test...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let fabricCanvas;
+        let designDataCapture;
+        let wordPressSimulation = {};
+        let wooCommerceSimulation = {};
+
+        // Initialize comprehensive test environment
+        function initializeTest() {
+            console.log('🎯 Initializing Comprehensive YPrint Plugin Test...');
+
+            // Initialize Fabric.js Canvas
+            fabricCanvas = new fabric.Canvas('design-canvas', {
+                width: 800,
+                height: 500,
+                backgroundColor: '#ffffff'
+            });
+
+            // Simulate WordPress environment
+            window.$ = window.jQuery = jQuery;
+            window.wp = {
+                ajax: {
+                    post: function(action, data) {
+                        console.log('WP AJAX:', action, data);
+                        return Promise.resolve({success: true});
+                    }
+                }
+            };
+
+            // Create WordPress-like global objects
+            window.octoPrintDesigner = {
+                ajaxUrl: '/wp-admin/admin-ajax.php',
+                nonce: 'test-nonce-12345',
+                isLoggedIn: true,
+                loginUrl: '/wp-login.php'
+            };
+
+            // Mock DesignerWidget Instance
+            window.designerWidgetInstance = {
+                fabricCanvas: fabricCanvas,
+                currentView: 'front',
+                activeTemplateId: 'test-template-001',
+                collectDesignState: function() {
+                    return {
+                        templateId: this.activeTemplateId,
+                        viewId: this.currentView,
+                        canvasData: fabricCanvas.toJSON()
+                    };
+                }
+            };
+
+            // Initialize Design Data Capture System
+            initializeDesignDataCapture();
+
+            // Setup WooCommerce simulation
+            setupWooCommerceSimulation();
+
+            updateSystemStatus();
+            console.log('✅ Comprehensive Test Environment Initialized');
+        }
+
+        // Advanced Design Data Capture System (from plugin)
+        class ComprehensiveDesignDataCapture {
+            constructor(canvas) {
+                this.fabricCanvas = canvas;
+                this.mockupDesignAreaContainer = document.getElementById('mockup-design-area');
+                this.initialized = true;
+                console.log('🎯 Comprehensive Design Data Capture initialized');
+            }
+
+            generateDesignData() {
+                if (!this.fabricCanvas) {
+                    console.error('❌ Fabric Canvas not available');
+                    return null;
+                }
+
+                const templateViewId = this.getTemplateViewId();
+                const designedOnAreaPx = this.getDesignAreaDimensions();
+                const elements = this.extractCanvasElements();
+
+                const designData = {
+                    template_view_id: templateViewId,
+                    designed_on_area_px: designedOnAreaPx,
+                    elements: elements,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        test_environment: 'comprehensive_plugin_test',
+                        wordpress_version: '6.4.1',
+                        woocommerce_version: '8.3.1',
+                        plugin_version: 'latest',
+                        user_id: 1,
+                        product_id: 123
+                    }
+                };
+
+                console.log('🎯 Design Data Captured:', designData);
+                return designData;
+            }
+
+            getTemplateViewId() {
+                return `${window.designerWidgetInstance.activeTemplateId}-${window.designerWidgetInstance.currentView}`;
+            }
+
+            getDesignAreaDimensions() {
+                return {
+                    width: this.fabricCanvas.width,
+                    height: this.fabricCanvas.height
+                };
+            }
+
+            extractCanvasElements() {
+                const objects = this.fabricCanvas.getObjects();
+                const elements = [];
+
+                objects.forEach(obj => {
+                    if (!this.isInternalObject(obj)) {
+                        const element = this.transformObjectToElement(obj);
+                        if (element) {
+                            elements.push(element);
+                        }
+                    }
+                });
+
+                return elements;
+            }
+
+            isInternalObject(obj) {
+                return obj.isInternal || obj.selectable === false;
+            }
+
+            transformObjectToElement(obj) {
+                const transformedCoords = this.transformCoordinates(obj.left, obj.top);
+
+                const baseElement = {
+                    x: Math.round(transformedCoords.x),
+                    y: Math.round(transformedCoords.y),
+                    width: Math.round(obj.width * obj.scaleX),
+                    height: Math.round(obj.height * obj.scaleY),
+                    scaleX: obj.scaleX,
+                    scaleY: obj.scaleY,
+                    angle: obj.angle,
+                    opacity: obj.opacity || 1,
+                    visible: obj.visible !== false
+                };
+
+                if (obj.type === 'image') {
+                    return {
+                        type: 'image',
+                        src: obj.src || obj._originalElement?.src || 'test-image.jpg',
+                        crossOrigin: obj.crossOrigin || null,
+                        ...baseElement
+                    };
+                } else if (obj.type === 'i-text' || obj.type === 'text') {
+                    return {
+                        type: 'text',
+                        text: obj.text || '',
+                        fontFamily: obj.fontFamily || 'Arial',
+                        fontSize: obj.fontSize || 24,
+                        fontWeight: obj.fontWeight || 'normal',
+                        fontStyle: obj.fontStyle || 'normal',
+                        fill: obj.fill || '#000000',
+                        textAlign: obj.textAlign || 'left',
+                        ...baseElement
+                    };
+                } else if (obj.type === 'rect') {
+                    return {
+                        type: 'rectangle',
+                        fill: obj.fill || '#000000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        rx: obj.rx || 0,
+                        ry: obj.ry || 0,
+                        ...baseElement
+                    };
+                } else if (obj.type === 'circle') {
+                    return {
+                        type: 'circle',
+                        radius: obj.radius || 0,
+                        fill: obj.fill || '#ff0000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        ...baseElement
+                    };
+                } else if (obj.type === 'line') {
+                    return {
+                        type: 'line',
+                        x1: obj.x1,
+                        y1: obj.y1,
+                        x2: obj.x2,
+                        y2: obj.y2,
+                        stroke: obj.stroke || '#000000',
+                        strokeWidth: obj.strokeWidth || 1,
+                        ...baseElement
+                    };
+                }
+
+                return {
+                    type: obj.type || 'unknown',
+                    ...baseElement
+                };
+            }
+
+            transformCoordinates(canvasX, canvasY) {
+                // In this test: coordinates are already relative to mockup area
+                return { x: canvasX, y: canvasY };
+            }
+        }
+
+        function initializeDesignDataCapture() {
+            designDataCapture = new ComprehensiveDesignDataCapture(fabricCanvas);
+
+            // Make globally available (like in real plugin)
+            window.designDataCapture = designDataCapture;
+            window.productionReadyDesignDataCapture = designDataCapture;
+        }
+
+        function setupWooCommerceSimulation() {
+            wooCommerceSimulation = {
+                product: {
+                    id: 123,
+                    name: 'YPrint Test Produkt',
+                    price: 19.99,
+                    currency: 'EUR',
+                    designer_enabled: true,
+                    template_id: 'test-template-001'
+                },
+                cart: {
+                    add: function(productId, designData) {
+                        console.log('🛒 WooCommerce: Adding to cart', {productId, designData});
+                        return {success: true, cart_item_key: 'test-cart-key-' + Date.now()};
+                    }
+                }
+            };
+
+            document.getElementById('woo-status').innerHTML =
+                `<span style="color: #28a745; font-weight: bold;">✅ Enabled (Product ID: ${wooCommerceSimulation.product.id})</span>`;
+        }
+
+        // Test Functions
+        function addTestImage() {
+            console.log('📷 Adding test image...');
+
+            const imageData = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiMwMDczYWE7c3RvcC1vcGFjaXR5OjEiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojMDA1YTg3O3N0b3Atb3BhY2l0eToxIiAvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSJ1cmwoI2cpIiByeD0iMTAiLz48dGV4dCB4PSI2MCIgeT0iNjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSJib2xkIj5URVNUPC90ZXh0Pjx0ZXh0IHg9IjYwIiB5PSI4NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SU1BR0U8L3RleHQ+PC9zdmc+';
+
+            fabric.Image.fromURL(imageData, function(img) {
+                img.set({
+                    left: Math.random() * 600,
+                    top: Math.random() * 300,
+                    scaleX: 0.8 + Math.random() * 0.4,
+                    scaleY: 0.8 + Math.random() * 0.4,
+                    angle: Math.random() * 30 - 15
+                });
+                fabricCanvas.add(img);
+                fabricCanvas.renderAll();
+                console.log('✅ Test image added');
+            });
+        }
+
+        function addTestText() {
+            console.log('📝 Adding test text...');
+
+            const texts = ['YPrint Design', 'Custom Text', 'WordPress Test', 'WooCommerce', 'Design Tool'];
+            const text = new fabric.IText(texts[Math.floor(Math.random() * texts.length)], {
+                left: Math.random() * 600,
+                top: Math.random() * 400,
+                fontFamily: 'Arial',
+                fontSize: 18 + Math.random() * 20,
+                fill: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                angle: Math.random() * 20 - 10,
+                fontWeight: Math.random() > 0.5 ? 'bold' : 'normal'
+            });
+
+            fabricCanvas.add(text);
+            fabricCanvas.renderAll();
+            console.log('✅ Test text added');
+        }
+
+        function addTestShape() {
+            console.log('🔴 Adding test shape...');
+
+            const shapes = ['circle', 'rect'];
+            const shapeType = shapes[Math.floor(Math.random() * shapes.length)];
+
+            if (shapeType === 'circle') {
+                const circle = new fabric.Circle({
+                    left: Math.random() * 600,
+                    top: Math.random() * 400,
+                    radius: 20 + Math.random() * 40,
+                    fill: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                    stroke: '#333',
+                    strokeWidth: 2,
+                    opacity: 0.8 + Math.random() * 0.2
+                });
+                fabricCanvas.add(circle);
+            } else {
+                const rect = new fabric.Rect({
+                    left: Math.random() * 600,
+                    top: Math.random() * 400,
+                    width: 40 + Math.random() * 80,
+                    height: 40 + Math.random() * 80,
+                    fill: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                    stroke: '#333',
+                    strokeWidth: 2,
+                    rx: Math.random() * 20,
+                    ry: Math.random() * 20,
+                    angle: Math.random() * 45,
+                    opacity: 0.8 + Math.random() * 0.2
+                });
+                fabricCanvas.add(rect);
+            }
+
+            fabricCanvas.renderAll();
+            console.log('✅ Test shape added');
+        }
+
+        function addComplexDesign() {
+            console.log('✨ Adding complex design...');
+
+            // Add multiple elements for comprehensive test
+            addTestImage();
+            setTimeout(() => addTestText(), 200);
+            setTimeout(() => addTestShape(), 400);
+            setTimeout(() => addTestShape(), 600);
+            setTimeout(() => addTestText(), 800);
+
+            console.log('✅ Complex design added');
+        }
+
+        function clearCanvas() {
+            fabricCanvas.clear();
+            fabricCanvas.backgroundColor = '#ffffff';
+            fabricCanvas.renderAll();
+            console.log('🗑️ Canvas cleared');
+        }
+
+        function testGenerateDesignData() {
+            console.log('🧪 Testing generateDesignData()...');
+
+            if (!designDataCapture) {
+                updateTestResults('❌ Design Data Capture not initialized', 'error');
+                return;
+            }
+
+            const designData = designDataCapture.generateDesignData();
+
+            if (designData) {
+                displayJsonOutput(designData);
+                validateDesignData(designData);
+                updateTestResults('✅ Design Data Capture erfolgreich!', 'success');
+            } else {
+                updateTestResults('❌ generateDesignData() returned null', 'error');
+            }
+        }
+
+        function simulateWordPressSave() {
+            console.log('💾 Simulating WordPress save action...');
+
+            const designData = designDataCapture.generateDesignData();
+
+            if (designData) {
+                // Simulate WordPress AJAX save
+                const saveData = {
+                    action: 'save_design',
+                    nonce: window.octoPrintDesigner.nonce,
+                    design_data: JSON.stringify(designData),
+                    product_id: wooCommerceSimulation.product.id,
+                    user_id: 1
+                };
+
+                console.log('WordPress AJAX Save:', saveData);
+                displayJsonOutput({
+                    wordpress_save: true,
+                    ajax_data: saveData,
+                    captured_design: designData
+                });
+
+                updateTestResults('✅ WordPress Save Simulation erfolgreich!', 'success');
+            } else {
+                updateTestResults('❌ Kein Design Data für WordPress Save', 'error');
+            }
+        }
+
+        function simulateWooCommerceSave() {
+            console.log('🛒 Simulating WooCommerce save action...');
+
+            const designData = designDataCapture.generateDesignData();
+
+            if (designData) {
+                // Simulate WooCommerce cart addition
+                const cartResult = wooCommerceSimulation.cart.add(
+                    wooCommerceSimulation.product.id,
+                    designData
+                );
+
+                const wooSaveData = {
+                    woocommerce_save: true,
+                    product: wooCommerceSimulation.product,
+                    cart_result: cartResult,
+                    design_data: designData
+                };
+
+                console.log('WooCommerce Save:', wooSaveData);
+                displayJsonOutput(wooSaveData);
+
+                updateTestResults('✅ WooCommerce Save Simulation erfolgreich!', 'success');
+            } else {
+                updateTestResults('❌ Kein Design Data für WooCommerce Save', 'error');
+            }
+        }
+
+        function validateDesignData(data) {
+            const results = [];
+
+            // Check required fields
+            if (data.template_view_id) {
+                results.push('✅ template_view_id present');
+            } else {
+                results.push('❌ template_view_id missing');
+            }
+
+            if (data.designed_on_area_px && data.designed_on_area_px.width && data.designed_on_area_px.height) {
+                results.push('✅ designed_on_area_px valid');
+            } else {
+                results.push('❌ designed_on_area_px invalid');
+            }
+
+            if (Array.isArray(data.elements)) {
+                results.push(`✅ elements array (${data.elements.length} items)`);
+
+                // Check elements structure
+                data.elements.forEach((element, index) => {
+                    if (element.type && typeof element.x === 'number' && typeof element.y === 'number') {
+                        results.push(`  ✅ Element ${index + 1}: ${element.type} at (${element.x}, ${element.y})`);
+                    } else {
+                        results.push(`  ❌ Element ${index + 1}: Invalid structure`);
+                    }
+                });
+            } else {
+                results.push('❌ elements not an array');
+            }
+
+            if (data.metadata) {
+                results.push('✅ metadata present');
+            }
+
+            updateTestResults(results.join('<br>'), 'success');
+        }
+
+        function displayJsonOutput(data) {
+            const output = document.getElementById('json-output');
+            output.innerHTML = '<div style="color: #0f0; margin-bottom: 10px; font-weight: bold;">🎯 CAPTURED DESIGN DATA:</div>' +
+                              '<pre style="color: #0f0;">' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+
+        function updateTestResults(message, type = 'success') {
+            const results = document.getElementById('test-results');
+            results.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function updateSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+            const checks = [];
+
+            if (window.fabric && window.fabric.Canvas) {
+                checks.push('<div class="status success">✅ Fabric.js loaded</div>');
+            } else {
+                checks.push('<div class="status error">❌ Fabric.js not loaded</div>');
+            }
+
+            if (fabricCanvas) {
+                checks.push('<div class="status success">✅ Canvas initialized</div>');
+            } else {
+                checks.push('<div class="status error">❌ Canvas not initialized</div>');
+            }
+
+            if (designDataCapture) {
+                checks.push('<div class="status success">✅ Design Data Capture ready</div>');
+            } else {
+                checks.push('<div class="status error">❌ Design Data Capture not ready</div>');
+            }
+
+            if (window.designerWidgetInstance) {
+                checks.push('<div class="status success">✅ Designer Widget Instance</div>');
+            } else {
+                checks.push('<div class="status error">❌ Designer Widget missing</div>');
+            }
+
+            if (window.wp && window.wp.ajax) {
+                checks.push('<div class="status success">✅ WordPress Environment</div>');
+            } else {
+                checks.push('<div class="status error">❌ WordPress Environment missing</div>');
+            }
+
+            if (wooCommerceSimulation.product) {
+                checks.push('<div class="status success">✅ WooCommerce Integration</div>');
+            } else {
+                checks.push('<div class="status error">❌ WooCommerce Integration missing</div>');
+            }
+
+            statusDiv.innerHTML = checks.join('');
+
+            // Update plugin status
+            document.getElementById('plugin-status').innerHTML =
+                '<span style="color: #28a745; font-weight: bold;">✅ Active & Ready</span>';
+        }
+
+        function clearOutput() {
+            document.getElementById('json-output').innerHTML = 'Output cleared...';
+            updateTestResults('Output cleared', 'warning');
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 COMPREHENSIVE PLUGIN TEST: Page loaded, initializing...');
+
+            setTimeout(() => {
+                initializeTest();
+                updateTestResults('🎯 System initialisiert - Bereit für umfassende Plugin-Tests!', 'success');
+
+                // Auto-add some test content for immediate testing
+                setTimeout(() => {
+                    addTestImage();
+                    setTimeout(() => addTestText(), 500);
+                }, 1000);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

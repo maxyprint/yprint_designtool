@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 HIVE-MIND LocalWP Plugin Kalibrierungs-Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 20px;
+            background: #f1f1f1;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-header {
+            background: #0073aa;
+            color: white;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+            margin: -20px -20px 20px -20px;
+        }
+        .status-ok { color: #46b450; font-weight: bold; }
+        .status-error { color: #dc3232; font-weight: bold; }
+        .status-warning { color: #ffb900; font-weight: bold; }
+        .test-button {
+            background: #0073aa;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover { background: #005a87; }
+        .console-output {
+            background: #23282d;
+            color: #eee;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .ajax-test {
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .hive-mind-header {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="hive-mind-header">
+        <h1>🧠 HIVE-MIND LocalWP PLUGIN KALIBRIERUNG</h1>
+        <p>Comprehensive testing suite for the multi-view point-to-point selector system</p>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>🔧 SCHRITT 1: LocalWP Umgebungs-Validierung</h2>
+        </div>
+
+        <div id="environment-tests">
+            <h3>LocalWP Environment Check:</h3>
+            <button class="test-button" onclick="checkEnvironment()">Test LocalWP Connection</button>
+            <div id="env-results"></div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>🎯 SCHRITT 2: Plugin Aktivierungs-Test</h2>
+        </div>
+
+        <div id="plugin-tests">
+            <p><strong>Anleitung:</strong></p>
+            <ol>
+                <li>Öffne <a href="https://test-site.local/wp-admin/plugins.php" target="_blank">test-site.local/wp-admin/plugins.php</a></li>
+                <li>Stelle sicher, dass "Octo Print Designer" Plugin aktiviert ist</li>
+                <li>Prüfe, ob WooCommerce ebenfalls aktiviert ist</li>
+            </ol>
+            <button class="test-button" onclick="testPluginEndpoints()">Test Plugin AJAX Endpoints</button>
+            <div id="plugin-results"></div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>📊 SCHRITT 3: AGENT-1 CORS Test</h2>
+        </div>
+
+        <div id="cors-tests">
+            <p>Teste AGENT-1 CORS fixes für AJAX Requests:</p>
+            <button class="test-button" onclick="testCorsHeaders()">Test CORS Headers</button>
+            <div id="cors-results"></div>
+
+            <div class="ajax-test">
+                <strong>Manual CORS Test:</strong>
+                <button class="test-button" onclick="testGetMeasurements()">Test get_template_measurements</button>
+                <button class="test-button" onclick="testSaveReferenceLines()">Test save_reference_lines</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>🔄 SCHRITT 4: AGENT-2 Measurement Sync Test</h2>
+        </div>
+
+        <div id="sync-tests">
+            <p>Teste AGENT-2 Measurement Synchronisation zwischen Dropdown und Tabelle:</p>
+            <button class="test-button" onclick="testMeasurementSync()">Test Measurement Sync</button>
+            <div id="sync-results"></div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>🧪 SCHRITT 5: Design Template Seite Test</h2>
+        </div>
+
+        <div id="template-tests">
+            <p><strong>Design Template Test (Post ID 63):</strong></p>
+            <ol>
+                <li><a href="https://test-site.local/wp-admin/post.php?post=63&action=edit" target="_blank">Öffne Design Template Editor</a></li>
+                <li>Überprüfe Browser Console auf Fehler</li>
+                <li>Teste Measurement Dropdown Funktionalität</li>
+                <li>Validiere Reference Line System</li>
+            </ol>
+            <button class="test-button" onclick="openConsoleHelper()">Console Helper aktivieren</button>
+            <div id="template-results"></div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <div class="test-header">
+            <h2>🔍 LIVE CONSOLE OUTPUT</h2>
+        </div>
+        <div class="console-output" id="console-output">
+Warte auf Test-Ausführung...
+        </div>
+        <button class="test-button" onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <script>
+        // Console capture for testing
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function logToOutput(message, type = 'log') {
+            const output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : '📝';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToOutput(args.join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToOutput(args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            logToOutput(args.join(' '), 'warn');
+        };
+
+        function clearConsole() {
+            document.getElementById('console-output').textContent = 'Console cleared...\n';
+        }
+
+        function checkEnvironment() {
+            console.log('🔧 ENVIRONMENT CHECK: Starting LocalWP validation...');
+
+            const results = document.getElementById('env-results');
+            results.innerHTML = '<p>Testing LocalWP connection...</p>';
+
+            // Test basic connectivity
+            fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=heartbeat'
+            })
+            .then(response => {
+                console.log('✅ LocalWP connection successful');
+                results.innerHTML = `<p class="status-ok">✅ LocalWP Connection: OK</p>`;
+                return response.text();
+            })
+            .catch(error => {
+                console.error('❌ LocalWP connection failed:', error);
+                results.innerHTML = `<p class="status-error">❌ LocalWP Connection: FAILED - ${error.message}</p>`;
+            });
+        }
+
+        function testPluginEndpoints() {
+            console.log('🎯 PLUGIN TEST: Testing AJAX endpoints...');
+
+            const results = document.getElementById('plugin-results');
+            results.innerHTML = '<p>Testing plugin endpoints...</p>';
+
+            // Test if plugin is loaded by testing admin-ajax endpoint
+            fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=get_template_measurements&template_id=63'
+            })
+            .then(response => {
+                console.log('📊 Plugin endpoint response status:', response.status);
+                return response.text();
+            })
+            .then(data => {
+                console.log('📊 Plugin endpoint response data:', data.substring(0, 200) + '...');
+
+                if (data.includes('get_template_measurements') || data.includes('success') || data.includes('measurement')) {
+                    results.innerHTML = `<p class="status-ok">✅ Plugin endpoints accessible</p>`;
+                } else {
+                    results.innerHTML = `<p class="status-warning">⚠️ Plugin might not be active or configured</p>`;
+                }
+            })
+            .catch(error => {
+                console.error('❌ Plugin endpoint test failed:', error);
+                results.innerHTML = `<p class="status-error">❌ Plugin endpoints: FAILED - ${error.message}</p>`;
+            });
+        }
+
+        function testCorsHeaders() {
+            console.log('🔄 CORS TEST: Testing AGENT-1 CORS headers...');
+
+            const results = document.getElementById('cors-results');
+            results.innerHTML = '<p>Testing CORS headers...</p>';
+
+            fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: 'action=get_template_measurements&template_id=63'
+            })
+            .then(response => {
+                console.log('✅ CORS TEST: No CORS errors - AGENT-1 fix successful');
+                console.log('📊 Response headers:', response.headers);
+
+                // Check for specific CORS headers
+                const allowOrigin = response.headers.get('Access-Control-Allow-Origin');
+                const allowMethods = response.headers.get('Access-Control-Allow-Methods');
+
+                let corsStatus = '✅ CORS Headers: OK';
+                if (allowOrigin) corsStatus += ` (Origin: ${allowOrigin})`;
+                if (allowMethods) corsStatus += ` (Methods: ${allowMethods})`;
+
+                results.innerHTML = `<p class="status-ok">${corsStatus}</p>`;
+                return response.text();
+            })
+            .catch(error => {
+                console.error('❌ CORS TEST: CORS error detected:', error);
+                results.innerHTML = `<p class="status-error">❌ CORS Headers: FAILED - ${error.message}</p>`;
+            });
+        }
+
+        function testGetMeasurements() {
+            console.log('📊 MEASUREMENT TEST: Testing get_template_measurements endpoint...');
+
+            fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=get_template_measurements&template_id=63&nonce=test'
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('📊 get_template_measurements response:', data);
+                logToOutput('MEASUREMENT ENDPOINT: ' + (data.includes('success') ? 'Working' : 'Needs nonce'), 'log');
+            })
+            .catch(error => {
+                console.error('❌ get_template_measurements failed:', error);
+            });
+        }
+
+        function testSaveReferenceLines() {
+            console.log('💾 SAVE TEST: Testing save_reference_lines endpoint...');
+
+            fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=save_reference_lines&template_id=63&nonce=test'
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('💾 save_reference_lines response:', data);
+                logToOutput('SAVE ENDPOINT: ' + (data.includes('success') ? 'Working' : 'Needs nonce'), 'log');
+            })
+            .catch(error => {
+                console.error('❌ save_reference_lines failed:', error);
+            });
+        }
+
+        function testMeasurementSync() {
+            console.log('🔄 SYNC TEST: Testing AGENT-2 measurement synchronization...');
+
+            const results = document.getElementById('sync-results');
+            results.innerHTML = '<p>Testing measurement synchronization...</p>';
+
+            // Test both endpoints that should now return synchronized data
+            Promise.all([
+                fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=get_template_measurements&template_id=63'
+                }).then(r => r.text()),
+
+                fetch('https://test-site.local/wp-admin/admin-ajax.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=get_template_measurements_for_admin&template_id=63'
+                }).then(r => r.text())
+            ])
+            .then(([dropdown, table]) => {
+                console.log('🔄 SYNC TEST: Dropdown endpoint response length:', dropdown.length);
+                console.log('🔄 SYNC TEST: Table endpoint response length:', table.length);
+
+                const syncStatus = dropdown.length > 0 && table.length > 0 ?
+                    '✅ Both endpoints responding' :
+                    '⚠️ One or both endpoints not responding properly';
+
+                results.innerHTML = `<p class="status-ok">${syncStatus}</p>`;
+                logToOutput('SYNC TEST: ' + syncStatus, 'log');
+            })
+            .catch(error => {
+                console.error('❌ Sync test failed:', error);
+                results.innerHTML = `<p class="status-error">❌ Sync Test: FAILED - ${error.message}</p>`;
+            });
+        }
+
+        function openConsoleHelper() {
+            console.log('🔍 CONSOLE HELPER: Activating browser console monitoring...');
+
+            const results = document.getElementById('template-results');
+            results.innerHTML = `
+                <div class="status-ok">
+                    <h4>🔍 Console Helper Aktiviert</h4>
+                    <p><strong>Anweisungen:</strong></p>
+                    <ol>
+                        <li>Öffne <a href="https://test-site.local/wp-admin/post.php?post=63&action=edit" target="_blank">Design Template Editor</a></li>
+                        <li>Öffne Browser Developer Tools (F12)</li>
+                        <li>Gehe zum Console Tab</li>
+                        <li>Achte auf folgende Meldungen:</li>
+                    </ol>
+                    <ul>
+                        <li>✅ "AGENT-1 CORS FIX" - CORS headers working</li>
+                        <li>✅ "AGENT-2 SYNCHRONIZATION FIX" - Data sync working</li>
+                        <li>✅ "AGENT-3 JSON PARSER FIX" - JSON parsing working</li>
+                        <li>✅ "AGENT-4 NOTIFICATION SYSTEM" - Notifications working</li>
+                    </ul>
+                    <p><strong>Erwartete Erfolgsmeldungen:</strong></p>
+                    <ul>
+                        <li>"✅ Loaded measurement types: X types"</li>
+                        <li>"✅ CANVAS HOOK: Canvas instance detected"</li>
+                        <li>"✅ Multi-View Point-to-Point initialization complete"</li>
+                    </ul>
+                </div>
+            `;
+
+            // Set up monitoring for the design template page
+            logToOutput('Console Helper aktiviert - öffne jetzt die Design Template Seite', 'log');
+        }
+
+        // Initialize
+        console.log('🧠 HIVE-MIND LocalWP Kalibrierungs-Test geladen');
+        console.log('Ready for LocalWP plugin testing...');
+    </script>
+</body>
+</html>

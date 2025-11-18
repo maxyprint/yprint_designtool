@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design Data Capture - System Fix Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .fix-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .console-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            border-radius: 5px;
+            margin: 10px 0;
+            min-height: 200px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        .test-button:hover { background: #45a049; }
+        .test-button:disabled { background: #cccccc; cursor: not-allowed; }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 Design Data Capture - System Fix Verification</h1>
+            <p>Comprehensive test to verify all critical fixes are working</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🎯 Test Progress</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="overallStatus" class="status info">Ready to start system verification tests</div>
+        </div>
+
+        <div class="fix-section">
+            <h3>🚨 Fix 1: Emergency Fabric.js Loader</h3>
+            <div id="fabricStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ fabric.js loads successfully from CDN or webpack bundle</p>
+            <p><strong>Fix:</strong> Emergency loader with multiple fallback methods</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🚨 Fix 2A: Webpack Designer Patch (NEW)</h3>
+            <div id="webpackPatchStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ Aggressive webpack intervention exposes DesignerWidget</p>
+            <p><strong>Fix:</strong> webpack-designer-patch.js intercepts webpack runtime and modules</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🎯 Fix 2B: DesignerWidget Global Exposure (Enhanced)</h3>
+            <div id="exposerStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ DesignerWidget class exposed globally from webpack bundle</p>
+            <p><strong>Fix:</strong> Enhanced designer-global-exposer.js with multiple extraction methods</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🏗️ Fix 3: Global Widget Instance Creation</h3>
+            <div id="instanceStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ window.designerWidgetInstance created successfully</p>
+            <p><strong>Fix:</strong> Enhanced initialization with webpack extraction and retry logic</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>📊 Fix 4: Design Data Capture Initialization</h3>
+            <div id="captureStatus" class="status warning">Testing...</div>
+            <p><strong>Expected:</strong> ✅ DesignDataCapture system initializes and hooks into save buttons</p>
+            <p><strong>Fix:</strong> Event-driven initialization with fallback retry mechanism</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>🧪 Final Integration Test</h3>
+            <button class="test-button" id="testGenerateData" disabled onclick="testGenerateDesignData()">Test generateDesignData()</button>
+            <div id="integrationStatus" class="status warning">Waiting for all components to initialize...</div>
+        </div>
+
+        <div class="fix-section">
+            <h3>🖥️ Console Output Monitor</h3>
+            <div id="consoleOutput" class="console-output">🔍 Monitoring console output for system initialization...</div>
+        </div>
+
+        <div class="fix-section">
+            <h3>📋 System Diagnostics</h3>
+            <button class="test-button" onclick="runDiagnostics()">Run Full Diagnostics</button>
+            <div id="diagnostics" class="console-output" style="min-height: 100px;">Click "Run Full Diagnostics" to see detailed system status</div>
+        </div>
+    </div>
+
+    <script>
+        // Console output capture
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        let consoleBuffer = [];
+
+        function captureConsole(level, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.join(' ');
+            consoleBuffer.push(`[${timestamp}] ${level}: ${message}`);
+
+            // Keep only last 50 messages
+            if (consoleBuffer.length > 50) {
+                consoleBuffer = consoleBuffer.slice(-50);
+            }
+
+            updateConsoleOutput();
+
+            // Call original
+            if (level === 'LOG') originalConsoleLog.apply(console, args);
+            else if (level === 'ERROR') originalConsoleError.apply(console, args);
+            else if (level === 'WARN') originalConsoleWarn.apply(console, args);
+        }
+
+        console.log = function(...args) { captureConsole('LOG', args); };
+        console.error = function(...args) { captureConsole('ERROR', args); };
+        console.warn = function(...args) { captureConsole('WARN', args); };
+
+        function updateConsoleOutput() {
+            document.getElementById('consoleOutput').textContent = consoleBuffer.join('\n');
+        }
+
+        // Test state
+        let testResults = {
+            fabric: false,
+            webpackPatch: false,
+            exposer: false,
+            instance: false,
+            capture: false
+        };
+
+        // Update progress
+        function updateProgress() {
+            const completed = Object.values(testResults).filter(Boolean).length;
+            const total = Object.keys(testResults).length;
+            const percentage = (completed / total) * 100;
+
+            document.getElementById('progressFill').style.width = percentage + '%';
+
+            if (percentage === 100) {
+                document.getElementById('overallStatus').className = 'status success';
+                document.getElementById('overallStatus').textContent = '🎉 All system components are working correctly!';
+                document.getElementById('testGenerateData').disabled = false;
+            } else {
+                document.getElementById('overallStatus').textContent = `System initialization: ${completed}/${total} components ready (${percentage.toFixed(0)}%)`;
+            }
+        }
+
+        // Test functions
+        function testFabricLoader() {
+            if (window.fabric && typeof window.fabric.Canvas === 'function') {
+                testResults.fabric = true;
+                document.getElementById('fabricStatus').className = 'status success';
+                document.getElementById('fabricStatus').textContent = '✅ fabric.js loaded and working correctly';
+            } else {
+                document.getElementById('fabricStatus').className = 'status error';
+                document.getElementById('fabricStatus').textContent = '❌ fabric.js not available';
+            }
+            updateProgress();
+        }
+
+        function testWebpackPatch() {
+            // Check if webpack patch system is working
+            if (window.webpackChunkocto_print_designer && window.__webpack_require__) {
+                testResults.webpackPatch = true;
+                document.getElementById('webpackPatchStatus').className = 'status success';
+                document.getElementById('webpackPatchStatus').textContent = '✅ Webpack patch system active and monitoring';
+            } else {
+                document.getElementById('webpackPatchStatus').className = 'status error';
+                document.getElementById('webpackPatchStatus').textContent = '❌ Webpack patch system not available';
+            }
+            updateProgress();
+        }
+
+        function testDesignerExposer() {
+            if (typeof window.DesignerWidget === 'function') {
+                testResults.exposer = true;
+                document.getElementById('exposerStatus').className = 'status success';
+                document.getElementById('exposerStatus').textContent = '✅ DesignerWidget class exposed globally';
+            } else {
+                document.getElementById('exposerStatus').className = 'status error';
+                document.getElementById('exposerStatus').textContent = '❌ DesignerWidget class not globally available';
+            }
+            updateProgress();
+        }
+
+        function testGlobalInstance() {
+            if (window.designerWidgetInstance && typeof window.designerWidgetInstance === 'object') {
+                testResults.instance = true;
+                document.getElementById('instanceStatus').className = 'status success';
+                document.getElementById('instanceStatus').textContent = '✅ window.designerWidgetInstance created successfully';
+            } else {
+                document.getElementById('instanceStatus').className = 'status error';
+                document.getElementById('instanceStatus').textContent = '❌ window.designerWidgetInstance not available';
+            }
+            updateProgress();
+        }
+
+        function testDataCapture() {
+            if (window.designDataCapture && typeof window.designDataCapture.generateDesignData === 'function') {
+                testResults.capture = true;
+                document.getElementById('captureStatus').className = 'status success';
+                document.getElementById('captureStatus').textContent = '✅ Design Data Capture system initialized';
+            } else {
+                document.getElementById('captureStatus').className = 'status error';
+                document.getElementById('captureStatus').textContent = '❌ Design Data Capture system not initialized';
+            }
+            updateProgress();
+        }
+
+        function testGenerateDesignData() {
+            if (!window.designDataCapture) {
+                alert('❌ Design Data Capture not available');
+                return;
+            }
+
+            try {
+                console.log('🧪 INTEGRATION TEST: Starting generateDesignData() test...');
+
+                const designData = window.designDataCapture.generateDesignData();
+
+                if (designData && typeof designData === 'object') {
+                    document.getElementById('integrationStatus').className = 'status success';
+                    document.getElementById('integrationStatus').textContent = '🎉 generateDesignData() working perfectly! Check console for JSON output.';
+                } else {
+                    document.getElementById('integrationStatus').className = 'status error';
+                    document.getElementById('integrationStatus').textContent = '❌ generateDesignData() returned invalid data';
+                }
+            } catch (error) {
+                document.getElementById('integrationStatus').className = 'status error';
+                document.getElementById('integrationStatus').textContent = '❌ generateDesignData() failed: ' + error.message;
+                console.error('Integration test error:', error);
+            }
+        }
+
+        function runDiagnostics() {
+            const diagnostics = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+
+                // System Components
+                jQuery: typeof window.$ !== 'undefined' ? $.fn.jquery : 'Not available',
+                fabric: typeof window.fabric !== 'undefined' ? 'Available' : 'Not available',
+                DesignerWidget: typeof window.DesignerWidget !== 'undefined' ? 'Available' : 'Not available',
+                designerWidgetInstance: typeof window.designerWidgetInstance !== 'undefined' ? 'Available' : 'Not available',
+                designDataCapture: typeof window.designDataCapture !== 'undefined' ? 'Available' : 'Not available',
+
+                // Emergency Systems
+                emergencyFabricLoaderActive: window.emergencyFabricLoaderActive || false,
+                emergencyFabricLoaded: window.emergencyFabricLoaded || false,
+                fabricManuallyExposed: window.fabricManuallyExposed || false,
+
+                // DOM Elements
+                designerContainer: !!document.querySelector('.octo-print-designer'),
+                canvasElements: document.querySelectorAll('canvas').length,
+
+                // Webpack
+                webpackRequire: typeof window.__webpack_require__ === 'function',
+
+                // Test Results
+                testResults: testResults
+            };
+
+            document.getElementById('diagnostics').textContent = JSON.stringify(diagnostics, null, 2);
+        }
+
+        // Event listeners
+        window.addEventListener('fabricGlobalReady', function(event) {
+            console.log('🎉 Received fabricGlobalReady event:', event.detail);
+            testFabricLoader();
+        });
+
+        window.addEventListener('designerWidgetExposed', function(event) {
+            console.log('🎉 Received designerWidgetExposed event:', event.detail);
+            testDesignerExposer();
+        });
+
+        // Run tests periodically
+        function runAllTests() {
+            testFabricLoader();
+            testWebpackPatch();
+            testDesignerExposer();
+            testGlobalInstance();
+            testDataCapture();
+        }
+
+        // Start testing
+        console.log('🧪 SYSTEM FIX VERIFICATION: Starting comprehensive tests...');
+
+        // Immediate test
+        runAllTests();
+
+        // Periodic testing
+        const testInterval = setInterval(runAllTests, 1000);
+
+        // Stop testing after 30 seconds
+        setTimeout(() => {
+            clearInterval(testInterval);
+            console.log('🏁 SYSTEM FIX VERIFICATION: Testing period completed');
+        }, 30000);
+
+        // Initial diagnostics after page load
+        setTimeout(runDiagnostics, 2000);
+    </script>
+</body>
+</html>

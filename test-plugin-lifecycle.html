@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Lifecycle Management Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .admin-controls { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .plugin-list { margin: 20px 0; }
+        .plugin-item { background: white; border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .plugin-controls { margin-top: 10px; }
+        .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-enable { background-color: #28a745; color: white; }
+        .btn-disable { background-color: #dc3545; color: white; }
+        .btn-restart { background-color: #007bff; color: white; }
+        .btn-emergency { background-color: #fd7e14; color: white; }
+        .status-enabled { color: #28a745; font-weight: bold; }
+        .status-disabled { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔄 Plugin Lifecycle Management Test</h1>
+
+    <div id="test-results"></div>
+
+    <div class="admin-controls">
+        <h3>🛠️ Admin Plugin Controls</h3>
+        <div class="plugin-list" id="plugin-list"></div>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <button class="btn btn-emergency" onclick="emergencyShutdown()">🚨 Emergency Shutdown All Plugins</button>
+            <button class="btn btn-restart" onclick="restartAllPlugins()">🔄 Restart All Plugins</button>
+        </div>
+    </div>
+
+    <!-- Load Plugin Framework -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+    <!-- Load Security Module -->
+    <script src="public/js/plugin-security.js"></script>
+
+    <script>
+        console.log('🔄 LIFECYCLE TEST: Starting plugin lifecycle management validation...');
+
+        const results = [];
+
+        function addResult(test, passed, message) {
+            results.push({ test, passed, message });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>🔄 LIFECYCLE:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // Plugin Manager Implementation
+        const PluginManager = {
+            /**
+             * Enable plugin
+             */
+            enable(pluginName) {
+                console.log(`🔄 PLUGIN MANAGER: Enabling plugin '${pluginName}'`);
+
+                try {
+                    if (!window.YPrintPlugins.hasPlugin(pluginName)) {
+                        throw new Error(`Plugin '${pluginName}' not registered`);
+                    }
+
+                    const result = window.YPrintPlugins.initializePlugin(pluginName);
+                    if (result) {
+                        this.updateUI(pluginName, 'enabled');
+                        console.log(`✅ PLUGIN MANAGER: Plugin '${pluginName}' enabled successfully`);
+                        return true;
+                    } else {
+                        throw new Error('Plugin initialization failed');
+                    }
+                } catch (error) {
+                    console.error(`❌ PLUGIN MANAGER: Failed to enable '${pluginName}':`, error);
+                    return false;
+                }
+            },
+
+            /**
+             * Disable plugin
+             */
+            disable(pluginName) {
+                console.log(`🔄 PLUGIN MANAGER: Disabling plugin '${pluginName}'`);
+
+                try {
+                    window.YPrintPlugins.disablePlugin(pluginName);
+                    this.updateUI(pluginName, 'disabled');
+                    console.log(`✅ PLUGIN MANAGER: Plugin '${pluginName}' disabled successfully`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ PLUGIN MANAGER: Failed to disable '${pluginName}':`, error);
+                    return false;
+                }
+            },
+
+            /**
+             * Restart plugin
+             */
+            restart(pluginName) {
+                console.log(`🔄 PLUGIN MANAGER: Restarting plugin '${pluginName}'`);
+
+                try {
+                    this.disable(pluginName);
+                    setTimeout(() => {
+                        this.enable(pluginName);
+                    }, 100);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ PLUGIN MANAGER: Failed to restart '${pluginName}':`, error);
+                    return false;
+                }
+            },
+
+            /**
+             * Emergency disable all plugins
+             */
+            emergencyDisableAll() {
+                console.log('🚨 PLUGIN MANAGER: EMERGENCY SHUTDOWN INITIATED');
+
+                try {
+                    const plugins = window.YPrintPlugins.listPlugins();
+                    let disabledCount = 0;
+
+                    plugins.forEach(plugin => {
+                        if (plugin.enabled) {
+                            this.disable(plugin.name);
+                            disabledCount++;
+                        }
+                    });
+
+                    // Clear plugin framework state
+                    window.YPrintPlugins.enabledPlugins.clear();
+
+                    // Call security emergency shutdown
+                    if (window.YPrintPluginSecurity) {
+                        window.YPrintPluginSecurity.emergencyShutdown('Admin initiated emergency shutdown');
+                    }
+
+                    console.log(`🚨 PLUGIN MANAGER: Emergency shutdown complete - ${disabledCount} plugins disabled`);
+                    this.refreshPluginList();
+
+                    return true;
+                } catch (error) {
+                    console.error('❌ PLUGIN MANAGER: Emergency shutdown failed:', error);
+                    return false;
+                }
+            },
+
+            /**
+             * Restart all plugins
+             */
+            restartAll() {
+                console.log('🔄 PLUGIN MANAGER: Restarting all plugins');
+
+                try {
+                    const plugins = window.YPrintPlugins.listPlugins();
+
+                    // Disable all first
+                    plugins.forEach(plugin => {
+                        if (plugin.enabled) {
+                            this.disable(plugin.name);
+                        }
+                    });
+
+                    // Re-enable after delay
+                    setTimeout(() => {
+                        plugins.forEach(plugin => {
+                            this.enable(plugin.name);
+                        });
+
+                        console.log('✅ PLUGIN MANAGER: All plugins restarted');
+                    }, 500);
+
+                    return true;
+                } catch (error) {
+                    console.error('❌ PLUGIN MANAGER: Restart all failed:', error);
+                    return false;
+                }
+            },
+
+            /**
+             * Update UI for plugin status
+             */
+            updateUI(pluginName, status) {
+                const pluginElement = document.getElementById(`plugin-${pluginName}`);
+                if (pluginElement) {
+                    const statusElement = pluginElement.querySelector('.plugin-status');
+                    const enableBtn = pluginElement.querySelector('.btn-enable');
+                    const disableBtn = pluginElement.querySelector('.btn-disable');
+
+                    if (status === 'enabled') {
+                        statusElement.textContent = 'ENABLED';
+                        statusElement.className = 'plugin-status status-enabled';
+                        enableBtn.disabled = true;
+                        disableBtn.disabled = false;
+                    } else {
+                        statusElement.textContent = 'DISABLED';
+                        statusElement.className = 'plugin-status status-disabled';
+                        enableBtn.disabled = false;
+                        disableBtn.disabled = true;
+                    }
+                }
+            },
+
+            /**
+             * Create plugin list UI
+             */
+            createPluginList() {
+                const container = document.getElementById('plugin-list');
+                const plugins = window.YPrintPlugins.listPlugins();
+
+                container.innerHTML = '';
+
+                if (plugins.length === 0) {
+                    container.innerHTML = '<p>No plugins registered</p>';
+                    return;
+                }
+
+                plugins.forEach(plugin => {
+                    const pluginDiv = document.createElement('div');
+                    pluginDiv.className = 'plugin-item';
+                    pluginDiv.id = `plugin-${plugin.name}`;
+
+                    pluginDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${plugin.name}</strong> (v${plugin.version})
+                                <br>
+                                <span class="plugin-status ${plugin.enabled ? 'status-enabled' : 'status-disabled'}">
+                                    ${plugin.enabled ? 'ENABLED' : 'DISABLED'}
+                                </span>
+                            </div>
+                            <div class="plugin-controls">
+                                <button class="btn btn-enable" ${plugin.enabled ? 'disabled' : ''}
+                                        onclick="PluginManager.enable('${plugin.name}')">Enable</button>
+                                <button class="btn btn-disable" ${!plugin.enabled ? 'disabled' : ''}
+                                        onclick="PluginManager.disable('${plugin.name}')">Disable</button>
+                                <button class="btn btn-restart"
+                                        onclick="PluginManager.restart('${plugin.name}')">Restart</button>
+                            </div>
+                        </div>
+                    `;
+
+                    container.appendChild(pluginDiv);
+                });
+            },
+
+            /**
+             * Refresh plugin list
+             */
+            refreshPluginList() {
+                this.createPluginList();
+            }
+        };
+
+        // Global functions for UI
+        window.emergencyShutdown = () => {
+            if (confirm('⚠️ This will immediately disable ALL plugins. Continue?')) {
+                PluginManager.emergencyDisableAll();
+            }
+        };
+
+        window.restartAllPlugins = () => {
+            if (confirm('🔄 This will restart all plugins. Continue?')) {
+                PluginManager.restartAll();
+            }
+        };
+
+        // Create test plugins for lifecycle testing
+        function createTestPlugins() {
+            const testPlugins = [
+                {
+                    name: 'lifecycle-test-1',
+                    version: '1.0.0',
+                    initialize: function() {
+                        console.log('Lifecycle Test Plugin 1 initialized');
+                        return true;
+                    },
+                    destroy: function() {
+                        console.log('Lifecycle Test Plugin 1 destroyed');
+                    }
+                },
+                {
+                    name: 'lifecycle-test-2',
+                    version: '2.0.0',
+                    initialize: function() {
+                        console.log('Lifecycle Test Plugin 2 initialized');
+                        return true;
+                    },
+                    destroy: function() {
+                        console.log('Lifecycle Test Plugin 2 destroyed');
+                    }
+                }
+            ];
+
+            testPlugins.forEach(plugin => {
+                window.YPrintPlugins.register(plugin.name, plugin);
+            });
+
+            console.log('🔄 LIFECYCLE TEST: Test plugins created');
+            return testPlugins;
+        }
+
+        // Run lifecycle tests
+        setTimeout(() => {
+            // Test 1: Plugin Manager availability
+            try {
+                const hasEnableMethod = typeof PluginManager.enable === 'function';
+                const hasDisableMethod = typeof PluginManager.disable === 'function';
+                const hasEmergencyMethod = typeof PluginManager.emergencyDisableAll === 'function';
+
+                addResult('Plugin Manager Methods', hasEnableMethod && hasDisableMethod && hasEmergencyMethod,
+                    'All plugin management methods available'
+                );
+            } catch (error) {
+                addResult('Plugin Manager Methods', false, `Plugin manager test failed: ${error.message}`);
+            }
+
+            // Test 2: Create test plugins
+            let testPlugins;
+            try {
+                testPlugins = createTestPlugins();
+                addResult('Test Plugin Creation', testPlugins.length > 0, `${testPlugins.length} test plugins created`);
+            } catch (error) {
+                addResult('Test Plugin Creation', false, `Test plugin creation failed: ${error.message}`);
+            }
+
+            // Test 3: Plugin enable/disable functionality
+            try {
+                const pluginName = 'lifecycle-test-1';
+
+                // Test enable
+                const enableResult = PluginManager.enable(pluginName);
+                const isEnabled = window.YPrintPlugins.enabledPlugins.has(pluginName);
+
+                addResult('Plugin Enable', enableResult && isEnabled,
+                    enableResult && isEnabled ? 'Plugin enabled successfully' : 'Plugin enable failed'
+                );
+
+                // Test disable
+                const disableResult = PluginManager.disable(pluginName);
+                const isDisabled = !window.YPrintPlugins.enabledPlugins.has(pluginName);
+
+                addResult('Plugin Disable', disableResult && isDisabled,
+                    disableResult && isDisabled ? 'Plugin disabled successfully' : 'Plugin disable failed'
+                );
+
+            } catch (error) {
+                addResult('Plugin Enable/Disable', false, `Enable/disable test failed: ${error.message}`);
+            }
+
+            // Test 4: Plugin restart functionality
+            try {
+                const pluginName = 'lifecycle-test-2';
+                const restartResult = PluginManager.restart(pluginName);
+
+                addResult('Plugin Restart', restartResult,
+                    restartResult ? 'Plugin restart initiated successfully' : 'Plugin restart failed'
+                );
+            } catch (error) {
+                addResult('Plugin Restart', false, `Plugin restart test failed: ${error.message}`);
+            }
+
+            // Test 5: Emergency shutdown
+            try {
+                // Enable both test plugins first
+                PluginManager.enable('lifecycle-test-1');
+                PluginManager.enable('lifecycle-test-2');
+
+                const beforeCount = window.YPrintPlugins.enabledPlugins.size;
+                const emergencyResult = PluginManager.emergencyDisableAll();
+                const afterCount = window.YPrintPlugins.enabledPlugins.size;
+
+                addResult('Emergency Shutdown', emergencyResult && afterCount === 0,
+                    `Emergency shutdown: ${beforeCount} plugins disabled, ${afterCount} remaining`
+                );
+            } catch (error) {
+                addResult('Emergency Shutdown', false, `Emergency shutdown test failed: ${error.message}`);
+            }
+
+            // Test 6: Create UI components
+            try {
+                PluginManager.createPluginList();
+                const pluginListElement = document.getElementById('plugin-list');
+                const hasPluginItems = pluginListElement.children.length > 0;
+
+                addResult('Plugin Manager UI', hasPluginItems,
+                    hasPluginItems ? 'Plugin management UI created successfully' : 'Plugin UI creation failed'
+                );
+            } catch (error) {
+                addResult('Plugin Manager UI', false, `Plugin UI test failed: ${error.message}`);
+            }
+
+            addInfo(`Plugin lifecycle testing complete! ${results.filter(r => r.passed).length}/${results.length} tests passed`);
+            console.log('🔄 LIFECYCLE TEST: All tests finished');
+
+        }, 200);
+
+        // Initialize UI
+        setTimeout(() => {
+            PluginManager.createPluginList();
+        }, 300);
+
+    </script>
+</body>
+</html>

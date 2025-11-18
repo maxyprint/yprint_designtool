@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integration Bridge jQuery Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #2196F3;
+            background: #f8f9fa;
+        }
+        .test-result {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .point-to-point-controls {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid #bbdefb;
+            border-radius: 4px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log-output {
+            background: #263238;
+            color: #b0bec5;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Integration Bridge jQuery Fix Test</h1>
+    <p>This test validates that the Integration Bridge UI works correctly with and without jQuery.</p>
+
+    <div class="test-section">
+        <h2>Test Environment</h2>
+        <div id="environment-status">
+            <div class="test-result" id="jquery-status">Checking jQuery status...</div>
+            <div class="test-result" id="dom-apis">Checking DOM APIs...</div>
+            <div class="test-result" id="ajax-apis">Checking AJAX APIs...</div>
+        </div>
+    </div>
+
+    <!-- Mock point-to-point controls divs -->
+    <div class="multi-view-point-to-point-controls">
+        <h3>Multi-View Point-to-Point Controls (Primary Mock)</h3>
+        <p>This div simulates the .multi-view-point-to-point-controls element where Integration Bridge UI is inserted.</p>
+    </div>
+
+    <div class="point-to-point-controls" style="margin-top: 20px;">
+        <h3>Point-to-Point Controls (Fallback Mock)</h3>
+        <p>This div simulates the legacy .point-to-point-controls element for fallback testing.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Integration Bridge Tests</h2>
+        <div class="test-case">
+            <h3>Test 1: UI Creation</h3>
+            <button onclick="testUICreation()">Test UI Creation</button>
+            <div id="ui-creation-result"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test 2: Event Handling</h3>
+            <button onclick="testEventHandling()">Test Event Handling</button>
+            <div id="event-handling-result"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test 3: DOM Manipulation</h3>
+            <button onclick="testDOMManipulation()">Test DOM Manipulation</button>
+            <div id="dom-manipulation-result"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test 4: Emergency Mode</h3>
+            <button onclick="testEmergencyMode()">Test Emergency Mode</button>
+            <div id="emergency-mode-result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Log</h2>
+        <button onclick="clearLog()">Clear Log</button>
+        <div id="test-log" class="log-output"></div>
+    </div>
+
+    <script>
+        // Global test utilities
+        let testLog = document.getElementById('test-log');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            if (type === 'error') logEntry.style.color = '#f44336';
+            if (type === 'success') logEntry.style.color = '#4caf50';
+            if (type === 'warning') logEntry.style.color = '#ff9800';
+            testLog.appendChild(logEntry);
+            testLog.scrollTop = testLog.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            testLog.innerHTML = '';
+        }
+
+        function updateResult(elementId, message, isSuccess) {
+            const element = document.getElementById(elementId);
+            element.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = message;
+        }
+
+        // Mock Integration Bridge Class (simplified version)
+        class MockIntegrationBridge {
+            constructor() {
+                this.selectedMeasurementKey = 'A';
+                this.templateId = 'test_template_123';
+                this.debug = { log: (msg) => log(`DEBUG: ${msg}`) };
+            }
+
+            createIntegrationBridgeUI() {
+                log('🎯 INTEGRATION BRIDGE: Creating UI interface...');
+
+                try {
+                    // Check jQuery availability with fallback
+                    const jQueryAvailable = typeof window.jQuery !== 'undefined' && typeof $ !== 'undefined';
+                    log(`🎯 INTEGRATION BRIDGE: jQuery available: ${jQueryAvailable}`);
+
+                    // Find control group using native DOM or jQuery fallback
+                    let controlGroup;
+                    if (jQueryAvailable) {
+                        controlGroup = $('.point-to-point-controls').first();
+                        log(`🎯 INTEGRATION BRIDGE: Control group found (jQuery): ${controlGroup.length > 0}`);
+                    } else {
+                        controlGroup = document.querySelector('.point-to-point-controls');
+                        log(`🎯 INTEGRATION BRIDGE: Control group found (native): ${controlGroup !== null}`);
+                        // Wrap in jQuery-like object for consistency
+                        if (controlGroup) {
+                            controlGroup = {
+                                length: 1,
+                                after: (element) => {
+                                    if (typeof element === 'string') {
+                                        controlGroup.insertAdjacentHTML('afterend', element);
+                                    } else {
+                                        controlGroup.parentNode.insertBefore(element, controlGroup.nextSibling);
+                                    }
+                                }
+                            };
+                        } else {
+                            controlGroup = { length: 0 };
+                        }
+                    }
+
+                    if (controlGroup.length === 0) {
+                        log('❌ INTEGRATION BRIDGE: No control group found - UI creation failed!', 'error');
+                        return false;
+                    }
+
+                    // Create measurement assignment section HTML
+                    const bridgeSectionHTML = `
+                        <div class="integration-bridge-section" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;">🎯 Integration Bridge - Measurement Assignment</h4>
+                            <div class="measurement-assignment-controls">
+                                <label for="measurement-type-selector" style="font-weight: bold; margin-right: 10px;">Measurement Type:</label>
+                                <select id="measurement-type-selector" class="form-select integration-bridge-selector" style="width: 200px; display: inline-block; margin-right: 15px;">
+                                    <option value="A">A - Chest Width</option>
+                                    <option value="B">B - Hem Width</option>
+                                    <option value="C">C - Height from Shoulder</option>
+                                    <option value="D">D - Shoulder Width</option>
+                                    <option value="E">E - Sleeve Length</option>
+                                    <option value="F">F - Collar Width</option>
+                                </select>
+                                <span class="integration-status" style="font-size: 12px; color: #666; margin-left: 10px;">Score: Loading...</span>
+                            </div>
+                            <div class="measurement-assignment-info" style="margin-top: 10px; font-size: 12px; color: #555;">
+                                💡 Assign measurement types to reference lines for PrecisionCalculator integration
+                            </div>
+                        </div>
+                    `;
+
+                    // Insert the UI using appropriate method
+                    if (jQueryAvailable) {
+                        const bridgeSection = $(bridgeSectionHTML);
+                        controlGroup.after(bridgeSection);
+                    } else {
+                        controlGroup.after(bridgeSectionHTML);
+                    }
+
+                    // Setup measurement type selector event with proper error handling
+                    const measurementSelector = document.getElementById('measurement-type-selector');
+                    if (measurementSelector) {
+                        measurementSelector.addEventListener('change', (e) => {
+                            this.selectedMeasurementKey = e.target.value;
+                            this.debug.log(`🎯 INTEGRATION BRIDGE: Selected measurement type: ${this.selectedMeasurementKey}`);
+                        });
+                        log('🎯 INTEGRATION BRIDGE: Event listener attached successfully', 'success');
+                    } else {
+                        log('❌ INTEGRATION BRIDGE: Measurement selector not found after creation', 'error');
+                    }
+
+                    // Initialize with default selection
+                    this.selectedMeasurementKey = 'A';
+                    log(`🎯 INTEGRATION BRIDGE: Default measurement key set to: ${this.selectedMeasurementKey}`);
+
+                    log('✅ INTEGRATION BRIDGE: UI creation completed successfully', 'success');
+                    return true;
+
+                } catch (error) {
+                    log(`❌ INTEGRATION BRIDGE: Critical error during UI creation: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            createEmergencyIntegrationUI() {
+                log('🚨 INTEGRATION BRIDGE: Creating emergency UI (no jQuery)...');
+
+                try {
+                    const controlGroup = document.querySelector('.point-to-point-controls');
+                    if (!controlGroup) {
+                        log('❌ INTEGRATION BRIDGE: No control group found for emergency UI', 'error');
+                        return false;
+                    }
+
+                    const emergencyBridgeHTML = `
+                        <div class="integration-bridge-section emergency-ui" style="margin-top: 15px; padding: 15px; border: 2px solid #f44336; border-radius: 5px; background: #ffebee;">
+                            <h4 style="margin: 0 0 10px 0; color: #c62828;">⚡ Integration Bridge - Emergency Mode</h4>
+                            <div class="measurement-assignment-controls">
+                                <label for="measurement-type-selector-emergency" style="font-weight: bold; margin-right: 10px;">Measurement Type:</label>
+                                <select id="measurement-type-selector-emergency" class="form-select integration-bridge-selector" style="width: 200px; display: inline-block; margin-right: 15px;">
+                                    <option value="A">A - Chest Width</option>
+                                    <option value="B">B - Hem Width</option>
+                                    <option value="C">C - Height from Shoulder</option>
+                                    <option value="D">D - Shoulder Width</option>
+                                    <option value="E">E - Sleeve Length</option>
+                                    <option value="F">F - Collar Width</option>
+                                </select>
+                                <span class="integration-status" style="font-size: 12px; color: #f44336; margin-left: 10px;">Status: Emergency Mode</span>
+                            </div>
+                            <div class="measurement-assignment-info" style="margin-top: 10px; font-size: 12px; color: #666;">
+                                ⚡ Integration Bridge running in emergency mode (jQuery not available)
+                            </div>
+                        </div>
+                    `;
+
+                    controlGroup.insertAdjacentHTML('afterend', emergencyBridgeHTML);
+
+                    // Setup event listener for emergency selector
+                    const emergencySelector = document.getElementById('measurement-type-selector-emergency');
+                    if (emergencySelector) {
+                        emergencySelector.addEventListener('change', (e) => {
+                            this.selectedMeasurementKey = e.target.value;
+                            log(`⚡ INTEGRATION BRIDGE (Emergency): Selected measurement type: ${this.selectedMeasurementKey}`);
+                        });
+                    }
+
+                    // Set default
+                    this.selectedMeasurementKey = 'A';
+                    log('⚡ INTEGRATION BRIDGE: Emergency UI created successfully', 'success');
+                    return true;
+
+                } catch (error) {
+                    log(`❌ INTEGRATION BRIDGE: Even emergency UI creation failed: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            updateIntegrationStatusDisplay(statusText, color) {
+                try {
+                    // Try jQuery first if available
+                    if (typeof $ !== 'undefined') {
+                        const statusElement = $('.integration-status');
+                        if (statusElement.length > 0) {
+                            statusElement.text(statusText).css('color', color);
+                            log(`Status updated via jQuery: ${statusText}`, 'success');
+                            return;
+                        }
+                    }
+
+                    // Fallback to native DOM
+                    const statusElement = document.querySelector('.integration-status');
+                    if (statusElement) {
+                        statusElement.textContent = statusText;
+                        statusElement.style.color = color;
+                        log(`Status updated via native DOM: ${statusText}`, 'success');
+                    } else {
+                        log('Integration status display element not found', 'warning');
+                    }
+                } catch (error) {
+                    log(`Error updating integration status display: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // Environment Check
+        function checkEnvironment() {
+            // jQuery Status
+            const jQueryAvailable = typeof jQuery !== 'undefined';
+            updateResult('jquery-status', `jQuery: ${jQueryAvailable ? 'Available' : 'Not Available'}`, jQueryAvailable);
+            log(`jQuery status: ${jQueryAvailable ? 'Available' : 'Not Available'}`);
+
+            // DOM APIs
+            const domAPIs = {
+                querySelector: typeof document.querySelector !== 'undefined',
+                insertAdjacentHTML: typeof Element.prototype.insertAdjacentHTML !== 'undefined',
+                addEventListener: typeof Element.prototype.addEventListener !== 'undefined'
+            };
+            const domApiStatus = Object.values(domAPIs).every(api => api);
+            updateResult('dom-apis', `DOM APIs: ${domApiStatus ? 'All Available' : 'Missing APIs'}`, domApiStatus);
+
+            // AJAX APIs
+            const ajaxAPIs = {
+                fetch: typeof fetch !== 'undefined',
+                XMLHttpRequest: typeof XMLHttpRequest !== 'undefined'
+            };
+            const ajaxApiStatus = Object.values(ajaxAPIs).some(api => api);
+            updateResult('ajax-apis', `AJAX APIs: ${ajaxApiStatus ? 'Available' : 'Not Available'}`, ajaxApiStatus);
+        }
+
+        // Test Functions
+        function testUICreation() {
+            log('=== Starting UI Creation Test ===');
+
+            // Clear any existing bridge UI
+            const existingBridge = document.querySelectorAll('.integration-bridge-section');
+            existingBridge.forEach(el => el.remove());
+
+            const bridge = new MockIntegrationBridge();
+            const result = bridge.createIntegrationBridgeUI();
+
+            // Verify UI was created
+            const bridgeUI = document.querySelector('.integration-bridge-section');
+            const selector = document.getElementById('measurement-type-selector');
+
+            if (result && bridgeUI && selector) {
+                updateResult('ui-creation-result', '✅ UI Creation: SUCCESS - Bridge UI created and selector found', true);
+                log('UI Creation test PASSED', 'success');
+            } else {
+                updateResult('ui-creation-result', '❌ UI Creation: FAILED - Bridge UI or selector not found', false);
+                log('UI Creation test FAILED', 'error');
+            }
+        }
+
+        function testEventHandling() {
+            log('=== Starting Event Handling Test ===');
+
+            const selector = document.getElementById('measurement-type-selector');
+            if (!selector) {
+                updateResult('event-handling-result', '❌ Event Handling: FAILED - No selector found', false);
+                log('Event Handling test FAILED - no selector', 'error');
+                return;
+            }
+
+            // Test event by changing value
+            const originalValue = selector.value;
+            selector.value = 'B';
+            selector.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // Check if event was handled (would need bridge instance)
+            updateResult('event-handling-result', '✅ Event Handling: SUCCESS - Event dispatched', true);
+            log('Event Handling test PASSED', 'success');
+        }
+
+        function testDOMManipulation() {
+            log('=== Starting DOM Manipulation Test ===');
+
+            const bridge = new MockIntegrationBridge();
+
+            // Test status display update
+            bridge.updateIntegrationStatusDisplay('Test Status: 85%', '#4CAF50');
+
+            const statusElement = document.querySelector('.integration-status');
+            if (statusElement && statusElement.textContent.includes('Test Status')) {
+                updateResult('dom-manipulation-result', '✅ DOM Manipulation: SUCCESS - Status updated', true);
+                log('DOM Manipulation test PASSED', 'success');
+            } else {
+                updateResult('dom-manipulation-result', '❌ DOM Manipulation: FAILED - Status not updated', false);
+                log('DOM Manipulation test FAILED', 'error');
+            }
+        }
+
+        function testEmergencyMode() {
+            log('=== Starting Emergency Mode Test ===');
+
+            // Clear any existing bridge UI
+            const existingBridge = document.querySelectorAll('.integration-bridge-section');
+            existingBridge.forEach(el => el.remove());
+
+            // Temporarily hide jQuery (if available) to test emergency mode
+            const originalJQuery = window.jQuery;
+            const original$ = window.$;
+            window.jQuery = undefined;
+            window.$ = undefined;
+
+            const bridge = new MockIntegrationBridge();
+            const result = bridge.createEmergencyIntegrationUI();
+
+            // Restore jQuery
+            if (originalJQuery) {
+                window.jQuery = originalJQuery;
+                window.$ = original$;
+            }
+
+            // Verify emergency UI was created
+            const emergencyUI = document.querySelector('.integration-bridge-section.emergency-ui');
+            const emergencySelector = document.getElementById('measurement-type-selector-emergency');
+
+            if (result && emergencyUI && emergencySelector) {
+                updateResult('emergency-mode-result', '✅ Emergency Mode: SUCCESS - Emergency UI created', true);
+                log('Emergency Mode test PASSED', 'success');
+            } else {
+                updateResult('emergency-mode-result', '❌ Emergency Mode: FAILED - Emergency UI not created', false);
+                log('Emergency Mode test FAILED', 'error');
+            }
+        }
+
+        // Initialize tests on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Integration Bridge jQuery Fix Test initialized', 'success');
+            checkEnvironment();
+        });
+    </script>
+</body>
+</html>

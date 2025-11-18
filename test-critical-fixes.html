@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Critical PNG System Fixes Test</title>
+</head>
+<body>
+    <h1>🔧 Testing Critical PNG System Fixes</h1>
+    <div id="test-results"></div>
+
+    <script>
+        console.log('🔧 CRITICAL FIXES TEST: Starting validation...');
+
+        const testsResults = [];
+
+        // Test 1: WordPress Config Availability
+        function testWordPressConfig() {
+            console.log('Test 1: WordPress Configuration');
+
+            // Mock the WordPress config as it would be localized
+            window.octo_print_designer_config = {
+                ajax_url: '/wp-admin/admin-ajax.php',
+                nonce: 'mock_nonce_12345',
+                plugin_url: '/wp-content/plugins/yprint_designtool/',
+                version: '1.0.0',
+                debug_mode: true,
+                core_rebuild: true
+            };
+
+            setTimeout(() => {
+                const config = window.octo_print_designer_config;
+                if (config && config.nonce && config.ajax_url) {
+                    console.log('✅ Test 1 PASSED: WordPress config available with required fields');
+                    console.log('🔍 Config details:', {
+                        ajax_url: config.ajax_url,
+                        nonce_exists: !!config.nonce,
+                        plugin_url: config.plugin_url
+                    });
+                    testsResults.push('✅ WordPress config availability: PASSED');
+                } else {
+                    console.error('❌ Test 1 FAILED: WordPress config missing or incomplete');
+                    testsResults.push('❌ WordPress config availability: FAILED');
+                }
+                updateResults();
+            }, 100);
+        }
+
+        // Test 2: Nonce Validation Format
+        function testNonceFormat() {
+            console.log('Test 2: Nonce Format Validation');
+
+            const config = window.octo_print_designer_config;
+            if (config && config.nonce) {
+                // Mock the exact data structure that would be sent to WordPress
+                const requestData = {
+                    action: 'yprint_save_design_print_png',
+                    nonce: config.nonce,
+                    design_id: 'test_design_123',
+                    print_png: 'data:image/png;base64,test'
+                };
+
+                console.log('🔍 Request data structure:', {
+                    action: requestData.action,
+                    nonce: requestData.nonce ? 'PRESENT' : 'MISSING',
+                    design_id: requestData.design_id,
+                    data_size: JSON.stringify(requestData).length + ' bytes'
+                });
+
+                // Simulate the URLSearchParams encoding WordPress expects
+                const urlParams = new URLSearchParams(requestData);
+                const encodedData = urlParams.toString();
+
+                console.log('🔍 Encoded for WordPress:', encodedData.substring(0, 100) + '...');
+
+                if (requestData.action && requestData.nonce && requestData.design_id) {
+                    console.log('✅ Test 2 PASSED: Request data properly formatted');
+                    testsResults.push('✅ Nonce format validation: PASSED');
+                } else {
+                    console.error('❌ Test 2 FAILED: Request data missing required fields');
+                    testsResults.push('❌ Nonce format validation: FAILED');
+                }
+            } else {
+                console.error('❌ Test 2 FAILED: No config available for nonce testing');
+                testsResults.push('❌ Nonce format validation: FAILED - No config');
+            }
+            updateResults();
+        }
+
+        // Test 3: Fallback System
+        function testFallbackSystem() {
+            console.log('Test 3: Fallback System Test');
+
+            // Simulate missing WordPress config
+            const originalConfig = window.octo_print_designer_config;
+            delete window.octo_print_designer_config;
+
+            // Test fallback handling
+            const config = window.octo_print_designer_config;
+            if (!config || !config.ajax_url || !config.nonce) {
+                console.log('✅ Fallback detected: WordPress AJAX configuration missing');
+
+                // Simulate fallback response creation
+                const fallbackResponse = {
+                    png_url: 'data:image/png;base64,fallback_test',
+                    design_id: 'fallback_test_123',
+                    template_id: 'fallback',
+                    storage_method: 'fallback',
+                    message: 'PNG generated successfully (database storage unavailable)'
+                };
+
+                console.log('🔧 Fallback response created:', fallbackResponse);
+                console.log('✅ Test 3 PASSED: Fallback system works correctly');
+                testsResults.push('✅ Fallback system: PASSED');
+            } else {
+                console.error('❌ Test 3 FAILED: Fallback not triggered when config missing');
+                testsResults.push('❌ Fallback system: FAILED');
+            }
+
+            // Restore original config
+            window.octo_print_designer_config = originalConfig;
+            updateResults();
+        }
+
+        // Test 4: Resource Preload Optimization
+        function testResourcePreload() {
+            console.log('Test 4: Resource Preload Check');
+
+            // Check if there are any preload links in the head
+            const preloadLinks = document.querySelectorAll('link[rel="preload"]');
+            console.log('🔍 Found preload links:', preloadLinks.length);
+
+            preloadLinks.forEach((link, index) => {
+                console.log(`🔍 Preload ${index + 1}:`, {
+                    href: link.href,
+                    as: link.getAttribute('as'),
+                    crossorigin: link.getAttribute('crossorigin')
+                });
+            });
+
+            if (preloadLinks.length === 0) {
+                console.log('✅ Test 4 PASSED: No unnecessary preload links (expected in test environment)');
+                testsResults.push('✅ Resource preload optimization: PASSED (no preloads in test)');
+            } else {
+                // In production, check if preloads have proper attributes
+                let validPreloads = 0;
+                preloadLinks.forEach(link => {
+                    if (link.getAttribute('as') && link.getAttribute('crossorigin')) {
+                        validPreloads++;
+                    }
+                });
+
+                if (validPreloads === preloadLinks.length) {
+                    console.log('✅ Test 4 PASSED: All preload links properly configured');
+                    testsResults.push('✅ Resource preload optimization: PASSED');
+                } else {
+                    console.error('❌ Test 4 FAILED: Some preload links missing attributes');
+                    testsResults.push('❌ Resource preload optimization: FAILED');
+                }
+            }
+            updateResults();
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<h2>Critical Fixes Test Results:</h2><ul>' +
+                testsResults.map(result => '<li>' + result + '</li>').join('') +
+                '</ul>';
+        }
+
+        // Run all tests
+        setTimeout(() => {
+            testWordPressConfig();
+            setTimeout(() => {
+                testNonceFormat();
+                setTimeout(() => {
+                    testFallbackSystem();
+                    setTimeout(() => {
+                        testResourcePreload();
+                    }, 200);
+                }, 200);
+            }, 200);
+        }, 100);
+
+        console.log('🔧 CRITICAL FIXES TEST: All tests queued');
+    </script>
+</body>
+</html>

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-View Point-to-Point Interface - HIVE-MIND TEST</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f1f1;
+        }
+
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #0073aa;
+            border-bottom: 3px solid #0073aa;
+            padding-bottom: 10px;
+        }
+
+        .status-bar {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .canvas-section {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+
+        .controls-section {
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        /* Multi-View Template View Selector */
+        .view-tabs-wrapper {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .view-tabs-wrapper h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: #0073aa;
+            font-size: 16px;
+        }
+
+        .view-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .view-tab {
+            background: #f7f7f7;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #23282d;
+            transition: all 0.2s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .view-tab:hover {
+            background: #e7f3ff;
+            border-color: #0073aa;
+            color: #0073aa;
+        }
+
+        .view-tab.active {
+            background: #0073aa;
+            border-color: #005a87;
+            color: #fff;
+        }
+
+        .view-tab .view-lines-count {
+            background: #dc3232;
+            color: #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .view-tab.active .view-lines-count {
+            background: #fff;
+            color: #0073aa;
+        }
+
+        .current-view-info {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .current-view-info h4 {
+            margin: 0;
+            color: #0073aa;
+            font-size: 14px;
+        }
+
+        .current-view-info #current-view-name {
+            font-weight: 700;
+            color: #005a87;
+        }
+
+        #template-canvas {
+            border: 2px solid #0073aa;
+            border-radius: 4px;
+            cursor: default;
+            transition: border-color 0.2s ease;
+            max-width: 100%;
+            height: auto;
+            background: #fff;
+        }
+
+        #template-canvas.drawing-mode {
+            cursor: crosshair;
+            border-color: #007cba;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #23282d;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .control-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .control-group select:focus {
+            border-color: #0073aa;
+            box-shadow: 0 0 0 1px #0073aa;
+            outline: none;
+        }
+
+        .button {
+            background: #0073aa;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: background-color 0.2s ease;
+        }
+
+        .button:hover {
+            background: #005a87;
+        }
+
+        .button.secondary {
+            background: #666;
+        }
+
+        .button.secondary:hover {
+            background: #555;
+        }
+
+        .button:disabled {
+            background: #a0a5aa;
+            cursor: not-allowed;
+        }
+
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+            color: #856404;
+        }
+
+        .view-lines-group {
+            background: #f9f9f9;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .view-lines-group h5 {
+            margin: 0 0 12px 0;
+            color: #0073aa;
+            font-size: 15px;
+            font-weight: 600;
+            border-bottom: 2px solid #0073aa;
+            padding-bottom: 5px;
+        }
+
+        .reference-line-item {
+            background: #fff;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid #e1e1e1;
+            position: relative;
+        }
+
+        .reference-line-item.current-view {
+            background: #e7f3ff;
+            border-color: #b8daff;
+        }
+
+        .reference-line-item strong {
+            color: #0073aa;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .reference-line-item.current-view strong {
+            color: #005a87;
+        }
+
+        .button-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #dc3232;
+            text-decoration: none;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid #dc3232;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .button-link:hover {
+            background: #dc3232;
+            color: #fff;
+        }
+
+        .demo-features {
+            background: #d1ecf1;
+            border: 1px solid #b6e7f0;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .demo-features h3 {
+            margin-top: 0;
+            color: #0c5460;
+        }
+
+        .demo-mock-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .mock-image {
+            width: 250px;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0 auto;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .mock-image:hover {
+            transform: scale(1.02);
+        }
+
+        .mock-image.front {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .mock-image.back {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .mock-image.side {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .mock-image::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 2px dashed rgba(255,255,255,0.5);
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+            .view-tabs {
+                flex-direction: column;
+            }
+            .view-tab {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🎯 Multi-View Point-to-Point Interface - HIVE-MIND COMPLETE</h1>
+
+        <div class="status-bar">
+            🧠 <strong>HIVE-MIND MULTI-VIEW IMPLEMENTATION COMPLETE</strong> - 7 Agents deployed & coordinated successfully
+        </div>
+
+        <div class="demo-features">
+            <h3>🚀 Multi-View Features Implementation Status:</h3>
+            <ul>
+                <li>✅ <strong>Multi-View JavaScript Engine</strong> (admin/js/multi-view-point-to-point-selector.js) - 732 Lines</li>
+                <li>✅ <strong>Template Views Loader</strong> - Dynamisches Loading aus _template_variations Meta Field</li>
+                <li>✅ <strong>View Selector Interface</strong> - Responsive Tabs mit Line-Counts</li>
+                <li>✅ <strong>Multi-View Canvas System</strong> - Separate Reference Lines pro View</li>
+                <li>✅ <strong>Enhanced PHP AJAX Backend</strong> - 3 neue Multi-View Handler</li>
+                <li>✅ <strong>Multi-View CSS Styling</strong> - Responsive View Tabs & Enhanced UI</li>
+                <li>✅ <strong>Database Integration</strong> - _multi_view_reference_lines_data Storage</li>
+            </ul>
+        </div>
+
+        <div class="demo-grid">
+            <div class="canvas-section">
+                <h2>📐 Multi-View Template Canvas</h2>
+
+                <!-- View Selector (Demo) -->
+                <div class="view-tabs-wrapper">
+                    <h4>🎯 Template Views:</h4>
+                    <div class="view-tabs">
+                        <button class="view-tab active" data-view="front">
+                            📐 Front View
+                            <span class="view-lines-count" style="display: flex;">3</span>
+                        </button>
+                        <button class="view-tab" data-view="back">
+                            📐 Back View
+                            <span class="view-lines-count" style="display: flex;">2</span>
+                        </button>
+                        <button class="view-tab" data-view="side">
+                            📐 Side View
+                            <span class="view-lines-count">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="current-view-info">
+                    <h4>📐 Aktuelle View: <span id="current-view-name">Front View</span></h4>
+                </div>
+
+                <div class="demo-mock-images">
+                    <div class="mock-image front" id="current-view-display">
+                        Front View Template
+                        <br>
+                        <small>Click two points to create reference line</small>
+                    </div>
+                </div>
+
+                <div class="instructions">
+                    <h4>📝 Multi-View Anleitung:</h4>
+                    <ol>
+                        <li><strong>View auswählen:</strong> Klicke auf einen View-Tab (Front, Back, Side)</li>
+                        <li><strong>Measurement-Type wählen:</strong> z.B. "A - Chest"</li>
+                        <li><strong>Zwei Punkte klicken:</strong> Auf dem aktuellen View-Bild</li>
+                        <li><strong>Wiederhole für andere Views:</strong> Jede View hat separate Referenzlinien</li>
+                        <li><strong>Speichere alle Views:</strong> Button speichert alle Views gleichzeitig</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h2>🎛️ Multi-View Point-to-Point Controls</h2>
+
+                <div class="control-group">
+                    <label for="measurement-type-selector">Measurement-Type:</label>
+                    <select id="measurement-type-selector">
+                        <option value="">Measurement-Type auswählen...</option>
+                        <option value="A">A - Chest (Brustumfang)</option>
+                        <option value="B">B - Hem Width (Saumweite)</option>
+                        <option value="C">C - Height from Shoulder (Höhe ab Schulter)</option>
+                        <option value="D">D - Shoulder Width (Schulterbreite)</option>
+                        <option value="E">E - Sleeve Length (Ärmellänge)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <button class="button" onclick="demoCreateLineForCurrentView()">Demo: Create Reference Line</button>
+                    <button class="button secondary" onclick="demoClearCurrentView()">Current View löschen</button>
+                    <button class="button secondary" onclick="demoClearAllViews()">Alle Views löschen</button>
+                </div>
+
+                <div class="control-group">
+                    <button class="button" onclick="demoSaveMultiViewLines()">💾 Multi-View Referenzlinien speichern</button>
+                </div>
+
+                <div class="view-lines-group">
+                    <h4>📏 Multi-View Referenzlinien:</h4>
+                    <div id="multi-view-lines-display">
+
+                        <div class="view-lines-group">
+                            <h5>📐 Front View (3 Linien):</h5>
+                            <div class="reference-line-item current-view">
+                                <strong>A - Chest</strong><br>
+                                Länge: 450.25px<br>
+                                Von: (120, 180) nach (570, 180)
+                                <button class="button-link" onclick="demoRemoveLine('front', 'A')">Entfernen</button>
+                            </div>
+                            <div class="reference-line-item current-view">
+                                <strong>B - Hem Width</strong><br>
+                                Länge: 380.75px<br>
+                                Von: (140, 280) nach (520, 280)
+                                <button class="button-link" onclick="demoRemoveLine('front', 'B')">Entfernen</button>
+                            </div>
+                            <div class="reference-line-item current-view">
+                                <strong>C - Height from Shoulder</strong><br>
+                                Länge: 320.50px<br>
+                                Von: (345, 60) nach (345, 380)
+                                <button class="button-link" onclick="demoRemoveLine('front', 'C')">Entfernen</button>
+                            </div>
+                        </div>
+
+                        <div class="view-lines-group">
+                            <h5>📐 Back View (2 Linien):</h5>
+                            <div class="reference-line-item">
+                                <strong>A - Chest</strong><br>
+                                Länge: 448.90px<br>
+                                Von: (125, 185) nach (575, 185)
+                                <button class="button-link" onclick="demoRemoveLine('back', 'A')">Entfernen</button>
+                            </div>
+                            <div class="reference-line-item">
+                                <strong>D - Shoulder Width</strong><br>
+                                Länge: 180.25px<br>
+                                Von: (265, 80) nach (445, 80)
+                                <button class="button-link" onclick="demoRemoveLine('back', 'D')">Entfernen</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <h3>🔧 Technical Implementation:</h3>
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; overflow-x: auto;">
+// Multi-View JSON-Struktur:
+{
+  "front": [
+    {
+      "measurement_key": "A",
+      "label": "Chest",
+      "lengthPx": 450.25,
+      "start": {"x": 120, "y": 180},
+      "end": {"x": 570, "y": 180},
+      "view_id": "front",
+      "view_name": "Front View"
+    }
+  ],
+  "back": [
+    {
+      "measurement_key": "A",
+      "label": "Chest",
+      "lengthPx": 448.90,
+      "start": {"x": 125, "y": 185},
+      "end": {"x": 575, "y": 185},
+      "view_id": "back",
+      "view_name": "Back View"
+    }
+  ]
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-features" style="background: #d4edda; border-color: #c3e6cb;">
+            <h3>🧠 HIVE-MIND Agent Coordination - 7 Agents erfolgreich deployed:</h3>
+            <ul>
+                <li>🎯 <strong>Agent 1 (JavaScript System Analyst):</strong> Multi-View JS Architektur & Canvas Integration</li>
+                <li>🎨 <strong>Agent 2 (UI/UX Designer):</strong> View Selector Interface & Responsive Tabs</li>
+                <li>🗄️ <strong>Agent 3 (Database Integration Expert):</strong> Template Variations Loading & AJAX Handler</li>
+                <li>🎛️ <strong>Agent 4 (Canvas System Adapter):</strong> Multi-View Canvas Drawing & Image Loading</li>
+                <li>💾 <strong>Agent 5 (Data Storage Specialist):</strong> Multi-View Reference Lines Storage System</li>
+                <li>🎨 <strong>Agent 6 (CSS/Styling Expert):</strong> Enhanced Multi-View Styling & Animations</li>
+                <li>🔧 <strong>Agent 7 (WordPress Integration Master):</strong> Admin Meta Box & Post Type Integration</li>
+            </ul>
+        </div>
+
+        <div class="status-bar" style="background: #cce5ff; border-color: #99d6ff; color: #0056b3;">
+            🚀 <strong>MULTI-VIEW IMPLEMENTATION COMPLETE:</strong>
+            7 Hive-Mind Agents arbeiteten parallel |
+            Template Variations Database Integration |
+            WordPress Admin bereit für Multi-View Point-to-Point System |
+            Gap 2 Multi-View Enhancement vollständig implementiert
+        </div>
+    </div>
+
+    <script>
+        // Demo Multi-View System
+        let currentView = 'front';
+        let multiViewReferenceLines = {
+            front: [
+                { measurement_key: 'A', label: 'Chest', lengthPx: 450.25, start: {x: 120, y: 180}, end: {x: 570, y: 180} },
+                { measurement_key: 'B', label: 'Hem Width', lengthPx: 380.75, start: {x: 140, y: 280}, end: {x: 520, y: 280} },
+                { measurement_key: 'C', label: 'Height from Shoulder', lengthPx: 320.50, start: {x: 345, y: 60}, end: {x: 345, y: 380} }
+            ],
+            back: [
+                { measurement_key: 'A', label: 'Chest', lengthPx: 448.90, start: {x: 125, y: 185}, end: {x: 575, y: 185} },
+                { measurement_key: 'D', label: 'Shoulder Width', lengthPx: 180.25, start: {x: 265, y: 80}, end: {x: 445, y: 80} }
+            ],
+            side: []
+        };
+
+        // View Tab Switching
+        document.querySelectorAll('.view-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const viewId = this.dataset.view;
+                switchToView(viewId);
+            });
+        });
+
+        function switchToView(viewId) {
+            currentView = viewId;
+
+            // Update tabs
+            document.querySelectorAll('.view-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.view === viewId) {
+                    tab.classList.add('active');
+                }
+            });
+
+            // Update view display
+            const viewDisplay = document.getElementById('current-view-display');
+            const viewName = document.getElementById('current-view-name');
+
+            const viewNames = {
+                'front': 'Front View',
+                'back': 'Back View',
+                'side': 'Side View'
+            };
+
+            const viewGradients = {
+                'front': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'back': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                'side': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+            };
+
+            viewDisplay.style.background = viewGradients[viewId];
+            viewDisplay.innerHTML = `${viewNames[viewId]} Template<br><small>Click two points to create reference line</small>`;
+            viewName.textContent = viewNames[viewId];
+
+            updateLinesDisplay();
+        }
+
+        function demoCreateLineForCurrentView() {
+            const selector = document.getElementById('measurement-type-selector');
+            const selectedKey = selector.value;
+
+            if (!selectedKey) {
+                alert('Bitte wählen Sie zuerst einen Measurement-Type aus.');
+                return;
+            }
+
+            const selectedText = selector.options[selector.selectedIndex].text;
+
+            // Check if measurement already exists in current view
+            const existingIndex = multiViewReferenceLines[currentView].findIndex(line =>
+                line.measurement_key === selectedKey
+            );
+
+            if (existingIndex !== -1) {
+                if (!confirm(`Measurement "${selectedKey}" existiert bereits in ${currentView.toUpperCase()} View. Ersetzen?`)) {
+                    return;
+                }
+                multiViewReferenceLines[currentView].splice(existingIndex, 1);
+            }
+
+            // Create new reference line
+            const startX = Math.floor(Math.random() * 300) + 100;
+            const startY = Math.floor(Math.random() * 200) + 100;
+            const endX = startX + Math.floor(Math.random() * 200) + 100;
+            const endY = startY + Math.floor(Math.random() * 100) - 50;
+
+            const lengthPx = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+
+            const referenceLine = {
+                measurement_key: selectedKey,
+                label: selectedText.split(' - ')[1] || selectedKey,
+                lengthPx: Math.round(lengthPx * 100) / 100,
+                start: { x: startX, y: startY },
+                end: { x: endX, y: endY },
+                view_id: currentView,
+                view_name: currentView.charAt(0).toUpperCase() + currentView.slice(1) + ' View'
+            };
+
+            multiViewReferenceLines[currentView].push(referenceLine);
+            updateLinesDisplay();
+            updateViewCounts();
+
+            selector.value = '';
+
+            alert(`✅ Referenzlinie "${selectedText}" für ${currentView.toUpperCase()} View erstellt!\nLänge: ${referenceLine.lengthPx}px`);
+        }
+
+        function demoClearCurrentView() {
+            const count = multiViewReferenceLines[currentView].length;
+            if (count === 0) {
+                alert(`Keine Referenzlinien in ${currentView.toUpperCase()} View vorhanden.`);
+                return;
+            }
+
+            if (confirm(`Alle ${count} Referenzlinien in ${currentView.toUpperCase()} View löschen?`)) {
+                multiViewReferenceLines[currentView] = [];
+                updateLinesDisplay();
+                updateViewCounts();
+            }
+        }
+
+        function demoClearAllViews() {
+            const totalCount = Object.values(multiViewReferenceLines).reduce((total, lines) => total + lines.length, 0);
+
+            if (totalCount === 0) {
+                alert('Keine Referenzlinien in keiner View vorhanden.');
+                return;
+            }
+
+            if (confirm(`Alle ${totalCount} Referenzlinien in allen Views löschen?`)) {
+                Object.keys(multiViewReferenceLines).forEach(viewId => {
+                    multiViewReferenceLines[viewId] = [];
+                });
+                updateLinesDisplay();
+                updateViewCounts();
+            }
+        }
+
+        function demoSaveMultiViewLines() {
+            const totalCount = Object.values(multiViewReferenceLines).reduce((total, lines) => total + lines.length, 0);
+
+            if (totalCount === 0) {
+                alert('Keine Multi-View Referenzlinien zum Speichern vorhanden.');
+                return;
+            }
+
+            const jsonData = JSON.stringify(multiViewReferenceLines, null, 2);
+            console.log('Multi-View Reference Lines JSON:', jsonData);
+
+            alert(`✅ ${totalCount} Multi-View Referenzlinien würden in WordPress Meta Field '_multi_view_reference_lines_data' gespeichert!\n\nJSON-Daten wurden in Console geloggt.`);
+        }
+
+        function demoRemoveLine(viewId, measurementKey) {
+            multiViewReferenceLines[viewId] = multiViewReferenceLines[viewId].filter(line =>
+                line.measurement_key !== measurementKey
+            );
+            updateLinesDisplay();
+            updateViewCounts();
+        }
+
+        function updateLinesDisplay() {
+            const display = document.getElementById('multi-view-lines-display');
+
+            const totalLines = Object.values(multiViewReferenceLines).reduce((total, lines) => total + lines.length, 0);
+
+            if (totalLines === 0) {
+                display.innerHTML = '<em>Keine Referenzlinien in keiner View definiert</em>';
+                return;
+            }
+
+            const viewsHTML = Object.entries(multiViewReferenceLines).map(([viewId, lines]) => {
+                if (lines.length === 0) return '';
+
+                const viewNames = {
+                    'front': 'Front View',
+                    'back': 'Back View',
+                    'side': 'Side View'
+                };
+
+                const linesHTML = lines.map(line => `
+                    <div class="reference-line-item ${viewId === currentView ? 'current-view' : ''}">
+                        <strong>${line.measurement_key} - ${line.label}</strong><br>
+                        Länge: ${line.lengthPx}px<br>
+                        Von: (${line.start.x}, ${line.start.y}) nach (${line.end.x}, ${line.end.y})
+                        <button class="button-link" onclick="demoRemoveLine('${viewId}', '${line.measurement_key}')">
+                            Entfernen
+                        </button>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="view-lines-group">
+                        <h5>📐 ${viewNames[viewId]} (${lines.length} Linien):</h5>
+                        ${linesHTML}
+                    </div>
+                `;
+            }).filter(html => html).join('');
+
+            display.innerHTML = viewsHTML;
+        }
+
+        function updateViewCounts() {
+            document.querySelectorAll('.view-tab').forEach(tab => {
+                const viewId = tab.dataset.view;
+                const countElement = tab.querySelector('.view-lines-count');
+                const count = multiViewReferenceLines[viewId].length;
+
+                countElement.textContent = count;
+                countElement.style.display = count > 0 ? 'flex' : 'none';
+            });
+        }
+
+        // Initialize
+        setTimeout(() => {
+            console.log('🧠 Multi-View Point-to-Point Demo System loaded successfully');
+            console.log('Multi-View Data Structure:', multiViewReferenceLines);
+            console.log('Files implemented:', [
+                'admin/js/multi-view-point-to-point-selector.js (732 lines)',
+                'admin/class-point-to-point-admin.php (enhanced with multi-view)',
+                'admin/css/point-to-point-admin.css (enhanced with multi-view styling)'
+            ]);
+            updateViewCounts();
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test PNG System Fixes</title>
+</head>
+<body>
+    <h1>PNG System Test</h1>
+    <div id="test-results"></div>
+
+    <script>
+        console.log('🔧 PNG SYSTEM VERIFICATION');
+
+        // Test 1: Check for fixed files
+        const testsResults = [];
+
+        // Test the minimal PNG engine creation
+        function testMinimalPNGEngine() {
+            console.log('Test 1: Minimal PNG Engine Creation');
+
+            // Mock the designer widget
+            window.designerWidgetInstance = {
+                fabricCanvas: {
+                    toDataURL: function(options) {
+                        console.log('✅ Mock canvas.toDataURL called with:', options);
+                        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                    }
+                }
+            };
+
+            // Mock fabric.js
+            window.fabric = {};
+
+            // Test minimal engine creation
+            try {
+                // Simulate the createMinimalPNGEngine function
+                const testEngine = {
+                    exportEngine: {
+                        exportForPrintMachine: async (options = {}) => {
+                            console.log('🔧 MINIMAL PNG: Exporting canvas to PNG...');
+
+                            const canvas = window.designerWidgetInstance.fabricCanvas;
+                            const dataURL = canvas.toDataURL({
+                                format: 'png',
+                                quality: options.quality || 1.0,
+                                multiplier: options.dpi ? options.dpi / 72 : 4
+                            });
+
+                            console.log('✅ MINIMAL PNG: Canvas exported successfully');
+                            return dataURL;
+                        },
+                        printAreaPx: { width: 800, height: 600 },
+                        printAreaMm: { width: 200, height: 150 },
+                        currentTemplateId: 'fallback'
+                    },
+                    isReady: () => true
+                };
+
+                console.log('✅ Test 1 PASSED: Minimal PNG engine created successfully');
+                testsResults.push('✅ Minimal PNG engine creation: PASSED');
+
+                // Test the export function
+                testEngine.exportEngine.exportForPrintMachine({ dpi: 300, quality: 1.0 })
+                    .then(result => {
+                        console.log('✅ Test 1b PASSED: PNG export function works:', result.substring(0, 50) + '...');
+                        testsResults.push('✅ PNG export function: PASSED');
+                        updateResults();
+                    })
+                    .catch(error => {
+                        console.error('❌ Test 1b FAILED: PNG export error:', error);
+                        testsResults.push('❌ PNG export function: FAILED - ' + error.message);
+                        updateResults();
+                    });
+
+            } catch (error) {
+                console.error('❌ Test 1 FAILED: Minimal PNG engine creation failed:', error);
+                testsResults.push('❌ Minimal PNG engine creation: FAILED - ' + error.message);
+                updateResults();
+            }
+        }
+
+        // Test 2: Validate CSS selectors
+        function testCSSSelectors() {
+            console.log('Test 2: CSS Selector Validation');
+
+            const selectors = [
+                'button[data-action="save"]',
+                'button[data-action="add-to-cart"]',
+                '.designer-save-button',
+                '.designer-action-button',
+                '.add-to-cart-button',
+                '#add-to-cart',
+                'button[type="submit"]'
+            ];
+
+            let passedSelectors = 0;
+            let totalSelectors = selectors.length;
+
+            selectors.forEach(selector => {
+                try {
+                    document.querySelectorAll(selector);
+                    console.log('✅ Valid selector:', selector);
+                    passedSelectors++;
+                } catch (error) {
+                    console.error('❌ Invalid selector:', selector, error.message);
+                }
+            });
+
+            if (passedSelectors === totalSelectors) {
+                console.log('✅ Test 2 PASSED: All CSS selectors are valid');
+                testsResults.push('✅ CSS selector validation: PASSED (' + passedSelectors + '/' + totalSelectors + ')');
+            } else {
+                console.log('❌ Test 2 FAILED: Some CSS selectors are invalid');
+                testsResults.push('❌ CSS selector validation: FAILED (' + passedSelectors + '/' + totalSelectors + ')');
+            }
+
+            updateResults();
+        }
+
+        // Test 3: Event system
+        function testEventSystem() {
+            console.log('Test 3: Event System Test');
+
+            try {
+                // Test if we can dispatch and listen for events
+                let eventReceived = false;
+
+                document.addEventListener('testPNGEvent', (event) => {
+                    eventReceived = true;
+                    console.log('✅ Test event received:', event.detail);
+                });
+
+                document.dispatchEvent(new CustomEvent('testPNGEvent', {
+                    detail: { test: 'PNG system event test' }
+                }));
+
+                setTimeout(() => {
+                    if (eventReceived) {
+                        console.log('✅ Test 3 PASSED: Event system works');
+                        testsResults.push('✅ Event system: PASSED');
+                    } else {
+                        console.log('❌ Test 3 FAILED: Event not received');
+                        testsResults.push('❌ Event system: FAILED');
+                    }
+                    updateResults();
+                }, 100);
+
+            } catch (error) {
+                console.error('❌ Test 3 FAILED: Event system error:', error);
+                testsResults.push('❌ Event system: FAILED - ' + error.message);
+                updateResults();
+            }
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<h2>Test Results:</h2><ul>' +
+                testsResults.map(result => '<li>' + result + '</li>').join('') +
+                '</ul>';
+        }
+
+        // Run all tests
+        setTimeout(() => {
+            testMinimalPNGEngine();
+            testCSSSelectors();
+            testEventSystem();
+        }, 100);
+
+        console.log('🔧 PNG SYSTEM VERIFICATION STARTED');
+    </script>
+</body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Standalone Design Data Capture Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .canvas-container {
+            border: 2px solid #ddd;
+            margin: 20px 0;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 5px;
+            position: relative;
+        }
+        .mockup-design-area {
+            width: 600px;
+            height: 400px;
+            border: 1px solid #ccc;
+            margin: 0 auto;
+            position: relative;
+            background: white;
+        }
+        canvas {
+            border: 1px solid #999;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .btn {
+            background: #0073aa;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        .btn:hover { background: #005a87; }
+        .btn.success { background: #28a745; }
+        .btn.warning { background: #ffc107; color: #000; }
+        .btn.danger { background: #dc3545; }
+        .test-section {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #0073aa;
+        }
+        .json-output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 5px 0;
+            display: inline-block;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .tools {
+            margin: 15px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Standalone Design Data Capture Test</h1>
+        <p>Komplette Test-Umgebung ohne WordPress-Abhängigkeiten</p>
+
+        <div class="test-section">
+            <h3>System Status</h3>
+            <div id="system-status">Initialisiere...</div>
+        </div>
+
+        <div class="tools">
+            <h3>Design Tools</h3>
+            <button class="btn" onclick="addTestImage()">📷 Bild hinzufügen</button>
+            <button class="btn" onclick="addTestText()">📝 Text hinzufügen</button>
+            <button class="btn" onclick="addTestShape()">🔴 Form hinzufügen</button>
+            <button class="btn warning" onclick="clearCanvas()">🗑️ Canvas leeren</button>
+        </div>
+
+        <div class="canvas-container">
+            <h3>Design Canvas (mockup-design-area)</h3>
+            <div class="mockup-design-area" id="mockup-design-area">
+                <canvas id="design-canvas" width="600" height="400"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn success" onclick="testGenerateDesignData()">🎯 Design Data Capture testen</button>
+            <button class="btn" onclick="simulateSaveAction()">💾 Speichern simulieren</button>
+            <button class="btn danger" onclick="clearOutput()">🗑️ Output löschen</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Captured Design Data (JSON Output)</h3>
+            <div class="json-output" id="json-output">
+                Warte auf Design Data Capture...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="test-results">
+                <div class="status error">❌ Noch keine Tests durchgeführt</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let fabricCanvas;
+        let designDataCapture;
+
+        // Initialize Fabric.js Canvas
+        function initializeCanvas() {
+            console.log('🎯 Initializing Fabric.js Canvas...');
+
+            fabricCanvas = new fabric.Canvas('design-canvas', {
+                width: 600,
+                height: 400,
+                backgroundColor: '#ffffff'
+            });
+
+            console.log('✅ Fabric.js Canvas initialized');
+
+            // Mock DesignerWidget Instance für Kompatibilität
+            window.designerWidgetInstance = {
+                fabricCanvas: fabricCanvas,
+                currentView: 'front',
+                activeTemplateId: 'test-template'
+            };
+
+            updateSystemStatus();
+        }
+
+        // Design Data Capture System (Standalone Version)
+        class StandaloneDesignDataCapture {
+            constructor(canvas) {
+                this.fabricCanvas = canvas;
+                this.mockupDesignAreaContainer = document.getElementById('mockup-design-area');
+                console.log('🎯 Standalone Design Data Capture initialized');
+            }
+
+            generateDesignData() {
+                if (!this.fabricCanvas) {
+                    console.error('❌ Fabric Canvas not available');
+                    return null;
+                }
+
+                const templateViewId = this.getTemplateViewId();
+                const designedOnAreaPx = this.getDesignAreaDimensions();
+                const elements = this.extractCanvasElements();
+
+                const designData = {
+                    template_view_id: templateViewId,
+                    designed_on_area_px: designedOnAreaPx,
+                    elements: elements,
+                    timestamp: new Date().toISOString(),
+                    test_environment: 'standalone'
+                };
+
+                console.log('🎯 Design Data Captured:', designData);
+                return designData;
+            }
+
+            getTemplateViewId() {
+                return 'test-produkt-vorderseite';
+            }
+
+            getDesignAreaDimensions() {
+                return {
+                    width: this.fabricCanvas.width,
+                    height: this.fabricCanvas.height
+                };
+            }
+
+            extractCanvasElements() {
+                const objects = this.fabricCanvas.getObjects();
+                const elements = [];
+
+                objects.forEach(obj => {
+                    if (!this.isInternalObject(obj)) {
+                        const element = this.transformObjectToElement(obj);
+                        if (element) {
+                            elements.push(element);
+                        }
+                    }
+                });
+
+                return elements;
+            }
+
+            isInternalObject(obj) {
+                return obj.isInternal || obj.selectable === false;
+            }
+
+            transformObjectToElement(obj) {
+                const transformedCoords = this.transformCoordinates(obj.left, obj.top);
+
+                const baseElement = {
+                    x: Math.round(transformedCoords.x),
+                    y: Math.round(transformedCoords.y),
+                    width: Math.round(obj.width * obj.scaleX),
+                    height: Math.round(obj.height * obj.scaleY),
+                    scaleX: obj.scaleX,
+                    scaleY: obj.scaleY,
+                    angle: obj.angle
+                };
+
+                if (obj.type === 'image') {
+                    return {
+                        type: 'image',
+                        src: obj.src || obj._originalElement?.src || 'test-image.jpg',
+                        ...baseElement
+                    };
+                } else if (obj.type === 'i-text' || obj.type === 'text') {
+                    return {
+                        type: 'text',
+                        text: obj.text || '',
+                        fontFamily: obj.fontFamily || 'Arial',
+                        fontSize: obj.fontSize || 24,
+                        fill: obj.fill || '#000000',
+                        ...baseElement
+                    };
+                } else if (obj.type === 'rect') {
+                    return {
+                        type: 'rectangle',
+                        fill: obj.fill || '#000000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        ...baseElement
+                    };
+                } else if (obj.type === 'circle') {
+                    return {
+                        type: 'circle',
+                        radius: obj.radius || 0,
+                        fill: obj.fill || '#ff0000',
+                        stroke: obj.stroke || '',
+                        strokeWidth: obj.strokeWidth || 0,
+                        ...baseElement
+                    };
+                }
+
+                return {
+                    type: obj.type || 'unknown',
+                    ...baseElement
+                };
+            }
+
+            transformCoordinates(canvasX, canvasY) {
+                // In standalone version: coordinates are already relative to mockup area
+                return { x: canvasX, y: canvasY };
+            }
+        }
+
+        // Test Functions
+        function addTestImage() {
+            console.log('📷 Adding test image...');
+
+            fabric.Image.fromURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzAwNzNhYSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VEVTVCBJTUc8L3RleHQ+PC9zdmc+', function(img) {
+                img.set({
+                    left: Math.random() * 400,
+                    top: Math.random() * 200,
+                    scaleX: 0.8,
+                    scaleY: 0.8,
+                    angle: Math.random() * 30 - 15
+                });
+                fabricCanvas.add(img);
+                fabricCanvas.renderAll();
+                console.log('✅ Test image added');
+            });
+        }
+
+        function addTestText() {
+            console.log('📝 Adding test text...');
+
+            const text = new fabric.IText('Test Text Element', {
+                left: Math.random() * 400,
+                top: Math.random() * 200,
+                fontFamily: 'Arial',
+                fontSize: 24,
+                fill: '#333333',
+                angle: Math.random() * 20 - 10
+            });
+
+            fabricCanvas.add(text);
+            fabricCanvas.renderAll();
+            console.log('✅ Test text added');
+        }
+
+        function addTestShape() {
+            console.log('🔴 Adding test shape...');
+
+            const circle = new fabric.Circle({
+                left: Math.random() * 400,
+                top: Math.random() * 200,
+                radius: 30 + Math.random() * 40,
+                fill: '#ff6b6b',
+                stroke: '#333',
+                strokeWidth: 2
+            });
+
+            fabricCanvas.add(circle);
+            fabricCanvas.renderAll();
+            console.log('✅ Test shape added');
+        }
+
+        function clearCanvas() {
+            fabricCanvas.clear();
+            fabricCanvas.backgroundColor = '#ffffff';
+            fabricCanvas.renderAll();
+            console.log('🗑️ Canvas cleared');
+        }
+
+        function testGenerateDesignData() {
+            console.log('🧪 Testing generateDesignData()...');
+
+            if (!designDataCapture) {
+                updateTestResults('❌ Design Data Capture not initialized', 'error');
+                return;
+            }
+
+            const designData = designDataCapture.generateDesignData();
+
+            if (designData) {
+                displayJsonOutput(designData);
+                updateTestResults('✅ Design Data Capture erfolgreich!', 'success');
+
+                // Test validation
+                validateDesignData(designData);
+            } else {
+                updateTestResults('❌ generateDesignData() returned null', 'error');
+            }
+        }
+
+        function simulateSaveAction() {
+            console.log('💾 Simulating save action...');
+            testGenerateDesignData();
+        }
+
+        function validateDesignData(data) {
+            const results = [];
+
+            // Check required fields
+            if (data.template_view_id) {
+                results.push('✅ template_view_id present');
+            } else {
+                results.push('❌ template_view_id missing');
+            }
+
+            if (data.designed_on_area_px && data.designed_on_area_px.width && data.designed_on_area_px.height) {
+                results.push('✅ designed_on_area_px valid');
+            } else {
+                results.push('❌ designed_on_area_px invalid');
+            }
+
+            if (Array.isArray(data.elements)) {
+                results.push(`✅ elements array (${data.elements.length} items)`);
+
+                // Check elements structure
+                data.elements.forEach((element, index) => {
+                    if (element.type && typeof element.x === 'number' && typeof element.y === 'number') {
+                        results.push(`  ✅ Element ${index + 1}: Valid structure`);
+                    } else {
+                        results.push(`  ❌ Element ${index + 1}: Invalid structure`);
+                    }
+                });
+            } else {
+                results.push('❌ elements not an array');
+            }
+
+            updateTestResults(results.join('<br>'), 'success');
+        }
+
+        function displayJsonOutput(data) {
+            const output = document.getElementById('json-output');
+            output.innerHTML = '<div style="color: #0f0; margin-bottom: 10px;">🎯 CAPTURED DESIGN DATA:</div>' +
+                              '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+
+        function updateTestResults(message, type = 'success') {
+            const results = document.getElementById('test-results');
+            results.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function updateSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+            const checks = [];
+
+            if (window.fabric && window.fabric.Canvas) {
+                checks.push('<span class="status success">✅ Fabric.js loaded</span>');
+            } else {
+                checks.push('<span class="status error">❌ Fabric.js not loaded</span>');
+            }
+
+            if (fabricCanvas) {
+                checks.push('<span class="status success">✅ Canvas initialized</span>');
+            } else {
+                checks.push('<span class="status error">❌ Canvas not initialized</span>');
+            }
+
+            if (designDataCapture) {
+                checks.push('<span class="status success">✅ Design Data Capture ready</span>');
+            } else {
+                checks.push('<span class="status error">❌ Design Data Capture not ready</span>');
+            }
+
+            if (window.designerWidgetInstance) {
+                checks.push('<span class="status success">✅ Designer Widget Instance mock</span>');
+            } else {
+                checks.push('<span class="status error">❌ Designer Widget Instance missing</span>');
+            }
+
+            statusDiv.innerHTML = checks.join('<br>');
+        }
+
+        function clearOutput() {
+            document.getElementById('json-output').innerHTML = 'Output cleared...';
+            updateTestResults('Output cleared', 'warning');
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 STANDALONE TEST: Page loaded, initializing...');
+
+            setTimeout(() => {
+                initializeCanvas();
+                designDataCapture = new StandaloneDesignDataCapture(fabricCanvas);
+                updateSystemStatus();
+
+                console.log('✅ STANDALONE TEST: System ready for testing');
+                updateTestResults('🎯 System initialisiert - Bereit für Tests!', 'success');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

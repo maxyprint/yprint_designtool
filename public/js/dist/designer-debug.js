@@ -1,0 +1,1832 @@
+
+
+
+export class DesignerWidget {
+
+    constructor() {
+        this.container = document.querySelector('.octo-print-designer');
+        if (!this.container) return;
+
+        this.currentDesignId = null;
+        this.templates = new Map();
+        this.currentView = null;
+        this.currentVariation = null;
+        this.activeTemplateId = null;
+        
+        // Store view-specific images and their transforms per variation
+        this.variationImages = new Map(); // Key format: `${variationId}_${viewId}`
+
+        // In-memory storage for temporary images (non-logged users)
+        this.tempImages = [];
+        this.tempImageCounter = 0;
+        this.isLoggedIn = window.octoPrintDesigner?.isLoggedIn || false;
+        
+        window.addEventListener('resize', () => this.handleResize());
+
+        this.storeElementReferences();
+        this.initializeTemplates();
+        this.storeModalElements();
+        this.setupModalEvents();
+
+        this.toastManager = new ToastManager(this.toastContainer);
+
+        this.init();
+    }
+
+    initializeToolbar() {
+        // Clone toolbar template
+        const toolbarTemplate = document.getElementById('designer-image-toolbar-template');
+        this.imageToolbar = toolbarTemplate.content.cloneNode(true).querySelector('.designer-image-toolbar');
+        this.canvas.parentNode.appendChild(this.imageToolbar);
+    
+        // Store references to inputs
+        this.widthInput = this.imageToolbar.querySelector('.width-input');
+        this.heightInput = this.imageToolbar.querySelector('.height-input');
+        this.pixelToCmLabel = this.imageToolbar.querySelector('.pixel-to-cm');
+    
+        // Add toolbar button handlers
+        this.imageToolbar.querySelector('.center-image').addEventListener('click', () => {
+            const activeObject = this.fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.set({
+                    left: this.fabricCanvas.width / 2,
+                    top: this.fabricCanvas.height / 2
+                });
+                
+                activeObject.setCoords();
+                this.fabricCanvas.renderAll();
+                
+                // Update stored position
+                if (this.currentView && this.currentVariation) {
+                    const key = `${this.currentVariation}_${this.currentView}`;
+                    const imageData = this.variationImages.get(key);
+                    if (imageData) {
+                        imageData.transform.left = activeObject.left;
+                        imageData.transform.top = activeObject.top;
+                    }
+                }
+
+                this.updateToolbarPosition();
+            }
+        });
+
+        // Add width/height input handlers
+        this.widthInput.addEventListener('input', (e) => this.handleDimensionChange('width', e.target.value));
+        this.heightInput.addEventListener('input', (e) => this.handleDimensionChange('height', e.target.value));
+        
+        // Rename label to clarify it shows physical dimensions
+        this.pixelToCmLabel.classList.add('physical-dimensions');
+    }
+
+    handleDimensionChange(dimension, value) {
+        const activeObject = this.fabricCanvas.getActiveObject();
+        if (!activeObject) return;
+
+        const pixelValue = parseInt(value, 10);
+        if (isNaN(pixelValue)) return;
+
+        const currentWidth = activeObject.width * activeObject.scaleX;
+        const currentHeight = activeObject.height * activeObject.scaleY;
+        const aspectRatio = activeObject.width / activeObject.height;
+
+        let newScaleX, newScaleY;
+
+        if (dimension === 'width') {
+            newScaleX = pixelValue / activeObject.width;
+            newScaleY = newScaleX; // Maintain aspect ratio
+        } else {
+            newScaleY = pixelValue / activeObject.height;
+            newScaleX = newScaleY; // Maintain aspect ratio
+        }
+
+        // Apply new scale
+        activeObject.set({
+            scaleX: newScaleX,
+            scaleY: newScaleY
+        });
+
+        // Update the other input
+        if (dimension === 'width') {
+            this.heightInput.value = Math.round(activeObject.height * newScaleY);
+        } else {
+            this.widthInput.value = Math.round(activeObject.width * newScaleX);
+        }
+
+        // Update physical dimensions display
+        this.updatePixelToCmConversion();
+
+        activeObject.setCoords();
+        this.fabricCanvas.renderAll();
+        this.updateToolbarPosition();
+        
+        // Store the image transformation
+        if (this.currentView && this.currentVariation) {
+            const key = `${this.currentVariation}_${this.currentView}`;
+            const imageData = this.variationImages.get(key);
+            if (imageData) {
+                imageData.transform.scaleX = newScaleX;
+                imageData.transform.scaleY = newScaleY;
+            }
+        }
+    }
+
+    updatePixelToCmConversion() {
+        // This method now updates the physical dimensions display
+        const activeObject = this.fabricCanvas.getActiveObject();
+        if (!activeObject) return;
+        
+        const template = this.templates.get(this.activeTemplateId);
+        if (!template) return;
+        
+        // Get physical dimensions and canvas dimensions
+        const physicalWidth = template.physical_width_cm || 30;
+        const physicalHeight = template.physical_height_cm || 40;
+        
+        const view = template.variations.get(this.currentVariation)?.views.get(this.currentView);
+        if (!view) return;
+        
+        const safeZoneWidth = view.safeZone?.width || 800;
+        const safeZoneHeight = view.safeZone?.height || 500;
+        
+        // Calculate actual physical dimensions of the design
+        const designWidthCm = ((activeObject.width * activeObject.scaleX) / safeZoneWidth) * physicalWidth;
+        const designHeightCm = ((activeObject.height * activeObject.scaleY) / safeZoneHeight) * physicalHeight;
+        
+        // Update the physical dimensions display
+        this.pixelToCmLabel.textContent = `${designWidthCm.toFixed(1)}cm × ${designHeightCm.toFixed(1)}cm`;
+    }
+
+    storeElementReferences() {
+        // Navigation elements
+        this.navItems = this.container.querySelectorAll('.designer-nav-item');
+        this.sectionItemsContainer = this.container.querySelector('.designer-item-sections');
+        this.sectionContents = this.container.querySelectorAll('.designer-item-section-content');
+        
+        // Upload zone elements
+        this.uploadZone = this.container.querySelector('#uploadZone');
+        this.uploadInput = this.container.querySelector('#uploadInput');
+        this.imagesGrid = this.container.querySelector('.images-grid');
+        this.imagesGridLimit = this.container.querySelector('.images-grid-limit');
+        
+        // Canvas elements
+        this.canvas = this.container.querySelector('#octo-print-designer-canvas');
+        this.viewsToolbar = this.container.querySelector('.views-toolbar');
+        
+        // Variation elements
+        this.variationsToolbar = this.container.querySelector('.variations-toolbar');
+        this.variationsList = this.container.querySelector('.variations-list');
+        
+        // Zoom controls
+        this.zoomControls = this.container.querySelector('.zoom-controls');
+        this.zoomInput = this.zoomControls.querySelector('input');
+        this.zoomButtons = this.zoomControls.querySelectorAll('button');
+        this.zoomPopup = this.container.querySelector('.zoom-level-popup');
+        this.zoomRange = this.zoomPopup.querySelector('input');
+
+        // Library section
+        this.libraryGrid = this.container.querySelector('[data-section="library"] .images-grid');
+
+        //Designer Toolbar
+        this.togglePrintZoneButton = this.container.querySelector('#toggle-print-zone');
+
+        this.toastContainer = this.container.querySelector('.toast-container');
+    }
+
+    initializeTemplates() {
+        this.libraryImageTemplate = document.querySelector('#octo-print-designer-library-image-template');
+        this.libraryItemTemplate = document.querySelector('#octo-print-designer-library-item-template');
+        this.viewButtonTemplate = document.querySelector('#octo-print-designer-view-button-template');
+    }
+
+    async init() {
+
+        this.initializeCanvas();
+        this.initializeToolbar();
+
+        await Promise.all([
+            this.loadTemplates(),
+            this.loadUserImages()
+        ]);
+        
+        this.setupNavigationEvents();
+        this.setupUploadEvents();
+        this.setupZoomControls();
+        this.setupDesignerToolbar();
+        this.setupViewButtons();
+        this.updateImagesGridLimit();
+        this.handleResize();
+
+        this.updateZoom(100);
+
+        await this.loadInitialTemplate();
+        
+        if (!this.activeTemplateId) {
+            await this.loadInitialDesign();
+        }
+    }
+
+    async loadInitialDesign() {
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialDesignId = urlParams.get('design_id');
+
+        if( !initialDesignId ) return false;
+
+        await this.loadDesign(initialDesignId);
+
+    }
+
+    async loadInitialTemplate() {
+
+        let templateId = this.getInitialTemplateByUrl();
+        if( !templateId ) templateId = this.getDefaultTemplateByData();
+
+        if( !templateId ) return;
+
+        if (templateId && this.templates.has(templateId)) {
+            await this.loadTemplate(templateId);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }
+
+    getInitialTemplateByUrl(){
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const templateId = urlParams.get('template_id');
+
+        if( !templateId ) return false;
+
+        return templateId;
+
+    }
+
+    getDefaultTemplateByData(){
+
+        const dataTemplateId = this.container.dataset.defaultTemplateId;
+
+        if( !dataTemplateId ) return false;
+
+        return dataTemplateId;
+
+    }
+
+    initializeCanvas() {
+        this.fabricCanvas = new Canvas('octo-print-designer-canvas', {
+            width: this.canvas.offsetWidth,
+            height: this.canvas.offsetHeight,
+            backgroundColor: '#fff',
+            preserveObjectStacking: true
+        });
+    }
+
+    async loadTemplates() {
+        try {
+            const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'get_templates',
+                    nonce: octoPrintDesigner.nonce
+                })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.templates = this.parseTemplates(data.data);
+                this.renderTemplatesLibrary();
+            } else {
+                throw new Error(data.data || 'Error loading templates');
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+    async loadUserImages() {
+        // Skip loading user images for non-logged in users
+        if (!this.isLoggedIn) return;
+        
+        try {
+            const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'get_user_images',
+                    nonce: octoPrintDesigner.nonce
+                })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+            
+            if (data.success) {
+                data.data.images.forEach(image => {
+                    this.addImageToGrid(image.url, image.id);
+                });
+            } else {
+                throw new Error(data.data.message || 'Error loading images');
+            }
+        } catch (error) {
+            console.error('Error loading user images:', error);
+        }
+    }
+
+    parseTemplates(templates) {
+        const parsedTemplates = new Map();
+        
+        for (const [templateId, template] of Object.entries(templates)) {
+            template.variations = new Map(Object.entries(template.variations));
+
+            for (const [variationId, variation] of template.variations) {
+                variation.views = new Map(Object.entries(variation.views));
+                if(variation.is_default) template.defaultVariation = variationId;
+            }
+
+            parsedTemplates.set(templateId, template);
+        }
+
+        return parsedTemplates;
+    }
+
+    renderTemplatesLibrary() {
+        this.libraryGrid.innerHTML = '';
+
+        for (const [templateId, template] of this.templates) {
+            const templateElement = this.createTemplateElement(template);
+            templateElement.addEventListener('click', () => this.loadTemplate(templateId));
+            this.libraryGrid.appendChild(templateElement);
+        }
+    }
+
+    createTemplateElement(template) {
+        const $element = this.libraryItemTemplate.content.cloneNode(true);
+        const $container = $element.querySelector('.library-item');
+        
+        const $preview = $container.querySelector('.image-preview');
+        const $name = $container.querySelector('span');
+        
+        const defaultVariation = template.variations.get(template.defaultVariation);
+        const firstView = Array.from(defaultVariation.views.values())[0];
+        if (firstView?.image_url) $preview.src = firstView.image_url; 
+        
+        $name.textContent = template.name;
+        
+        return $container;
+    }
+
+    setupViewButtons() {
+        this.viewsToolbar.innerHTML = '';
+    }
+
+    createViewButton(name, viewId) {
+        const buttonTemplate = this.viewButtonTemplate.content.cloneNode(true);
+        const button = buttonTemplate.querySelector('button');
+        button.textContent = name;
+        button.dataset.viewId = viewId;
+        button.classList.add('designer-view-button', 'designer-action-button');
+        return button;
+    }
+
+    updateViewButtons() {
+
+        const template = this.templates.get(this.activeTemplateId);     
+        const variation = template.variations.get(this.currentVariation);
+
+        this.viewsToolbar.innerHTML = '';
+        
+        for (const [viewId, view] of variation.views) {
+            const button = this.createViewButton(view.name, viewId);
+            this.viewsToolbar.appendChild(button);
+            
+            button.addEventListener('click', () => {
+                this.viewsToolbar.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                this.currentView = viewId;
+                this.loadTemplateView(viewId);
+            });
+        }
+        
+        const firstButton = this.viewsToolbar.querySelector('button');
+        if (firstButton) firstButton.classList.add('active');
+
+    }
+
+    updateVariationButtons() {
+        const template = this.templates.get(this.activeTemplateId);
+
+        this.variationsList.innerHTML = '';
+        
+        template.variations.forEach(variation => {
+            const button = document.createElement('button');
+            button.classList.add('variation-button');
+            button.style.backgroundColor = variation.color;
+            button.dataset.variationId = variation.id;
+            
+            if (variation.is_default) button.classList.add('active');
+            
+            button.addEventListener('click', () => this.handleVariationChange(variation.id));
+            this.variationsList.appendChild(button);
+        });
+    }
+
+    handleVariationChange(variationId) {
+        this.currentVariation = variationId;
+        
+        this.variationsList.querySelectorAll('.variation-button')
+            .forEach(btn => btn.classList.toggle('active', btn.dataset.variationId === variationId));        
+
+        this.loadTemplateView(this.currentView);
+    }
+
+    async loadTemplate(templateId) {
+        const template = this.templates.get(templateId);     
+        if (!template) return;
+
+        if( this.isMobile ) this.sectionItemsContainer.classList.toggle('hidden', true);
+
+        this.activeTemplateId = templateId;
+        this.currentVariation = template.defaultVariation;
+        
+        this.updateVariationButtons();
+        this.updateViewButtons();
+        
+        const defaultVariation = template.variations.get(template.defaultVariation);
+        const firstViewId = Array.from(defaultVariation.views.keys())[0];
+        if (firstViewId) {
+            this.currentView = firstViewId;
+            await this.loadTemplateView(firstViewId);
+        }
+
+        this.updatePixelToCmConversion();
+    }
+
+    async loadTemplateView(viewId) {
+
+        if (!this.activeTemplateId) return;
+
+        const template = this.templates.get(this.activeTemplateId);
+        const variation = template.variations.get(this.currentVariation.toString());
+        const view = variation.views.get(viewId);
+
+        if (!view) return;
+
+        Image.fromURL(view.image_url).then(img => {
+            this.renderTemplateView(view, img); 
+        });
+    }
+
+    renderTemplateView(view, fabricImage) {
+        // Clear existing canvas
+        this.fabricCanvas.clear();
+
+        this.clipMask = new Rect({
+            left: view.safeZone.left * this.fabricCanvas.width / 100,
+            top: view.safeZone.top * this.fabricCanvas.height / 100,
+            width: view.safeZone.width * this.fabricCanvas.width / 100,
+            height: view.safeZone.height * this.fabricCanvas.height / 100,
+            absolutePositioned: true,
+            fill: 'transparent',
+            selectable: false,
+            evented: false,
+            originX: 'center',
+            originY: 'center'
+        });
+
+        fabricImage.set({
+            ...view.imageZone,
+            selectable: false,
+            evented: false,
+            left: view.imageZone.left * this.fabricCanvas.width / 100,
+            top: view.imageZone.top * this.fabricCanvas.height / 100,
+            originX: 'center',
+            originY: 'center',
+        });
+
+        // 🔍 DEBUG: Detailed Print Zone Analysis
+        console.log('🔍 CANVAS DIMENSIONS:', {
+            canvasWidth: this.fabricCanvas.width,
+            canvasHeight: this.fabricCanvas.height
+        });
+
+        console.log('🔍 RAW ZONE DATA:', {
+            safeZone: view.safeZone,
+            printZone: view.printZone || 'nicht vorhanden'
+        });
+
+        // Use printZone data if available, fallback to safeZone
+        const zoneData = view.printZone || view.safeZone;
+
+        console.log('🔍 VERWENDETE ZONE DATA:', zoneData);
+
+        console.log('🔍 BERECHNUNGEN (AKTUELL - MIT /100):', {
+            left_calculated: zoneData.left * this.fabricCanvas.width / 100,
+            top_calculated: zoneData.top * this.fabricCanvas.height / 100,
+            width_calculated: zoneData.width * this.fabricCanvas.width / 100,
+            height_calculated: zoneData.height * this.fabricCanvas.height / 100
+        });
+
+        console.log('🔍 BERECHNUNGEN (TEST - OHNE /100):', {
+            left_direct: zoneData.left,
+            top_direct: zoneData.top,
+            width_direct: zoneData.width,
+            height_direct: zoneData.height
+        });
+
+        this.printingZoneElement = new Rect({
+            left: zoneData.left * this.fabricCanvas.width / 100,
+            top: zoneData.top * this.fabricCanvas.height / 100,
+            width: zoneData.width * this.fabricCanvas.width / 100,
+            height: zoneData.height * this.fabricCanvas.height / 100,
+            // fill: 'rgba(0, 124, 186, 0.2)',
+            fill: 'transparent',
+            stroke: '#007cba',
+            strokeWidth: 2,
+            strokeDashArray: [5, 5],
+            selectable: false,
+            evented: false,
+            originX: 'center',
+            originY: 'center',
+        });
+
+        if (view.colorOverlayEnabled) {
+
+            const template = this.templates.get(this.activeTemplateId);
+            const variation = template.variations.get(this.currentVariation.toString());
+
+            fabricImage.filters.push(new filters.BlendColor({
+                color: variation?.color,
+                mode: 'multiply',
+                alpha: view.overlayOpacity || 0.5
+            }));
+            fabricImage.applyFilters();
+        }
+
+        this.fabricCanvas.add(fabricImage);
+        if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
+
+        // Load saved image for this view if it exists
+        this.loadViewImage();
+    }
+
+    addImageToGrid(imageUrl, imageId, isTemporary = false) {
+        const template = this.libraryImageTemplate.content.cloneNode(true);
+        const imageItem = template.querySelector('.library-image-item');
+        const preview = imageItem.querySelector('.image-preview');
+        const removeButton = imageItem.querySelector('button');
+
+        preview.src = imageUrl;
+        imageItem.dataset.imageId = imageId;
+        imageItem.dataset.isTemporary = isTemporary ? 'true' : 'false';
+        
+        preview.addEventListener('click', () => {
+            if (this.isMobile) this.sectionItemsContainer.classList.toggle('hidden', true);
+        
+            Image.fromURL(imageUrl).then(img => {
+                const template = this.templates.get(this.activeTemplateId);
+                const variation = template.variations.get(this.currentVariation.toString());
+                const view = variation.views.get(this.currentView);
+                const safeZone = view.safeZone;
+        
+                const scaleX = safeZone.width / img.width;
+                const scaleY = safeZone.height / img.height;
+                const scale = Math.min(scaleX, scaleY, 1);  
+        
+                img.set({
+                    left: this.fabricCanvas.width / 2,
+                    top: this.fabricCanvas.height / 2,
+                    originX: 'center',
+                    originY: 'center',
+                    scaleX: scale,
+                    scaleY: scale,
+                    // Remove other styling properties that will be set in configureAndLoadFabricImage
+                });
+        
+                // Generate unique ID for the image
+                const imageId = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                img.data = { imageId };
+        
+                // Store the image in our data structure
+                this.storeViewImage(imageUrl, img);
+                
+                // Instead of adding directly to canvas, use our loading method
+                // which will properly apply all styles, filters, and clipping
+                this.loadViewImage();
+        
+                // After loading, find and select this image
+                const key = `${this.currentVariation}_${this.currentView}`;
+                const imagesArray = this.variationImages.get(key) || [];
+                const addedImageData = imagesArray.find(data => data.id === imageId);
+                
+                if (addedImageData && addedImageData.fabricImage) {
+                    this.fabricCanvas.setActiveObject(addedImageData.fabricImage);
+                    this.fabricCanvas.renderAll();
+                }
+            });
+        });
+
+        removeButton.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Are you sure you want to remove this image?')) return;
+
+            if (isTemporary) {
+                // Remove temporary image
+                this.removeTempImage(imageId);
+                imageItem.remove();
+                this.updateImagesGridLimit();
+                
+                // If this image is being used in the current view, remove it
+                if (this.currentView && this.currentVariation) {
+                    const key = `${this.currentVariation}_${this.currentView}`;
+                    const currentImage = this.variationImages.get(key);
+                    if (currentImage?.url === imageUrl) this.removeViewImage();
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        action: 'delete_user_image',
+                        nonce: octoPrintDesigner.nonce,
+                        image_id: imageId
+                    })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    imageItem.remove();
+                    this.updateImagesGridLimit();
+                    
+                    // If this image is being used in the current view, remove it
+                    if (this.currentView && this.currentVariation) {
+                        const key = `${this.currentVariation}_${this.currentView}`;
+                        const currentImage = this.variationImages.get(key);
+                        if (currentImage?.url === imageUrl) this.removeViewImage();
+                    }
+                } else {
+                    throw new Error(data.data.message || 'Error deleting image');
+                }
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                alert('Failed to delete image: ' + error.message);
+            }
+        });
+
+        this.imagesGrid.appendChild(imageItem);
+        this.updateImagesGridLimit();
+    }
+
+    storeViewImage(imageUrl, fabricImage) {
+        if (!this.currentView || !this.currentVariation) return;
+        
+        // Create a unique ID for the image
+        const imageId = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        
+        const imageData = {
+            id: imageId,
+            url: imageUrl,
+            transform: {
+                left: fabricImage.left,
+                top: fabricImage.top,
+                scaleX: fabricImage.scaleX,
+                scaleY: fabricImage.scaleY,
+                angle: fabricImage.angle,
+                width: fabricImage.width,
+                height: fabricImage.height
+            },
+            fabricImage: fabricImage,
+            visible: true
+        };
+    
+        const key = `${this.currentVariation}_${this.currentView}`;
+        
+        // Initialize array if needed
+        if (!this.variationImages.has(key)) {
+            this.variationImages.set(key, []);
+        }
+        
+        // Add to image array instead of replacing
+        this.variationImages.get(key).push(imageData);
+        
+        // Mark the template view as having custom images (existing code)
+        const template = this.templates.get(this.activeTemplateId);
+        const variation = template.variations.get(this.currentVariation.toString());
+        const view = variation.views.get(this.currentView);
+        view.has_custom_image = true;
+        
+        // Handle copying to other variations if this is the default variation
+        if (this.currentVariation != template.defaultVariation) return;
+    
+        template.variations.forEach(eachVariation => {
+            if (eachVariation.is_default || this.hasCustomImage(eachVariation.id)) return;
+    
+            const variationKey = `${eachVariation.id}_${this.currentView}`;
+            
+            // Initialize array if needed
+            if (!this.variationImages.has(variationKey)) {
+                this.variationImages.set(variationKey, []);
+            }
+            
+            // Add a deep copy of the image data (without fabricImage reference)
+            const imageCopy = {...imageData};
+            delete imageCopy.fabricImage; // We'll create a new fabric instance when loading
+            this.variationImages.get(variationKey).push(imageCopy);
+        });
+        
+        return imageId; // Return the ID so we can reference this specific image
+    }
+
+    removeViewImage(imageId = null) {
+        if (!this.currentView || !this.currentVariation) return;
+    
+        const key = `${this.currentVariation}_${this.currentView}`;
+        const imagesArray = this.variationImages.get(key);
+        
+        if (!imagesArray || imagesArray.length === 0) return;
+        
+        if (imageId) {
+            // Remove specific image by ID
+            const index = imagesArray.findIndex(img => img.id === imageId);
+            if (index !== -1) {
+                // Remove from canvas if it exists
+                const imageData = imagesArray[index];
+                if (imageData.fabricImage) {
+                    this.fabricCanvas.remove(imageData.fabricImage);
+                }
+                // Remove from array
+                imagesArray.splice(index, 1);
+            }
+        } else {
+            // Remove all images (backward compatibility)
+            imagesArray.forEach(imageData => {
+                if (imageData.fabricImage) {
+                    this.fabricCanvas.remove(imageData.fabricImage);
+                }
+            });
+            imagesArray.length = 0; // Clear the array
+        }
+        
+        // Update has_custom_image flag if needed
+        if (imagesArray.length === 0) {
+            const template = this.templates.get(this.activeTemplateId);
+            const variation = template.variations.get(this.currentVariation.toString());
+            const view = variation.views.get(this.currentView);
+            view.has_custom_image = false;
+            
+            // Also remove from other variations if this is default
+            if (this.currentVariation == template.defaultVariation) {
+                template.variations.forEach(eachVariation => {
+                    if (eachVariation.is_default) return;
+                    
+                    const variationKey = `${eachVariation.id}_${this.currentView}`;
+                    const variationImages = this.variationImages.get(variationKey);
+                    
+                    if (variationImages && variationImages.length > 0) {
+                        variationImages.forEach(img => {
+                            if (img.fabricImage) {
+                                this.fabricCanvas.remove(img.fabricImage);
+                            }
+                        });
+                        variationImages.length = 0;
+                    }
+                    
+                    const variationView = eachVariation.views.get(this.currentView);
+                    if (variationView) {
+                        variationView.has_custom_image = false;
+                    }
+                });
+            }
+        }
+        
+        // Render canvas to reflect changes
+        this.fabricCanvas.renderAll();
+    }
+
+    loadViewImage() {
+        if (!this.currentView || !this.currentVariation) return;
+    
+        const key = `${this.currentVariation}_${this.currentView}`;
+        const imagesArray = this.variationImages.get(key);
+        
+        if (!imagesArray || imagesArray.length === 0) return;
+        
+        // Get template and variation data for filter settings
+        const template = this.templates.get(this.activeTemplateId);
+        const variation = template.variations.get(this.currentVariation.toString());
+        const isDarkShirt = variation.is_dark_shirt === true;
+    
+        // Load each image
+        imagesArray.forEach(imageData => {
+            // Skip if we already have this image on canvas (avoids duplicates)
+            if (imageData.fabricImage && this.fabricCanvas.contains(imageData.fabricImage)) {
+                return;
+            }
+            
+            // If we have a URL but no fabric instance, create one
+            if (imageData.url && !imageData.fabricImage) {
+                Image.fromURL(imageData.url).then(img => {
+                    // Store the fabricImage reference
+                    imageData.fabricImage = img;
+                    
+                    // Apply common settings and load the image
+                    this.configureAndLoadFabricImage(imageData, isDarkShirt);
+                });
+            } else if (imageData.fabricImage) {
+                // We have a fabric instance already, just configure and add
+                this.configureAndLoadFabricImage(imageData, isDarkShirt);
+            }
+        });
+    }
+
+    configureAndLoadFabricImage(imageData, isDarkShirt) {
+        const img = imageData.fabricImage;
+        
+        // Reset filters
+        img.filters = [];
+        
+        if (isDarkShirt) {
+            // Settings for dark shirts (keep existing logic)
+            img.filters.push(
+                new filters.Contrast({ contrast: 0.15 }),
+                new filters.BlendColor({
+                    color: '#ffffff',
+                    mode: 'screen',
+                    alpha: 0.1
+                })
+            );
+    
+            img.applyFilters();
+            
+            img.set({
+                ...imageData.transform,
+                cornerSize: 10,
+                cornerStyle: 'circle',
+                transparentCorners: false,
+                cornerColor: '#007cba',
+                borderColor: '#007cba',
+                cornerStrokeColor: '#fff',
+                padding: 5,
+                globalCompositeOperation: 'screen',
+                preserveAspectRatio: true,
+                clipPath: this.clipMask,
+                opacity: 0.95,
+                visible: imageData.visible !== undefined ? imageData.visible : true
+            });
+        } else {
+            // Settings for light shirts (keep existing logic)
+            img.filters.push(
+                new filters.Brightness({ brightness: -0.05 }),
+                new filters.Contrast({ contrast: 0.1 }),
+                new filters.BlendColor({
+                    color: '#ffffff',
+                    mode: 'multiply',
+                    alpha: 0.9
+                })
+            );
+    
+            img.applyFilters();
+            
+            img.set({
+                ...imageData.transform,
+                cornerSize: 10,
+                cornerStyle: 'circle',
+                transparentCorners: false,
+                cornerColor: '#007cba',
+                borderColor: '#007cba',
+                cornerStrokeColor: '#fff',
+                padding: 5,
+                globalCompositeOperation: 'multiply',
+                preserveAspectRatio: true,
+                clipPath: this.clipMask,
+                opacity: 0.8,
+                visible: imageData.visible !== undefined ? imageData.visible : true
+            });
+        }
+    
+        // Bind events to this image
+        this.bindImageEvents(img);
+        
+        // Add to canvas
+        this.fabricCanvas.add(img);
+        img.setCoords();
+        
+        // Render canvas
+        this.fabricCanvas.renderAll();
+    }
+
+    hasCustomImage(variationId) {
+
+        const variation = this.templates.get(this.activeTemplateId).variations.get(variationId.toString());
+        const view = variation.views.get(this.currentView);
+        return view.has_custom_image;
+        
+    }
+
+    copyImageFromDefaultVariation(targetVariationId) {
+        const template = this.templates.get(this.activeTemplateId);
+        const defaultVariation = template.variations.find(v => v.is_default);
+        
+        const defaultImageData = this.variationImages.get(`${defaultVariation.id}_${this.currentView}`);
+        if (defaultImageData) {
+            this.variationImages.set(`${targetVariationId}_${this.currentView}`, {...defaultImageData});
+        }
+    }
+
+    bindImageEvents(img) {
+
+        img.on('scaling', (event) => {
+            // Maintain aspect ratio
+            if (img.scaleX !== img.scaleY) {
+                const avgScale = (img.scaleX + img.scaleY) / 2;
+                img.set({
+                    scaleX: avgScale,
+                    scaleY: avgScale
+                });
+            }
+            
+            // Update input fields during scaling
+            if (this.widthInput && this.heightInput) {
+                this.widthInput.value = Math.round(img.width * img.scaleX);
+                this.heightInput.value = Math.round(img.height * img.scaleY);
+                
+                // Update physical dimensions display
+                this.updatePixelToCmConversion();
+            }
+            
+            // Update toolbar position
+            this.updateToolbarPosition();
+        });
+
+        img.on('modified', () => {
+            // Maintain aspect ratio
+            if (img.scaleX !== img.scaleY) {
+                const avgScale = (img.scaleX + img.scaleY) / 2;
+                img.set({
+                    scaleX: avgScale,
+                    scaleY: avgScale
+                });
+            }
+    
+            // Update input fields
+            if (this.widthInput && this.heightInput) {
+                this.widthInput.value = Math.round(img.width * img.scaleX);
+                this.heightInput.value = Math.round(img.height * img.scaleY);
+                
+                // Update physical dimensions display
+                this.updatePixelToCmConversion();
+            }
+    
+            // Find and update the corresponding image data
+            this.updateImageTransform(img);
+            
+            this.fabricCanvas.renderAll();
+            this.updateToolbarPosition();
+        });
+
+        img.on('selected', () => {
+            img.set({
+                borderColor: '#007cba',
+                cornerColor: '#007cba'
+            });
+            this.showToolbar();
+        });
+
+        img.on('deselected', () => {
+            img.set({
+                borderColor: '#d2d2d2',
+                cornerColor: '#d2d2d2'
+            });
+            this.hideToolbar();
+        });
+
+        img.on('moving', () => {
+            this.updateToolbarPosition();
+        });
+    }
+
+    updateImageTransform(img) {
+        if (!this.currentView || !this.currentVariation) return;
+        
+        const key = `${this.currentVariation}_${this.currentView}`;
+        const imagesArray = this.variationImages.get(key);
+        
+        if (!imagesArray) return;
+        
+        // Find the image by reference or by ID
+        const imageData = imagesArray.find(data => 
+            data.fabricImage === img || (img.data && img.data.imageId === data.id)
+        );
+        
+        if (imageData) {
+            // Update transform data
+            imageData.transform = {
+                left: img.left,
+                top: img.top,
+                scaleX: img.scaleX,
+                scaleY: img.scaleY,
+                angle: img.angle,
+                width: img.width,
+                height: img.height
+            };
+        }
+    }
+
+    setupNavigationEvents() {
+        this.navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                if (item.dataset.type === 'fiverr') {
+                    window.open('https://fiverr.com', '_blank');
+                    return;
+                }
+
+                this.navItems.forEach(navItem => navItem.classList.remove('active'));
+                item.classList.add('active');
+
+                const sectionType = item.dataset.type;
+                this.sectionContents.forEach(section => {
+                    section.classList.toggle('hidden', section.dataset.section !== sectionType);
+                });
+            });
+        });
+    }
+
+    showToolbar() {
+        const activeObject = this.fabricCanvas.getActiveObject();
+        if (!activeObject) return;
+
+        // Update dimension inputs
+        this.widthInput.value = Math.round(activeObject.width * activeObject.scaleX);
+        this.heightInput.value = Math.round(activeObject.height * activeObject.scaleY);
+        
+        // Update physical dimensions display
+        this.updatePixelToCmConversion();
+
+        this.imageToolbar.classList.add('visible');
+        this.updateToolbarPosition();
+    }
+    
+    hideToolbar() {
+        this.imageToolbar.classList.remove('visible');
+    }
+    
+    updateToolbarPosition() {
+        const activeObject = this.fabricCanvas.getActiveObject();
+        if (!activeObject) return;
+    
+        // Get canvas container (wrapper) rect
+        const containerRect = this.canvas.parentNode.getBoundingClientRect();
+        
+        // Get object coordinates relative to canvas
+        const objCoords = activeObject.getBoundingRect();
+        const zoom = this.fabricCanvas.getZoom();
+        const pan = this.fabricCanvas.viewportTransform;
+    
+        // Calculate absolute position considering zoom and pan
+        const absoluteLeft = (objCoords.left * zoom) + pan[4];
+        const absoluteTop = (objCoords.top * zoom) + pan[5];
+        const absoluteWidth = objCoords.width * zoom;
+        
+        // Position the toolbar relative to the canvas container
+        this.imageToolbar.style.left = `${absoluteLeft + (absoluteWidth / 2)}px`;
+        this.imageToolbar.style.top = `${absoluteTop - this.imageToolbar.offsetHeight - 10}px`;
+    }
+
+    setupUploadEvents() {
+        // Setup drag and drop
+        this.uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.uploadZone.style.backgroundColor = '#f8f8f8';
+        });
+
+        this.uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.uploadZone.style.backgroundColor = '';
+        });
+
+        this.uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.uploadZone.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            this.handleFileUpload(files);
+        });
+
+        // Setup click to upload
+        this.uploadZone.addEventListener('click', () => {
+            this.uploadInput.click();
+        });
+
+        this.uploadInput.addEventListener('change', (e) => {
+            this.handleFileUpload(e.target.files);
+        });
+    }
+
+    async handleFileUpload(files) {
+        if (!files.length) return;
+
+        const allowedTypes = ['image/jpeg', 'image/png'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxImages = 20; // Match server-side limit
+        const currentImages = this.imagesGrid.querySelectorAll('.library-image-item').length;
+
+        if (currentImages >= maxImages) {
+            alert('Maximum number of images reached');
+            return;
+        }
+
+        for (const file of Array.from(files)) {
+            // Validate file type and size
+            if (!allowedTypes.includes(file.type)) {
+                alert('Only JPG and PNG files are allowed');
+                continue;
+            }
+
+            if (file.size > maxSize) {
+                alert('File size must be less than 5MB');
+                continue;
+            }
+
+            if (currentImages + files.length > maxImages) {
+                alert(`Can only add ${maxImages - currentImages} more images`);
+                break;
+            }
+
+            // For non-logged in users, handle files in memory
+            if (!this.isLoggedIn) {
+                this.handleTempImageUpload(file);
+                continue;
+            }
+
+            try {
+                // Create FormData and upload to server for logged-in users
+                const formData = new FormData();
+                formData.append('action', 'upload_user_image');
+                formData.append('nonce', octoPrintDesigner.nonce);
+                formData.append('image', file);
+
+                const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Add image to grid with server-generated ID
+                    this.addImageToGrid(data.data.url, data.data.id);
+                } else {
+                    throw new Error(data.data.message || 'Error uploading image');
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                alert('Failed to upload image: ' + error.message);
+            }
+        }
+    }
+
+    // Handle temporary image upload for non-logged users
+    handleTempImageUpload(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imageUrl = e.target.result;
+            const tempId = `temp-${++this.tempImageCounter}`;
+            
+            // Store in tempImages array
+            this.tempImages.push({
+                id: tempId,
+                url: imageUrl,
+                file: file
+            });
+            
+            // Add to grid with temporary flag
+            this.addImageToGrid(imageUrl, tempId, true);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Remove a temporary image by ID
+    removeTempImage(tempId) {
+        const index = this.tempImages.findIndex(img => img.id === tempId);
+        if (index !== -1) {
+            this.tempImages.splice(index, 1);
+        }
+    }
+
+    updateImagesGridLimit() {
+        const maxImages = 25;
+        const currentImages = this.imagesGrid.querySelectorAll('.library-image-item').length;
+        this.imagesGridLimit.innerHTML = `${currentImages}/<b>${maxImages}</b>`;
+    }
+
+    setupDesignerToolbar(){
+
+        this.togglePrintZoneButton.addEventListener('click', () => {
+            this.isPrintingVisible = !this.isPrintingVisible || false;
+            this.togglePrintZoneButton.classList.toggle('active', this.isPrintingVisible);
+            if( this.isPrintingVisible ) this.fabricCanvas.add(this.printingZoneElement);
+            else this.fabricCanvas.remove(this.printingZoneElement);
+        });
+
+    }
+
+    setupZoomControls() {
+        let zoomTimeout;
+        const minZoom = 10;  // 10%
+        const maxZoom = 200; // 200%
+        const step = 10;     // 10% steps
+    
+        // Setup zoom buttons
+        this.zoomButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const currentZoom = parseInt(this.zoomInput.value);
+                const newZoom = button.dataset.zoomType === 'in' 
+                    ? Math.min(currentZoom + step, maxZoom)
+                    : Math.max(currentZoom - step, minZoom);
+                    
+                this.updateZoom(newZoom);
+            });
+        });
+    
+        // Setup zoom input
+        this.zoomInput.addEventListener('input', (e) => {
+            let value = parseInt(e.target.value);
+            // Ensure value is within bounds
+            value = Math.max(minZoom, Math.min(maxZoom, value));
+            // Ensure value is a multiple of step
+            value = Math.round(value / step) * step;
+            this.updateZoom(value);
+        });
+    
+        // Setup zoom range in popup
+        this.zoomRange.addEventListener('input', (e) => {
+            this.updateZoom(parseInt(e.target.value));
+        });
+    
+        // Show/hide zoom popup
+        this.zoomInput.addEventListener('focus', () => {
+            clearTimeout(zoomTimeout);
+            this.zoomPopup.classList.remove('hidden');
+            this.zoomRange.focus();
+        });
+    
+        this.zoomRange.addEventListener('blur', () => {
+            zoomTimeout = setTimeout(() => {
+                this.zoomPopup.classList.add('hidden');
+            }, 200);
+        });
+    }
+
+    updateZoom(percentage) {
+        // Update inputs with percentage value
+        this.zoomInput.value = percentage;
+        this.zoomRange.value = percentage;
+        
+        // Convert percentage to zoom factor (100% = 1.0)
+        const zoom = percentage / 100;
+        
+        // Get the canvas center
+        const center = {
+            x: this.fabricCanvas.width / 2,
+            y: this.fabricCanvas.height / 2
+        };
+    
+        // Apply zoom from center
+        this.fabricCanvas.zoomToPoint(center, zoom);
+        this.fabricCanvas.renderAll();
+    
+        // Update any UI elements that depend on zoom level
+        if (this.imageToolbar?.classList.contains('visible')) {
+            this.updateToolbarPosition();
+        }
+    }
+
+    handleResize() {
+        
+        // Check if mobile view (under 950px)
+        this.isMobile = window.innerWidth <= 950;
+        
+        // Toggle section visibility based on viewport
+        if (!this.isMobile) this.sectionItemsContainer.classList.remove('hidden');
+        
+        // Add click handlers for mobile navigation
+        this.navItems.forEach(item => {
+            const originalClickHandler = item.onclick;
+            item.onclick = (e) => {
+                if (this.isMobile && item.dataset.type !== 'fiverr') this.sectionItemsContainer.classList.toggle('hidden');
+                if (originalClickHandler) originalClickHandler(e);
+            };
+        });
+    
+        // Reload current view to adjust positions
+        if (this.currentView) {
+            this.loadTemplateView(this.currentView);
+        }
+    }
+
+    // Add these new methods to DesignerWidget class
+    storeModalElements() {
+        this.saveDesignModal = document.getElementById('saveDesignModal');
+        if (!this.saveDesignModal) return;
+
+        this.modalNameInput = this.saveDesignModal.querySelector('#designName');
+        this.modalDesignId = this.saveDesignModal.querySelector('#designId');
+        this.modalSaveButton = this.saveDesignModal.querySelector('.designer-modal-save');
+        this.modalCancelButton = this.saveDesignModal.querySelector('.designer-modal-cancel');
+        this.modalCloseButton = this.saveDesignModal.querySelector('.designer-modal-close');
+    }
+
+    setupModalEvents() {
+        if (!this.saveDesignModal) return;
+
+        // Save button in footer
+        const saveButton = this.container.querySelector('.designer-editor footer .designer-action-button');
+        saveButton.addEventListener('click', () => this.showSaveModal());
+
+        // Modal events
+        this.modalSaveButton.addEventListener('click', () => this.saveDesign());
+        this.modalCancelButton.addEventListener('click', () => this.hideModal());
+        this.modalCloseButton.addEventListener('click', () => this.hideModal());
+        
+        // Close on overlay click
+        this.saveDesignModal.querySelector('.designer-modal-overlay')
+            .addEventListener('click', () => this.hideModal());
+
+        // Prevent modal close when clicking modal content
+        this.saveDesignModal.querySelector('.designer-modal-content')
+            .addEventListener('click', e => e.stopPropagation());
+    }
+
+    showSaveModal() {
+
+        if (!this.isLoggedIn) {
+            this.showLoginModal();
+            return;
+        }
+
+        if (!this.activeTemplateId) {
+            alert('Please select a template first');
+            return;
+        }
+
+        this.saveDesignModal.classList.remove('hidden');
+        this.modalNameInput.focus();
+    }
+
+    showLoginModal() {
+
+        try{
+            elementorProFrontend.modules.popup.showPopup( { id: 1831 } );
+        }catch(e){
+        }
+
+        // const loginModal = document.getElementById('loginRequiredModal');
+        // if (!loginModal) return;
+
+        // // Disable all interactions with the designer
+        // this.container.querySelectorAll('button, input, a').forEach(element => {
+        //     if (!element.closest('#loginRequiredModal')) {
+        //         element.style.pointerEvents = 'none';
+        //     }
+        // });
+
+        // loginModal.classList.remove('hidden');
+    }
+
+    hideModal() {
+        this.saveDesignModal.classList.remove('loading');
+        this.saveDesignModal.classList.add('hidden');
+    }
+
+    async saveDesign() {
+        // Skip save for non-logged users
+        if (!this.isLoggedIn) {
+            this.showLoginModal();
+            return;
+        }
+        
+        const name = this.modalNameInput.value.trim();
+        if (!name) {
+            alert('Please enter a name for your design');
+            return;
+        }
+    
+        try {
+            this.saveDesignModal.classList.add('loading');
+            
+            // Collect the current design state
+            const designData = this.collectDesignState();
+    
+            const formData = new FormData();
+            formData.append('action', 'save_design');
+            formData.append('nonce', octoPrintDesigner.nonce);
+            formData.append('template_id', this.activeTemplateId);
+            formData.append('name', name);
+            formData.append('design_data', JSON.stringify(designData));
+            
+            if (this.currentDesignId) {
+                formData.append('design_id', this.currentDesignId);
+                
+                // For existing designs, capture all view previews if we're updating the design
+                const previews = await this.captureAllViewsPreviews();
+                let viewIndex = 0;
+                
+                for (const viewId in previews) {
+                    const preview = previews[viewId];
+                    formData.append(`preview_image_${viewId}`, preview.blob, `preview_${viewId}.png`);
+                    formData.append(`preview_view_${viewId}`, viewId);
+                    formData.append(`preview_view_name_${viewId}`, preview.viewName);
+                    viewIndex++;
+                }
+                
+                formData.append('preview_count', viewIndex); // Add count of previews
+            } else {
+                // For new designs, capture all view previews
+                const previews = await this.captureAllViewsPreviews();
+                let viewIndex = 0;
+                
+                for (const viewId in previews) {
+                    const preview = previews[viewId];
+                    formData.append(`preview_image_${viewId}`, preview.blob, `preview_${viewId}.png`);
+                    formData.append(`preview_view_${viewId}`, viewId);
+                    formData.append(`preview_view_name_${viewId}`, preview.viewName);
+                    viewIndex++;
+                }
+                
+                formData.append('preview_count', viewIndex); // Add count of previews
+            }
+    
+            const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                method: 'POST',
+                body: formData
+            });
+    
+            if (!response.ok) throw new Error('Network response was not ok');
+    
+            const data = await response.json();
+            
+            if (data.success) {
+                this.toastManager.show('Design saved!', 'success');
+                this.currentDesignId = data.data.design_id;
+    
+                setTimeout(() => {
+                    // window.location.href = data.data.redirect_url;
+                }, 1000);
+    
+            } else {
+                throw new Error(data.data.message || 'Error saving design');
+            }
+        } catch (error) {
+            this.toastManager.show('Error while saving the design', 'error', { duration: null });
+            console.error('Error saving design:', error);
+            alert('Failed to save design: ' + error.message);
+        } finally {
+            this.saveDesignModal.classList.remove('loading');
+        }
+    }
+
+    async loadDesign(designId) {
+        // Skip for non-logged users
+        if (!this.isLoggedIn) {
+            this.showLoginModal();
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'load_design');
+            formData.append('nonce', octoPrintDesigner.nonce);
+            formData.append('design_id', designId);
+
+            const response = await fetch(octoPrintDesigner.ajaxUrl, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.toastManager.show('Design loaded', 'success');
+                await this.applyDesignState(data.data);
+            } else {
+                throw new Error(data.data.message || 'Error loading design');
+            }
+        } catch (error) {
+            this.toastManager.show('Error loading the design', 'error');
+            console.error('Error loading design:', error);
+            alert('Failed to load design: ' + error.message);
+        }
+    }
+
+    collectDesignState() {
+        // Create an object representing the current state of the design
+        const state = {
+            templateId: this.activeTemplateId,
+            currentVariation: this.currentVariation,
+            variationImages: {}
+        };
+    
+        // Convert the variationImages Map to a plain object with arrays
+        for (const [key, imagesArray] of this.variationImages) {
+            if (!imagesArray || imagesArray.length === 0) continue;
+            
+            state.variationImages[key] = imagesArray.map(imageData => {
+                // Create a clean version without circular references
+                return {
+                    id: imageData.id,
+                    url: imageData.url,
+                    transform: {
+                        left: imageData.transform.left,
+                        top: imageData.transform.top,
+                        scaleX: imageData.transform.scaleX,
+                        scaleY: imageData.transform.scaleY,
+                        angle: imageData.transform.angle,
+                        width: imageData.transform.width || imageData.fabricImage.width,
+                        height: imageData.transform.height || imageData.fabricImage.height
+                    },
+                    visible: imageData.visible !== undefined ? imageData.visible : true
+                };
+            });
+        }
+    
+        return state;
+    }
+
+    async applyDesignState(design) {
+        const designData = JSON.parse(design.design_data);
+        
+        // Load the template first
+        await this.loadTemplate(designData.templateId);
+        
+        // Clear existing images
+        this.variationImages.clear();
+        
+        // Restore variation images - handle both formats
+        for (const [key, value] of Object.entries(designData.variationImages || {})) {
+            const [variationId, viewId] = key.split('_');
+            
+            if (Array.isArray(value)) {
+                // New format: array of images
+                for (const imageData of value) {
+                    await this.restoreViewImage(variationId, viewId, imageData);
+                }
+            } else {
+                // Old format: single image object - convert to array format
+                await this.restoreViewImage(variationId, viewId, value);
+            }
+        }
+    
+        // Load the template again to refresh the view
+        this.loadTemplate(designData.templateId);
+    
+        // Store the current design ID
+        this.currentDesignId = design.id;
+        this.modalNameInput.value = design.name;
+        this.modalDesignId.value = design.id;
+    }
+
+    async restoreViewImage(variationId, viewId, imageData) {
+        try {
+            const img = await Image.fromURL(imageData.url);
+            
+            // Set image properties
+            img.set({
+                originX: 'center',
+                originY: 'center',
+                cornerSize: 10,
+                cornerStyle: 'circle',
+                transparentCorners: false,
+                cornerColor: '#007cba',
+                borderColor: '#007cba',
+                cornerStrokeColor: '#fff',
+                padding: 5, 
+                centeredScaling: true,
+                preserveAspectRatio: true,
+                ...imageData.transform
+            });
+            
+            // Store image ID in fabric object for reference
+            img.data = {
+                imageId: imageData.id || `img_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+            };
+            
+            // Get or create key in variationImages map
+            const key = `${variationId}_${viewId}`;
+            if (!this.variationImages.has(key)) {
+                this.variationImages.set(key, []);
+            }
+            
+            // Add image to the array
+            this.variationImages.get(key).push({
+                id: img.data.imageId,
+                url: imageData.url,
+                transform: imageData.transform,
+                fabricImage: img,
+                visible: imageData.visible !== undefined ? imageData.visible : true
+            });
+            
+            // Bind events to the image
+            this.bindImageEvents(img);
+            
+            return img;
+        } catch (error) {
+            console.error('Error restoring image:', error);
+            return null;
+        }
+    }
+
+    async captureCanvasPreview() {
+        // Create temporary canvas for preview 
+        const tempCanvasElement = document.createElement('canvas');
+        const tempCanvas = new Canvas(tempCanvasElement, {
+            width: 500,
+            height: 500,
+            backgroundColor: 'white'
+        });
+    
+        try {
+            // Get the current template view settings
+            const template = this.templates.get(this.activeTemplateId);
+            const variation = template.variations.get(this.currentVariation.toString());
+            const view = variation.views.get(this.currentView);
+    
+            // Add template background with same settings as main canvas
+            const backgroundImage = await Image.fromURL(view.image_url);
+            backgroundImage.set({
+                ...view.imageZone,
+                selectable: false,
+                evented: false,
+                left: view.imageZone.left * tempCanvas.width / 100,
+                top: view.imageZone.top * tempCanvas.height / 100,
+                originX: 'center',
+                originY: 'center'
+            });
+    
+            // Add color overlay if enabled
+            if (view.colorOverlayEnabled) {
+                backgroundImage.filters.push(new filters.BlendColor({
+                    color: variation?.color,
+                    mode: 'multiply',
+                    alpha: view.overlayOpacity || 0.5
+                }));
+                backgroundImage.applyFilters();
+            }
+    
+            tempCanvas.add(backgroundImage);
+    
+            // Get current user images for this view
+            const key = `${this.currentVariation}_${this.currentView}`;
+            const imagesArray = this.variationImages.get(key) || [];
+            
+            // Calculate position adjustment factors
+            const widthRatio = tempCanvas.width / this.fabricCanvas.width;
+            const heightRatio = tempCanvas.height / this.fabricCanvas.height;
+    
+            // Create clipPath with adjusted dimensions
+            const clipPath = new Rect({
+                left: view.safeZone.left * tempCanvas.width / 100,
+                top: view.safeZone.top * tempCanvas.height / 100,
+                width: view.safeZone.width * tempCanvas.width / 100,
+                height: view.safeZone.height * tempCanvas.height / 100,
+                absolutePositioned: true,
+                fill: 'transparent',
+                selectable: false,
+                evented: false,
+                originX: 'center',
+                originY: 'center'
+            });
+    
+            // Add each image to the preview canvas
+            for (const imageData of imagesArray) {
+                if (!imageData.visible || !imageData.url) continue;
+                
+                // Load the image
+                const userImage = await Image.fromURL(imageData.url);
+                
+                // Set position and transformation
+                userImage.set({
+                    left: imageData.transform.left * widthRatio,
+                    top: imageData.transform.top * heightRatio,
+                    scaleX: imageData.transform.scaleX,
+                    scaleY: imageData.transform.scaleY,
+                    angle: imageData.transform.angle || 0,
+                    originX: 'center',
+                    originY: 'center',
+                    clipPath: clipPath
+                });
+                
+                // Apply dark/light shirt filters if needed
+                const isDarkShirt = variation.is_dark_shirt === true;
+                if (isDarkShirt) {
+                    userImage.filters.push(
+                        new filters.Contrast({ contrast: 0.15 }),
+                        new filters.BlendColor({
+                            color: '#ffffff',
+                            mode: 'screen',
+                            alpha: 0.1
+                        })
+                    );
+                    userImage.set({
+                        globalCompositeOperation: 'screen',
+                        opacity: 0.95
+                    });
+                } else {
+                    userImage.filters.push(
+                        new filters.Brightness({ brightness: -0.05 }),
+                        new filters.Contrast({ contrast: 0.1 }),
+                        new filters.BlendColor({
+                            color: '#ffffff',
+                            mode: 'multiply',
+                            alpha: 0.9
+                        })
+                    );
+                    userImage.set({
+                        globalCompositeOperation: 'multiply',
+                        opacity: 0.8
+                    });
+                }
+                
+                userImage.applyFilters();
+                tempCanvas.add(userImage);
+            }
+    
+            tempCanvas.renderAll();
+            return tempCanvas.toDataURL({
+                format: 'png',
+                quality: 0.8
+            });
+    
+        } finally {
+            tempCanvas.dispose();
+        }
+    }
+
+    async captureAllViewsPreviews() {
+        // Get the current template and variation
+        const template = this.templates.get(this.activeTemplateId);
+        console.log(template);
+        if (!template) return {};
+        
+        const variation = template.variations.get(this.currentVariation.toString());
+        console.log(variation); 
+        if (!variation) return {};
+        
+        // Store the current view so we can restore it later
+        const originalView = this.currentView;
+        
+        // Object to store all previews
+        const previews = {};
+        
+        // Capture preview for each view
+        for (const [viewId, view] of variation.views) {
+            // Set current view to capture
+            this.currentView = viewId;
+            
+            // Capture the preview
+            const previewDataUrl = await this.captureCanvasPreview();
+            
+            // Convert data URL to blob
+            const blob = await (await fetch(previewDataUrl)).blob();
+            
+            // Store the preview
+            previews[viewId] = {
+                viewId: viewId,
+                viewName: view.name,
+                blob: blob
+            };
+        }
+        
+        // Restore the original view
+        this.currentView = originalView;
+        
+        return previews;
+    }
+
+}
+
+// Initialize the designer widget when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new DesignerWidget();
+});

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 3 Canvas System - Functionality Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
+        .test-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        #canvas-container { margin: 20px 0; padding: 20px; border: 2px dashed #ccc; min-height: 300px; }
+        .test-button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .test-button:hover { background: #005a87; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Agent 3 Canvas System - Functionality Test</h1>
+        <p>Testing the 3-phase WooCommerce Admin Canvas Rendering System</p>
+
+        <div class="test-section info">
+            <h2>System Requirements</h2>
+            <ul id="requirements-list">
+                <li id="req-admin-renderer">❓ AdminCanvasRenderer class loaded</li>
+                <li id="req-preview-generator">❓ DesignPreviewGenerator available</li>
+                <li id="req-admin-integration">❓ AdminPreviewIntegration available</li>
+                <li id="req-no-jquery">❓ jQuery-free operation</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Canvas Rendering Test</h2>
+            <button class="test-button" onclick="testCanvasRenderer()">Test Canvas Renderer</button>
+            <button class="test-button" onclick="testDesignPreview()">Test Design Preview</button>
+            <button class="test-button" onclick="runFullTest()">Run Full Test Suite</button>
+            <div id="canvas-container">
+                <p style="text-align: center; color: #666;">Canvas will appear here</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Console Log</h2>
+            <div id="console-log" class="log"></div>
+        </div>
+    </div>
+
+    <!-- Load Agent 3 Canvas System Scripts in correct order -->
+    <script src="admin/js/admin-canvas-renderer.js"></script>
+    <script src="admin/js/design-preview-generator.js"></script>
+    <script src="admin/js/admin-preview-integration.js"></script>
+
+    <script>
+        // Console log capture
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const logElement = document.getElementById('console-log');
+
+        function appendToLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+            logElement.innerHTML += `<div style="color: ${type === 'error' ? 'red' : type === 'warn' ? 'orange' : 'black'}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            appendToLog('log', ...args);
+            originalLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            appendToLog('error', ...args);
+            originalError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            appendToLog('warn', ...args);
+            originalWarn.apply(console, args);
+        };
+
+        // Test functions
+        function checkRequirements() {
+            const requirements = {
+                'req-admin-renderer': typeof window.AdminCanvasRenderer !== 'undefined',
+                'req-preview-generator': typeof window.DesignPreviewGenerator !== 'undefined',
+                'req-admin-integration': typeof window.AdminPreviewIntegration !== 'undefined',
+                'req-no-jquery': typeof window.$ === 'undefined' || typeof window.jQuery === 'undefined'
+            };
+
+            Object.entries(requirements).forEach(([id, passed]) => {
+                const element = document.getElementById(id);
+                element.textContent = element.textContent.replace('❓', passed ? '✅' : '❌');
+                element.style.color = passed ? 'green' : 'red';
+            });
+
+            return Object.values(requirements).every(Boolean);
+        }
+
+        function addResult(title, success, details = '') {
+            const resultsContainer = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-section ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <h3>${success ? '✅' : '❌'} ${title}</h3>
+                <p>${details}</p>
+            `;
+            resultsContainer.appendChild(resultDiv);
+        }
+
+        function testCanvasRenderer() {
+            console.log('🧪 Testing AdminCanvasRenderer...');
+
+            try {
+                if (typeof window.AdminCanvasRenderer === 'undefined') {
+                    throw new Error('AdminCanvasRenderer class not available');
+                }
+
+                const renderer = new AdminCanvasRenderer();
+                const success = renderer.init('canvas-container');
+
+                if (success) {
+                    addResult('Canvas Renderer Initialization', true, 'Canvas successfully initialized with proper dimensions');
+
+                    // Test basic rendering
+                    const testData = {
+                        'front': {
+                            images: [
+                                {
+                                    id: 'test-rect',
+                                    url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3Y2JhIi8+Cjwvc3ZnPg==',
+                                    transform: {
+                                        left: 50,
+                                        top: 50,
+                                        scaleX: 1,
+                                        scaleY: 1,
+                                        angle: 0
+                                    }
+                                }
+                            ]
+                        }
+                    };
+
+                    renderer.renderDesign(testData).then(() => {
+                        addResult('Canvas Rendering Test', true, 'Test design rendered successfully');
+                    }).catch(error => {
+                        addResult('Canvas Rendering Test', false, `Rendering failed: ${error.message}`);
+                    });
+                } else {
+                    throw new Error('Canvas initialization failed');
+                }
+            } catch (error) {
+                addResult('Canvas Renderer Test', false, error.message);
+                console.error('Canvas renderer test failed:', error);
+            }
+        }
+
+        function testDesignPreview() {
+            console.log('🧪 Testing DesignPreviewGenerator...');
+
+            if (typeof window.DesignPreviewGenerator === 'undefined') {
+                addResult('Design Preview Generator', false, 'DesignPreviewGenerator class not available');
+                return;
+            }
+
+            try {
+                // This would normally test the design preview generator
+                addResult('Design Preview Generator', true, 'DesignPreviewGenerator class loaded successfully');
+            } catch (error) {
+                addResult('Design Preview Generator', false, error.message);
+            }
+        }
+
+        function runFullTest() {
+            console.log('🧪 Running full Agent 3 canvas system test...');
+
+            // Clear previous results
+            document.getElementById('test-results').innerHTML = '';
+
+            // Check requirements first
+            const requirementsPassed = checkRequirements();
+            addResult('System Requirements Check', requirementsPassed,
+                requirementsPassed ? 'All requirements met' : 'Some requirements failed - check the requirements list above');
+
+            if (requirementsPassed) {
+                testCanvasRenderer();
+                testDesignPreview();
+            } else {
+                addResult('Full Test Suite', false, 'Cannot run full tests - requirements not met');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 Agent 3 Canvas System Test - Page loaded');
+            checkRequirements();
+        });
+    </script>
+</body>
+</html>

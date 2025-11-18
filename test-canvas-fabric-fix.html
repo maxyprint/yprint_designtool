@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 Canvas Fabric Fix Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        #octo-print-designer-canvas { border: 2px solid #007cba; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Canvas Fabric Fix Verification</h1>
+    <p>Testing Agent 3's minimal fix for canvas instantiation failure.</p>
+
+    <div id="test-results"></div>
+
+    <!-- Designer Canvas Element -->
+    <div class="octo-print-designer">
+        <canvas id="octo-print-designer-canvas" width="800" height="600"></canvas>
+    </div>
+
+    <!-- Load the fixed designer.bundle.js -->
+    <script src="public/js/dist/designer.bundle.js"></script>
+
+    <script>
+        const results = document.getElementById('test-results');
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function runCanvasFabricTests() {
+            addResult('🔄 Starting Canvas Fabric Fix Tests...', 'info');
+
+            // Test 1: Check if canvas element exists
+            const canvas = document.getElementById('octo-print-designer-canvas');
+            if (canvas) {
+                addResult('✅ Test 1: Canvas element exists', 'success');
+            } else {
+                addResult('❌ Test 1: Canvas element missing', 'error');
+                return;
+            }
+
+            // Test 2: Check if DesignerWidget can be created
+            try {
+                if (typeof window.DesignerWidget !== 'undefined') {
+                    addResult('✅ Test 2: DesignerWidget class available', 'success');
+                } else {
+                    addResult('⚠️ Test 2: DesignerWidget not yet available', 'info');
+                    setTimeout(runCanvasFabricTests, 1000);
+                    return;
+                }
+            } catch (e) {
+                addResult('❌ Test 2: DesignerWidget error: ' + e.message, 'error');
+            }
+
+            // Test 3: Try to create DesignerWidget instance
+            try {
+                const container = document.querySelector('.octo-print-designer');
+                if (container && window.DesignerWidget) {
+                    const designer = new window.DesignerWidget(container);
+                    addResult('✅ Test 3: DesignerWidget instance created', 'success');
+
+                    // Test 4: Check if canvas.__fabric property is set
+                    setTimeout(() => {
+                        const canvasElement = document.getElementById('octo-print-designer-canvas');
+                        if (canvasElement && canvasElement.__fabric) {
+                            addResult('🎉 Test 4: canvas.__fabric property SET - PARADOX ELIMINATED!', 'success');
+                            addResult('📊 Fabric Canvas Object: ' + typeof canvasElement.__fabric, 'success');
+                        } else {
+                            addResult('❌ Test 4: canvas.__fabric property NOT SET - Paradox persists', 'error');
+
+                            // Additional debugging
+                            const allCanvases = document.querySelectorAll('canvas');
+                            addResult('🔍 Debug: Found ' + allCanvases.length + ' canvas elements', 'info');
+                            allCanvases.forEach((c, i) => {
+                                addResult(`Canvas ${i}: id="${c.id}" __fabric=${!!c.__fabric}`, 'info');
+                            });
+                        }
+                    }, 2000);
+                } else {
+                    addResult('❌ Test 3: Cannot create DesignerWidget - missing container or class', 'error');
+                }
+            } catch (e) {
+                addResult('❌ Test 3: DesignerWidget creation failed: ' + e.message, 'error');
+            }
+        }
+
+        // Wait for page load and run tests
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runCanvasFabricTests);
+        } else {
+            runCanvasFabricTests();
+        }
+
+        // Also provide manual test function
+        window.testCanvasFabric = function() {
+            results.innerHTML = '';
+            runCanvasFabricTests();
+        };
+
+        console.log('🧪 Canvas Fabric Fix Verification Loaded');
+        console.log('💡 Run window.testCanvasFabric() to re-run tests');
+    </script>
+</body>
+</html>

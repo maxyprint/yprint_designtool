@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🖨️ PNG-Only System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        #test-canvas {
+            border: 2px solid #007cba;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007cba;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn:hover { background: #005a87; }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .preview-area {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007cba;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖨️ PNG-Only System Test Interface</h1>
+        <p>Testing the new high-DPI PNG export system for print machine transmission.</p>
+
+        <div id="test-results"></div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+
+        <!-- Test Canvas -->
+        <div class="test-section">
+            <h3>🎨 Test Designer Canvas</h3>
+            <canvas id="test-canvas" width="800" height="600"></canvas>
+
+            <div class="controls">
+                <button class="btn" onclick="addTestText()">Add Test Text</button>
+                <button class="btn" onclick="addTestShape()">Add Test Shape</button>
+                <button class="btn" onclick="addTestImage()">Add Test Image</button>
+                <button class="btn" onclick="clearCanvas()">Clear Canvas</button>
+            </div>
+        </div>
+
+        <!-- Export Controls -->
+        <div class="test-section">
+            <h3>🖨️ Print PNG Export</h3>
+            <div class="controls">
+                <button class="btn" id="export-btn" onclick="testPrintExport()">Export Print PNG</button>
+                <button class="btn" onclick="testPreview()">Preview Print Area</button>
+                <button class="btn" onclick="runAllTests()">🧪 Run All Tests</button>
+            </div>
+        </div>
+
+        <!-- Preview Area -->
+        <div class="preview-area" id="preview-area" style="display: none;">
+            <h4>🖨️ Print PNG Preview</h4>
+            <div id="preview-content"></div>
+        </div>
+
+        <!-- System Status -->
+        <div class="test-section">
+            <h3>⚙️ System Status</h3>
+            <div id="system-status"></div>
+        </div>
+    </div>
+
+    <!-- Mock WordPress Config -->
+    <script>
+        window.octo_print_designer_config = {
+            ajax_url: '/wp-admin/admin-ajax.php',
+            nonce: 'mock_nonce_12345'
+        };
+    </script>
+
+    <!-- Load Core Systems -->
+    <script src="public/js/unified-fabric-core.js"></script>
+    <script src="public/js/designer-widget-core.js"></script>
+    <script src="public/js/yprint-unified-api.js"></script>
+
+    <!-- Load PNG Export Systems -->
+    <script src="public/js/high-dpi-png-export-engine.js"></script>
+    <script src="public/js/png-only-system-integration.js"></script>
+
+    <script>
+        const results = document.getElementById('test-results');
+        const progressFill = document.getElementById('progress-fill');
+        let testsPassed = 0;
+        let testsTotal = 0;
+        let testCanvas = null;
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+
+            if (type === 'success') testsPassed++;
+            if (type !== 'info') testsTotal++;
+
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const percentage = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0;
+            progressFill.style.width = percentage + '%';
+        }
+
+        function initTestCanvas() {
+            try {
+                const canvasElement = document.getElementById('test-canvas');
+                testCanvas = new fabric.Canvas(canvasElement, {
+                    backgroundColor: 'white',
+                    width: 800,
+                    height: 600
+                });
+
+                // Mock template data
+                window.mockTemplateData = {
+                    template_id: 'test-template-1',
+                    printable_area_px: { x: 50, y: 50, width: 700, height: 500 },
+                    printable_area_mm: { width: 200, height: 150 }
+                };
+
+                addResult('✅ Test canvas initialized', 'success');
+
+            } catch (error) {
+                addResult('❌ Test canvas initialization failed: ' + error.message, 'error');
+            }
+        }
+
+        function addTestText() {
+            if (!testCanvas) return;
+
+            const text = new fabric.Text('Test Print Text', {
+                left: 150,
+                top: 150,
+                fontSize: 40,
+                fill: '#ff0000',
+                fontFamily: 'Arial'
+            });
+
+            testCanvas.add(text);
+            addResult('📝 Test text added to canvas', 'info');
+        }
+
+        function addTestShape() {
+            if (!testCanvas) return;
+
+            const circle = new fabric.Circle({
+                left: 300,
+                top: 200,
+                radius: 50,
+                fill: '#00ff00',
+                stroke: '#000000',
+                strokeWidth: 2
+            });
+
+            testCanvas.add(circle);
+            addResult('🔴 Test shape added to canvas', 'info');
+        }
+
+        function addTestImage() {
+            if (!testCanvas) return;
+
+            // Create a simple test image
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 100;
+            const ctx = canvas.getContext('2d');
+
+            // Draw a simple pattern
+            ctx.fillStyle = '#0066cc';
+            ctx.fillRect(0, 0, 100, 100);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(10, 10, 80, 80);
+            ctx.fillStyle = '#ff6600';
+            ctx.fillRect(20, 20, 60, 60);
+
+            const imageUrl = canvas.toDataURL();
+
+            fabric.Image.fromURL(imageUrl, (img) => {
+                img.set({
+                    left: 450,
+                    top: 250,
+                    scaleX: 1.5,
+                    scaleY: 1.5
+                });
+
+                testCanvas.add(img);
+                addResult('🖼️ Test image added to canvas', 'info');
+            });
+        }
+
+        function clearCanvas() {
+            if (!testCanvas) return;
+
+            testCanvas.clear();
+            testCanvas.backgroundColor = 'white';
+            testCanvas.renderAll();
+            addResult('🧹 Canvas cleared', 'info');
+        }
+
+        async function testPrintExport() {
+            try {
+                const exportBtn = document.getElementById('export-btn');
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Exporting...';
+
+                addResult('🖨️ Starting print PNG export test...', 'info');
+
+                // Check if export engine is available
+                if (!window.highDPIPrintExportEngine) {
+                    throw new Error('High-DPI Print Export Engine not available');
+                }
+
+                // Test export
+                const printPNG = await window.highDPIPrintExportEngine.exportForPrintMachine({
+                    dpi: 150, // Lower DPI for testing
+                    format: 'png',
+                    quality: 1.0
+                });
+
+                if (printPNG && printPNG.startsWith('data:image/png;base64,')) {
+                    addResult('✅ Print PNG export successful', 'success');
+                    showPreview(printPNG);
+                } else {
+                    throw new Error('Invalid PNG data returned');
+                }
+
+            } catch (error) {
+                addResult('❌ Print PNG export failed: ' + error.message, 'error');
+            } finally {
+                const exportBtn = document.getElementById('export-btn');
+                exportBtn.disabled = false;
+                exportBtn.textContent = 'Export Print PNG';
+            }
+        }
+
+        function showPreview(pngData) {
+            const previewArea = document.getElementById('preview-area');
+            const previewContent = document.getElementById('preview-content');
+
+            const img = document.createElement('img');
+            img.src = pngData;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.border = '1px solid #ddd';
+
+            const info = document.createElement('div');
+            info.innerHTML = `
+                <p><strong>Data Size:</strong> ${(pngData.length / 1024).toFixed(2)} KB</p>
+                <p><strong>Format:</strong> PNG (Base64)</p>
+                <p><strong>Export Engine:</strong> HighDPIPrintExportEngine</p>
+            `;
+
+            previewContent.innerHTML = '';
+            previewContent.appendChild(img);
+            previewContent.appendChild(info);
+
+            previewArea.style.display = 'block';
+            addResult('👁️ Preview displayed', 'info');
+        }
+
+        async function testPreview() {
+            try {
+                if (!window.pngOnlySystemIntegration) {
+                    throw new Error('PNG-Only System Integration not available');
+                }
+
+                const dimensions = window.pngOnlySystemIntegration.getPrintDimensions();
+
+                if (dimensions) {
+                    addResult('📐 Print dimensions: ' +
+                        dimensions.pixels.width + 'x' + dimensions.pixels.height + ' px (' +
+                        dimensions.millimeters.width + 'x' + dimensions.millimeters.height + ' mm)', 'success');
+                } else {
+                    throw new Error('Could not get print dimensions');
+                }
+
+            } catch (error) {
+                addResult('❌ Preview test failed: ' + error.message, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            addResult('🧪 Running comprehensive PNG-Only system tests...', 'info');
+
+            // Reset counters
+            testsPassed = 0;
+            testsTotal = 0;
+
+            // Test 1: Core Systems
+            addResult('Test 1: Checking core systems...', 'info');
+            if (window.fabric) {
+                addResult('✅ Fabric.js loaded', 'success');
+            } else {
+                addResult('❌ Fabric.js not loaded', 'error');
+            }
+
+            if (window.YPrint) {
+                addResult('✅ YPrint API available', 'success');
+            } else {
+                addResult('❌ YPrint API not available', 'error');
+            }
+
+            // Test 2: PNG Export Engine
+            addResult('Test 2: Checking PNG export engine...', 'info');
+            if (window.highDPIPrintExportEngine) {
+                addResult('✅ High-DPI Print Export Engine loaded', 'success');
+
+                const status = window.highDPIPrintExportEngine.getStatus();
+                if (status.initialized) {
+                    addResult('✅ Export engine initialized', 'success');
+                } else {
+                    addResult('❌ Export engine not initialized', 'error');
+                }
+            } else {
+                addResult('❌ High-DPI Print Export Engine not loaded', 'error');
+            }
+
+            // Test 3: System Integration
+            addResult('Test 3: Checking system integration...', 'info');
+            if (window.pngOnlySystemIntegration) {
+                addResult('✅ PNG-Only System Integration loaded', 'success');
+
+                const status = window.pngOnlySystemIntegration.getStatus();
+                if (status.initialized) {
+                    addResult('✅ System integration initialized', 'success');
+                } else {
+                    addResult('❌ System integration not initialized', 'error');
+                }
+            } else {
+                addResult('❌ PNG-Only System Integration not loaded', 'error');
+            }
+
+            // Test 4: Canvas Operations
+            addResult('Test 4: Testing canvas operations...', 'info');
+            if (testCanvas) {
+                addResult('✅ Test canvas available', 'success');
+
+                // Add test elements
+                addTestText();
+                addTestShape();
+
+                setTimeout(() => {
+                    const objects = testCanvas.getObjects();
+                    if (objects.length > 0) {
+                        addResult(`✅ Canvas has ${objects.length} test objects`, 'success');
+                    } else {
+                        addResult('❌ Canvas is empty', 'error');
+                    }
+                }, 500);
+            } else {
+                addResult('❌ Test canvas not available', 'error');
+            }
+
+            // Test 5: Export Functionality
+            setTimeout(async () => {
+                addResult('Test 5: Testing export functionality...', 'info');
+                try {
+                    await testPrintExport();
+                } catch (error) {
+                    addResult('❌ Export test failed: ' + error.message, 'error');
+                }
+
+                // Final summary
+                setTimeout(() => {
+                    addResult('📊 Test Summary:', 'info');
+                    if (testsPassed >= testsTotal * 0.8) {
+                        addResult(`🎉 PNG-Only System Tests SUCCESSFUL! ${testsPassed}/${testsTotal} tests passed`, 'success');
+                    } else {
+                        addResult(`⚠️ Some tests failed: ${testsPassed}/${testsTotal} tests passed`, 'warning');
+                    }
+                }, 1000);
+            }, 1000);
+        }
+
+        function updateSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+
+            const systems = {
+                'Fabric.js': !!window.fabric,
+                'YPrint API': !!window.YPrint,
+                'High-DPI Export Engine': !!window.highDPIPrintExportEngine,
+                'PNG-Only Integration': !!window.pngOnlySystemIntegration,
+                'Test Canvas': !!testCanvas
+            };
+
+            let statusHTML = '<table style="width: 100%; border-collapse: collapse;">';
+            statusHTML += '<tr><th style="border: 1px solid #ddd; padding: 8px;">System</th><th style="border: 1px solid #ddd; padding: 8px;">Status</th></tr>';
+
+            for (const [name, status] of Object.entries(systems)) {
+                const statusText = status ? '✅ Ready' : '❌ Not Available';
+                const rowColor = status ? '#d4edda' : '#f8d7da';
+                statusHTML += `<tr style="background: ${rowColor};">`;
+                statusHTML += `<td style="border: 1px solid #ddd; padding: 8px;">${name}</td>`;
+                statusHTML += `<td style="border: 1px solid #ddd; padding: 8px;">${statusText}</td>`;
+                statusHTML += '</tr>';
+            }
+
+            statusHTML += '</table>';
+            statusDiv.innerHTML = statusHTML;
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            addResult('🚀 PNG-Only System Test Interface loaded', 'info');
+
+            // Wait for fabric to load
+            setTimeout(() => {
+                initTestCanvas();
+                updateSystemStatus();
+
+                // Auto-update status every 2 seconds
+                setInterval(updateSystemStatus, 2000);
+            }, 1000);
+        });
+
+        // Manual functions for console testing
+        window.testPNGExport = testPrintExport;
+        window.testPreview = testPreview;
+        window.runAllTests = runAllTests;
+
+        console.log('🖨️ PNG-Only System Test Interface Ready');
+        console.log('💡 Available functions:');
+        console.log('  - window.testPNGExport() - Test PNG export');
+        console.log('  - window.testPreview() - Test preview functionality');
+        console.log('  - window.runAllTests() - Run comprehensive tests');
+    </script>
+</body>
+</html>

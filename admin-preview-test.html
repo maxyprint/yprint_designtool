@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Preview System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f1f1f1;
+        }
+        .wp-admin {
+            background: #f1f1f1;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .meta-field {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        .button {
+            background: #0073aa;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .button:hover {
+            background: #005a87;
+        }
+        .button-secondary {
+            background: #f3f5f6;
+            color: #50575e;
+            border: 1px solid #c3c4c7;
+        }
+        .button-secondary:hover {
+            background: #f0f0f1;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .status-info {
+            background: #e7f3ff;
+            border: 1px solid #72aee6;
+            border-radius: 3px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .error-info {
+            background: #fff5f5;
+            border: 1px solid #fecaca;
+            border-radius: 3px;
+            padding: 10px;
+            margin: 10px 0;
+            color: #dc2626;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        h2 {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body class="wp-admin">
+    <div class="test-container">
+        <h1>🎨 Admin Canvas Renderer - Test System</h1>
+        <p>Testing the canvas-free design preview system for WooCommerce admin context.</p>
+
+        <div id="status-container" class="status-info">
+            <strong>System Status:</strong> <span id="status-text">Initializing...</span>
+        </div>
+
+        <!-- Test Section 1: Manual Preview Generation -->
+        <div class="test-section">
+            <h2>Test 1: Manual Preview Generation</h2>
+            <p>Direct preview generation from demo data:</p>
+
+            <div id="manual-preview-container" style="min-height: 300px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center;">
+                <span>Manual preview will appear here</span>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <button id="generate-manual-preview" class="button">🎨 Generate Preview</button>
+                <button id="clear-manual-preview" class="button button-secondary">🗑️ Clear</button>
+                <button id="export-manual-preview" class="button button-secondary">📷 Export</button>
+            </div>
+        </div>
+
+        <!-- Test Section 2: Meta Field Integration -->
+        <div class="test-section">
+            <h2>Test 2: Meta Field Integration</h2>
+            <p>Simulated WordPress meta field with auto-preview:</p>
+
+            <label for="design_json_data"><strong>Design JSON Data:</strong></label>
+            <textarea id="design_json_data" class="meta-field" placeholder="Paste design JSON data here...">{
+  "167359_189542": {
+    "view_name": "Design View",
+    "system_id": "189542",
+    "variation_id": "167359",
+    "images": [
+      {
+        "id": "img_1758699902386_119",
+        "url": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/11092025ylifelogowhite-1.png",
+        "transform": {"left": 326, "top": 150, "scaleX": 0.113, "scaleY": 0.113, "angle": 0}
+      },
+      {
+        "id": "img_1758699907869_875",
+        "url": "https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/yprint-logo.png",
+        "transform": {"left": 406.39, "top": 116.49, "scaleX": 0.050, "scaleY": 0.050, "angle": 0}
+      }
+    ]
+  }
+}</textarea>
+
+            <!-- Auto-generated preview will appear here via AdminPreviewIntegration -->
+        </div>
+
+        <!-- Test Section 3: Performance & Validation -->
+        <div class="test-section">
+            <h2>Test 3: System Information</h2>
+
+            <div id="validation-results">
+                <strong>Validation Results:</strong>
+                <pre id="validation-output" style="background: #f5f5f5; padding: 10px; border-radius: 3px; margin-top: 5px;">Not tested yet</pre>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button id="run-validation" class="button button-secondary">🔍 Run Validation</button>
+                <button id="show-system-info" class="button button-secondary">ℹ️ System Info</button>
+                <button id="test-performance" class="button button-secondary">⚡ Performance Test</button>
+            </div>
+
+            <div id="system-info" style="margin-top: 10px; font-family: monospace; font-size: 12px; background: #f5f5f5; padding: 10px; border-radius: 3px; display: none;">
+                System information will appear here...
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the preview system -->
+    <script src="admin/js/admin-canvas-renderer.js"></script>
+    <script src="admin/js/design-preview-generator.js"></script>
+    <script src="admin/js/admin-preview-integration.js"></script>
+
+    <script>
+        // Test script
+        let manualPreviewGenerator = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🧪 TEST SYSTEM: Initializing...');
+
+            // Update status
+            document.getElementById('status-text').textContent = 'System loaded, dependencies ready';
+
+            // Initialize manual preview generator
+            manualPreviewGenerator = new DesignPreviewGenerator();
+            manualPreviewGenerator.init('manual-preview-container');
+
+            // Setup manual test buttons
+            document.getElementById('generate-manual-preview').addEventListener('click', () => {
+                console.log('🧪 MANUAL TEST: Generating preview...');
+                manualPreviewGenerator.generatePreview(window.DEMO_DESIGN_DATA, {
+                    loadingText: 'Testing manual preview generation...'
+                });
+            });
+
+            document.getElementById('clear-manual-preview').addEventListener('click', () => {
+                manualPreviewGenerator.clearPreview();
+            });
+
+            document.getElementById('export-manual-preview').addEventListener('click', () => {
+                try {
+                    const dataUrl = manualPreviewGenerator.exportPreview();
+                    const link = document.createElement('a');
+                    link.download = 'manual-test-export.png';
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } catch (error) {
+                    alert('Export failed: ' + error.message);
+                }
+            });
+
+            // Setup validation test
+            document.getElementById('run-validation').addEventListener('click', () => {
+                const validator = new DesignPreviewGenerator();
+                const validation = validator.validateDesignData(window.DEMO_DESIGN_DATA);
+                document.getElementById('validation-output').textContent = JSON.stringify(validation, null, 2);
+            });
+
+            // Setup system info
+            document.getElementById('show-system-info').addEventListener('click', () => {
+                const info = {
+                    userAgent: navigator.userAgent,
+                    devicePixelRatio: window.devicePixelRatio,
+                    canvasSupported: !!document.createElement('canvas').getContext,
+                    adminIntegrationStatus: window.adminPreviewIntegration ? window.adminPreviewIntegration.getStatus() : 'Not initialized',
+                    demoDataValid: manualPreviewGenerator ? manualPreviewGenerator.validateDesignData(window.DEMO_DESIGN_DATA) : 'Not available',
+                    timestamp: new Date().toISOString()
+                };
+
+                const infoEl = document.getElementById('system-info');
+                infoEl.textContent = JSON.stringify(info, null, 2);
+                infoEl.style.display = 'block';
+            });
+
+            // Setup performance test
+            document.getElementById('test-performance').addEventListener('click', async () => {
+                console.log('🧪 PERFORMANCE TEST: Starting...');
+                const startTime = performance.now();
+
+                try {
+                    await manualPreviewGenerator.generatePreview(window.DEMO_DESIGN_DATA);
+                    const endTime = performance.now();
+                    const duration = endTime - startTime;
+
+                    alert(`Performance Test Result:\nRender time: ${duration.toFixed(2)}ms\nTarget: <5000ms\nResult: ${duration < 5000 ? '✅ PASS' : '❌ FAIL'}`);
+                    console.log(`🧪 PERFORMANCE: Render completed in ${duration}ms`);
+
+                } catch (error) {
+                    alert(`Performance test failed: ${error.message}`);
+                }
+            });
+
+            console.log('✅ TEST SYSTEM: Ready for testing');
+        });
+
+        // Listen for admin integration events
+        document.addEventListener('adminPreviewReady', (event) => {
+            console.log('🎯 ADMIN INTEGRATION READY:', event.detail);
+            document.getElementById('status-text').textContent = 'Admin integration active - auto-preview enabled';
+        });
+    </script>
+</body>
+</html>

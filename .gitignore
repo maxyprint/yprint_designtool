@@ -1,0 +1,32 @@
+# Development & Testing
+tests/
+node_modules/
+*.log
+
+# Claude Flow System Files
+.claude-flow/
+.swarm/
+.hive-mind/
+memory/
+claude-flow
+claude-flow.bat
+claude-flow.ps1
+claude-flow.config.json
+.mcp.json
+
+# Development Test Files
+test-*.php
+gap-analysis-*.php
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/admin/js/dist/*.map

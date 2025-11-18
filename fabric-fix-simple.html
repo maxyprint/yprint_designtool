@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Fabric.js Emergency Fix - Einfach</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            background: #e74c3c;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .code-box {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 20px 0;
+            border-left: 4px solid #e74c3c;
+            overflow-x: auto;
+        }
+        .btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background: #c0392b;
+        }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #229954; }
+        .step {
+            background: #f8f9fa;
+            border: 2px solid #e74c3c;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        .step-number {
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Fabric.js Emergency Fix</h1>
+            <p>Lösung für "window.fabric undefined" Fehler</p>
+        </div>
+
+        <div class="step">
+            <h2><span class="step-number">1</span>Console Code kopieren</h2>
+            <p>Kopieren Sie diesen Code für die Browser-Console:</p>
+
+            <div class="code-box" id="emergency-code">
+// 🚨 FABRIC.JS EMERGENCY FIX
+console.log('🚨 Starting Fabric.js Emergency Fix...');
+
+const fabricSources = [
+    'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js',
+    'https://unpkg.com/fabric@5.3.0/dist/fabric.min.js',
+    'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js'
+];
+
+async function loadFabricEmergency() {
+    if (typeof window.fabric !== 'undefined') {
+        console.log('✅ Fabric.js already available');
+        return;
+    }
+
+    for (const url of fabricSources) {
+        try {
+            console.log(`🔄 Loading: ${url}`);
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+                setTimeout(reject, 5000);
+            });
+
+            if (typeof window.fabric !== 'undefined') {
+                console.log('✅ Fabric.js loaded successfully!');
+                window.dispatchEvent(new CustomEvent('fabricGlobalReady'));
+                document.dispatchEvent(new CustomEvent('fabricGlobalReady'));
+                console.log('🎉 Emergency fix complete - try designer now!');
+                return;
+            }
+        } catch (e) {
+            console.log(`❌ Failed: ${url}`);
+        }
+    }
+
+    console.error('❌ All emergency sources failed');
+}
+
+loadFabricEmergency();
+            </div>
+
+            <button class="btn" onclick="copyCode()">📋 Code kopieren</button>
+            <button class="btn btn-success" onclick="selectCode()">📝 Code markieren</button>
+        </div>
+
+        <div class="step">
+            <h2><span class="step-number">2</span>Anwendung</h2>
+            <ol>
+                <li>Gehen Sie zu <strong>https://test-site.local/test-everything-digga/</strong></li>
+                <li>Drücken Sie <strong>F12</strong> um die Entwicklertools zu öffnen</li>
+                <li>Klicken Sie auf <strong>Console</strong></li>
+                <li>Fügen Sie den kopierten Code ein</li>
+                <li>Drücken Sie <strong>Enter</strong></li>
+                <li>Warten Sie auf: <code>✅ Fabric.js loaded successfully!</code></li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h2><span class="step-number">3</span>Test</h2>
+            <p>Nach dem Fix sollten Sie erfolgreich:</p>
+            <ul>
+                <li>🎨 Bilder auf das Canvas ziehen können</li>
+                <li>✏️ Objekte verschieben und skalieren können</li>
+                <li>💾 Design speichern können (nächster Fix)</li>
+                <li>📄 JSON-Output in der Console sehen</li>
+            </ul>
+
+            <a href="https://test-site.local/test-everything-digga/" class="btn btn-success" target="_blank">🌐 Test-Seite öffnen</a>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <h3>🎯 Schnelle Aktionen</h3>
+            <button class="btn" onclick="copyCode()">📋 Fix-Code kopieren</button>
+            <a href="https://test-site.local/test-everything-digga/" class="btn btn-success" target="_blank">🌐 Test-Seite</a>
+        </div>
+    </div>
+
+    <script>
+        function copyCode() {
+            const code = `// 🚨 FABRIC.JS EMERGENCY FIX
+console.log('🚨 Starting Fabric.js Emergency Fix...');
+
+const fabricSources = [
+    'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js',
+    'https://unpkg.com/fabric@5.3.0/dist/fabric.min.js',
+    'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js'
+];
+
+async function loadFabricEmergency() {
+    if (typeof window.fabric !== 'undefined') {
+        console.log('✅ Fabric.js already available');
+        return;
+    }
+
+    for (const url of fabricSources) {
+        try {
+            console.log(\`🔄 Loading: \${url}\`);
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+                setTimeout(reject, 5000);
+            });
+
+            if (typeof window.fabric !== 'undefined') {
+                console.log('✅ Fabric.js loaded successfully!');
+                window.dispatchEvent(new CustomEvent('fabricGlobalReady'));
+                document.dispatchEvent(new CustomEvent('fabricGlobalReady'));
+                console.log('🎉 Emergency fix complete - try designer now!');
+                return;
+            }
+        } catch (e) {
+            console.log(\`❌ Failed: \${url}\`);
+        }
+    }
+
+    console.error('❌ All emergency sources failed');
+}
+
+loadFabricEmergency();`;
+
+            navigator.clipboard.writeText(code).then(() => {
+                alert('✅ Fabric.js Fix Code kopiert!\\n\\nNächste Schritte:\\n1. F12 → Console\\n2. Code einfügen\\n3. Enter drücken\\n4. Auf Fabric.js loading warten');
+            }).catch(() => {
+                alert('📋 Bitte manuell kopieren:\\n\\nCode wurde in der Console ausgegeben');
+                console.log('FABRIC.JS FIX CODE:', code);
+            });
+        }
+
+        function selectCode() {
+            const codeElement = document.getElementById('emergency-code');
+            const range = document.createRange();
+            range.selectNode(codeElement);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            alert('Code markiert! Drücken Sie Ctrl+C (Windows) oder Cmd+C (Mac) zum Kopieren');
+        }
+
+        // Auto-info on load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚨 Fabric.js Emergency Fix Interface geladen');
+
+            setTimeout(() => {
+                if (confirm('🚨 Fabric.js Fix sofort kopieren?\\n\\nMöchten Sie den Emergency Code direkt in die Zwischenablage kopieren?')) {
+                    copyCode();
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

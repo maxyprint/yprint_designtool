@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Test: WordPress Duplicate Script Fix</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        .test-section { background: white; margin: 10px 0; padding: 15px; border-left: 4px solid #007cba; }
+        .success { border-left-color: #28a745; }
+        .error { border-left-color: #dc3545; }
+        .warning { border-left-color: #ffc107; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 WordPress Duplicate Script Registration Fix Test</h1>
+
+    <div class="test-section">
+        <h3>📝 Test Instructions</h3>
+        <p>Diese Seite testet, ob die WordPress duplicate script registration Fixes funktionieren.</p>
+        <p><strong>Kopiere folgenden Console-Code in deinen Browser:</strong></p>
+        <pre id="testCode">
+// 🔧 TEST: Script Duplicate Detection
+console.log('🔧 DUPLICATE SCRIPT FIX TEST: Starting analysis...');
+
+// Check for duplicate script URLs
+const allScripts = Array.from(document.querySelectorAll('script[src]'));
+const scriptSources = allScripts.map(s => s.src);
+
+// Group scripts by base name (without version parameters)
+const scriptGroups = {};
+scriptSources.forEach(src => {
+    // Extract base script name
+    const baseName = src.split('?')[0].split('/').pop();
+    if (!scriptGroups[baseName]) {
+        scriptGroups[baseName] = [];
+    }
+    scriptGroups[baseName].push(src);
+});
+
+// Check specifically for high-dpi-png-export-engine duplicates
+const highDPIScripts = scriptGroups['high-dpi-png-export-engine.js'] || [];
+console.log('🖨️ High-DPI PNG Export Engine scripts found:', highDPIScripts.length);
+highDPIScripts.forEach((url, index) => {
+    console.log(`   ${index + 1}: ${url}`);
+});
+
+// Check for WordPress duplicate variable errors
+console.log('🔍 Variable Declaration Check:');
+console.log('HighDPIPrintExportEngine:', typeof window.HighDPIPrintExportEngine);
+console.log('PNGOnlySystemIntegration:', typeof window.PNGOnlySystemIntegration);
+console.log('SaveOnlyPNGGenerator:', typeof window.SaveOnlyPNGGenerator);
+
+// Result Summary
+if (highDPIScripts.length <= 1) {
+    console.log('✅ SUCCESS: No duplicate high-DPI script loading detected!');
+} else {
+    console.log('❌ PROBLEM: Still duplicate high-DPI script loading!');
+}
+
+console.log('🔧 DUPLICATE SCRIPT FIX TEST: Complete');
+        </pre>
+    </div>
+
+    <div class="test-section warning">
+        <h3>⚠️ Expected Results After Fix</h3>
+        <ul>
+            <li><strong>Before Fix:</strong> 2 entries for high-dpi-png-export-engine.js</li>
+            <li><strong>After Fix:</strong> 1 entry for high-dpi-png-export-engine.js</li>
+            <li><strong>WordPress Logs:</strong> Should show "already registered, skipping" messages</li>
+            <li><strong>Console Errors:</strong> No more "Can't create duplicate variable" errors</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🔍 WordPress Error Log Check</h3>
+        <p>Nach dem Load solltest du folgende Logs sehen:</p>
+        <pre>
+🔍 PNG REGISTRATION: yprint-high-dpi-export registered
+⚠️ PNG REGISTRATION: yprint-high-dpi-export already registered, skipping
+        </pre>
+        <p>Wenn du zweimal "registered" siehst, funktioniert der Fix!</p>
+    </div>
+
+    <div class="test-section success">
+        <h3>✅ High-DPI Engine Test</h3>
+        <p>Nach dem Script-Fix sollte das High-DPI Engine ordnungsgemäß initialisieren:</p>
+        <pre>
+// Test High-DPI Engine Initialization
+if (window.HighDPIPrintExportEngine && window.HighDPIPrintExportEngine.initialized) {
+    console.log('✅ High-DPI PNG Engine successfully initialized!');
+} else {
+    console.log('❌ High-DPI PNG Engine not initialized');
+}
+        </pre>
+    </div>
+
+    <script>
+        // Auto-copy test code to clipboard for convenience
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                console.log('📋 Test code copied to clipboard!');
+            });
+        }
+
+        // Make test code easily copyable
+        const testCodeElement = document.getElementById('testCode');
+        testCodeElement.addEventListener('click', () => {
+            copyToClipboard(testCodeElement.textContent);
+            testCodeElement.style.background = '#d4edda';
+            setTimeout(() => {
+                testCodeElement.style.background = '#f8f9fa';
+            }, 1000);
+        });
+
+        console.log('🔧 DUPLICATE SCRIPT FIX TEST PAGE: Ready');
+        console.log('📋 Click on the test code to copy it to clipboard');
+    </script>
+</body>
+</html>

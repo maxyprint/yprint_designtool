@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YPrint Checkout System Fix - Validation Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .test-section {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-section h2 {
+            margin: 0 0 20px 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .test-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #ddd;
+        }
+        .test-item.pass {
+            border-left-color: #28a745;
+        }
+        .test-item.fail {
+            border-left-color: #dc3545;
+        }
+        .test-item.pending {
+            border-left-color: #ffc107;
+        }
+        .test-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .test-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .test-result {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .console-output .success {
+            color: #4ade80;
+        }
+        .console-output .error {
+            color: #f87171;
+        }
+        .console-output .warning {
+            color: #fbbf24;
+        }
+        .console-output .info {
+            color: #60a5fa;
+        }
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #5a67d8;
+        }
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .summary h3 {
+            margin: 0 0 15px 0;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            display: block;
+        }
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 YPrint Checkout System Fix</h1>
+            <p>Comprehensive validation test for checkout system restoration</p>
+        </div>
+
+        <div class="content">
+            <div class="test-section">
+                <h2>
+                    1. Address AJAX System
+                    <span class="status" id="address-status">Testing</span>
+                </h2>
+                <div class="test-item pending" id="address-dependency">
+                    <div class="test-name">Missing yprint_address_ajax Dependency</div>
+                    <div class="test-description">Check if yprint_address_ajax global object is available</div>
+                    <div class="test-result" id="address-dependency-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="address-functions">
+                    <div class="test-name">Address Validation Functions</div>
+                    <div class="test-description">Verify address field validation and auto-complete</div>
+                    <div class="test-result" id="address-functions-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="address-events">
+                    <div class="test-name">Address Event Handlers</div>
+                    <div class="test-description">Test address field change and validation events</div>
+                    <div class="test-result" id="address-events-result">Testing...</div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h2>
+                    2. Payment Slider System
+                    <span class="status" id="slider-status">Testing</span>
+                </h2>
+                <div class="test-item pending" id="slider-options">
+                    <div class="test-name">Payment Slider Options</div>
+                    <div class="test-description">Check if payment slider has available options</div>
+                    <div class="test-result" id="slider-options-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="slider-ui">
+                    <div class="test-name">Payment Method UI</div>
+                    <div class="test-description">Verify payment method selection interface</div>
+                    <div class="test-result" id="slider-ui-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="slider-functionality">
+                    <div class="test-name">Payment Processing</div>
+                    <div class="test-description">Test payment method switching and form rendering</div>
+                    <div class="test-result" id="slider-functionality-result">Testing...</div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h2>
+                    3. Express Checkout System
+                    <span class="status" id="express-status">Testing</span>
+                </h2>
+                <div class="test-item pending" id="express-availability">
+                    <div class="test-name">Express Checkout Availability</div>
+                    <div class="test-description">Check if express checkout methods are detected</div>
+                    <div class="test-result" id="express-availability-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="express-methods">
+                    <div class="test-name">Express Payment Methods</div>
+                    <div class="test-description">Verify Apple Pay, Google Pay, PayPal Express detection</div>
+                    <div class="test-result" id="express-methods-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="express-processing">
+                    <div class="test-name">Express Payment Processing</div>
+                    <div class="test-description">Test express payment flow and modal system</div>
+                    <div class="test-result" id="express-processing-result">Testing...</div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h2>
+                    4. Global Data Fix
+                    <span class="status" id="data-status">Testing</span>
+                </h2>
+                <div class="test-item pending" id="data-variable">
+                    <div class="test-name">Global 'data' Variable</div>
+                    <div class="test-description">Check if global data variable exists (fixes line 4378 error)</div>
+                    <div class="test-result" id="data-variable-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="stripe-vars">
+                    <div class="test-name">Stripe Configuration</div>
+                    <div class="test-description">Verify yprint_stripe_vars global configuration</div>
+                    <div class="test-result" id="stripe-vars-result">Testing...</div>
+                </div>
+                <div class="test-item pending" id="checkout-params">
+                    <div class="test-name">Checkout Parameters</div>
+                    <div class="test-description">Validate WooCommerce checkout configuration</div>
+                    <div class="test-result" id="checkout-params-result">Testing...</div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <button class="button" onclick="runAllTests()">🚀 Run All Tests</button>
+                <button class="button" onclick="loadCheckoutScripts()">📜 Load Scripts</button>
+                <button class="button" onclick="clearConsole()">🧹 Clear Console</button>
+            </div>
+
+            <div class="console-output" id="console-output">
+                <div class="info">🚨 YPrint Checkout System Fix - Console Output</div>
+                <div class="info">Ready to test checkout system restoration...</div>
+            </div>
+
+            <div class="summary">
+                <h3>Test Summary</h3>
+                <div class="summary-stats">
+                    <div class="stat">
+                        <span class="stat-number" id="total-tests">12</span>
+                        <span class="stat-label">Total Tests</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="passed-tests">0</span>
+                        <span class="stat-label">Passed</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="failed-tests">0</span>
+                        <span class="stat-label">Failed</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="pending-tests">12</span>
+                        <span class="stat-label">Pending</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = {
+            passed: 0,
+            failed: 0,
+            pending: 12
+        };
+
+        function log(message, type = 'info') {
+            const console = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logClass = type === 'success' ? 'success' :
+                            type === 'error' ? 'error' :
+                            type === 'warning' ? 'warning' : 'info';
+
+            console.innerHTML += `<div class="${logClass}">[${timestamp}] ${message}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function updateTestResult(testId, status, result) {
+            const testElement = document.getElementById(testId);
+            const resultElement = document.getElementById(testId + '-result');
+
+            testElement.className = `test-item ${status}`;
+            resultElement.textContent = result;
+
+            // Update counters
+            if (status === 'pass') {
+                testResults.passed++;
+                testResults.pending--;
+            } else if (status === 'fail') {
+                testResults.failed++;
+                testResults.pending--;
+            }
+
+            updateSummary();
+        }
+
+        function updateSummary() {
+            document.getElementById('passed-tests').textContent = testResults.passed;
+            document.getElementById('failed-tests').textContent = testResults.failed;
+            document.getElementById('pending-tests').textContent = testResults.pending;
+        }
+
+        function updateSectionStatus(sectionId, status) {
+            const statusElement = document.getElementById(sectionId + '-status');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = status === 'success' ? 'Pass' :
+                                      status === 'error' ? 'Fail' :
+                                      status === 'warning' ? 'Partial' : 'Testing';
+        }
+
+        async function loadCheckoutScripts() {
+            log('🔄 Loading checkout system scripts...', 'info');
+
+            const scripts = [
+                'public/js/yprint-address-ajax.js',
+                'public/js/yprint-payment-slider.js',
+                'public/js/yprint-express-checkout.js',
+                'public/js/yprint-stripe-service.js'
+            ];
+
+            try {
+                for (const script of scripts) {
+                    await loadScript(script);
+                    log(`✅ Loaded: ${script}`, 'success');
+                }
+                log('🎉 All checkout scripts loaded successfully!', 'success');
+
+                // Wait for initialization
+                setTimeout(() => {
+                    runAllTests();
+                }, 1000);
+
+            } catch (error) {
+                log(`❌ Script loading failed: ${error.message}`, 'error');
+            }
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                document.head.appendChild(script);
+            });
+        }
+
+        async function runAllTests() {
+            log('🚀 Starting comprehensive checkout system tests...', 'info');
+
+            // Reset counters
+            testResults = { passed: 0, failed: 0, pending: 12 };
+            updateSummary();
+
+            await testAddressSystem();
+            await testPaymentSlider();
+            await testExpressCheckout();
+            await testGlobalDataFix();
+
+            log('🏁 All tests completed!', 'info');
+
+            if (testResults.failed === 0) {
+                log('🎉 ALL TESTS PASSED! Checkout system is fully functional.', 'success');
+            } else {
+                log(`⚠️ ${testResults.failed} tests failed. Please review and fix issues.`, 'warning');
+            }
+        }
+
+        async function testAddressSystem() {
+            log('🔍 Testing Address AJAX System...', 'info');
+
+            // Test 1: Check yprint_address_ajax dependency
+            try {
+                if (typeof window.yprint_address_ajax !== 'undefined') {
+                    updateTestResult('address-dependency', 'pass', 'yprint_address_ajax object found ✅');
+                    log('✅ Address AJAX dependency resolved', 'success');
+                } else {
+                    updateTestResult('address-dependency', 'fail', 'yprint_address_ajax not found ❌');
+                    log('❌ Missing yprint_address_ajax dependency', 'error');
+                }
+            } catch (error) {
+                updateTestResult('address-dependency', 'fail', `Error: ${error.message}`);
+                log(`❌ Address dependency test failed: ${error.message}`, 'error');
+            }
+
+            // Test 2: Address validation functions
+            try {
+                if (window.yprint_address_ajax && window.yprint_address_ajax.isReady && window.yprint_address_ajax.isReady()) {
+                    updateTestResult('address-functions', 'pass', 'Address validation system ready ✅');
+                    log('✅ Address validation functions available', 'success');
+                } else {
+                    updateTestResult('address-functions', 'fail', 'Address system not ready ❌');
+                    log('❌ Address validation system not ready', 'error');
+                }
+            } catch (error) {
+                updateTestResult('address-functions', 'fail', `Error: ${error.message}`);
+                log(`❌ Address functions test failed: ${error.message}`, 'error');
+            }
+
+            // Test 3: Address event handlers
+            try {
+                const testPassed = window.yprint_address_ajax &&
+                                 typeof window.yprint_address_ajax.handleAddressChange === 'function';
+
+                if (testPassed) {
+                    updateTestResult('address-events', 'pass', 'Event handlers configured ✅');
+                    log('✅ Address event handlers ready', 'success');
+                } else {
+                    updateTestResult('address-events', 'fail', 'Event handlers missing ❌');
+                    log('❌ Address event handlers not found', 'error');
+                }
+            } catch (error) {
+                updateTestResult('address-events', 'fail', `Error: ${error.message}`);
+                log(`❌ Address events test failed: ${error.message}`, 'error');
+            }
+
+            // Update section status
+            const addressTests = [
+                document.getElementById('address-dependency').className.includes('pass'),
+                document.getElementById('address-functions').className.includes('pass'),
+                document.getElementById('address-events').className.includes('pass')
+            ];
+
+            const addressPassed = addressTests.filter(Boolean).length;
+            if (addressPassed === 3) {
+                updateSectionStatus('address', 'success');
+            } else if (addressPassed > 0) {
+                updateSectionStatus('address', 'warning');
+            } else {
+                updateSectionStatus('address', 'error');
+            }
+        }
+
+        async function testPaymentSlider() {
+            log('🔍 Testing Payment Slider System...', 'info');
+
+            // Test 1: Payment slider options
+            try {
+                if (window.YPrintPaymentSlider && window.YPrintPaymentSlider.getOptions) {
+                    const options = window.YPrintPaymentSlider.getOptions();
+                    if (options && options.length > 0) {
+                        updateTestResult('slider-options', 'pass', `${options.length} payment options available ✅`);
+                        log(`✅ Payment slider has ${options.length} options`, 'success');
+                    } else {
+                        updateTestResult('slider-options', 'fail', 'No payment options found ❌');
+                        log('❌ No payment options in slider', 'error');
+                    }
+                } else {
+                    updateTestResult('slider-options', 'fail', 'Payment slider not found ❌');
+                    log('❌ YPrintPaymentSlider not available', 'error');
+                }
+            } catch (error) {
+                updateTestResult('slider-options', 'fail', `Error: ${error.message}`);
+                log(`❌ Payment options test failed: ${error.message}`, 'error');
+            }
+
+            // Test 2: Payment UI
+            try {
+                const sliderContainer = document.querySelector('.yprint-payment-slider');
+                if (sliderContainer) {
+                    updateTestResult('slider-ui', 'pass', 'Payment UI rendered ✅');
+                    log('✅ Payment slider UI created', 'success');
+                } else {
+                    updateTestResult('slider-ui', 'fail', 'Payment UI not rendered ❌');
+                    log('❌ Payment slider UI not found', 'error');
+                }
+            } catch (error) {
+                updateTestResult('slider-ui', 'fail', `Error: ${error.message}`);
+                log(`❌ Payment UI test failed: ${error.message}`, 'error');
+            }
+
+            // Test 3: Payment functionality
+            try {
+                if (window.YPrintPaymentSlider && window.YPrintPaymentSlider.isReady && window.YPrintPaymentSlider.isReady()) {
+                    updateTestResult('slider-functionality', 'pass', 'Payment processing ready ✅');
+                    log('✅ Payment slider functionality ready', 'success');
+                } else {
+                    updateTestResult('slider-functionality', 'fail', 'Payment processing not ready ❌');
+                    log('❌ Payment slider not ready', 'error');
+                }
+            } catch (error) {
+                updateTestResult('slider-functionality', 'fail', `Error: ${error.message}`);
+                log(`❌ Payment functionality test failed: ${error.message}`, 'error');
+            }
+
+            // Update section status
+            const sliderTests = [
+                document.getElementById('slider-options').className.includes('pass'),
+                document.getElementById('slider-ui').className.includes('pass'),
+                document.getElementById('slider-functionality').className.includes('pass')
+            ];
+
+            const sliderPassed = sliderTests.filter(Boolean).length;
+            if (sliderPassed === 3) {
+                updateSectionStatus('slider', 'success');
+            } else if (sliderPassed > 0) {
+                updateSectionStatus('slider', 'warning');
+            } else {
+                updateSectionStatus('slider', 'error');
+            }
+        }
+
+        async function testExpressCheckout() {
+            log('🔍 Testing Express Checkout System...', 'info');
+
+            // Test 1: Express checkout availability
+            try {
+                if (window.YPrintExpressCheckout) {
+                    updateTestResult('express-availability', 'pass', 'Express checkout available ✅');
+                    log('✅ Express checkout system found', 'success');
+                } else {
+                    updateTestResult('express-availability', 'fail', 'Express checkout not available ❌');
+                    log('❌ YPrintExpressCheckout not found', 'error');
+                }
+            } catch (error) {
+                updateTestResult('express-availability', 'fail', `Error: ${error.message}`);
+                log(`❌ Express availability test failed: ${error.message}`, 'error');
+            }
+
+            // Test 2: Express methods
+            try {
+                if (window.YPrintExpressCheckout && window.YPrintExpressCheckout.getAvailableMethods) {
+                    const methods = window.YPrintExpressCheckout.getAvailableMethods();
+                    if (methods && methods.length > 0) {
+                        updateTestResult('express-methods', 'pass', `${methods.length} express methods detected ✅`);
+                        log(`✅ Found ${methods.length} express payment methods`, 'success');
+                    } else {
+                        updateTestResult('express-methods', 'fail', 'No express methods detected ❌');
+                        log('❌ No express payment methods found', 'error');
+                    }
+                } else {
+                    updateTestResult('express-methods', 'fail', 'Express methods not accessible ❌');
+                    log('❌ Express methods not accessible', 'error');
+                }
+            } catch (error) {
+                updateTestResult('express-methods', 'fail', `Error: ${error.message}`);
+                log(`❌ Express methods test failed: ${error.message}`, 'error');
+            }
+
+            // Test 3: Express processing
+            try {
+                const expressContainer = document.querySelector('.yprint-express-checkout');
+                if (expressContainer) {
+                    updateTestResult('express-processing', 'pass', 'Express UI and processing ready ✅');
+                    log('✅ Express checkout UI rendered', 'success');
+                } else {
+                    updateTestResult('express-processing', 'fail', 'Express UI not rendered ❌');
+                    log('❌ Express checkout UI not found', 'error');
+                }
+            } catch (error) {
+                updateTestResult('express-processing', 'fail', `Error: ${error.message}`);
+                log(`❌ Express processing test failed: ${error.message}`, 'error');
+            }
+
+            // Update section status
+            const expressTests = [
+                document.getElementById('express-availability').className.includes('pass'),
+                document.getElementById('express-methods').className.includes('pass'),
+                document.getElementById('express-processing').className.includes('pass')
+            ];
+
+            const expressPassed = expressTests.filter(Boolean).length;
+            if (expressPassed === 3) {
+                updateSectionStatus('express', 'success');
+            } else if (expressPassed > 0) {
+                updateSectionStatus('express', 'warning');
+            } else {
+                updateSectionStatus('express', 'error');
+            }
+        }
+
+        async function testGlobalDataFix() {
+            log('🔍 Testing Global Data Fix...', 'info');
+
+            // Test 1: Global data variable
+            try {
+                if (typeof window.data !== 'undefined') {
+                    updateTestResult('data-variable', 'pass', 'Global data variable exists ✅');
+                    log('✅ Global data variable fixed (resolves line 4378 error)', 'success');
+                } else {
+                    updateTestResult('data-variable', 'fail', 'Global data variable missing ❌');
+                    log('❌ Global data variable still undefined', 'error');
+                }
+            } catch (error) {
+                updateTestResult('data-variable', 'fail', `Error: ${error.message}`);
+                log(`❌ Data variable test failed: ${error.message}`, 'error');
+            }
+
+            // Test 2: Stripe configuration
+            try {
+                if (typeof window.yprint_stripe_vars !== 'undefined') {
+                    updateTestResult('stripe-vars', 'pass', 'Stripe configuration available ✅');
+                    log('✅ yprint_stripe_vars configuration ready', 'success');
+                } else {
+                    updateTestResult('stripe-vars', 'fail', 'Stripe configuration missing ❌');
+                    log('❌ yprint_stripe_vars still undefined', 'error');
+                }
+            } catch (error) {
+                updateTestResult('stripe-vars', 'fail', `Error: ${error.message}`);
+                log(`❌ Stripe vars test failed: ${error.message}`, 'error');
+            }
+
+            // Test 3: Checkout parameters
+            try {
+                if (window.data && window.data.checkout_url && window.data.ajax_url) {
+                    updateTestResult('checkout-params', 'pass', 'Checkout parameters configured ✅');
+                    log('✅ WooCommerce checkout parameters ready', 'success');
+                } else {
+                    updateTestResult('checkout-params', 'fail', 'Checkout parameters incomplete ❌');
+                    log('❌ Checkout parameters missing or incomplete', 'error');
+                }
+            } catch (error) {
+                updateTestResult('checkout-params', 'fail', `Error: ${error.message}`);
+                log(`❌ Checkout params test failed: ${error.message}`, 'error');
+            }
+
+            // Update section status
+            const dataTests = [
+                document.getElementById('data-variable').className.includes('pass'),
+                document.getElementById('stripe-vars').className.includes('pass'),
+                document.getElementById('checkout-params').className.includes('pass')
+            ];
+
+            const dataPassed = dataTests.filter(Boolean).length;
+            if (dataPassed === 3) {
+                updateSectionStatus('data', 'success');
+            } else if (dataPassed > 0) {
+                updateSectionStatus('data', 'warning');
+            } else {
+                updateSectionStatus('data', 'error');
+            }
+        }
+
+        function clearConsole() {
+            const console = document.getElementById('console-output');
+            console.innerHTML = `
+                <div class="info">🚨 YPrint Checkout System Fix - Console Output</div>
+                <div class="info">Console cleared. Ready for new tests...</div>
+            `;
+        }
+
+        // Auto-load scripts when page loads
+        window.addEventListener('load', function() {
+            log('🔄 Page loaded. Auto-loading checkout scripts...', 'info');
+            setTimeout(loadCheckoutScripts, 1000);
+        });
+    </script>
+</body>
+</html>

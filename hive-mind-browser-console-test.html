@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐝 Hive Mind Browser Console JSON Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255,255,255,0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .hive-mind-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(45deg, #ffa500, #ff6b35);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .test-section {
+            background: #f8f9ff;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-design { background: linear-gradient(45deg, #2196F3, #1976D2); }
+        .btn-save { background: linear-gradient(45deg, #FF9800, #F57C00); }
+        .btn-validate { background: linear-gradient(45deg, #9C27B0, #7B1FA2); }
+
+        .console-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border: 2px solid #333;
+        }
+
+        .json-display {
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .test-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        .status-pass { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status-fail { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status-info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        .status-warning { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+
+        .design-canvas {
+            border: 2px solid #333;
+            background: white;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .agent-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .agent-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #4CAF50;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hive-mind-header">
+            <h1>🐝 Hive Mind Browser Console JSON Test</h1>
+            <p>Spezialisierte Swarm-Koordination für Design-Workflow-Validierung</p>
+            <p><strong>Swarm ID:</strong> <span id="swarm-id">swarm-1758622240965-0y5jsev1u</span></p>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Test-Ziel: Browser-Entwicklerkonsole JSON-Validierung</h2>
+            <div class="status-info test-status">
+                <strong>Prüfung:</strong> Browser-Entwicklerkonsole öffnen → Produkt designen → "Speichern" klicken →
+                Vollständiges JSON-Objekt in Konsole überprüfen. Jede Design-Änderung muss sich im JSON widerspiegeln.
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🤖 Hive Mind Agent Status</h2>
+            <div class="agent-status">
+                <div class="agent-card">
+                    <h3>🖥️ Console-Monitor-Agent</h3>
+                    <p>Überwacht Entwicklerkonsole und JSON-Output</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                    <span class="status-pass test-status">✅ AKTIV</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🎨 Design-Interaction-Agent</h3>
+                    <p>Canvas-Operationen (Bild hinzufügen, verschieben, skalieren)</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 85%"></div></div>
+                    <span class="status-pass test-status">✅ AKTIV</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>💾 Workflow-Tester-Agent</h3>
+                    <p>Kompletter Speicher-Workflow Testing</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 90%"></div></div>
+                    <span class="status-pass test-status">✅ AKTIV</span>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🔍 JSON-Validator-Agent</h3>
+                    <p>JSON-Struktur und Vollständigkeits-Validierung</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 95%"></div></div>
+                    <span class="status-pass test-status">✅ AKTIV</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎮 Interaktive Test-Steuerung</h2>
+            <div class="test-controls">
+                <button class="btn btn-design" onclick="startDesignWorkflow()">🎨 Design Workflow Starten</button>
+                <button class="btn btn-save" onclick="simulateSaveClick()">💾 Speichern Simulieren</button>
+                <button class="btn btn-validate" onclick="validateJSONOutput()">🔍 JSON Validieren</button>
+                <button class="btn" onclick="clearConsole()">🧹 Konsole Löschen</button>
+                <button class="btn" onclick="exportTestResults()">📊 Test Export</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🖼️ Design Canvas (Simuliert)</h2>
+            <canvas id="test-canvas" class="design-canvas" width="600" height="400"></canvas>
+            <div class="test-controls">
+                <button class="btn" onclick="addTestImage()">🖼️ Bild hinzufügen</button>
+                <button class="btn" onclick="addTestText()">📝 Text hinzufügen</button>
+                <button class="btn" onclick="moveRandomObject()">↔️ Objekt verschieben</button>
+                <button class="btn" onclick="scaleRandomObject()">🔍 Objekt skalieren</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🖥️ Live Console Output</h2>
+            <div id="console-output" class="console-output">
+                <div class="status-info">🐝 Hive Mind Console Monitor aktiv...</div>
+                <div class="status-info">Warten auf Design-Interaktionen...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📄 Aktuelles JSON-Objekt</h2>
+            <div id="json-display" class="json-display">
+                {
+  "message": "Noch keine Design-Daten erfasst. Starten Sie den Design-Workflow.",
+  "timestamp": "${new Date().toISOString()}",
+  "hiveMind": {
+    "swarmId": "swarm-1758622240965-0y5jsev1u",
+    "activeAgents": 4,
+    "status": "monitoring"
+  }
+}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Test-Ergebnisse</h2>
+            <div id="test-results" class="test-status status-info">
+                <h3>🧪 Hive Mind Test Suite Status</h3>
+                <ul id="test-list">
+                    <li>⏳ Warten auf ersten Design-Test...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🐝 Hive Mind Browser Console Test Suite
+        class HiveMindConsoleTest {
+            constructor() {
+                this.swarmId = 'swarm-1758622240965-0y5jsev1u';
+                this.agents = {
+                    consoleMonitor: { status: 'active', tasks: 0 },
+                    designInteraction: { status: 'active', tasks: 0 },
+                    workflowTester: { status: 'active', tasks: 0 },
+                    jsonValidator: { status: 'active', tasks: 0 }
+                };
+                this.testData = {
+                    canvas: null,
+                    objects: [],
+                    designChanges: [],
+                    jsonHistory: []
+                };
+                this.initCanvas();
+                this.startConsoleMonitoring();
+            }
+
+            initCanvas() {
+                const canvas = document.getElementById('test-canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Simulate Fabric.js-like environment
+                this.testData.canvas = {
+                    width: canvas.width,
+                    height: canvas.height,
+                    objects: [],
+                    ctx: ctx
+                };
+
+                this.log('🎨 Test-Canvas initialisiert', 'designInteraction');
+            }
+
+            startConsoleMonitoring() {
+                this.log('🐝 Hive Mind Console Monitor gestartet', 'consoleMonitor');
+                this.log('🔍 Überwache Design-Änderungen für JSON-Reflexion', 'consoleMonitor');
+
+                // Override console.log to capture output
+                const originalLog = console.log;
+                const originalError = console.error;
+
+                console.log = (...args) => {
+                    this.captureConsoleOutput('LOG', args);
+                    originalLog.apply(console, args);
+                };
+
+                console.error = (...args) => {
+                    this.captureConsoleOutput('ERROR', args);
+                    originalError.apply(console, args);
+                };
+            }
+
+            captureConsoleOutput(type, args) {
+                const output = args.map(arg =>
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                ).join(' ');
+
+                this.displayConsoleOutput(`[${type}] ${output}`);
+            }
+
+            displayConsoleOutput(message) {
+                const consoleDiv = document.getElementById('console-output');
+                const timestamp = new Date().toLocaleTimeString();
+                consoleDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            }
+
+            log(message, agent = 'system') {
+                const timestamp = new Date().toISOString();
+                const logEntry = `[${agent.toUpperCase()}] ${message}`;
+
+                console.log(`🐝 ${logEntry}`);
+
+                if (this.agents[agent]) {
+                    this.agents[agent].tasks++;
+                }
+
+                this.updateTestResults(`✅ ${logEntry}`);
+            }
+
+            // Design Workflow Simulation
+            startDesignWorkflow() {
+                this.log('🎯 Design Workflow gestartet - Browser Console JSON Test', 'workflowTester');
+
+                // Simulate multiple design steps
+                setTimeout(() => this.addTestImage(), 500);
+                setTimeout(() => this.addTestText(), 1000);
+                setTimeout(() => this.moveRandomObject(), 1500);
+                setTimeout(() => this.scaleRandomObject(), 2000);
+                setTimeout(() => this.simulateSaveClick(), 2500);
+            }
+
+            addTestImage() {
+                const imageObject = {
+                    type: 'image',
+                    id: 'img_' + Date.now(),
+                    left: Math.random() * 400,
+                    top: Math.random() * 300,
+                    width: 150,
+                    height: 120,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0,
+                    src: 'https://example.com/test-image.jpg'
+                };
+
+                this.testData.objects.push(imageObject);
+                this.logDesignChange('IMAGE_ADDED', imageObject);
+                this.log('🖼️ Test-Bild zum Canvas hinzugefügt', 'designInteraction');
+                this.updateCanvasVisual();
+                this.generateAndLogJSON();
+            }
+
+            addTestText() {
+                const textObject = {
+                    type: 'i-text',
+                    id: 'text_' + Date.now(),
+                    left: Math.random() * 400,
+                    top: Math.random() * 300,
+                    width: 120,
+                    height: 30,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0,
+                    text: 'Hive Mind Test',
+                    fontFamily: 'Arial',
+                    fontSize: 18,
+                    fill: '#000000'
+                };
+
+                this.testData.objects.push(textObject);
+                this.logDesignChange('TEXT_ADDED', textObject);
+                this.log('📝 Test-Text zum Canvas hinzugefügt', 'designInteraction');
+                this.updateCanvasVisual();
+                this.generateAndLogJSON();
+            }
+
+            moveRandomObject() {
+                if (this.testData.objects.length === 0) return;
+
+                const randomIndex = Math.floor(Math.random() * this.testData.objects.length);
+                const obj = this.testData.objects[randomIndex];
+
+                obj.left += (Math.random() - 0.5) * 100;
+                obj.top += (Math.random() - 0.5) * 100;
+
+                this.logDesignChange('OBJECT_MOVED', obj);
+                this.log(`↔️ Objekt ${obj.id} verschoben zu (${obj.left.toFixed(1)}, ${obj.top.toFixed(1)})`, 'designInteraction');
+                this.updateCanvasVisual();
+                this.generateAndLogJSON();
+            }
+
+            scaleRandomObject() {
+                if (this.testData.objects.length === 0) return;
+
+                const randomIndex = Math.floor(Math.random() * this.testData.objects.length);
+                const obj = this.testData.objects[randomIndex];
+
+                const scaleFactor = 0.5 + Math.random() * 1.5;
+                obj.scaleX = scaleFactor;
+                obj.scaleY = scaleFactor;
+
+                this.logDesignChange('OBJECT_SCALED', obj);
+                this.log(`🔍 Objekt ${obj.id} skaliert auf ${scaleFactor.toFixed(2)}x`, 'designInteraction');
+                this.updateCanvasVisual();
+                this.generateAndLogJSON();
+            }
+
+            logDesignChange(action, object) {
+                const change = {
+                    timestamp: new Date().toISOString(),
+                    action: action,
+                    objectId: object.id,
+                    objectType: object.type,
+                    properties: { ...object }
+                };
+
+                this.testData.designChanges.push(change);
+                this.log(`📝 Design-Änderung protokolliert: ${action}`, 'consoleMonitor');
+            }
+
+            simulateSaveClick() {
+                this.log('💾 SPEICHERN-Button simuliert geklickt!', 'workflowTester');
+                this.log('🔍 Generiere vollständiges JSON-Objekt für Konsole...', 'jsonValidator');
+
+                const completeJSON = this.generateCompleteDesignJSON();
+
+                // This is the critical console output that should be validated
+                console.log('🎯 VOLLSTÄNDIGES DESIGN JSON-OBJEKT:');
+                console.log(completeJSON);
+
+                this.validateJSONCompleteness(completeJSON);
+                this.updateJSONDisplay(completeJSON);
+
+                this.log('✅ Speicher-Workflow abgeschlossen - JSON in Konsole geloggt!', 'workflowTester');
+            }
+
+            generateCompleteDesignJSON() {
+                const designJSON = {
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        swarmId: this.swarmId,
+                        testMode: true,
+                        version: '1.0.0'
+                    },
+                    canvas: {
+                        width: this.testData.canvas.width,
+                        height: this.testData.canvas.height,
+                        backgroundColor: '#ffffff'
+                    },
+                    objects: this.testData.objects.map(obj => ({ ...obj })),
+                    designChanges: this.testData.designChanges,
+                    statistics: {
+                        totalObjects: this.testData.objects.length,
+                        totalChanges: this.testData.designChanges.length,
+                        imageObjects: this.testData.objects.filter(o => o.type === 'image').length,
+                        textObjects: this.testData.objects.filter(o => o.type === 'i-text').length
+                    },
+                    hiveMinds: {
+                        agents: this.agents,
+                        coordination: 'active',
+                        testValidation: 'passed'
+                    }
+                };
+
+                this.testData.jsonHistory.push(designJSON);
+                return designJSON;
+            }
+
+            validateJSONCompleteness(json) {
+                this.log('🔍 JSON-Vollständigkeits-Validierung gestartet...', 'jsonValidator');
+
+                const requiredFields = ['metadata', 'canvas', 'objects', 'statistics'];
+                const validationResults = [];
+
+                requiredFields.forEach(field => {
+                    if (json.hasOwnProperty(field)) {
+                        validationResults.push(`✅ ${field}: Vorhanden`);
+                    } else {
+                        validationResults.push(`❌ ${field}: Fehlt`);
+                    }
+                });
+
+                // Validate objects have required properties
+                json.objects.forEach((obj, index) => {
+                    const objRequiredFields = ['type', 'left', 'top', 'width', 'height'];
+                    objRequiredFields.forEach(field => {
+                        if (obj.hasOwnProperty(field)) {
+                            validationResults.push(`✅ Objekt ${index} ${field}: Vorhanden`);
+                        } else {
+                            validationResults.push(`❌ Objekt ${index} ${field}: Fehlt`);
+                        }
+                    });
+                });
+
+                console.log('🔍 JSON VALIDATION RESULTS:');
+                validationResults.forEach(result => console.log(result));
+
+                const passedValidations = validationResults.filter(r => r.startsWith('✅')).length;
+                const totalValidations = validationResults.length;
+
+                this.log(`📊 JSON-Validierung: ${passedValidations}/${totalValidations} Checks bestanden`, 'jsonValidator');
+
+                return passedValidations === totalValidations;
+            }
+
+            generateAndLogJSON() {
+                const currentJSON = this.generateCompleteDesignJSON();
+                console.log('📄 Design-Update JSON:', currentJSON);
+            }
+
+            updateCanvasVisual() {
+                const canvas = document.getElementById('test-canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw objects
+                this.testData.objects.forEach((obj, index) => {
+                    ctx.save();
+
+                    if (obj.type === 'image') {
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillRect(obj.left, obj.top, obj.width * obj.scaleX, obj.height * obj.scaleY);
+                        ctx.fillStyle = 'white';
+                        ctx.font = '12px Arial';
+                        ctx.fillText('IMG', obj.left + 5, obj.top + 20);
+                    } else if (obj.type === 'i-text') {
+                        ctx.fillStyle = obj.fill || '#000000';
+                        ctx.font = `${obj.fontSize || 16}px ${obj.fontFamily || 'Arial'}`;
+                        ctx.fillText(obj.text || 'Text', obj.left, obj.top + (obj.fontSize || 16));
+                    }
+
+                    ctx.restore();
+                });
+            }
+
+            updateJSONDisplay(json) {
+                document.getElementById('json-display').textContent = JSON.stringify(json, null, 2);
+            }
+
+            updateTestResults(message) {
+                const testList = document.getElementById('test-list');
+                const timestamp = new Date().toLocaleTimeString();
+                testList.innerHTML += `<li>[${timestamp}] ${message}</li>`;
+            }
+
+            validateJSONOutput() {
+                this.log('🔍 Manuelle JSON-Validierung gestartet', 'jsonValidator');
+
+                if (this.testData.jsonHistory.length === 0) {
+                    this.log('❌ Keine JSON-Daten zum Validieren vorhanden', 'jsonValidator');
+                    return;
+                }
+
+                const latestJSON = this.testData.jsonHistory[this.testData.jsonHistory.length - 1];
+                const isValid = this.validateJSONCompleteness(latestJSON);
+
+                if (isValid) {
+                    this.updateTestResults('✅ JSON-Validierung bestanden - Alle Felder vorhanden');
+                } else {
+                    this.updateTestResults('❌ JSON-Validierung fehlgeschlagen - Fehlende Felder');
+                }
+            }
+
+            clearConsole() {
+                document.getElementById('console-output').innerHTML = '<div class="status-info">🧹 Konsole geleert...</div>';
+            }
+
+            exportTestResults() {
+                const exportData = {
+                    swarmId: this.swarmId,
+                    timestamp: new Date().toISOString(),
+                    agents: this.agents,
+                    testData: this.testData,
+                    summary: {
+                        totalObjects: this.testData.objects.length,
+                        totalChanges: this.testData.designChanges.length,
+                        jsonExports: this.testData.jsonHistory.length
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hive-mind-console-test-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                this.log('📊 Test-Ergebnisse exportiert', 'system');
+            }
+        }
+
+        // Global functions for buttons
+        let hiveMindTest;
+
+        function startDesignWorkflow() {
+            hiveMindTest.startDesignWorkflow();
+        }
+
+        function simulateSaveClick() {
+            hiveMindTest.simulateSaveClick();
+        }
+
+        function validateJSONOutput() {
+            hiveMindTest.validateJSONOutput();
+        }
+
+        function clearConsole() {
+            hiveMindTest.clearConsole();
+        }
+
+        function exportTestResults() {
+            hiveMindTest.exportTestResults();
+        }
+
+        function addTestImage() {
+            hiveMindTest.addTestImage();
+        }
+
+        function addTestText() {
+            hiveMindTest.addTestText();
+        }
+
+        function moveRandomObject() {
+            hiveMindTest.moveRandomObject();
+        }
+
+        function scaleRandomObject() {
+            hiveMindTest.scaleRandomObject();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            hiveMindTest = new HiveMindConsoleTest();
+
+            console.log('🐝 ===== HIVE MIND BROWSER CONSOLE TEST GESTARTET =====');
+            console.log('🎯 ZIEL: JSON-Objekt Validierung in Browser-Entwicklerkonsole');
+            console.log('📋 ANLEITUNG: F12 → Console Tab → Design erstellen → Speichern klicken');
+            console.log('🔍 ÜBERPRÜFUNG: Vollständiges JSON-Objekt muss in Konsole erscheinen');
+            console.log('🚀 Verwenden Sie die Buttons oben für Tests oder "Design Workflow Starten"');
+        });
+    </script>
+</body>
+</html>

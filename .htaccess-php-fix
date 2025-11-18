@@ -1,0 +1,18 @@
+# 🔧 PHP CONFIGURATION FIX FOR PNG STORAGE
+# Add these lines to your .htaccess file in your WordPress root directory
+
+# PHP limits for large PNG uploads (5MB files)
+php_value memory_limit 512M
+php_value max_execution_time 300
+php_value post_max_size 64M
+php_value upload_max_filesize 64M
+php_value max_input_time 300
+
+# Alternative if php_value doesn't work - try php_admin_value
+# php_admin_value memory_limit 512M
+# php_admin_value max_execution_time 300
+# php_admin_value post_max_size 64M
+# php_admin_value upload_max_filesize 64M
+# php_admin_value max_input_time 300
+
+# If neither works, you'll need to contact your hosting provider

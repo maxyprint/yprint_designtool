@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGENT 4 - Enhanced Measurement Dropdown Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .test-header {
+            border-bottom: 2px solid #1976d2;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .test-header h1 {
+            color: #1976d2;
+            margin: 0 0 10px 0;
+        }
+
+        .test-section {
+            margin: 25px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            border-left: 4px solid #4caf50;
+        }
+
+        .dropdown-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+
+        .test-controls {
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #1565c0;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+        }
+
+        .btn-warning:hover {
+            background: #f57c00;
+        }
+
+        .btn-success {
+            background: #4caf50;
+        }
+
+        .btn-success:hover {
+            background: #388e3c;
+        }
+
+        .status-indicator {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status-loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+
+        .status-success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .status-error {
+            background: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ffcdd2;
+        }
+
+        .log-container {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+
+        .measurement-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .info-card {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .info-card h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976d2;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .feature-list li:before {
+            content: "✅ ";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎯 AGENT 4 - Enhanced Measurement Dropdown Test</h1>
+            <p>Testing dynamic measurement dropdown population with database integration, loading states, and error handling.</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Measurement Type Selection</h3>
+            <p>This dropdown demonstrates AGENT 4's enhanced functionality:</p>
+
+            <div class="dropdown-container">
+                <label for="measurement-type-selector"><strong>Measurement Type:</strong></label>
+                <select id="measurement-type-selector" class="form-select integration-bridge-selector">
+                    <option value="">🔄 Initializing...</option>
+                </select>
+            </div>
+
+            <div id="status-indicator" class="status-indicator status-loading">
+                🔄 Initializing AGENT 4 enhanced measurement dropdown...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Test Controls</h3>
+            <div class="test-controls">
+                <button class="btn" onclick="testRefreshDropdown()">🔄 Refresh Measurements</button>
+                <button class="btn btn-warning" onclick="testErrorScenario()">⚠️ Simulate Error</button>
+                <button class="btn btn-success" onclick="testDatabaseLoad()">📊 Test Database Load</button>
+                <button class="btn" onclick="clearTestLog()">🗑️ Clear Log</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 Real-Time Metrics</h3>
+            <div class="measurement-info">
+                <div class="info-card">
+                    <h4>Loading Status</h4>
+                    <div class="metric-value" id="loading-status">Ready</div>
+                </div>
+                <div class="info-card">
+                    <h4>Measurements Loaded</h4>
+                    <div class="metric-value" id="measurement-count">0</div>
+                </div>
+                <div class="info-card">
+                    <h4>Load Time</h4>
+                    <div class="metric-value" id="load-time">0ms</div>
+                </div>
+                <div class="info-card">
+                    <h4>Retry Attempts</h4>
+                    <div class="metric-value" id="retry-count">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Log</h3>
+            <div id="test-log" class="log-container">
+                [AGENT 4 TEST] Test environment initialized...<br>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 AGENT 4 Enhanced Features</h3>
+            <ul class="feature-list">
+                <li>Dynamic AJAX loading from wp_template_measurements database</li>
+                <li>Loading states with spinner and progress indicators</li>
+                <li>Comprehensive error handling with retry mechanisms</li>
+                <li>Fallback to static measurements on database failure</li>
+                <li>Click-to-refresh functionality for manual updates</li>
+                <li>Real-time status tracking and metrics</li>
+                <li>Enhanced visual feedback for measurement states</li>
+                <li>Integration bridge status indicators</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Mock WordPress AJAX environment for testing
+        window.pointToPointAjax = {
+            ajaxurl: '/wp-admin/admin-ajax.php',
+            nonce: 'test_nonce_12345',
+            pluginUrl: '/wp-content/plugins/octo-print-designer'
+        };
+
+        // Mock template selector for testing
+        window.multiViewPointToPointSelector = {
+            templateId: 123,
+            measurementTypes: {},
+            debug: {
+                log: (message, data) => logToConsole('LOG', message, data),
+                error: (message, data) => logToConsole('ERROR', message, data)
+            },
+            checkMeasurementHasReferenceLines: (key) => Math.random() > 0.7,
+            isPrimaryMeasurement: (key) => ['A', 'C'].includes(key),
+            checkMeasurementConflicts: (key) => Math.random() > 0.9,
+            getPrecisionLevel: (key) => Math.floor(Math.random() * 3) + 1,
+            getMeasurementCategory: (key) => ['chest', 'length', 'width', 'height'][Math.floor(Math.random() * 4)]
+        };
+
+        let testStartTime = Date.now();
+        let loadAttempts = 0;
+
+        function logToConsole(level, message, data) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${level}: ${message}`;
+            const logContainer = document.getElementById('test-log');
+            logContainer.innerHTML += logEntry + '<br>';
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            console.log(logEntry, data || '');
+        }
+
+        // Mock fetch function to simulate different scenarios
+        window.originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            return new Promise((resolve, reject) => {
+                logToConsole('AJAX', 'Simulating AJAX call to ' + url);
+
+                setTimeout(() => {
+                    // Simulate different response scenarios
+                    const scenario = getTestScenario();
+
+                    if (scenario === 'success') {
+                        resolve({
+                            ok: true,
+                            json: () => Promise.resolve({
+                                success: true,
+                                data: {
+                                    measurement_types: {
+                                        'A': { label: 'Chest', description: 'Brustumfang' },
+                                        'B': { label: 'Hem Width', description: 'Saumweite' },
+                                        'C': { label: 'Height from Shoulder', description: 'Höhe ab Schulter' },
+                                        'D': { label: 'Shoulder Width', description: 'Schulterbreite' },
+                                        'E': { label: 'Sleeve Length', description: 'Ärmellänge' },
+                                        'F': { label: 'Back Length', description: 'Rückenlänge' },
+                                        'G': { label: 'Armhole Width', description: 'Armausschnitt Breite' },
+                                        'H': { label: 'Neck Width', description: 'Halsausschnitt Breite' }
+                                    }
+                                }
+                            })
+                        });
+                    } else if (scenario === 'error') {
+                        reject(new Error('Database connection failed'));
+                    } else {
+                        resolve({
+                            ok: false,
+                            status: 500,
+                            statusText: 'Internal Server Error'
+                        });
+                    }
+                }, Math.random() * 2000 + 500); // Random delay 0.5-2.5s
+            });
+        };
+
+        let testScenario = 'success'; // 'success', 'error', 'http_error'
+
+        function getTestScenario() {
+            return testScenario;
+        }
+
+        function updateStatus(message, type = 'loading') {
+            const statusElement = document.getElementById('status-indicator');
+            statusElement.textContent = message;
+            statusElement.className = `status-indicator status-${type}`;
+
+            document.getElementById('loading-status').textContent = type.toUpperCase();
+        }
+
+        function updateMetrics(count, loadTime, retryCount) {
+            document.getElementById('measurement-count').textContent = count || 0;
+            document.getElementById('load-time').textContent = (loadTime || 0) + 'ms';
+            document.getElementById('retry-count').textContent = retryCount || 0;
+        }
+
+        async function testRefreshDropdown() {
+            logToConsole('TEST', 'Manual refresh triggered');
+            testScenario = 'success';
+            loadAttempts++;
+
+            if (window.agent4MeasurementEnhancer) {
+                await window.agent4MeasurementEnhancer.loadMeasurementTypesEnhanced();
+            } else {
+                logToConsole('ERROR', 'AGENT 4 enhancer not loaded yet');
+            }
+        }
+
+        function testErrorScenario() {
+            logToConsole('TEST', 'Error scenario triggered');
+            testScenario = 'error';
+            testRefreshDropdown();
+        }
+
+        function testDatabaseLoad() {
+            logToConsole('TEST', 'Database load test triggered');
+            testScenario = 'success';
+            testRefreshDropdown();
+        }
+
+        function clearTestLog() {
+            document.getElementById('test-log').innerHTML = '[AGENT 4 TEST] Log cleared...<br>';
+        }
+
+        // Initialize test environment
+        document.addEventListener('DOMContentLoaded', async function() {
+            logToConsole('INIT', 'DOM loaded, starting AGENT 4 test initialization');
+
+            try {
+                // Load the AGENT 4 enhancement script
+                const script = document.createElement('script');
+                script.src = './admin/js/agent4-measurement-dropdown-enhancement.js';
+                script.onload = async function() {
+                    logToConsole('SUCCESS', 'AGENT 4 enhancement script loaded');
+
+                    // Initialize the enhancer
+                    window.agent4MeasurementEnhancer = new Agent4MeasurementDropdownEnhancer(window.multiViewPointToPointSelector);
+                    window.agent4MeasurementEnhancer.initializeStyles();
+                    window.agent4MeasurementEnhancer.initializeDropdownInteractivity();
+
+                    updateStatus('AGENT 4 enhancer loaded successfully', 'success');
+
+                    // Start initial load
+                    logToConsole('INIT', 'Starting initial measurement load');
+                    const startTime = Date.now();
+                    await window.agent4MeasurementEnhancer.loadMeasurementTypesEnhanced();
+                    const loadTime = Date.now() - startTime;
+
+                    const measurementCount = Object.keys(window.multiViewPointToPointSelector.measurementTypes || {}).length;
+                    updateMetrics(measurementCount, loadTime, 0);
+
+                    logToConsole('SUCCESS', `Initial load complete: ${measurementCount} measurements in ${loadTime}ms`);
+                };
+                script.onerror = function() {
+                    logToConsole('ERROR', 'Failed to load AGENT 4 enhancement script');
+                    updateStatus('Failed to load AGENT 4 enhancement script', 'error');
+                };
+                document.head.appendChild(script);
+
+            } catch (error) {
+                logToConsole('ERROR', 'Test initialization failed: ' + error.message);
+                updateStatus('Test initialization failed', 'error');
+            }
+        });
+
+        // Monitor dropdown changes
+        document.addEventListener('change', function(event) {
+            if (event.target.id === 'measurement-type-selector') {
+                const selectedValue = event.target.value;
+                logToConsole('USER', `Measurement selected: ${selectedValue}`);
+
+                if (selectedValue && selectedValue !== 'retry') {
+                    updateStatus(`Selected measurement: ${selectedValue}`, 'success');
+                }
+            }
+        });
+
+        // Update test metrics every 5 seconds
+        setInterval(() => {
+            if (window.agent4MeasurementEnhancer) {
+                const status = window.agent4MeasurementEnhancer.loadingStates;
+                const retryCount = window.agent4MeasurementEnhancer.retryAttempts || 0;
+
+                if (status.isLoading) {
+                    updateStatus('Loading measurements from database...', 'loading');
+                } else if (status.hasError) {
+                    updateStatus(`Error: ${status.errorMessage}`, 'error');
+                } else {
+                    updateStatus('Ready - measurements loaded', 'success');
+                }
+
+                updateMetrics(
+                    Object.keys(window.multiViewPointToPointSelector.measurementTypes || {}).length,
+                    null,
+                    retryCount
+                );
+            }
+        }, 1000);
+
+        logToConsole('INIT', 'AGENT 4 test environment ready');
+    </script>
+</body>
+</html>

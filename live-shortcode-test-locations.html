@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 [ops-designer] Shortcode Live Test Locations</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255,255,255,0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.4);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .location-card {
+            background: #f8f9ff;
+            border: 2px solid #6c5ce7;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+
+        .location-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(108, 92, 231, 0.2);
+        }
+
+        .priority-high {
+            border-color: #00b894;
+            background: #e8f5e8;
+        }
+
+        .priority-medium {
+            border-color: #fdcb6e;
+            background: #fff8e1;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+        }
+
+        .btn-create { background: linear-gradient(45deg, #00b894, #00cec9); }
+        .btn-test { background: linear-gradient(45deg, #e17055, #d63031); }
+        .btn-admin { background: linear-gradient(45deg, #0984e3, #74b9ff); }
+
+        .step-number {
+            background: #6c5ce7;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            border-left: 4px solid #6c5ce7;
+        }
+
+        .quick-access {
+            background: linear-gradient(135deg, #ff7675, #fd79a8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .test-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-ready { background: #00b894; color: white; }
+        .status-create { background: #fdcb6e; color: #2d3436; }
+        .status-unknown { background: #ddd; color: #636e72; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 [ops-designer] Live Test Locations</h1>
+            <p>Wo Sie den Shortcode auf <strong>https://test-site.local</strong> testen können</p>
+        </div>
+
+        <div class="quick-access">
+            <h2>🚀 SCHNELLSTER WEG</h2>
+            <p>Neue Test-Seite erstellen und sofort testen:</p>
+            <a href="https://test-site.local/wp-admin/post-new.php?post_type=page" class="btn btn-create" target="_blank">
+                📄 Neue Seite mit [ops-designer] erstellen
+            </a>
+        </div>
+
+        <div class="location-card priority-high">
+            <h2>
+                <div class="step-number">1</div>
+                Neue WordPress-Seite erstellen
+                <span class="test-status status-create">EMPFOHLEN</span>
+            </h2>
+            <p><strong>Schnellste und sicherste Methode für den Test</strong></p>
+
+            <div class="code-block">
+1. WordPress Admin → Seiten → Neu hinzufügen
+2. Titel: "OPS Designer Test"
+3. Inhalt: [ops-designer]
+4. Veröffentlichen
+5. Seite ansehen
+            </div>
+
+            <div style="margin: 15px 0;">
+                <a href="https://test-site.local/wp-admin/post-new.php?post_type=page" class="btn btn-create" target="_blank">
+                    📄 Neue Seite erstellen
+                </a>
+                <button class="btn" onclick="copyShortcode()">📋 [ops-designer] kopieren</button>
+            </div>
+        </div>
+
+        <div class="location-card priority-medium">
+            <h2>
+                <div class="step-number">2</div>
+                Bestehende Seiten prüfen
+                <span class="test-status status-unknown">ZU PRÜFEN</span>
+            </h2>
+            <p>Möglicherweise gibt es bereits Seiten mit dem Shortcode</p>
+
+            <div style="margin: 15px 0;">
+                <a href="https://test-site.local/wp-admin/edit.php?post_type=page" class="btn btn-admin" target="_blank">
+                    📋 Alle Seiten anzeigen
+                </a>
+                <button class="btn" onclick="searchForShortcode()">🔍 Nach [ops-designer] suchen</button>
+            </div>
+
+            <p><strong>Häufige Seitennamen zu prüfen:</strong></p>
+            <ul>
+                <li><a href="https://test-site.local/designer/" target="_blank">https://test-site.local/designer/</a></li>
+                <li><a href="https://test-site.local/design/" target="_blank">https://test-site.local/design/</a></li>
+                <li><a href="https://test-site.local/product-designer/" target="_blank">https://test-site.local/product-designer/</a></li>
+                <li><a href="https://test-site.local/ops-designer/" target="_blank">https://test-site.local/ops-designer/</a></li>
+                <li><a href="https://test-site.local/test/" target="_blank">https://test-site.local/test/</a></li>
+            </ul>
+        </div>
+
+        <div class="location-card">
+            <h2>
+                <div class="step-number">3</div>
+                Bestehende Beiträge prüfen
+                <span class="test-status status-unknown">OPTIONAL</span>
+            </h2>
+            <p>Shortcode könnte auch in Blog-Beiträgen verwendet werden</p>
+
+            <div style="margin: 15px 0;">
+                <a href="https://test-site.local/wp-admin/edit.php" class="btn btn-admin" target="_blank">
+                    📝 Alle Beiträge anzeigen
+                </a>
+            </div>
+        </div>
+
+        <div class="location-card">
+            <h2>
+                <div class="step-number">4</div>
+                Plugin-Demo-Seite prüfen
+                <span class="test-status status-unknown">MÖGLICH</span>
+            </h2>
+            <p>Manche Plugins erstellen automatisch Demo-Seiten</p>
+
+            <div style="margin: 15px 0;">
+                <a href="https://test-site.local/" target="_blank" class="btn">🏠 Homepage prüfen</a>
+                <a href="https://test-site.local/sample-page/" target="_blank" class="btn">📄 Sample Page</a>
+            </div>
+        </div>
+
+        <div class="location-card priority-high">
+            <h2>🔍 Sofortige Shortcode-Suche</h2>
+            <p>Lassen Sie das Hive Mind automatisch nach dem Shortcode suchen:</p>
+
+            <button class="btn btn-test" onclick="automaticShortcodeSearch()">
+                🤖 Automatische Shortcode-Suche starten
+            </button>
+
+            <div id="search-results" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
+                <h4>🔍 Suchergebnisse:</h4>
+                <div id="results-content">Suche läuft...</div>
+            </div>
+        </div>
+
+        <div class="location-card" style="background: #e8f5e8; border-color: #00b894;">
+            <h2>✅ Nach dem Test</h2>
+            <p><strong>Sobald Sie eine Seite mit [ops-designer] gefunden/erstellt haben:</strong></p>
+
+            <ol>
+                <li>🖥️ <strong>F12 → Console</strong> öffnen</li>
+                <li>🎨 <strong>Design erstellen:</strong> Bild hochladen → Canvas platzieren</li>
+                <li>✏️ <strong>Bearbeiten:</strong> Verschieben, skalieren, rotieren</li>
+                <li>💾 <strong>Speichern klicken</strong></li>
+                <li>🔍 <strong>JSON in Console prüfen</strong></li>
+            </ol>
+
+            <button class="btn btn-test" onclick="openConsoleGuide()">
+                🖥️ Console-Test Guide öffnen
+            </button>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <h3>🎯 Direkter Zugang</h3>
+            <a href="https://test-site.local/wp-admin" class="btn btn-admin" target="_blank">🏗️ WordPress Admin</a>
+            <a href="https://test-site.local" class="btn" target="_blank">🌐 Site Homepage</a>
+            <button class="btn btn-create" onclick="createTestPageNow()">⚡ Test-Seite JETZT erstellen</button>
+        </div>
+    </div>
+
+    <script>
+        function copyShortcode() {
+            navigator.clipboard.writeText('[ops-designer]').then(() => {
+                alert('✅ [ops-designer] in Zwischenablage kopiert!\n\nJetzt:\n1. WordPress Admin öffnen\n2. Neue Seite erstellen\n3. Shortcode einfügen\n4. Veröffentlichen');
+            });
+        }
+
+        function searchForShortcode() {
+            alert(`🔍 So suchen Sie nach bestehenden [ops-designer] Seiten:
+
+1. WordPress Admin → Seiten → Alle Seiten
+2. Suchfeld: "ops-designer" eingeben
+3. Oder: Jede Seite einzeln öffnen und nach dem Shortcode suchen
+
+Alternativ:
+- WordPress Admin → Darstellung → Editor
+- Dateien nach "ops-designer" durchsuchen`);
+        }
+
+        function automaticShortcodeSearch() {
+            const resultsDiv = document.getElementById('search-results');
+            const contentDiv = document.getElementById('results-content');
+
+            resultsDiv.style.display = 'block';
+            contentDiv.innerHTML = '🔄 Durchsuche https://test-site.local nach [ops-designer]...';
+
+            // Simulate search (in real implementation, this would query WordPress)
+            const commonUrls = [
+                'https://test-site.local/',
+                'https://test-site.local/designer/',
+                'https://test-site.local/design/',
+                'https://test-site.local/product-designer/',
+                'https://test-site.local/ops-designer/',
+                'https://test-site.local/test/',
+                'https://test-site.local/sample-page/'
+            ];
+
+            let searchHtml = '<div style="font-family: monospace; font-size: 14px;">';
+
+            commonUrls.forEach((url, index) => {
+                setTimeout(() => {
+                    searchHtml += `<div style="margin: 5px 0;">🔍 Prüfe: <a href="${url}" target="_blank">${url}</a> - <span style="color: #666;">Manuell prüfen</span></div>`;
+                    contentDiv.innerHTML = searchHtml + '</div>';
+
+                    if (index === commonUrls.length - 1) {
+                        contentDiv.innerHTML += `
+                            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px;">
+                                <strong>💡 Empfehlung:</strong> Erstellen Sie eine neue Test-Seite für garantierte Funktionalität
+                                <br><a href="https://test-site.local/wp-admin/post-new.php?post_type=page" target="_blank" style="color: #6c5ce7; font-weight: bold;">→ Neue Seite erstellen</a>
+                            </div>
+                        `;
+                    }
+                }, index * 500);
+            });
+        }
+
+        function createTestPageNow() {
+            if (confirm(`🚀 Test-Seite erstellen?
+
+Das öffnet WordPress Admin, wo Sie:
+1. Neue Seite erstellen
+2. [ops-designer] Shortcode einfügen
+3. Veröffentlichen
+4. Sofort testen können
+
+Fortfahren?`)) {
+                window.open('https://test-site.local/wp-admin/post-new.php?post_type=page', '_blank');
+            }
+        }
+
+        function openConsoleGuide() {
+            alert(`🖥️ Browser Console Test Guide:
+
+1. Seite mit [ops-designer] öffnen
+2. F12 drücken → Console Tab
+3. console.clear() eingeben (für saubere Konsole)
+4. Design-Workflow:
+   📁 Bild hochladen
+   🎯 Auf Canvas platzieren
+   ✏️ Verschieben/Skalieren/Rotieren
+   💾 "Speichern" klicken
+5. 🔍 JSON-Objekt in Console prüfen:
+   - Vollständige Design-Daten?
+   - Canvas-Abmessungen?
+   - Objekt-Eigenschaften?
+   - Metadaten vorhanden?
+
+✅ Erfolgreich = Vollständiges JSON in Console!`);
+        }
+
+        // Auto-suggestions on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 [ops-designer] Test Locations geladen');
+            console.log('🌐 Site: https://test-site.local');
+            console.log('💡 Empfohlen: Neue Test-Seite erstellen');
+
+            // Show suggestion after a moment
+            setTimeout(() => {
+                if (confirm(`💡 Sofort-Tipp: Neue Test-Seite erstellen?
+
+Möchten Sie direkt eine neue WordPress-Seite mit [ops-designer] erstellen?
+Das ist der schnellste Weg zum Test!`)) {
+                    window.open('https://test-site.local/wp-admin/post-new.php?post_type=page', '_blank');
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

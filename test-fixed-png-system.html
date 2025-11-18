@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fixed PNG System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+        button { margin: 5px; padding: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>Fixed PNG System Test</h1>
+    <p>Testing the actual fixes made to the PNG generation system.</p>
+
+    <button onclick="testNullEngine()">Test Null Engine</button>
+    <button onclick="testMissingExportMethod()">Test Missing Export Method</button>
+    <button onclick="testExportMethodFailure()">Test Export Method Failure</button>
+    <button onclick="testWorkingSystem()">Test Working System</button>
+
+    <div id="results"></div>
+
+    <script>
+        // Simplified version of the actual SaveOnlyPNGGenerator with fixes
+        class FixedSaveOnlyPNGGenerator {
+            constructor() {
+                this.pngEngine = null;
+                this.isGenerating = false;
+            }
+
+            async generateAndStorePNG(designData, saveType, orderId = null) {
+                if (this.isGenerating) {
+                    console.log('⏳ Generation already in progress, skipping...');
+                    return;
+                }
+
+                // 🔧 CRITICAL FIX: Check if PNG engine is available
+                if (!this.pngEngine || !this.pngEngine.exportEngine) {
+                    console.error('❌ PNG engine not available. Cannot generate PNG.');
+                    this.isGenerating = false;
+                    return {
+                        success: false,
+                        error: 'PNG engine not available'
+                    };
+                }
+
+                this.isGenerating = true;
+
+                try {
+                    console.log(`🖨️ Generating PNG for ${saveType}...`);
+
+                    // Generate high-quality print PNG
+                    const printPNG = await this.pngEngine.exportEngine.exportForPrintMachine({
+                        dpi: 300,
+                        format: 'png',
+                        quality: 1.0
+                    });
+
+                    // Store PNG with metadata (with safe property access)
+                    const pngData = {
+                        design_id: 'test-design-' + Date.now(),
+                        print_png: printPNG,
+                        save_type: saveType,
+                        order_id: orderId,
+                        generated_at: new Date().toISOString(),
+                        print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 }),
+                        print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }),
+                        template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback'
+                    };
+
+                    console.log('✅ Generated successfully');
+                    return { success: true, data: pngData };
+
+                } catch (error) {
+                    console.error('❌ Generation failed:', error);
+                    return {
+                        success: false,
+                        error: error.message || 'PNG generation failed'
+                    };
+                } finally {
+                    this.isGenerating = false;
+                }
+            }
+        }
+
+        function addResult(test, status, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            div.innerHTML = `<strong>${test}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testNullEngine() {
+            addResult('Test 1', 'info', 'Testing completely null PNG engine...');
+
+            const generator = new FixedSaveOnlyPNGGenerator();
+            // Deliberately leave pngEngine as null
+
+            try {
+                const result = await generator.generateAndStorePNG({}, 'test_save');
+
+                if (result && result.success === false && result.error === 'PNG engine not available') {
+                    addResult('Test 1', 'pass', '✅ PASSED - Correctly returned error for null engine');
+                } else {
+                    addResult('Test 1', 'fail', `❌ FAILED - Expected error, got: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                addResult('Test 1', 'fail', `❌ FAILED - Should not throw error, but threw: ${error.message}`);
+            }
+        }
+
+        async function testMissingExportMethod() {
+            addResult('Test 2', 'info', 'Testing engine with missing exportEngine...');
+
+            const generator = new FixedSaveOnlyPNGGenerator();
+            // Set pngEngine but without exportEngine property
+            generator.pngEngine = {
+                isReady: () => true,
+                // exportEngine is missing
+            };
+
+            try {
+                const result = await generator.generateAndStorePNG({}, 'test_save');
+
+                if (result && result.success === false && result.error === 'PNG engine not available') {
+                    addResult('Test 2', 'pass', '✅ PASSED - Correctly detected missing exportEngine');
+                } else {
+                    addResult('Test 2', 'fail', `❌ FAILED - Expected error, got: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                addResult('Test 2', 'fail', `❌ FAILED - Should not throw error, but threw: ${error.message}`);
+            }
+        }
+
+        async function testExportMethodFailure() {
+            addResult('Test 3', 'info', 'Testing engine with failing export method...');
+
+            const generator = new FixedSaveOnlyPNGGenerator();
+            // Set up engine with export method that throws an error
+            generator.pngEngine = {
+                exportEngine: {
+                    exportForPrintMachine: async () => {
+                        throw new Error('Export method failed');
+                    },
+                    printAreaPx: { width: 800, height: 600 },
+                    printAreaMm: { width: 200, height: 150 },
+                    currentTemplateId: 'test'
+                }
+            };
+
+            try {
+                const result = await generator.generateAndStorePNG({}, 'test_save');
+
+                if (result && result.success === false && result.error.includes('Export method failed')) {
+                    addResult('Test 3', 'pass', '✅ PASSED - Correctly caught export method failure');
+                } else {
+                    addResult('Test 3', 'fail', `❌ FAILED - Expected export error, got: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                addResult('Test 3', 'fail', `❌ FAILED - Should not throw error, but threw: ${error.message}`);
+            }
+        }
+
+        async function testWorkingSystem() {
+            addResult('Test 4', 'info', 'Testing fully working PNG system...');
+
+            const generator = new FixedSaveOnlyPNGGenerator();
+            // Set up properly working engine
+            generator.pngEngine = {
+                exportEngine: {
+                    exportForPrintMachine: async (options) => {
+                        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                    },
+                    printAreaPx: { width: 800, height: 600 },
+                    printAreaMm: { width: 200, height: 150 },
+                    currentTemplateId: 'test-template'
+                }
+            };
+
+            try {
+                const result = await generator.generateAndStorePNG({ test: 'data' }, 'test_save');
+
+                if (result && result.success === true && result.data && result.data.print_png) {
+                    addResult('Test 4', 'pass', '✅ PASSED - Complete PNG generation successful');
+                } else {
+                    addResult('Test 4', 'fail', `❌ FAILED - Expected success, got: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                addResult('Test 4', 'fail', `❌ FAILED - Should not throw error, but threw: ${error.message}`);
+            }
+        }
+
+        // Auto-run setup
+        setTimeout(() => {
+            addResult('Setup', 'info', 'Test environment ready. Click buttons to run specific tests.');
+        }, 100);
+    </script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGENT 5: Integration Bridge API Validation Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .validation-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .validation-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .test-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e1e5e9;
+            font-weight: 600;
+        }
+        .test-content {
+            padding: 15px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+        .method-test {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .log-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .results-summary {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="validation-container">
+        <div class="validation-header">
+            <h1>🔍 AGENT 5: Integration Bridge API Validation Test</h1>
+            <p>Comprehensive validation of Integration Bridge method accessibility and functionality</p>
+        </div>
+
+        <div class="test-section">
+            <div class="test-header">🎯 Test Controls</div>
+            <div class="test-content">
+                <button onclick="runFullValidation()">🚀 Run Full Validation</button>
+                <button onclick="testMethodAccessibility()">🔧 Test Method Accessibility</button>
+                <button onclick="testCoreAPIMethods()">⚙️ Test Core API Methods</button>
+                <button onclick="validateClassInstance()">🏗️ Validate Class Instance</button>
+                <button onclick="clearLog()">🗑️ Clear Log</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-header">📊 Validation Results</div>
+            <div class="test-content">
+                <div id="validationSummary">
+                    <span class="status-badge status-info">Ready</span>
+                    Click "Run Full Validation" to start testing
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-header">📝 Test Log</div>
+            <div class="test-content">
+                <div id="testLog" class="log-output">AGENT 5 Integration Bridge Validation System Ready
+=================================================
+Waiting for validation commands...
+</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // AGENT 5: Integration Bridge API Validation System
+        class IntegrationBridgeValidator {
+            constructor() {
+                this.logElement = document.getElementById('testLog');
+                this.summaryElement = document.getElementById('validationSummary');
+                this.testResults = {
+                    globalInstance: null,
+                    methodAccessibility: {},
+                    coreAPIMethods: {},
+                    classIntegrity: null
+                };
+                this.log('🎯 AGENT 5: Integration Bridge Validator initialized');
+            }
+
+            log(message, level = 'info') {
+                const timestamp = new Date().toISOString().substr(11, 12);
+                const levelColors = {
+                    info: '#00ff00',
+                    success: '#00ff00',
+                    warning: '#ffff00',
+                    error: '#ff0000'
+                };
+
+                const logEntry = `[${timestamp}] ${message}`;
+                this.logElement.innerHTML += logEntry + '\n';
+                this.logElement.scrollTop = this.logElement.scrollHeight;
+            }
+
+            async validateGlobalInstance() {
+                this.log('🔍 AGENT 5: Validating global instance accessibility...');
+
+                try {
+                    // Check for global instance
+                    if (typeof window.multiViewSelector !== 'undefined' && window.multiViewSelector) {
+                        this.testResults.globalInstance = {
+                            accessible: true,
+                            type: typeof window.multiViewSelector,
+                            constructor: window.multiViewSelector.constructor.name
+                        };
+                        this.log('✅ AGENT 5: Global instance found - window.multiViewSelector');
+                        return true;
+                    } else {
+                        this.testResults.globalInstance = {
+                            accessible: false,
+                            error: 'Global instance not found'
+                        };
+                        this.log('❌ AGENT 5: Global instance not found - window.multiViewSelector is undefined');
+                        return false;
+                    }
+                } catch (error) {
+                    this.testResults.globalInstance = {
+                        accessible: false,
+                        error: error.message
+                    };
+                    this.log(`❌ AGENT 5: Error validating global instance: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async testMethodAccessibility() {
+                this.log('🔧 AGENT 5: Testing Integration Bridge method accessibility...');
+
+                const globalInstanceOk = await this.validateGlobalInstance();
+                if (!globalInstanceOk) {
+                    this.log('⚠️ AGENT 5: Cannot test methods - global instance not accessible');
+                    return false;
+                }
+
+                const methodsToTest = [
+                    'validateReferenceLineBridgeSystem',
+                    'exportForPrecisionCalculation',
+                    'validateForPrecisionCalculation',
+                    'getReferenceLinesByMeasurement',
+                    'getPrimaryReferenceLines'
+                ];
+
+                let accessibleMethods = 0;
+                let totalMethods = methodsToTest.length;
+
+                for (const methodName of methodsToTest) {
+                    try {
+                        const method = window.multiViewSelector[methodName];
+                        if (typeof method === 'function') {
+                            this.testResults.methodAccessibility[methodName] = {
+                                accessible: true,
+                                type: typeof method
+                            };
+                            this.log(`✅ AGENT 5: Method ${methodName}() - ACCESSIBLE`);
+                            accessibleMethods++;
+                        } else {
+                            this.testResults.methodAccessibility[methodName] = {
+                                accessible: false,
+                                type: typeof method,
+                                error: 'Not a function'
+                            };
+                            this.log(`❌ AGENT 5: Method ${methodName}() - NOT ACCESSIBLE (${typeof method})`);
+                        }
+                    } catch (error) {
+                        this.testResults.methodAccessibility[methodName] = {
+                            accessible: false,
+                            error: error.message
+                        };
+                        this.log(`❌ AGENT 5: Method ${methodName}() - ERROR: ${error.message}`);
+                    }
+                }
+
+                this.log(`📊 AGENT 5: Method accessibility results: ${accessibleMethods}/${totalMethods} methods accessible`);
+                return accessibleMethods === totalMethods;
+            }
+
+            async testCoreAPIMethods() {
+                this.log('⚙️ AGENT 5: Testing core API method functionality...');
+
+                const methodsAccessible = await this.testMethodAccessibility();
+                if (!methodsAccessible) {
+                    this.log('⚠️ AGENT 5: Cannot test method functionality - accessibility issues detected');
+                    return false;
+                }
+
+                // Test validateReferenceLineBridgeSystem
+                try {
+                    this.log('🧪 AGENT 5: Testing validateReferenceLineBridgeSystem()...');
+                    const validationResult = window.multiViewSelector.validateReferenceLineBridgeSystem();
+
+                    if (validationResult && typeof validationResult === 'object') {
+                        this.testResults.coreAPIMethods.validateReferenceLineBridgeSystem = {
+                            working: true,
+                            resultType: typeof validationResult,
+                            hasOverallScore: 'overall_score' in validationResult,
+                            hasValidationResults: 'validation_results' in validationResult
+                        };
+                        this.log('✅ AGENT 5: validateReferenceLineBridgeSystem() - WORKING');
+                        this.log(`   → Result type: ${typeof validationResult}`);
+                        this.log(`   → Has overall_score: ${'overall_score' in validationResult}`);
+                        this.log(`   → Has validation_results: ${'validation_results' in validationResult}`);
+                    } else {
+                        this.testResults.coreAPIMethods.validateReferenceLineBridgeSystem = {
+                            working: false,
+                            error: 'Invalid return type'
+                        };
+                        this.log('❌ AGENT 5: validateReferenceLineBridgeSystem() - Invalid return type');
+                    }
+                } catch (error) {
+                    this.testResults.coreAPIMethods.validateReferenceLineBridgeSystem = {
+                        working: false,
+                        error: error.message
+                    };
+                    this.log(`❌ AGENT 5: validateReferenceLineBridgeSystem() - ERROR: ${error.message}`);
+                }
+
+                // Test exportForPrecisionCalculation
+                try {
+                    this.log('🧪 AGENT 5: Testing exportForPrecisionCalculation()...');
+                    const exportResult = window.multiViewSelector.exportForPrecisionCalculation();
+
+                    if (exportResult && typeof exportResult === 'object') {
+                        this.testResults.coreAPIMethods.exportForPrecisionCalculation = {
+                            working: true,
+                            resultType: typeof exportResult,
+                            hasTemplateId: 'template_id' in exportResult,
+                            hasViews: 'views' in exportResult,
+                            hasTimestamp: 'timestamp' in exportResult
+                        };
+                        this.log('✅ AGENT 5: exportForPrecisionCalculation() - WORKING');
+                        this.log(`   → Result type: ${typeof exportResult}`);
+                        this.log(`   → Has template_id: ${'template_id' in exportResult}`);
+                        this.log(`   → Has views: ${'views' in exportResult}`);
+                        this.log(`   → Has timestamp: ${'timestamp' in exportResult}`);
+                    } else {
+                        this.testResults.coreAPIMethods.exportForPrecisionCalculation = {
+                            working: false,
+                            error: 'Invalid return type'
+                        };
+                        this.log('❌ AGENT 5: exportForPrecisionCalculation() - Invalid return type');
+                    }
+                } catch (error) {
+                    this.testResults.coreAPIMethods.exportForPrecisionCalculation = {
+                        working: false,
+                        error: error.message
+                    };
+                    this.log(`❌ AGENT 5: exportForPrecisionCalculation() - ERROR: ${error.message}`);
+                }
+
+                return true;
+            }
+
+            async validateClassInstance() {
+                this.log('🏗️ AGENT 5: Validating class instance integrity...');
+
+                const globalInstanceOk = await this.validateGlobalInstance();
+                if (!globalInstanceOk) {
+                    return false;
+                }
+
+                try {
+                    const instance = window.multiViewSelector;
+                    const properties = Object.getOwnPropertyNames(instance);
+                    const methods = properties.filter(prop => typeof instance[prop] === 'function');
+
+                    this.testResults.classIntegrity = {
+                        valid: true,
+                        totalProperties: properties.length,
+                        totalMethods: methods.length,
+                        constructorName: instance.constructor.name,
+                        hasTemplateId: 'templateId' in instance,
+                        hasCanvas: 'canvas' in instance,
+                        hasDebugger: 'debug' in instance
+                    };
+
+                    this.log('✅ AGENT 5: Class instance integrity validated');
+                    this.log(`   → Constructor: ${instance.constructor.name}`);
+                    this.log(`   → Total properties: ${properties.length}`);
+                    this.log(`   → Total methods: ${methods.length}`);
+                    this.log(`   → Has templateId: ${'templateId' in instance}`);
+                    this.log(`   → Has canvas: ${'canvas' in instance}`);
+                    this.log(`   → Has debug: ${'debug' in instance}`);
+
+                    return true;
+                } catch (error) {
+                    this.testResults.classIntegrity = {
+                        valid: false,
+                        error: error.message
+                    };
+                    this.log(`❌ AGENT 5: Class instance validation failed: ${error.message}`);
+                    return false;
+                }
+            }
+
+            async runFullValidation() {
+                this.log('🚀 AGENT 5: Starting full Integration Bridge API validation...');
+                this.log('='.repeat(60));
+
+                const results = {
+                    globalInstance: await this.validateGlobalInstance(),
+                    methodAccessibility: await this.testMethodAccessibility(),
+                    coreAPIMethods: await this.testCoreAPIMethods(),
+                    classIntegrity: await this.validateClassInstance()
+                };
+
+                this.log('='.repeat(60));
+                this.log('📊 AGENT 5: VALIDATION SUMMARY');
+                this.log('='.repeat(60));
+
+                const totalTests = Object.keys(results).length;
+                const passedTests = Object.values(results).filter(result => result === true).length;
+                const successRate = Math.round((passedTests / totalTests) * 100);
+
+                this.log(`Global Instance Access: ${results.globalInstance ? '✅ PASS' : '❌ FAIL'}`);
+                this.log(`Method Accessibility: ${results.methodAccessibility ? '✅ PASS' : '❌ FAIL'}`);
+                this.log(`Core API Methods: ${results.coreAPIMethods ? '✅ PASS' : '❌ FAIL'}`);
+                this.log(`Class Instance Integrity: ${results.classIntegrity ? '✅ PASS' : '❌ FAIL'}`);
+                this.log('');
+                this.log(`OVERALL SUCCESS RATE: ${passedTests}/${totalTests} (${successRate}%)`);
+
+                // Update summary display
+                this.updateSummaryDisplay(successRate, passedTests, totalTests);
+
+                if (successRate === 100) {
+                    this.log('🎉 AGENT 5: INTEGRATION BRIDGE API FULLY VALIDATED AND READY!');
+                } else {
+                    this.log('⚠️ AGENT 5: Integration Bridge API has validation issues - check individual test results');
+                }
+
+                return successRate === 100;
+            }
+
+            updateSummaryDisplay(successRate, passed, total) {
+                let statusClass, statusText;
+
+                if (successRate === 100) {
+                    statusClass = 'status-success';
+                    statusText = '✅ API READY';
+                } else if (successRate >= 75) {
+                    statusClass = 'status-warning';
+                    statusText = '⚠️ PARTIAL SUCCESS';
+                } else {
+                    statusClass = 'status-error';
+                    statusText = '❌ VALIDATION FAILED';
+                }
+
+                this.summaryElement.innerHTML = `
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                    <br><br>
+                    <strong>Validation Results:</strong> ${passed}/${total} tests passed (${successRate}%)
+                    <br>
+                    <small>Last validation: ${new Date().toLocaleString()}</small>
+                `;
+            }
+
+            clearLog() {
+                this.logElement.innerHTML = 'Log cleared - Ready for new validation\n';
+                this.log('🎯 AGENT 5: Integration Bridge Validator ready for testing');
+            }
+        }
+
+        // Global validator instance
+        const validator = new IntegrationBridgeValidator();
+
+        // Global functions for button clicks
+        async function runFullValidation() {
+            await validator.runFullValidation();
+        }
+
+        async function testMethodAccessibility() {
+            await validator.testMethodAccessibility();
+        }
+
+        async function testCoreAPIMethods() {
+            await validator.testCoreAPIMethods();
+        }
+
+        async function validateClassInstance() {
+            await validator.validateClassInstance();
+        }
+
+        function clearLog() {
+            validator.clearLog();
+        }
+
+        // Auto-run validation on page load if global instance is available
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof window.multiViewSelector !== 'undefined') {
+                    validator.log('🎯 AGENT 5: Global instance detected - ready for validation');
+                } else {
+                    validator.log('⚠️ AGENT 5: Global instance not detected - load MultiViewPointToPointSelector first');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

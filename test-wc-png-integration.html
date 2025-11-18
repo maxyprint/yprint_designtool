@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WooCommerce PNG Integration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .mock-response { background-color: #fff3cd; color: #856404; margin: 10px 0; padding: 10px; border-radius: 4px; }
+        canvas { border: 1px solid #ccc; margin: 10px 0; }
+        .upload-preview { max-width: 200px; border: 1px solid #ddd; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🛒 WooCommerce PNG Integration Test</h1>
+
+    <div id="test-results"></div>
+    <canvas id="test-canvas" width="400" height="300"></canvas>
+
+    <div id="upload-results">
+        <h3>Upload Results:</h3>
+        <div id="upload-previews"></div>
+    </div>
+
+    <!-- Load Plugin Framework -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+    <!-- Load PNG Plugin -->
+    <script src="plugins/yprint-png-export/plugin.js"></script>
+
+    <script>
+        console.log('🛒 WC PNG INTEGRATION TEST: Starting WooCommerce integration validation...');
+
+        const results = [];
+
+        function addResult(test, passed, message) {
+            results.push({ test, passed, message });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>🛒 WC INFO:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addMockResponse(message) {
+            const div = document.createElement('div');
+            div.className = 'mock-response';
+            div.innerHTML = `<strong>📡 MOCK RESPONSE:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // Mock WordPress AJAX for testing
+        function mockWordPressAjax() {
+            // Mock WordPress ajaxurl (normally defined by WordPress)
+            window.ajaxurl = '/wp-admin/admin-ajax.php';
+
+            // Mock jQuery if not available
+            if (typeof $ === 'undefined') {
+                window.$ = {
+                    post: function(url, data, callback) {
+                        console.log('🛒 MOCK AJAX: POST request to', url, 'with data:', data);
+
+                        // Simulate network delay
+                        setTimeout(() => {
+                            // Mock successful response
+                            const mockResponse = {
+                                success: true,
+                                data: {
+                                    png_path: '/wp-content/uploads/yprint-designs/design-' + Date.now() + '.png',
+                                    png_url: 'https://test-site.local/wp-content/uploads/yprint-designs/design-' + Date.now() + '.png',
+                                    file_size: Math.floor(Math.random() * 500000) + 100000, // 100KB - 600KB
+                                    timestamp: Date.now()
+                                }
+                            };
+
+                            addMockResponse(`PNG uploaded successfully: ${mockResponse.data.png_path}`);
+                            callback(mockResponse);
+                        }, 500);
+                    }
+                };
+            }
+
+            console.log('🛒 MOCK: WordPress AJAX environment created');
+        }
+
+        // Create test canvas with design
+        function createTestCanvas() {
+            const canvas = document.getElementById('test-canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Create a design that simulates YPrint output
+            // Background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Product mockup
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(100, 50, 200, 150);
+
+            // Design overlay
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(120, 70, 160, 110);
+
+            // Text
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('Custom Design', 130, 130);
+
+            // Border
+            ctx.strokeStyle = '#34495e';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            console.log('🛒 TEST: WooCommerce design canvas created');
+            return canvas;
+        }
+
+        // Test WooCommerce integration functionality
+        async function testWooCommerceIntegration() {
+            // Create WooCommerce integration module
+            const WCPNGIntegration = {
+                /**
+                 * Upload PNG to WooCommerce via AJAX
+                 */
+                async uploadToWooCommerce(pngDataURL, metadata = {}) {
+                    console.log('🛒 WC INTEGRATION: Starting PNG upload to WooCommerce...');
+
+                    return new Promise((resolve, reject) => {
+                        try {
+                            // Validate PNG data
+                            if (!pngDataURL || !pngDataURL.startsWith('data:image/png')) {
+                                throw new Error('Invalid PNG data provided');
+                            }
+
+                            // Prepare upload data
+                            const uploadData = {
+                                action: 'yprint_upload_png',
+                                png_data: pngDataURL,
+                                design_metadata: JSON.stringify({
+                                    width: metadata.width || 400,
+                                    height: metadata.height || 300,
+                                    resolution: metadata.resolution || 'standard',
+                                    plugin_version: '1.0.0',
+                                    timestamp: Date.now(),
+                                    ...metadata
+                                }),
+                                nonce: 'mock_nonce_for_testing'
+                            };
+
+                            // Make AJAX request to WordPress
+                            $.post(window.ajaxurl, uploadData, (response) => {
+                                console.log('🛒 WC INTEGRATION: Upload response received:', response);
+
+                                if (response.success) {
+                                    resolve({
+                                        success: true,
+                                        png_path: response.data.png_path,
+                                        png_url: response.data.png_url,
+                                        file_size: response.data.file_size,
+                                        timestamp: response.data.timestamp
+                                    });
+                                } else {
+                                    reject(new Error(response.data || 'Upload failed'));
+                                }
+                            }).fail(() => {
+                                reject(new Error('AJAX request failed'));
+                            });
+
+                        } catch (error) {
+                            console.error('🛒 WC INTEGRATION: Upload error:', error);
+                            reject(error);
+                        }
+                    });
+                },
+
+                /**
+                 * Batch upload multiple PNGs
+                 */
+                async batchUpload(pngDataURLs, metadata = {}) {
+                    console.log(`🛒 WC INTEGRATION: Batch uploading ${pngDataURLs.length} PNGs...`);
+
+                    const results = [];
+                    for (const [index, pngDataURL] of pngDataURLs.entries()) {
+                        try {
+                            console.log(`🛒 WC INTEGRATION: Uploading PNG ${index + 1}/${pngDataURLs.length}`);
+
+                            const result = await this.uploadToWooCommerce(pngDataURL, {
+                                ...metadata,
+                                batch_index: index,
+                                batch_total: pngDataURLs.length
+                            });
+
+                            results.push({ success: true, data: result, index });
+
+                        } catch (error) {
+                            console.error(`🛒 WC INTEGRATION: Batch upload ${index + 1} failed:`, error);
+                            results.push({ success: false, error: error.message, index });
+                        }
+                    }
+
+                    console.log(`🛒 WC INTEGRATION: Batch upload complete (${results.filter(r => r.success).length}/${pngDataURLs.length} successful)`);
+                    return results;
+                }
+            };
+
+            // Add to PNG Plugin
+            if (window.YPrintPNGPlugin) {
+                window.YPrintPNGPlugin.uploadToWooCommerce = WCPNGIntegration.uploadToWooCommerce.bind(WCPNGIntegration);
+                window.YPrintPNGPlugin.batchUploadToWooCommerce = WCPNGIntegration.batchUpload.bind(WCPNGIntegration);
+
+                console.log('✅ WC INTEGRATION: WooCommerce methods added to PNG Plugin');
+            }
+
+            return WCPNGIntegration;
+        }
+
+        // Initialize tests
+        mockWordPressAjax();
+
+        // Test 1: Mock environment setup
+        try {
+            const hasAjaxUrl = !!window.ajaxurl;
+            const hasJQuery = !!window.$;
+
+            addResult('Mock Environment', hasAjaxUrl && hasJQuery,
+                hasAjaxUrl && hasJQuery ? 'WordPress AJAX environment mocked successfully' : 'Failed to setup mock environment'
+            );
+        } catch (error) {
+            addResult('Mock Environment', false, `Environment setup failed: ${error.message}`);
+        }
+
+        // Test 2: Canvas creation
+        let testCanvas;
+        try {
+            testCanvas = createTestCanvas();
+            addResult('Test Canvas', !!testCanvas, testCanvas ? 'WooCommerce test design created' : 'Failed to create test design');
+        } catch (error) {
+            addResult('Test Canvas', false, `Canvas creation failed: ${error.message}`);
+        }
+
+        // Test 3: PNG Plugin WooCommerce integration
+        setTimeout(async () => {
+            try {
+                const wcIntegration = await testWooCommerceIntegration();
+
+                if (window.YPrintPNGPlugin && window.YPrintPNGPlugin.uploadToWooCommerce) {
+                    addResult('Plugin Integration', true, 'WooCommerce methods added to PNG Plugin');
+                } else {
+                    addResult('Plugin Integration', false, 'Failed to add WooCommerce methods to PNG Plugin');
+                }
+
+                // Test 4: PNG export and upload
+                if (testCanvas) {
+                    const pngDataURL = testCanvas.toDataURL('image/png');
+
+                    try {
+                        const uploadResult = await window.YPrintPNGPlugin.uploadToWooCommerce(pngDataURL, {
+                            width: testCanvas.width,
+                            height: testCanvas.height,
+                            resolution: 'standard'
+                        });
+
+                        if (uploadResult && uploadResult.success) {
+                            addResult('PNG Upload', true, `PNG uploaded successfully to ${uploadResult.png_path}`);
+
+                            // Display upload preview
+                            displayUploadResult(uploadResult, pngDataURL);
+                        } else {
+                            addResult('PNG Upload', false, 'PNG upload returned failure');
+                        }
+
+                    } catch (error) {
+                        addResult('PNG Upload', false, `PNG upload failed: ${error.message}`);
+                    }
+                }
+
+                // Test 5: Batch upload (simulated)
+                if (testCanvas) {
+                    const pngDataURLs = [
+                        testCanvas.toDataURL('image/png'),
+                        testCanvas.toDataURL('image/png', 0.8),
+                        testCanvas.toDataURL('image/png', 0.6)
+                    ];
+
+                    try {
+                        const batchResults = await window.YPrintPNGPlugin.batchUploadToWooCommerce(pngDataURLs, {
+                            resolution: 'multi'
+                        });
+
+                        const successCount = batchResults.filter(r => r.success).length;
+                        addResult('Batch Upload', successCount === pngDataURLs.length,
+                            `Batch upload: ${successCount}/${pngDataURLs.length} successful`
+                        );
+
+                    } catch (error) {
+                        addResult('Batch Upload', false, `Batch upload failed: ${error.message}`);
+                    }
+                }
+
+                addInfo(`WooCommerce integration testing complete! ${results.filter(r => r.passed).length}/${results.length} tests passed`);
+                console.log('🛒 WC PNG INTEGRATION TEST: All tests finished');
+
+            } catch (error) {
+                addResult('Integration Test', false, `Integration test failed: ${error.message}`);
+            }
+        }, 100);
+
+        // Display upload result
+        function displayUploadResult(result, originalPNG) {
+            const previewContainer = document.getElementById('upload-previews');
+
+            const div = document.createElement('div');
+            div.style.display = 'inline-block';
+            div.style.margin = '10px';
+            div.style.textAlign = 'center';
+
+            const img = document.createElement('img');
+            img.src = originalPNG;
+            img.className = 'upload-preview';
+            img.title = 'Uploaded PNG preview';
+
+            const label = document.createElement('div');
+            label.innerHTML = `
+                <strong>Uploaded to WooCommerce</strong><br>
+                Path: ${result.png_path}<br>
+                Size: ${Math.round(result.file_size / 1024)}KB<br>
+                URL: <a href="${result.png_url}" target="_blank">View</a>
+            `;
+            label.style.fontSize = '12px';
+            label.style.marginTop = '5px';
+
+            div.appendChild(img);
+            div.appendChild(label);
+            previewContainer.appendChild(div);
+        }
+
+    </script>
+</body>
+</html>

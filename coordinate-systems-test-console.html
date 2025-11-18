@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Coordinate Systems Manual Testing Console</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin: 15px 0; }
+        .status-card { padding: 15px; border-radius: 6px; border-left: 4px solid #007cba; }
+        .success { background: #d4edda; border-left-color: #28a745; }
+        .error { background: #f8d7da; border-left-color: #dc3545; }
+        .warning { background: #fff3cd; border-left-color: #ffc107; }
+        .info { background: #d1ecf1; border-left-color: #17a2b8; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; background: #007cba; color: white; font-weight: bold; }
+        button:hover { background: #005a87; }
+        .test-button { background: #28a745; }
+        .test-button:hover { background: #1e7e34; }
+        .code-block { background: #f8f9fa; padding: 15px; border-radius: 4px; font-family: monospace; margin: 10px 0; border: 1px solid #e9ecef; overflow-x: auto; }
+        .results { min-height: 100px; max-height: 300px; overflow-y: auto; }
+        .console-command { background: #2d3748; color: #e2e8f0; padding: 12px; border-radius: 4px; margin: 8px 0; font-family: monospace; font-size: 14px; }
+        .console-command::before { content: "> "; color: #68d391; font-weight: bold; }
+        h2 { color: #2d3748; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        h3 { color: #4a5568; margin-top: 25px; }
+        .critical { background: #fed7d7; border-left-color: #e53e3e; }
+        .test-success { background: #c6f6d5; border-left-color: #38a169; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Coordinate Systems Manual Testing Console</h1>
+        <p><strong>Post-THADDÄUS Fix Testing:</strong> Verify all coordinate systems work after syntax error fix.</p>
+
+        <!-- System Status Overview -->
+        <div class="test-section">
+            <h2>📊 System Status Overview</h2>
+            <button onclick="runFullSystemCheck()" class="test-button">🔍 Run Full System Check</button>
+            <div id="system-status" class="status-grid"></div>
+        </div>
+
+        <!-- Function Availability Tests -->
+        <div class="test-section">
+            <h2>🎯 Function Availability Tests</h2>
+            <button onclick="testFunctionAvailability()" class="test-button">🔍 Test All Functions</button>
+            <div id="function-availability" class="results"></div>
+
+            <h3>Manual Console Commands:</h3>
+            <div class="console-command">typeof window.generateDesignData === 'function'</div>
+            <div class="console-command">typeof window.YPrintTools?.CoordinateCapture?.generateDesignData === 'function'</div>
+            <div class="console-command">typeof window.ProductionReadyDesignDataCapture?.generateDesignData === 'function'</div>
+            <div class="console-command">typeof window.OptimizedDesignDataCapture?.generateDesignData === 'function'</div>
+        </div>
+
+        <!-- Direct Execution Tests -->
+        <div class="test-section">
+            <h2>🚀 Direct Execution Tests</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
+                <button onclick="testGlobalFunction()" class="test-button">🌐 Test Global Function</button>
+                <button onclick="testYPrintCapture()" class="test-button">🎯 Test YPrint Capture</button>
+                <button onclick="testProductionReady()" class="test-button">📊 Test Production Ready</button>
+                <button onclick="testOptimized()" class="test-button">⚡ Test Optimized</button>
+            </div>
+            <div id="execution-results" class="results"></div>
+        </div>
+
+        <!-- Logging System Tests -->
+        <div class="test-section">
+            <h2>📝 Logging System Tests</h2>
+            <button onclick="testLoggingFunction()" class="test-button">📝 Test Log Function</button>
+            <button onclick="testMockLogging()" class="test-button">🧪 Test Mock Data Logging</button>
+            <div id="logging-results" class="results"></div>
+        </div>
+
+        <!-- Canvas State Analysis -->
+        <div class="test-section">
+            <h2>🎨 Canvas State Analysis</h2>
+            <button onclick="analyzeCanvasState()" class="test-button">🎨 Analyze Canvas</button>
+            <div id="canvas-analysis" class="results"></div>
+        </div>
+
+        <!-- Event System Tests -->
+        <div class="test-section">
+            <h2>📢 Event System Tests</h2>
+            <button onclick="testDesignerReadyEvent()" class="test-button">📢 Test designerReady Event</button>
+            <button onclick="testEventListeners()" class="test-button">🎧 Check Event Listeners</button>
+            <div id="event-results" class="results"></div>
+        </div>
+
+        <!-- Error Analysis -->
+        <div class="test-section">
+            <h2>❌ Error Analysis</h2>
+            <button onclick="runErrorAnalysis()" class="test-button">❌ Run Error Analysis</button>
+            <div id="error-analysis" class="results"></div>
+        </div>
+
+        <!-- Quick Test Summary -->
+        <div class="test-section">
+            <h2>⚡ Quick Test Commands</h2>
+            <p>Copy and paste these commands directly into browser console:</p>
+
+            <h3>1. Quick Function Check:</h3>
+            <div class="code-block">console.log('Functions Available:', {
+  global: typeof window.generateDesignData === 'function',
+  yprint: !!window.YPrintTools?.CoordinateCapture?.generateDesignData,
+  production: !!window.ProductionReadyDesignDataCapture?.generateDesignData,
+  optimized: !!window.OptimizedDesignDataCapture?.generateDesignData,
+  logging: typeof window.logCoordinateSystemOutput === 'function'
+});</div>
+
+            <h3>2. Quick Execution Test:</h3>
+            <div class="code-block">try {
+  const result = window.generateDesignData();
+  console.log('✅ Global function executed:', result);
+} catch(e) {
+  console.error('❌ Global function failed:', e.message);
+}</div>
+
+            <h3>3. Quick Canvas Check:</h3>
+            <div class="code-block">console.log('Canvas State:', {
+  designerInstance: !!window.designerWidgetInstance,
+  canvas: !!window.canvas,
+  fabricCanvas: !!window.fabricCanvas,
+  readyEventFired: !!window.designerReadyEventFired
+});</div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🔍 [TEST CONSOLE] Coordinate Systems Manual Testing Console loaded');
+
+        function logResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'test-success' :
+                            type === 'error' ? 'critical' :
+                            type === 'warning' ? 'warning' : 'info';
+
+            const timestamp = new Date().toLocaleTimeString();
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status-card ${className}`;
+            resultDiv.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+
+            element.appendChild(resultDiv);
+            console.log(`[${timestamp}] ${message}`);
+
+            // Auto-scroll to bottom
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function clearResults(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        // System Status Overview
+        function runFullSystemCheck() {
+            clearResults('system-status');
+            logResult('system-status', '🔍 Running full system check...', 'info');
+
+            // Check THADDÄUS fix
+            const hasLogFunction = typeof window.logCoordinateSystemOutput === 'function';
+            logResult('system-status',
+                `THADDÄUS Fix: ${hasLogFunction ? '✅ logCoordinateSystemOutput function available' : '❌ logCoordinateSystemOutput missing'}`,
+                hasLogFunction ? 'success' : 'error'
+            );
+
+            // Check coordinate systems
+            const systems = [
+                { name: 'Global generateDesignData', check: () => typeof window.generateDesignData === 'function' },
+                { name: 'YPrint Coordinate Capture', check: () => !!window.YPrintTools?.CoordinateCapture?.generateDesignData },
+                { name: 'Production Ready', check: () => !!window.ProductionReadyDesignDataCapture?.generateDesignData },
+                { name: 'Optimized', check: () => !!window.OptimizedDesignDataCapture?.generateDesignData }
+            ];
+
+            systems.forEach(system => {
+                const available = system.check();
+                logResult('system-status',
+                    `${system.name}: ${available ? '✅ Available' : '❌ Missing'}`,
+                    available ? 'success' : 'error'
+                );
+            });
+
+            // Check canvas state
+            const hasCanvas = !!(window.canvas || window.fabricCanvas || window.designerWidgetInstance?.fabricCanvas);
+            logResult('system-status',
+                `Canvas State: ${hasCanvas ? '✅ Canvas available' : '❌ No canvas found'}`,
+                hasCanvas ? 'success' : 'warning'
+            );
+
+            // Check events
+            const hasDesignerInstance = !!window.designerWidgetInstance;
+            logResult('system-status',
+                `Designer Instance: ${hasDesignerInstance ? '✅ Available' : '❌ Missing'}`,
+                hasDesignerInstance ? 'success' : 'warning'
+            );
+        }
+
+        // Function Availability Tests
+        function testFunctionAvailability() {
+            clearResults('function-availability');
+            logResult('function-availability', '🔍 Testing function availability...', 'info');
+
+            const tests = [
+                {
+                    name: 'Global generateDesignData',
+                    test: () => typeof window.generateDesignData === 'function',
+                    details: 'window.generateDesignData'
+                },
+                {
+                    name: 'YPrint Tools Namespace',
+                    test: () => !!window.YPrintTools,
+                    details: 'window.YPrintTools'
+                },
+                {
+                    name: 'YPrint Coordinate Capture',
+                    test: () => !!window.YPrintTools?.CoordinateCapture,
+                    details: 'window.YPrintTools.CoordinateCapture'
+                },
+                {
+                    name: 'YPrint generateDesignData',
+                    test: () => typeof window.YPrintTools?.CoordinateCapture?.generateDesignData === 'function',
+                    details: 'window.YPrintTools.CoordinateCapture.generateDesignData'
+                },
+                {
+                    name: 'Production Ready Class',
+                    test: () => !!window.ProductionReadyDesignDataCapture,
+                    details: 'window.ProductionReadyDesignDataCapture'
+                },
+                {
+                    name: 'Production Ready generateDesignData',
+                    test: () => typeof window.ProductionReadyDesignDataCapture?.generateDesignData === 'function',
+                    details: 'window.ProductionReadyDesignDataCapture.generateDesignData'
+                },
+                {
+                    name: 'Optimized Class',
+                    test: () => !!window.OptimizedDesignDataCapture,
+                    details: 'window.OptimizedDesignDataCapture'
+                },
+                {
+                    name: 'Optimized generateDesignData',
+                    test: () => typeof window.OptimizedDesignDataCapture?.generateDesignData === 'function',
+                    details: 'window.OptimizedDesignDataCapture.generateDesignData'
+                },
+                {
+                    name: 'Logging Function',
+                    test: () => typeof window.logCoordinateSystemOutput === 'function',
+                    details: 'window.logCoordinateSystemOutput'
+                }
+            ];
+
+            tests.forEach(test => {
+                const result = test.test();
+                logResult('function-availability',
+                    `${test.name}: ${result ? '✅ Available' : '❌ Missing'} (${test.details})`,
+                    result ? 'success' : 'error'
+                );
+            });
+        }
+
+        // Direct Execution Tests
+        function testGlobalFunction() {
+            clearResults('execution-results');
+            logResult('execution-results', '🌐 Testing global generateDesignData function...', 'info');
+
+            if (typeof window.generateDesignData === 'function') {
+                try {
+                    const result = window.generateDesignData();
+                    logResult('execution-results', '✅ Global function executed successfully', 'success');
+                    logResult('execution-results', `📊 Result: ${JSON.stringify(result, null, 2)}`, 'info');
+                } catch (error) {
+                    logResult('execution-results', `❌ Global function error: ${error.message}`, 'error');
+                }
+            } else {
+                logResult('execution-results', '❌ Global generateDesignData function not available', 'error');
+            }
+        }
+
+        function testYPrintCapture() {
+            logResult('execution-results', '🎯 Testing YPrint Coordinate Capture...', 'info');
+
+            if (window.YPrintTools?.CoordinateCapture?.generateDesignData) {
+                try {
+                    const result = window.YPrintTools.CoordinateCapture.generateDesignData();
+                    logResult('execution-results', '✅ YPrint Capture executed successfully', 'success');
+                    logResult('execution-results', `🎯 Elements found: ${result.elements?.length || 0}`, 'info');
+                } catch (error) {
+                    logResult('execution-results', `❌ YPrint Capture error: ${error.message}`, 'error');
+                }
+            } else {
+                logResult('execution-results', '❌ YPrint Coordinate Capture not available', 'error');
+            }
+        }
+
+        function testProductionReady() {
+            logResult('execution-results', '📊 Testing Production Ready system...', 'info');
+
+            if (window.ProductionReadyDesignDataCapture?.generateDesignData) {
+                try {
+                    const result = window.ProductionReadyDesignDataCapture.generateDesignData();
+                    logResult('execution-results', '✅ Production Ready executed successfully', 'success');
+                    logResult('execution-results', `📊 Elements found: ${result.elements?.length || 0}`, 'info');
+                } catch (error) {
+                    logResult('execution-results', `❌ Production Ready error: ${error.message}`, 'error');
+                }
+            } else {
+                logResult('execution-results', '❌ Production Ready system not available', 'error');
+            }
+        }
+
+        function testOptimized() {
+            logResult('execution-results', '⚡ Testing Optimized system...', 'info');
+
+            if (window.OptimizedDesignDataCapture?.generateDesignData) {
+                try {
+                    const result = window.OptimizedDesignDataCapture.generateDesignData();
+                    logResult('execution-results', '✅ Optimized system executed successfully', 'success');
+                    logResult('execution-results', `⚡ Elements found: ${result.elements?.length || 0}`, 'info');
+                } catch (error) {
+                    logResult('execution-results', `❌ Optimized system error: ${error.message}`, 'error');
+                }
+            } else {
+                logResult('execution-results', '❌ Optimized system not available', 'error');
+            }
+        }
+
+        // Logging System Tests
+        function testLoggingFunction() {
+            clearResults('logging-results');
+            logResult('logging-results', '📝 Testing logCoordinateSystemOutput function...', 'info');
+
+            if (typeof window.logCoordinateSystemOutput === 'function') {
+                try {
+                    window.logCoordinateSystemOutput('TEST SYSTEM', {
+                        elements: [{x: 10, y: 20, type: 'test'}],
+                        test: true
+                    });
+                    logResult('logging-results', '✅ Logging function works! Check browser console for styled output.', 'success');
+                } catch (error) {
+                    logResult('logging-results', `❌ Logging function error: ${error.message}`, 'error');
+                }
+            } else {
+                logResult('logging-results', '❌ logCoordinateSystemOutput function not available', 'error');
+            }
+        }
+
+        function testMockLogging() {
+            logResult('logging-results', '🧪 Testing with mock coordinate data...', 'info');
+
+            const mockData = {
+                template_view_id: 'test-123',
+                designed_on_area_px: { width: 800, height: 600 },
+                elements: [
+                    { type: 'text', coordinates: { x: 100, y: 150 }, text_content: 'Test Text' },
+                    { type: 'image', coordinates: { x: 200, y: 250 }, src: 'test.jpg' }
+                ],
+                timestamp: new Date().toISOString()
+            };
+
+            if (typeof window.logCoordinateSystemOutput === 'function') {
+                window.logCoordinateSystemOutput('MOCK TEST SYSTEM', mockData);
+                logResult('logging-results', '✅ Mock data logged! Check browser console for output.', 'success');
+            } else {
+                logResult('logging-results', '❌ Cannot test mock logging - function not available', 'error');
+            }
+        }
+
+        // Canvas State Analysis
+        function analyzeCanvasState() {
+            clearResults('canvas-analysis');
+            logResult('canvas-analysis', '🎨 Analyzing canvas state...', 'info');
+
+            const canvasSources = [
+                { name: 'window.canvas', value: window.canvas },
+                { name: 'window.fabricCanvas', value: window.fabricCanvas },
+                { name: 'window.designerWidgetInstance', value: window.designerWidgetInstance },
+                { name: 'designerWidgetInstance.fabricCanvas', value: window.designerWidgetInstance?.fabricCanvas },
+                { name: 'designerWidgetInstance.canvas', value: window.designerWidgetInstance?.canvas }
+            ];
+
+            canvasSources.forEach(source => {
+                const available = !!source.value;
+                const hasGetObjects = source.value?.getObjects ? '(has getObjects)' : '(no getObjects)';
+                logResult('canvas-analysis',
+                    `${source.name}: ${available ? `✅ Available ${hasGetObjects}` : '❌ Missing'}`,
+                    available ? 'success' : 'warning'
+                );
+            });
+
+            // Check DOM canvas elements
+            const domCanvases = document.querySelectorAll('canvas');
+            logResult('canvas-analysis', `DOM Canvas Elements: ${domCanvases.length} found`, 'info');
+
+            domCanvases.forEach((canvas, index) => {
+                const hasFabric = !!canvas.__fabric;
+                logResult('canvas-analysis',
+                    `Canvas ${index + 1}: ${hasFabric ? '✅ Has Fabric.js' : '❌ No Fabric.js'}`,
+                    hasFabric ? 'success' : 'warning'
+                );
+            });
+        }
+
+        // Event System Tests
+        function testDesignerReadyEvent() {
+            clearResults('event-results');
+            logResult('event-results', '📢 Testing designerReady event dispatch...', 'info');
+
+            // Add temporary listener
+            const testListener = (event) => {
+                logResult('event-results', '✅ designerReady event received!', 'success');
+                logResult('event-results', `Event detail: ${JSON.stringify(event.detail)}`, 'info');
+                document.removeEventListener('designerReady', testListener);
+            };
+
+            document.addEventListener('designerReady', testListener);
+
+            // Dispatch test event
+            const testEvent = new CustomEvent('designerReady', {
+                detail: {
+                    instance: window.designerWidgetInstance || {
+                        fabricCanvas: window.canvas || window.fabricCanvas,
+                        test: true
+                    }
+                }
+            });
+
+            document.dispatchEvent(testEvent);
+            logResult('event-results', '📤 Test designerReady event dispatched', 'info');
+
+            // Clean up after 2 seconds if no response
+            setTimeout(() => {
+                document.removeEventListener('designerReady', testListener);
+            }, 2000);
+        }
+
+        function testEventListeners() {
+            logResult('event-results', '🎧 Checking event listeners...', 'info');
+
+            // Check if event deduplication flags exist
+            const dedupFlags = {
+                'optimized': window.designerReadyListenerAttached,
+                'production': window.productionReadyListenerAttached,
+                'yprint': window.yprintReadyListenerAttached
+            };
+
+            Object.entries(dedupFlags).forEach(([system, flag]) => {
+                logResult('event-results',
+                    `${system} listener flag: ${flag ? '✅ Set (listener attached)' : '❌ Not set'}`,
+                    flag ? 'success' : 'warning'
+                );
+            });
+        }
+
+        // Error Analysis
+        function runErrorAnalysis() {
+            clearResults('error-analysis');
+            logResult('error-analysis', '❌ Running error analysis...', 'info');
+
+            // Test missing dependencies
+            const dependencies = [
+                { name: 'fabric.js', check: () => typeof fabric !== 'undefined' },
+                { name: 'jQuery', check: () => typeof $ !== 'undefined' },
+                { name: 'WordPress AJAX', check: () => typeof ajaxurl !== 'undefined' }
+            ];
+
+            dependencies.forEach(dep => {
+                const available = dep.check();
+                logResult('error-analysis',
+                    `${dep.name}: ${available ? '✅ Available' : '⚠️ Missing'}`,
+                    available ? 'success' : 'warning'
+                );
+            });
+
+            // Test error scenarios
+            logResult('error-analysis', '🧪 Testing error scenarios...', 'info');
+
+            // Test with null canvas
+            try {
+                const tempCanvas = window.canvas;
+                window.canvas = null;
+                window.generateDesignData?.();
+                window.canvas = tempCanvas;
+                logResult('error-analysis', '✅ Null canvas handled gracefully', 'success');
+            } catch (error) {
+                logResult('error-analysis', `❌ Null canvas error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run system check on load
+        setTimeout(() => {
+            runFullSystemCheck();
+        }, 1000);
+    </script>
+</body>
+</html>

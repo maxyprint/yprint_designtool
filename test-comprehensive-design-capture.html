@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Design Data Capture Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .mockup-design-area {
+            border: 2px solid #007cba;
+            background: white;
+            width: 600px;
+            height: 400px;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .designer-canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #005a87;
+        }
+
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .element-info {
+            background: #e9ecef;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎯 Comprehensive Design Data Capture Test</h1>
+        <p>Teste die vollständige Design Data Capture Implementation ohne DesignerWidget Abhängigkeit</p>
+
+        <div class="status info">
+            <strong>Test Status:</strong> <span id="test-status">Initializing...</span>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🎨 Mock Design Area</h2>
+        <div class="mockup-design-area" id="mockup-design-area">
+            <div class="designer-canvas-container">
+                <canvas id="test-canvas" width="580" height="380"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h3>Test Controls</h3>
+            <div class="test-buttons">
+                <button onclick="createTestElements()">Create Test Elements</button>
+                <button onclick="generateAndDisplayData()" class="designer-action-button">Generate Design Data</button>
+                <button onclick="testButtonCapture()" class="save-design-button">Test Save Button</button>
+                <button onclick="testCartCapture()" class="add-to-cart-button">Test Cart Button</button>
+                <button onclick="clearCanvas()">Clear Canvas</button>
+                <button onclick="showCanvasInfo()">Show Canvas Info</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>📊 Test Results</h2>
+        <div id="results" class="results">
+            <div>Ready for testing...</div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🧪 Console Tests</h2>
+        <p>Öffne die Browser-Konsole und teste:</p>
+        <ul>
+            <li><code>generateDesignData()</code> - Hauptfunktion testen</li>
+            <li><code>comprehensiveCapture.test()</code> - Vollständiger Test</li>
+            <li><code>comprehensiveCapture.fabricCanvases</code> - Gefundene Canvases</li>
+            <li><code>comprehensiveCapture.mockupDesignArea</code> - Design Area Container</li>
+        </ul>
+    </div>
+
+    <!-- Load Fabric.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+    <!-- Load the comprehensive capture system -->
+    <script src="public/js/comprehensive-design-data-capture.js"></script>
+
+    <script>
+        let testCanvas = null;
+        let resultsDiv = null;
+
+        // Initialize test environment
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 TEST: DOM loaded, initializing test environment...');
+
+            resultsDiv = document.getElementById('results');
+
+            // Initialize fabric canvas
+            setTimeout(() => {
+                initializeTestCanvas();
+                updateStatus('Test environment ready', 'success');
+                logResult('✅ Test environment initialized');
+            }, 500);
+        });
+
+        function initializeTestCanvas() {
+            const canvasElement = document.getElementById('test-canvas');
+
+            testCanvas = new fabric.Canvas('test-canvas', {
+                backgroundColor: '#ffffff',
+                selection: true
+            });
+
+            console.log('🎨 Test canvas initialized:', testCanvas);
+            logResult('🎨 Fabric.js canvas created with ID: test-canvas');
+            logResult(`📐 Canvas dimensions: ${testCanvas.width}x${testCanvas.height}`);
+        }
+
+        function createTestElements() {
+            if (!testCanvas) {
+                logResult('❌ Canvas not initialized', 'error');
+                return;
+            }
+
+            // Clear existing objects first
+            testCanvas.clear();
+            testCanvas.backgroundColor = '#ffffff';
+
+            // Create various test elements
+            const elements = [
+                // Text element
+                new fabric.IText('Sample Text', {
+                    left: 50,
+                    top: 50,
+                    fontFamily: 'Arial',
+                    fontSize: 24,
+                    fill: '#333333'
+                }),
+
+                // Rectangle
+                new fabric.Rect({
+                    left: 200,
+                    top: 80,
+                    width: 100,
+                    height: 60,
+                    fill: '#ff6b6b',
+                    stroke: '#d63031',
+                    strokeWidth: 2
+                }),
+
+                // Circle
+                new fabric.Circle({
+                    left: 350,
+                    top: 100,
+                    radius: 40,
+                    fill: '#74b9ff',
+                    stroke: '#0984e3',
+                    strokeWidth: 2
+                }),
+
+                // Image (create a simple colored rectangle as image substitute)
+                new fabric.Rect({
+                    left: 100,
+                    top: 200,
+                    width: 120,
+                    height: 80,
+                    fill: '#55a3ff',
+                    type: 'image', // Simulate image type
+                    src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjNTVBM0ZGIi8+Cjx0ZXh0IHg9IjYwIiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCI+SW1hZ2U8L3RleHQ+Cjwvc3ZnPgo='
+                }),
+
+                // Line
+                new fabric.Line([300, 250, 450, 280], {
+                    stroke: '#fdcb6e',
+                    strokeWidth: 4
+                }),
+
+                // Ellipse
+                new fabric.Ellipse({
+                    left: 400,
+                    top: 200,
+                    rx: 50,
+                    ry: 30,
+                    fill: '#a29bfe',
+                    stroke: '#6c5ce7',
+                    strokeWidth: 2
+                })
+            ];
+
+            // Add all elements to canvas
+            elements.forEach(element => {
+                testCanvas.add(element);
+            });
+
+            testCanvas.renderAll();
+
+            logResult(`✅ Created ${elements.length} test elements on canvas`);
+            logResult('🎨 Elements: text, rectangle, circle, image, line, ellipse');
+
+            console.log('🧪 TEST: Canvas objects created:', testCanvas.getObjects());
+        }
+
+        function generateAndDisplayData() {
+            logResult('🎯 Generating design data...');
+
+            try {
+                // Call the global function
+                const designData = window.generateDesignData ? window.generateDesignData() :
+                                  (window.comprehensiveCapture ? window.comprehensiveCapture.generateDesignData() : null);
+
+                if (designData) {
+                    logResult('✅ Design data generated successfully!');
+                    logResult('📊 Data structure:', 'success');
+                    logResult(JSON.stringify(designData, null, 2));
+
+                    // Show element summary
+                    if (designData.elements) {
+                        const elementTypes = {};
+                        designData.elements.forEach(el => {
+                            elementTypes[el.type] = (elementTypes[el.type] || 0) + 1;
+                        });
+                        logResult(`🎭 Element summary: ${JSON.stringify(elementTypes)}`);
+                    }
+
+                    updateStatus('Design data generated successfully', 'success');
+                } else {
+                    logResult('❌ Failed to generate design data', 'error');
+                    updateStatus('Failed to generate design data', 'error');
+                }
+            } catch (error) {
+                logResult(`❌ Error generating design data: ${error.message}`, 'error');
+                updateStatus('Error generating design data', 'error');
+                console.error('Design data generation error:', error);
+            }
+        }
+
+        function testButtonCapture() {
+            logResult('🖱️ Testing save button capture...');
+            // This should automatically trigger the design data capture due to button attachment
+            generateAndDisplayData();
+        }
+
+        function testCartCapture() {
+            logResult('🛒 Testing cart button capture...');
+            // This should automatically trigger the design data capture due to button attachment
+            generateAndDisplayData();
+        }
+
+        function clearCanvas() {
+            if (testCanvas) {
+                testCanvas.clear();
+                testCanvas.backgroundColor = '#ffffff';
+                logResult('🧹 Canvas cleared');
+            }
+        }
+
+        function showCanvasInfo() {
+            logResult('ℹ️ Canvas Information:');
+
+            if (testCanvas) {
+                logResult(`📐 Canvas size: ${testCanvas.width}x${testCanvas.height}`);
+                logResult(`🎨 Objects count: ${testCanvas.getObjects().length}`);
+                logResult(`🎯 Canvas element ID: ${testCanvas.upperCanvasEl.id}`);
+
+                // Show comprehensive capture info
+                if (window.comprehensiveCapture) {
+                    logResult(`🔍 Fabric canvases found: ${window.comprehensiveCapture.fabricCanvases.length}`);
+                    logResult(`📦 Mockup area found: ${!!window.comprehensiveCapture.mockupDesignArea}`);
+                    logResult(`✅ System initialized: ${window.comprehensiveCapture.initialized}`);
+                }
+            } else {
+                logResult('❌ Canvas not initialized', 'error');
+            }
+        }
+
+        function logResult(message, type = 'info') {
+            if (!resultsDiv) return;
+
+            const timestamp = new Date().toLocaleTimeString();
+            const resultDiv = document.createElement('div');
+            resultDiv.className = type === 'error' ? 'element-info' : '';
+            resultDiv.style.color = type === 'error' ? '#721c24' : type === 'success' ? '#155724' : '#000';
+            resultDiv.innerHTML = `[${timestamp}] ${message}`;
+
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('test-status');
+            if (statusElement) {
+                statusElement.textContent = message;
+                const statusContainer = statusElement.closest('.status');
+                statusContainer.className = `status ${type}`;
+            }
+        }
+
+        // Listen for custom events
+        window.addEventListener('designDataGenerated', function(event) {
+            logResult('📢 Custom event received: designDataGenerated');
+            logResult(`🎯 Trigger: ${event.detail.trigger}`);
+            logResult('📊 Event data:', 'success');
+            logResult(JSON.stringify(event.detail.designData, null, 2));
+        });
+
+        // Test automatic initialization detection
+        setInterval(() => {
+            if (window.comprehensiveCapture && window.generateDesignData) {
+                updateStatus('Comprehensive capture system active', 'success');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

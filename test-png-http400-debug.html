@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PNG HTTP 400 Debug Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 10px; font-size: 14px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 PNG HTTP 400 Debug Test</h1>
+    <p>This test will trigger a PNG save request and monitor the exact response.</p>
+
+    <button onclick="testPNGSave()">🖨️ Test PNG Save (Trigger HTTP 400)</button>
+    <button onclick="clearResults()">🧹 Clear Results</button>
+
+    <div id="results"></div>
+
+    <script>
+        function addResult(title, status, message, details = null) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${status}`;
+
+            let content = `<strong>${title}:</strong> ${message}`;
+            if (details) {
+                content += `<pre>${JSON.stringify(details, null, 2)}</pre>`;
+            }
+            resultDiv.innerHTML = content;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testPNGSave() {
+            clearResults();
+            addResult('Test Start', 'info', 'Triggering PNG save request...');
+
+            try {
+                // 1. Check if config is available
+                const config = window.octo_print_designer_config;
+                if (!config) {
+                    addResult('Config Check', 'fail', '❌ octo_print_designer_config not found');
+                    return;
+                }
+
+                addResult('Config Check', 'pass', '✅ WordPress config found', {
+                    ajax_url: config.ajax_url,
+                    nonce: config.nonce ? 'PRESENT' : 'MISSING',
+                    debug_mode: config.debug_mode
+                });
+
+                // 2. Prepare test PNG data
+                const testPNGData = {
+                    design_id: 'debug_test_' + Date.now(),
+                    print_png: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                    print_area_px: JSON.stringify({width: 300, height: 200}),
+                    print_area_mm: JSON.stringify({width: 76.2, height: 50.8}),
+                    template_id: 'debug_template'
+                };
+
+                // 3. Prepare request data
+                const requestData = {
+                    action: 'yprint_save_design_print_png',
+                    nonce: config.nonce,
+                    ...testPNGData
+                };
+
+                addResult('Request Prep', 'info', '📡 Request prepared', requestData);
+
+                // 4. Send the request using FormData (like the real system)
+                const formData = new FormData();
+                Object.keys(requestData).forEach(key => {
+                    formData.append(key, requestData[key]);
+                });
+
+                addResult('FormData Prep', 'info', '📦 FormData created',
+                    'Keys: ' + Array.from(formData.keys()).join(', '));
+
+                // 5. Make the actual request
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                addResult('Response Status', response.ok ? 'pass' : 'fail',
+                    `HTTP ${response.status} ${response.statusText}`);
+
+                // 6. Try to get response text
+                let responseText;
+                try {
+                    responseText = await response.text();
+                } catch (e) {
+                    responseText = 'Could not read response text: ' + e.message;
+                }
+
+                addResult('Response Body', response.ok ? 'pass' : 'fail',
+                    'Response received', responseText);
+
+                // 7. Try to parse as JSON
+                try {
+                    const responseData = JSON.parse(responseText);
+                    addResult('JSON Parse', 'pass', '✅ Response is valid JSON', responseData);
+                } catch (e) {
+                    addResult('JSON Parse', 'fail', '❌ Response is not valid JSON: ' + e.message);
+                }
+
+            } catch (error) {
+                addResult('Error', 'fail', '❌ Test failed: ' + error.message, {
+                    stack: error.stack
+                });
+            }
+        }
+
+        // Auto-load if config is available
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.octo_print_designer_config) {
+                addResult('Auto-load', 'info', '✅ WordPress config detected on page load');
+            } else {
+                addResult('Auto-load', 'fail', '❌ No WordPress config found on page load');
+            }
+        });
+    </script>
+</body>
+</html>

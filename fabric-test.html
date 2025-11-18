@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fabric.js Structure Test</title>
+</head>
+<body>
+    <h1>Testing Fabric.js 5.3.0 Structure</h1>
+    <div id="output"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            console.log('Testing fabric.js structure...');
+            console.log('fabric object:', fabric);
+            console.log('fabric.version:', fabric.version);
+
+            // Test what's directly available on fabric
+            console.log('fabric.Canvas:', typeof fabric.Canvas);
+            console.log('fabric.Image:', typeof fabric.Image);
+            console.log('fabric.Rect:', typeof fabric.Rect);
+            console.log('fabric.filters:', typeof fabric.filters);
+            console.log('fabric.ActiveSelection:', typeof fabric.ActiveSelection);
+            console.log('fabric.Group:', typeof fabric.Group);
+
+            // Try destructuring
+            try {
+                const { Canvas, Image, Rect, ActiveSelection, filters, Group } = fabric;
+                console.log('✅ DESTRUCTURE SUCCESS');
+                console.log('Canvas:', typeof Canvas);
+                console.log('Image:', typeof Image);
+                console.log('Rect:', typeof Rect);
+                console.log('filters:', typeof filters);
+                console.log('ActiveSelection:', typeof ActiveSelection);
+                console.log('Group:', typeof Group);
+
+                document.getElementById('output').innerHTML = `
+                    <h2>✅ Fabric.js Destructuring Test PASSED</h2>
+                    <p><strong>Canvas:</strong> ${typeof Canvas}</p>
+                    <p><strong>Image:</strong> ${typeof Image}</p>
+                    <p><strong>Rect:</strong> ${typeof Rect}</p>
+                    <p><strong>filters:</strong> ${typeof filters}</p>
+                    <p><strong>ActiveSelection:</strong> ${typeof ActiveSelection}</p>
+                    <p><strong>Group:</strong> ${typeof Group}</p>
+                `;
+            } catch (error) {
+                console.error('❌ DESTRUCTURE FAILED:', error);
+                document.getElementById('output').innerHTML = `
+                    <h2>❌ Fabric.js Destructuring Test FAILED</h2>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

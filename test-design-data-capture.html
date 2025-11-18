@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Design Data Capture Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .console-output { background: #000; color: #0f0; padding: 10px; border-radius: 5px; font-family: monospace; }
+        .test-button { background: #0073aa; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .test-button:hover { background: #005a87; }
+        .status { padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Design Data Capture System Test</h1>
+
+    <div class="test-section">
+        <h2>System Status</h2>
+        <div id="system-status">Prüfe System...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Actions</h2>
+        <button class="test-button" onclick="testDesignDataCapture()">Test generateDesignData()</button>
+        <button class="test-button" onclick="testSaveAction()">Simuliere Speichern-Aktion</button>
+        <button class="test-button" onclick="testGlobalExposure()">Test Global Exposure</button>
+        <button class="test-button" onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Expected JSON Structure</h2>
+        <pre style="background: #f9f9f9; padding: 10px; border-radius: 5px; overflow-x: auto;">{
+  "template_view_id": "produkt-xyz-vorn",
+  "designed_on_area_px": { "width": 500, "height": 625 },
+  "elements": [
+    {
+      "type": "image",
+      "src": "https://server.com/pfad/zum/bild.png",
+      "x": 50,
+      "y": 75,
+      "width": 200,
+      "height": 180,
+      "scaleX": 1.2,
+      "scaleY": 1.2,
+      "angle": 15
+    }
+  ]
+}</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Output Monitor</h2>
+        <div class="console-output" id="console-monitor">
+            <div>🔍 Öffne die Browser-Entwicklerkonsole für detaillierte Logs</div>
+            <div>📝 Alle generateDesignData() Aufrufe werden hier geloggt</div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🎯 DESIGN DATA CAPTURE TEST PAGE: Starting tests...');
+
+        // Console monitoring
+        const originalLog = console.log;
+        const consoleMonitor = document.getElementById('console-monitor');
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+
+            // Zeige relevante Logs im Monitor
+            const message = args.join(' ');
+            if (message.includes('Design Data') || message.includes('generateDesignData') ||
+                message.includes('DESIGN DATA CAPTURE') || message.includes('PRODUCTION-READY')) {
+                const div = document.createElement('div');
+                div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+                div.style.color = message.includes('✅') ? '#0f0' :
+                                 message.includes('❌') ? '#f00' :
+                                 message.includes('⚠️') ? '#ff0' : '#0f0';
+                consoleMonitor.appendChild(div);
+                consoleMonitor.scrollTop = consoleMonitor.scrollHeight;
+            }
+        };
+
+        function updateSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+            const checks = [];
+
+            // Check 1: Production Ready Capture System
+            if (window.productionReadyDesignDataCapture) {
+                checks.push('<span class="status success">✅ Production Ready Capture System loaded</span>');
+            } else {
+                checks.push('<span class="status error">❌ Production Ready Capture System not found</span>');
+            }
+
+            // Check 2: Legacy Design Data Capture
+            if (window.designDataCapture) {
+                checks.push('<span class="status success">✅ Legacy Design Data Capture loaded</span>');
+            } else {
+                checks.push('<span class="status warning">⚠️ Legacy Design Data Capture not found</span>');
+            }
+
+            // Check 3: Designer Widget Instance
+            if (window.designerWidgetInstance) {
+                checks.push('<span class="status success">✅ Designer Widget Instance available</span>');
+            } else {
+                checks.push('<span class="status error">❌ Designer Widget Instance not found</span>');
+            }
+
+            // Check 4: Fabric.js
+            if (window.fabric && window.fabric.Canvas) {
+                checks.push('<span class="status success">✅ Fabric.js loaded</span>');
+            } else {
+                checks.push('<span class="status error">❌ Fabric.js not loaded</span>');
+            }
+
+            statusDiv.innerHTML = checks.join('<br>');
+        }
+
+        function testDesignDataCapture() {
+            console.log('🧪 TEST: Direct generateDesignData() call');
+
+            let captureSystem = window.productionReadyDesignDataCapture || window.designDataCapture;
+
+            if (captureSystem && typeof captureSystem.generateDesignData === 'function') {
+                console.log('✅ TEST: Found capture system, calling generateDesignData()');
+                const result = captureSystem.generateDesignData();
+                console.log('🎯 TEST RESULT - Design Data Generated:', result);
+
+                if (result) {
+                    alert('✅ Test erfolgreich! Sieh in der Konsole für das JSON-Objekt.');
+                } else {
+                    alert('⚠️ generateDesignData() gab null zurück. Prüfe die Konsole für Details.');
+                }
+            } else {
+                console.error('❌ TEST: Capture system not available');
+                alert('❌ Design Data Capture System nicht gefunden!');
+            }
+        }
+
+        function testSaveAction() {
+            console.log('🧪 TEST: Simulating save button click');
+
+            // Simuliere verschiedene Save-Button Selektoren
+            const saveSelectors = [
+                '.designer-action-button',
+                '.add-to-cart-button',
+                '.designer-cart-button',
+                '.designer-modal-save',
+                'button[onclick*="save"]',
+                'button:contains("Speichern")'
+            ];
+
+            let buttonFound = false;
+            saveSelectors.forEach(selector => {
+                const button = document.querySelector(selector);
+                if (button) {
+                    console.log('✅ TEST: Found save button with selector:', selector);
+                    buttonFound = true;
+
+                    // Trigger click event
+                    button.click();
+                }
+            });
+
+            if (!buttonFound) {
+                console.log('⚠️ TEST: No save buttons found, triggering manual generateDesignData()');
+                testDesignDataCapture();
+            }
+        }
+
+        function testGlobalExposure() {
+            console.log('🧪 TEST: Checking global object exposure');
+
+            const globalObjects = {
+                'fabric': window.fabric,
+                'DesignerWidget': window.DesignerWidget,
+                'designerWidgetInstance': window.designerWidgetInstance,
+                'designDataCapture': window.designDataCapture,
+                'productionReadyDesignDataCapture': window.productionReadyDesignDataCapture
+            };
+
+            console.log('🔍 Global Objects Status:', globalObjects);
+
+            Object.entries(globalObjects).forEach(([name, obj]) => {
+                if (obj) {
+                    console.log(`✅ ${name}: Available`);
+                    if (typeof obj === 'object' && obj.generateDesignData) {
+                        console.log(`  └─ Has generateDesignData() method`);
+                    }
+                } else {
+                    console.log(`❌ ${name}: Not available`);
+                }
+            });
+        }
+
+        function clearConsole() {
+            console.clear();
+            document.getElementById('console-monitor').innerHTML = '<div>Console cleared</div>';
+        }
+
+        // Auto-check system status on load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(updateSystemStatus, 1000);
+
+            // Re-check every 3 seconds
+            setInterval(updateSystemStatus, 3000);
+        });
+
+        // Test message
+        setTimeout(() => {
+            console.log('🎯 DESIGN DATA CAPTURE TEST: Page ready for testing');
+            console.log('📝 Expected: generateDesignData() should return complete JSON object');
+            console.log('🎯 Acceptance Criteria: JSON appears in console when Save is clicked');
+        }, 500);
+    </script>
+</body>
+</html>

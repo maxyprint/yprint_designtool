@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Real YPrint Designer Canvas Test</title>
+
+    <!-- Original Plugin CSS -->
+    <link rel="stylesheet" href="public/css/octo-print-designer-designer.css">
+    <link rel="stylesheet" href="public/css/octo-print-designer-products.css">
+    <link rel="stylesheet" href="public/css/octo-print-designer-toast.css">
+
+    <!-- Additional styling for test environment -->
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .test-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .test-header {
+            background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .test-header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .test-controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .test-btn {
+            background: #0073aa;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .test-btn:hover { background: #005a87; }
+        .test-btn.success { background: #28a745; }
+        .test-btn.danger { background: #dc3545; }
+        .designer-container {
+            padding: 20px;
+            min-height: 800px;
+        }
+        .status-panel {
+            background: #e8f4f8;
+            border: 2px solid #0073aa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        .json-output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+            border: 2px solid #0f0;
+        }
+        /* Ensure designer styling works */
+        .octo-print-designer {
+            border: 2px solid #0073aa;
+            border-radius: 10px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎯 Real YPrint Designer Canvas Test</h1>
+            <p>Test mit echtem Plugin Designer Canvas & Webpack Bundles</p>
+        </div>
+
+        <div class="test-controls">
+            <button class="test-btn" onclick="initializeRealDesigner()">🚀 Initialize Real Designer</button>
+            <button class="test-btn" onclick="loadTemplates()">📋 Load Templates</button>
+            <button class="test-btn" onclick="testDesignCapture()">🎯 Test Design Capture</button>
+            <button class="test-btn" onclick="activateCoordinateComparison()" style="background: #ff6b35;">🎯 YPrint vs Legacy Test</button>
+            <button class="test-btn success" onclick="simulateWordPressSave()">💾 WordPress Save</button>
+            <button class="test-btn danger" onclick="clearDesigner()">🗑️ Clear Designer</button>
+        </div>
+
+        <div class="designer-container">
+            <div class="status-panel">
+                <h3>🔍 System Status</h3>
+                <div id="system-status" class="status-grid">
+                    <div class="status warning">Initialisiere...</div>
+                </div>
+            </div>
+
+            <!-- Real Designer Container (wie im echten Plugin) -->
+            <div class="octo-print-designer" id="octo-print-designer">
+                <div class="designer-loading">
+                    <h3>🔄 Loading Real YPrint Designer...</h3>
+                    <p>Initialisiere echte Plugin-Komponenten...</p>
+                </div>
+            </div>
+
+            <div class="status-panel">
+                <h3>🎯 Design Data Output</h3>
+                <div class="json-output" id="json-output">
+                    Warte auf Designer-Initialisierung...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WordPress Environment Simulation -->
+    <script>
+        // Create WordPress-like environment
+        window.$ = window.jQuery = function(selector) {
+            // Minimal jQuery-like implementation
+            if (typeof selector === 'string') {
+                return {
+                    ready: function(fn) {
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', fn);
+                        } else {
+                            fn();
+                        }
+                        return this;
+                    },
+                    on: function(event, handler) {
+                        const elements = document.querySelectorAll(selector);
+                        elements.forEach(el => el.addEventListener(event, handler));
+                        return this;
+                    },
+                    find: function(subselector) {
+                        const elements = document.querySelectorAll(selector);
+                        const results = [];
+                        elements.forEach(el => {
+                            results.push(...el.querySelectorAll(subselector));
+                        });
+                        return { 0: results[0], length: results.length };
+                    },
+                    append: function(content) {
+                        const elements = document.querySelectorAll(selector);
+                        elements.forEach(el => {
+                            if (typeof content === 'string') {
+                                el.innerHTML += content;
+                            } else {
+                                el.appendChild(content);
+                            }
+                        });
+                        return this;
+                    }
+                };
+            } else if (typeof selector === 'function') {
+                // Document ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', selector);
+                } else {
+                    selector();
+                }
+                return this;
+            }
+            return this;
+        };
+
+        // WordPress globals
+        window.wp = {
+            ajax: {
+                post: function(action, data) {
+                    console.log('WP AJAX:', action, data);
+                    return Promise.resolve({success: true, data: data});
+                }
+            }
+        };
+
+        // Plugin globals (like in real WordPress)
+        window.octoPrintDesigner = {
+            ajaxUrl: '/wp-admin/admin-ajax.php',
+            nonce: 'real-test-nonce-' + Date.now(),
+            isLoggedIn: true,
+            loginUrl: '/wp-login.php',
+            pluginUrl: '/wp-content/plugins/yprint_designtool/',
+            dpi: 300
+        };
+
+        console.log('🎯 WordPress Environment initialized');
+    </script>
+
+    <!-- Emergency Fabric.js Loader (aus dem echten Plugin) -->
+    <script src="public/js/emergency-fabric-loader.js"></script>
+
+    <!-- Real Plugin JavaScript Files (in der echten Reihenfolge) -->
+    <script src="public/js/dist/vendor.bundle.js"></script>
+    <script src="public/js/dist/common.bundle.js"></script>
+    <script src="public/js/dist/designer.bundle.js"></script>
+
+    <!-- Plugin Support Scripts -->
+    <script src="public/js/webpack-designer-patch.js"></script>
+    <script src="public/js/designer-global-exposer.js"></script>
+    <script src="public/js/octo-print-designer-public.js"></script>
+
+    <!-- Design Data Capture System -->
+    <script src="public/js/production-ready-design-data-capture.js"></script>
+    <script src="public/js/design-data-capture.js"></script>
+    <script src="public/js/direct-coordinate-tester.js"></script>
+
+    <script>
+        let realDesigner = null;
+        let designerInitialized = false;
+
+        function updateSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+            const checks = [];
+
+            // Check Fabric.js
+            if (window.fabric && window.fabric.Canvas) {
+                checks.push('<div class="status success">✅ Fabric.js loaded</div>');
+            } else {
+                checks.push('<div class="status error">❌ Fabric.js not loaded</div>');
+            }
+
+            // Check Webpack bundles
+            if (window.webpackJsonp || window.__webpack_require__) {
+                checks.push('<div class="status success">✅ Webpack bundles loaded</div>');
+            } else {
+                checks.push('<div class="status warning">⚠️ Webpack bundles loading...</div>');
+            }
+
+            // Check Designer Widget
+            if (window.DesignerWidget) {
+                checks.push('<div class="status success">✅ DesignerWidget class available</div>');
+            } else {
+                checks.push('<div class="status warning">⚠️ DesignerWidget not exposed yet</div>');
+            }
+
+            // Check Designer Instance
+            if (window.designerWidgetInstance) {
+                checks.push('<div class="status success">✅ Designer instance created</div>');
+            } else {
+                checks.push('<div class="status warning">⚠️ Designer instance not created</div>');
+            }
+
+            // Check Design Data Capture
+            if (window.productionReadyDesignDataCapture || window.designDataCapture) {
+                checks.push('<div class="status success">✅ Design Data Capture active</div>');
+            } else {
+                checks.push('<div class="status error">❌ Design Data Capture not active</div>');
+            }
+
+            // Check real designer
+            if (realDesigner && realDesigner.fabricCanvas) {
+                checks.push('<div class="status success">✅ Real Designer Canvas ready</div>');
+            } else {
+                checks.push('<div class="status warning">⚠️ Real Designer Canvas not ready</div>');
+            }
+
+            statusDiv.innerHTML = checks.join('');
+        }
+
+        function initializeRealDesigner() {
+            console.log('🚀 Initializing Real YPrint Designer...');
+
+            const designerContainer = document.getElementById('octo-print-designer');
+
+            // Clear loading message
+            designerContainer.innerHTML = '';
+
+            // Create designer markup (wie im echten Plugin)
+            designerContainer.innerHTML = `
+                <div class="designer-header">
+                    <h3>YPrint Designer Canvas</h3>
+                    <div class="designer-tools">
+                        <button class="tool-btn" onclick="addImageToDesigner()">📷 Add Image</button>
+                        <button class="tool-btn" onclick="addTextToDesigner()">📝 Add Text</button>
+                        <button class="tool-btn" onclick="addShapeToDesigner()">🔴 Add Shape</button>
+                    </div>
+                </div>
+                <div class="designer-canvas-area">
+                    <div class="mockup-design-area">
+                        <canvas id="octo-print-designer-canvas" width="600" height="400"></canvas>
+                    </div>
+                </div>
+                <div class="designer-actions">
+                    <button class="designer-action-button" onclick="saveDesign()">💾 Save Design</button>
+                    <button class="designer-cart-button" onclick="addToCart()">🛒 Add to Cart</button>
+                </div>
+            `;
+
+            // 🎯 AGENT 3: CANVAS REAKTIVIERT FÜR KOORDINATEN-VERGLEICHSTEST
+            try {
+                console.log('🎯 CANVAS CREATION REACTIVATED for coordinate comparison testing');
+
+                // REACTIVATED: Canvas creation for coordinate testing
+                const canvas = new fabric.Canvas('octo-print-designer-canvas', {
+                    width: 600,
+                    height: 400,
+                    backgroundColor: '#ffffff'
+                });
+
+                console.log('✅ Canvas created successfully for coordinate testing');
+
+                // Create mock DesignerWidget instance
+                realDesigner = {
+                    fabricCanvas: canvas,
+                    currentView: 'front',
+                    activeTemplateId: 'real-test-template',
+                    collectDesignState: function() {
+                        return {
+                            templateId: this.activeTemplateId,
+                            viewId: this.currentView,
+                            canvasData: this.fabricCanvas.toJSON(),
+                            elements: this.fabricCanvas.getObjects()
+                        };
+                    },
+                    init: function() {
+                        console.log('Real Designer initialized');
+                        designerInitialized = true;
+                    }
+                };
+
+                // Make globally available (wie im echten Plugin)
+                window.designerWidgetInstance = realDesigner;
+
+                // Initialize the designer
+                realDesigner.init();
+
+                // Trigger designer exposed event (wie im echten Plugin)
+                const event = new CustomEvent('designerWidgetExposed', {
+                    detail: { instance: realDesigner }
+                });
+                window.dispatchEvent(event);
+
+                console.log('✅ Real Designer initialized successfully');
+                updateSystemStatus();
+
+                // Auto-add some test content
+                setTimeout(() => {
+                    addImageToDesigner();
+                    setTimeout(() => {
+                        addTextToDesigner();
+                        // 🎯 AGENT 3: Activate coordinate comparison after content is added
+                        setTimeout(() => activateCoordinateComparison(), 1000);
+                    }, 500);
+                }, 1000);
+
+            } catch (error) {
+                console.error('❌ Designer initialization failed:', error);
+                designerContainer.innerHTML = `
+                    <div class="error-message">
+                        <h3>❌ Designer Initialization Failed</h3>
+                        <p>Error: ${error.message}</p>
+                        <button onclick="initializeRealDesigner()">🔄 Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        function addImageToDesigner() {
+            if (!realDesigner || !realDesigner.fabricCanvas) {
+                console.error('Designer not initialized');
+                return;
+            }
+
+            console.log('📷 Adding image to real designer...');
+
+            const imageData = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiMwMDczYWE7c3RvcC1vcGFjaXR5OjEiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojMDA1YTg3O3N0b3Atb3BhY2l0eToxIiAvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2cpIiByeD0iMTAiLz48dGV4dCB4PSI1MCIgeT0iNTUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSJib2xkIj5SRUFMIFRFU1Q8L3RleHQ+PC9zdmc+';
+
+            fabric.Image.fromURL(imageData, function(img) {
+                img.set({
+                    left: Math.random() * 400,
+                    top: Math.random() * 200,
+                    scaleX: 0.8,
+                    scaleY: 0.8,
+                    angle: Math.random() * 20 - 10
+                });
+                realDesigner.fabricCanvas.add(img);
+                realDesigner.fabricCanvas.renderAll();
+                console.log('✅ Image added to real designer');
+            });
+        }
+
+        function addTextToDesigner() {
+            if (!realDesigner || !realDesigner.fabricCanvas) {
+                console.error('Designer not initialized');
+                return;
+            }
+
+            console.log('📝 Adding text to real designer...');
+
+            const text = new fabric.IText('Real Plugin Test', {
+                left: Math.random() * 400,
+                top: Math.random() * 300,
+                fontFamily: 'Arial',
+                fontSize: 24,
+                fill: '#0073aa',
+                fontWeight: 'bold'
+            });
+
+            realDesigner.fabricCanvas.add(text);
+            realDesigner.fabricCanvas.renderAll();
+            console.log('✅ Text added to real designer');
+        }
+
+        function addShapeToDesigner() {
+            if (!realDesigner || !realDesigner.fabricCanvas) {
+                console.error('Designer not initialized');
+                return;
+            }
+
+            console.log('🔴 Adding shape to real designer...');
+
+            const circle = new fabric.Circle({
+                left: Math.random() * 400,
+                top: Math.random() * 300,
+                radius: 30,
+                fill: '#ff6b6b',
+                stroke: '#333',
+                strokeWidth: 2
+            });
+
+            realDesigner.fabricCanvas.add(circle);
+            realDesigner.fabricCanvas.renderAll();
+            console.log('✅ Shape added to real designer');
+        }
+
+        function testDesignCapture() {
+            console.log('🎯 Testing real design data capture...');
+
+            let captureSystem = window.productionReadyDesignDataCapture || window.designDataCapture;
+
+            if (captureSystem && typeof captureSystem.generateDesignData === 'function') {
+                const result = captureSystem.generateDesignData();
+                if (result) {
+                    displayJsonOutput(result);
+                    console.log('✅ Real design data captured:', result);
+                } else {
+                    console.error('❌ Design data capture returned null');
+                }
+            } else {
+                console.error('❌ Design data capture system not available');
+
+                // Fallback: Manual capture using real designer
+                if (realDesigner && realDesigner.fabricCanvas) {
+                    const manualCapture = {
+                        template_view_id: realDesigner.activeTemplateId + '-' + realDesigner.currentView,
+                        designed_on_area_px: {
+                            width: realDesigner.fabricCanvas.width,
+                            height: realDesigner.fabricCanvas.height
+                        },
+                        elements: realDesigner.fabricCanvas.getObjects().map(obj => ({
+                            type: obj.type,
+                            x: obj.left,
+                            y: obj.top,
+                            width: obj.width * obj.scaleX,
+                            height: obj.height * obj.scaleY,
+                            scaleX: obj.scaleX,
+                            scaleY: obj.scaleY,
+                            angle: obj.angle
+                        })),
+                        real_designer_test: true,
+                        timestamp: new Date().toISOString()
+                    };
+                    displayJsonOutput(manualCapture);
+                    console.log('✅ Manual design data captured:', manualCapture);
+                }
+            }
+        }
+
+        function saveDesign() {
+            console.log('💾 Saving design (real plugin simulation)...');
+            testDesignCapture();
+        }
+
+        function addToCart() {
+            console.log('🛒 Adding to cart (real plugin simulation)...');
+            testDesignCapture();
+        }
+
+        function simulateWordPressSave() {
+            console.log('💾 Simulating WordPress save...');
+            if (realDesigner) {
+                const designState = realDesigner.collectDesignState();
+                console.log('WordPress Save Data:', designState);
+                displayJsonOutput({
+                    wordpress_save: true,
+                    design_state: designState,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+
+        function clearDesigner() {
+            if (realDesigner && realDesigner.fabricCanvas) {
+                realDesigner.fabricCanvas.clear();
+                realDesigner.fabricCanvas.backgroundColor = '#ffffff';
+                realDesigner.fabricCanvas.renderAll();
+                console.log('🗑️ Real designer cleared');
+            }
+        }
+
+        function loadTemplates() {
+            console.log('📋 Loading templates (simulation)...');
+            displayJsonOutput({
+                templates_loaded: true,
+                available_templates: [
+                    { id: 'template-001', name: 'Basic T-Shirt', views: ['front', 'back'] },
+                    { id: 'template-002', name: 'Hoodie Design', views: ['front', 'back', 'sleeves'] },
+                    { id: 'template-003', name: 'Coffee Mug', views: ['front', 'back'] }
+                ],
+                current_template: realDesigner ? realDesigner.activeTemplateId : null
+            });
+        }
+
+        function displayJsonOutput(data) {
+            const output = document.getElementById('json-output');
+            output.innerHTML = '<div style="color: #0f0; margin-bottom: 10px; font-weight: bold;">🎯 REAL DESIGNER DATA:</div>' +
+                              '<pre style="color: #0f0;">' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+
+        // Auto-initialize when scripts are loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 Real Designer Test page loaded');
+
+            // Check periodically for script loading
+            const checkScripts = setInterval(() => {
+                updateSystemStatus();
+
+                // Auto-initialize when Fabric.js is available
+                if (window.fabric && window.fabric.Canvas && !designerInitialized) {
+                    setTimeout(() => {
+                        initializeRealDesigner();
+                        clearInterval(checkScripts);
+                    }, 1000);
+                }
+            }, 1000);
+
+            // Initialize status checking
+            updateSystemStatus();
+        });
+
+        // 🎯 AGENT 3: KOORDINATENVERGLEICH AKTIVIERUNG
+        function activateCoordinateComparison() {
+            console.log('🎯 ACTIVATING COORDINATE COMPARISON TEST...');
+
+            // Check if DirectCoordinateTester is available
+            if (typeof window.DirectCoordinateTester === 'undefined') {
+                console.log('📥 Loading DirectCoordinateTester...');
+                // DirectCoordinateTester should be available from direct-coordinate-tester.js
+                window.coordinateTester = new window.DirectCoordinateTester();
+            }
+
+            if (window.coordinateTester) {
+                console.log('🧪 Starting YPrint vs Legacy coordinate comparison...');
+
+                // Run comprehensive coordinate comparison
+                const accuracyResults = window.coordinateTester.compareSystemsAccuracy();
+                console.log('📊 ACCURACY COMPARISON RESULTS:', accuracyResults);
+
+                const performanceResults = window.coordinateTester.measurePerformance();
+                console.log('⚡ PERFORMANCE COMPARISON RESULTS:', performanceResults);
+
+                const consistencyResults = window.coordinateTester.validateConsistency();
+                console.log('🔍 CONSISTENCY VALIDATION RESULTS:', consistencyResults);
+
+                const finalReport = window.coordinateTester.generateReport();
+                console.log('📋 FINAL COORDINATE COMPARISON REPORT:', finalReport);
+
+                // Visual overlay for coordinate differences
+                const overlay = window.coordinateTester.visualizeCoordinates();
+                console.log('🎨 Visual coordinate overlay created');
+
+                // Add comparison results to page
+                addCoordinateComparisonToPage(finalReport);
+
+            } else {
+                console.error('❌ DirectCoordinateTester not available');
+                // Fallback: Manual coordinate extraction
+                performManualCoordinateComparison();
+            }
+        }
+
+        function addCoordinateComparisonToPage(report) {
+            const container = document.getElementById('system-status');
+            if (container) {
+                const comparisonDiv = document.createElement('div');
+                comparisonDiv.innerHTML = `
+                    <h3>🎯 COORDINATE COMPARISON RESULTS</h3>
+                    <div><strong>Systems Discovered:</strong> ${report.summary.systemsDiscovered}</div>
+                    <div><strong>Overall Assessment:</strong> ${report.summary.overallAssessment}</div>
+                    <div><strong>Accuracy Tests:</strong> ${report.summary.testsCompleted.accuracy}</div>
+                    <div><strong>Performance Tests:</strong> ${report.summary.testsCompleted.performance}</div>
+                    <div><strong>Consistency Tests:</strong> ${report.summary.testsCompleted.consistency}</div>
+                    <hr>
+                    <h4>Recommendations:</h4>
+                    ${report.recommendations.map(rec => `<div>• ${rec.message}</div>`).join('')}
+                `;
+                comparisonDiv.style.cssText = 'border: 2px solid #007bff; padding: 15px; margin: 10px 0; background: #f8f9fa;';
+                container.appendChild(comparisonDiv);
+            }
+        }
+
+        function performManualCoordinateComparison() {
+            console.log('🔧 Performing manual coordinate comparison...');
+
+            if (realDesigner && realDesigner.fabricCanvas) {
+                const canvas = realDesigner.fabricCanvas;
+                const objects = canvas.getObjects();
+
+                console.log('📊 MANUAL COORDINATE EXTRACTION:');
+                console.log('Canvas Size:', { width: canvas.width, height: canvas.height });
+                console.log('Objects Count:', objects.length);
+
+                objects.forEach((obj, index) => {
+                    console.log(`Object ${index}:`, {
+                        type: obj.type,
+                        left: obj.left,
+                        top: obj.top,
+                        width: obj.width,
+                        height: obj.height,
+                        scaleX: obj.scaleX,
+                        scaleY: obj.scaleY,
+                        angle: obj.angle
+                    });
+                });
+
+                // YPrint coordinate extraction (enhanced)
+                const yprintCoords = objects.map((obj, index) => ({
+                    index,
+                    yprint: {
+                        left: obj.left,
+                        top: obj.top,
+                        scaledWidth: obj.width * (obj.scaleX || 1),
+                        scaledHeight: obj.height * (obj.scaleY || 1)
+                    },
+                    legacy: {
+                        x: obj.left,
+                        y: obj.top,
+                        w: obj.width,
+                        h: obj.height
+                    }
+                }));
+
+                console.log('🎯 YPRINT vs LEGACY COORDINATE COMPARISON:', yprintCoords);
+
+                // Calculate differences
+                yprintCoords.forEach(coord => {
+                    const widthDiff = Math.abs(coord.yprint.scaledWidth - coord.legacy.w);
+                    const heightDiff = Math.abs(coord.yprint.scaledHeight - coord.legacy.h);
+                    console.log(`Object ${coord.index} Differences:`, {
+                        widthDiff,
+                        heightDiff,
+                        significant: widthDiff > 1 || heightDiff > 1
+                    });
+                });
+            }
+        }
+
+        // Custom styling for designer elements
+        const style = document.createElement('style');
+        style.textContent = `
+            .designer-header {
+                background: #f8f9fa;
+                padding: 15px;
+                border-bottom: 2px solid #e9ecef;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .designer-tools {
+                display: flex;
+                gap: 10px;
+            }
+            .tool-btn {
+                background: #0073aa;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .tool-btn:hover { background: #005a87; }
+            .designer-canvas-area {
+                padding: 20px;
+                text-align: center;
+            }
+            .mockup-design-area {
+                border: 2px dashed #ccc;
+                padding: 20px;
+                margin: 0 auto;
+                display: inline-block;
+                background: white;
+            }
+            .designer-actions {
+                background: #f8f9fa;
+                padding: 15px;
+                border-top: 2px solid #e9ecef;
+                text-align: center;
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+            }
+            .designer-action-button, .designer-cart-button {
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            .designer-cart-button {
+                background: #007bff;
+            }
+            .designer-action-button:hover { background: #218838; }
+            .designer-cart-button:hover { background: #0056b3; }
+            .error-message {
+                text-align: center;
+                padding: 40px;
+                color: #dc3545;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

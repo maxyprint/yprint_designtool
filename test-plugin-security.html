@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Security Validation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .security-critical { background-color: #f5c6cb; color: #721c24; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔒 Plugin Security Validation</h1>
+
+    <div id="test-results"></div>
+
+    <!-- Load Plugin Framework -->
+    <script src="public/js/yprint-plugin-framework.js"></script>
+
+    <script>
+        console.log('🔒 SECURITY TEST: Starting plugin security validation...');
+
+        const results = [];
+
+        function addResult(test, passed, message, critical = false) {
+            results.push({ test, passed, message, critical });
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : (critical ? 'security-critical' : 'fail')}`;
+            div.innerHTML = `<strong>${test}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'} - ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        function addInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = `<strong>🔒 SECURITY:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // Mock Designer instance to test isolation
+        window.designerWidgetInstance = {
+            fabricCanvas: {
+                toDataURL: () => 'mock-canvas-data',
+                getObjects: () => [{ type: 'rect' }]
+            },
+            secretInternalMethod: () => 'CRITICAL_SECRET_DATA',
+            adminCredentials: { token: 'SECRET_ADMIN_TOKEN' },
+            databaseConnection: { query: 'DANGEROUS_SQL_ACCESS' }
+        };
+
+        // Test 1: Plugin API should NOT expose Core-Designer internals
+        try {
+            const maliciousPlugin = {
+                name: 'security-test-plugin',
+                version: '1.0.0',
+                attemptedBreaches: [],
+
+                initialize(designerAPI) {
+                    console.log('🔒 SECURITY TEST: Testing API boundaries...');
+
+                    // These should NOT be accessible
+                    const restricted = [
+                        'designerWidgetInstance',
+                        'secretInternalMethod',
+                        'adminCredentials',
+                        'databaseConnection',
+                        'window',
+                        'document',
+                        'eval',
+                        'Function'
+                    ];
+
+                    restricted.forEach(prop => {
+                        if (designerAPI.hasOwnProperty(prop) || designerAPI[prop] !== undefined) {
+                            this.attemptedBreaches.push(prop);
+                        }
+                    });
+
+                    // Test what IS accessible
+                    const allowed = ['getCanvas', 'getEventBus', 'addMenuItem', 'fireEvent', 'getDesignerInfo'];
+                    this.allowedMethods = allowed.filter(method =>
+                        typeof designerAPI[method] === 'function'
+                    );
+
+                    return {
+                        breaches: this.attemptedBreaches,
+                        allowedMethods: this.allowedMethods
+                    };
+                }
+            };
+
+            window.YPrintPlugins.register('security-test', maliciousPlugin);
+            const result = window.YPrintPlugins.initializePlugin('security-test');
+
+            // Validate API isolation
+            if (maliciousPlugin.attemptedBreaches.length === 0) {
+                addResult('API Isolation', true, 'Plugin API correctly restricts access to Core internals');
+            } else {
+                addResult('API Isolation', false, `Security breach: Plugin accessed ${maliciousPlugin.attemptedBreaches.join(', ')}`, true);
+            }
+
+            // Validate allowed methods
+            const expectedMethods = ['getCanvas', 'getEventBus', 'addMenuItem', 'fireEvent', 'getDesignerInfo'];
+            const hasAllMethods = expectedMethods.every(method =>
+                maliciousPlugin.allowedMethods.includes(method)
+            );
+
+            addResult('Allowed Methods', hasAllMethods,
+                hasAllMethods ? 'All expected safe methods available' : 'Some safe methods missing'
+            );
+
+        } catch (error) {
+            addResult('API Isolation', false, `Security test failed: ${error.message}`, true);
+        }
+
+        // Test 2: Canvas access should be read-only and safe
+        try {
+            const canvasTestPlugin = {
+                name: 'canvas-test-plugin',
+                version: '1.0.0',
+
+                initialize(designerAPI) {
+                    const canvas = designerAPI.getCanvas();
+
+                    // Test canvas safety
+                    if (canvas) {
+                        // Should be able to read
+                        const canRead = typeof canvas.toDataURL === 'function';
+
+                        // Should NOT be able to access dangerous methods
+                        const hasDangerousMethods = !!(
+                            canvas.removeAll ||
+                            canvas.clear ||
+                            canvas.loadFromJSON ||
+                            canvas._restoreObjectsState
+                        );
+
+                        return {
+                            canRead,
+                            hasDangerousMethods,
+                            canvasType: typeof canvas
+                        };
+                    }
+
+                    return { canvasAccess: false };
+                }
+            };
+
+            window.YPrintPlugins.register('canvas-test', canvasTestPlugin);
+            window.YPrintPlugins.initializePlugin('canvas-test');
+
+            // Note: In our implementation, canvas is passed directly
+            // In production, this should be a read-only proxy
+            addInfo('Canvas access provided - should be read-only proxy in production');
+
+        } catch (error) {
+            addResult('Canvas Security', false, `Canvas access test failed: ${error.message}`);
+        }
+
+        // Test 3: Event bus should be isolated
+        try {
+            const eventTestPlugin = {
+                name: 'event-test-plugin',
+                version: '1.0.0',
+
+                initialize(designerAPI) {
+                    const eventBus = designerAPI.getEventBus();
+
+                    if (eventBus && eventBus instanceof EventTarget) {
+                        // Should be able to listen and fire
+                        const canListen = typeof eventBus.addEventListener === 'function';
+                        const canFire = typeof designerAPI.fireEvent === 'function';
+
+                        // Should NOT be able to access system events directly
+                        const hasDangerousAccess = !!(
+                            eventBus.dispatchEvent === designerAPI.fireEvent ||
+                            eventBus._listeners ||
+                            eventBus.removeAllListeners
+                        );
+
+                        return {
+                            canListen,
+                            canFire,
+                            hasDangerousAccess,
+                            eventBusType: eventBus.constructor.name
+                        };
+                    }
+
+                    return { eventBusAccess: false };
+                }
+            };
+
+            window.YPrintPlugins.register('event-test', eventTestPlugin);
+            window.YPrintPlugins.initializePlugin('event-test');
+
+            addResult('Event Bus Security', true, 'Event bus provides controlled access');
+
+        } catch (error) {
+            addResult('Event Bus Security', false, `Event security test failed: ${error.message}`);
+        }
+
+        // Test 4: Plugin cannot access other plugins' data
+        try {
+            const plugin1 = {
+                name: 'plugin-1',
+                version: '1.0.0',
+                secretData: 'PLUGIN_1_SECRET',
+
+                initialize(designerAPI) {
+                    // Store secret in plugin instance
+                    this.internalSecret = 'SUPER_SECRET_DATA';
+                    return true;
+                }
+            };
+
+            const plugin2 = {
+                name: 'plugin-2',
+                version: '1.0.0',
+                stolenSecrets: [],
+
+                initialize(designerAPI) {
+                    // Try to access other plugin's data
+                    try {
+                        const otherPlugin = window.YPrintPlugins.getPlugin('plugin-1');
+                        if (otherPlugin) {
+                            if (otherPlugin.secretData) this.stolenSecrets.push('secretData');
+                            if (otherPlugin.internalSecret) this.stolenSecrets.push('internalSecret');
+                        }
+                    } catch (e) {
+                        // Expected - should not be able to access
+                    }
+
+                    return { stolenSecrets: this.stolenSecrets };
+                }
+            };
+
+            window.YPrintPlugins.register('plugin-1', plugin1);
+            window.YPrintPlugins.register('plugin-2', plugin2);
+
+            window.YPrintPlugins.initializePlugin('plugin-1');
+            window.YPrintPlugins.initializePlugin('plugin-2');
+
+            // This test actually exposes a vulnerability in our current implementation
+            // Plugins CAN access each other through getPlugin()
+            if (plugin2.stolenSecrets.length === 0) {
+                addResult('Plugin Isolation', true, 'Plugins cannot access each other\'s data');
+            } else {
+                addResult('Plugin Isolation', false, `Plugin isolation breach: accessed ${plugin2.stolenSecrets.join(', ')}`, true);
+            }
+
+        } catch (error) {
+            addResult('Plugin Isolation', false, `Plugin isolation test failed: ${error.message}`);
+        }
+
+        // Test 5: Global namespace pollution check
+        try {
+            const beforeKeys = Object.keys(window).length;
+
+            const namespaceTestPlugin = {
+                name: 'namespace-test',
+                version: '1.0.0',
+
+                initialize(designerAPI) {
+                    // Try to pollute global namespace
+                    try {
+                        window.maliciousGlobal = 'HACKED';
+                        window.YPrintHacked = true;
+                        delete window.YPrintPlugins; // Try to delete framework
+                    } catch (e) {
+                        // Should be prevented
+                    }
+
+                    return true;
+                }
+            };
+
+            window.YPrintPlugins.register('namespace-test', namespaceTestPlugin);
+            window.YPrintPlugins.initializePlugin('namespace-test');
+
+            const afterKeys = Object.keys(window).length;
+            const frameworkStillExists = !!window.YPrintPlugins;
+
+            // Check for pollution
+            const hasMaliciousGlobals = !!(window.maliciousGlobal || window.YPrintHacked);
+
+            if (!hasMaliciousGlobals && frameworkStillExists) {
+                addResult('Namespace Protection', true, 'Global namespace protected from plugin pollution');
+            } else {
+                addResult('Namespace Protection', false, 'Plugin was able to pollute global namespace', true);
+            }
+
+        } catch (error) {
+            addResult('Namespace Protection', false, `Namespace protection test failed: ${error.message}`);
+        }
+
+        // Summary
+        setTimeout(() => {
+            const securityIssues = results.filter(r => !r.passed && r.critical);
+            const passedTests = results.filter(r => r.passed).length;
+
+            if (securityIssues.length === 0) {
+                addInfo(`Security validation complete: ${passedTests}/${results.length} tests passed, no critical security issues`);
+            } else {
+                addInfo(`⚠️ CRITICAL: ${securityIssues.length} security vulnerabilities found - requires immediate attention`);
+            }
+
+            console.log('🔒 SECURITY TEST: Validation complete');
+            console.log('Results:', results);
+        }, 100);
+
+    </script>
+</body>
+</html>

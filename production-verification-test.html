@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YPrint Production Environment Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 400px;
+            height: 90vh;
+            overflow-y: auto;
+            z-index: 9999;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+        }
+        .container {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .test-result {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .pass { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .console-monitor {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 10px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .stat-box {
+            background: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 10px;
+        }
+        .stat-number {
+            font-size: 16px;
+            font-weight: bold;
+            color: #495057;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 3px;
+            font-size: 11px;
+        }
+        button:hover { background: #0056b3; }
+        .minimize {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            font-size: 14px;
+        }
+        .minimized {
+            height: 40px;
+            overflow: hidden;
+        }
+        h1 { font-size: 14px; margin: 0 0 10px 0; }
+        h4 { font-size: 12px; margin: 10px 0 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="minimize" onclick="toggleMinimize()">−</button>
+        <h1>🎯 YPrint Production Verification</h1>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number" id="totalMessages">0</div>
+                <div>Console Messages</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="webpackFailures">0</div>
+                <div>Webpack Failures</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="fabricAttempts">0</div>
+                <div>Fabric Attempts</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="designErrors">0</div>
+                <div>Design Errors</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="hiddenGroups">0</div>
+                <div>Hidden Groups</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="repetitivePatterns">0</div>
+                <div>Repetitive</div>
+            </div>
+        </div>
+
+        <div id="testResults"></div>
+
+        <button onclick="startRealTimeMonitoring()">🚀 Start Real-Time Monitoring</button>
+        <button onclick="runFullAnalysis()">📊 Full Analysis</button>
+        <button onclick="clearResults()">🧹 Clear</button>
+
+        <div class="console-monitor">
+            <h4>📊 Live Production Monitor</h4>
+            <div id="consoleOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        // Production Environment Verifier
+        class ProductionVerifier {
+            constructor() {
+                this.startTime = Date.now();
+                this.consoleMessages = [];
+                this.fabricAttempts = 0;
+                this.designErrors = 0;
+                this.webpackFailures = 0;
+                this.hiddenMessageGroups = 0;
+                this.initializationParadoxes = 0;
+                this.repetitivePatterns = {};
+                this.repetitiveCount = 0;
+                this.monitoring = false;
+                this.originalConsoleLog = console.log;
+                this.originalConsoleError = console.error;
+                this.originalConsoleWarn = console.warn;
+                this.originalConsoleGroup = console.group;
+                this.originalConsoleGroupCollapsed = console.groupCollapsed;
+
+                // Don't start monitoring automatically - wait for user interaction
+                console.log('🎯 Production Verifier ready - click "Start Real-Time Monitoring" to begin');
+            }
+
+            startMonitoring() {
+                if (this.monitoring) return;
+                this.monitoring = true;
+
+                const self = this;
+
+                // Override console.log
+                console.log = function(...args) {
+                    const message = args.join(' ');
+                    self.consoleMessages.push(message);
+
+                    // Track specific patterns
+                    if (message.includes('🔄 No fabric canvas instances found yet')) {
+                        self.fabricAttempts++;
+                    }
+
+                    // Track webpack failures
+                    if (message.includes('WEBPACK PATCH: Failed to expose') ||
+                        message.includes('❌ WEBPACK PATCH')) {
+                        self.webpackFailures++;
+                    }
+
+                    // Track repetitive patterns
+                    self.repetitivePatterns[message] = (self.repetitivePatterns[message] || 0) + 1;
+                    if (self.repetitivePatterns[message] === 10) {
+                        self.repetitiveCount++;
+                    }
+
+                    // Detect initialization paradox
+                    if ((message.includes('all components ready') && message.includes('Failed to initialize')) ||
+                        (message.includes('❌ Failed to initialize after maximum retries'))) {
+                        self.initializationParadoxes++;
+                    }
+
+                    self.updateConsoleDisplay(message, 'log');
+                    self.originalConsoleLog.apply(console, args);
+                };
+
+                // Override console.error
+                console.error = function(...args) {
+                    const message = args.join(' ');
+                    self.consoleMessages.push(`ERROR: ${message}`);
+
+                    if (message.includes('Invalid input data') || message.includes('Error saving design')) {
+                        self.designErrors++;
+                    }
+
+                    if (message.includes('WEBPACK PATCH: Failed') || message.includes('❌ WEBPACK')) {
+                        self.webpackFailures++;
+                    }
+
+                    self.updateConsoleDisplay(`ERROR: ${message}`, 'error');
+                    self.originalConsoleError.apply(console, args);
+                };
+
+                // Override console.warn
+                console.warn = function(...args) {
+                    const message = args.join(' ');
+                    self.consoleMessages.push(`WARN: ${message}`);
+                    self.updateConsoleDisplay(`WARN: ${message}`, 'warn');
+                    self.originalConsoleWarn.apply(console, args);
+                };
+
+                // Override console.group to detect hidden messages
+                console.group = function(...args) {
+                    self.hiddenMessageGroups++;
+                    self.originalConsoleGroup.apply(console, args);
+                };
+
+                // Override console.groupCollapsed to detect hidden messages
+                console.groupCollapsed = function(...args) {
+                    self.hiddenMessageGroups++;
+                    self.originalConsoleGroupCollapsed.apply(console, args);
+                };
+
+                this.addResult('✅ Real-time monitoring started in production environment', 'pass');
+            }
+
+            stopMonitoring() {
+                if (!this.monitoring) return;
+
+                console.log = this.originalConsoleLog;
+                console.error = this.originalConsoleError;
+                console.warn = this.originalConsoleWarn;
+                console.group = this.originalConsoleGroup;
+                console.groupCollapsed = this.originalConsoleGroupCollapsed;
+
+                this.monitoring = false;
+                this.addResult('⏹️ Real-time monitoring stopped', 'info');
+            }
+
+            updateConsoleDisplay(message, type) {
+                const output = document.getElementById('consoleOutput');
+                const div = document.createElement('div');
+                div.style.color = type === 'error' ? 'red' : type === 'warn' ? 'orange' : '#333';
+                div.style.fontSize = '9px';
+                div.style.marginBottom = '1px';
+                div.style.wordBreak = 'break-word';
+
+                const timestamp = new Date().toLocaleTimeString();
+                const truncated = message.length > 80 ? message.substring(0, 80) + '...' : message;
+                div.textContent = `[${timestamp}] ${truncated}`;
+
+                output.appendChild(div);
+                output.scrollTop = output.scrollHeight;
+
+                // Limit to last 50 messages
+                while (output.children.length > 50) {
+                    output.removeChild(output.firstChild);
+                }
+
+                this.updateStats();
+            }
+
+            updateStats() {
+                document.getElementById('totalMessages').textContent = this.consoleMessages.length;
+                document.getElementById('fabricAttempts').textContent = this.fabricAttempts;
+                document.getElementById('designErrors').textContent = this.designErrors;
+                document.getElementById('webpackFailures').textContent = this.webpackFailures;
+                document.getElementById('hiddenGroups').textContent = this.hiddenMessageGroups;
+                document.getElementById('repetitivePatterns').textContent = this.repetitiveCount;
+            }
+
+            async runFullAnalysis() {
+                this.addResult('🔍 Running Full Production Analysis...', 'info');
+
+                // Check current system state
+                await this.checkSystemState();
+
+                // Analyze console patterns
+                await this.analyzeConsolePatterns();
+
+                // Check performance metrics
+                await this.checkPerformanceMetrics();
+
+                // Generate recommendations
+                await this.generateRecommendations();
+            }
+
+            async checkSystemState() {
+                this.addResult('🧪 Checking Production System State...', 'info');
+
+                // Check if we're in WordPress/YPrint environment
+                const isWordPress = !!window.wp || !!document.querySelector('body.wp-admin') ||
+                                  !!document.querySelector('#octo-print-designer-canvas');
+
+                if (isWordPress) {
+                    this.addResult('✅ Running in WordPress/YPrint environment', 'pass');
+                } else {
+                    this.addResult('⚠️ Not detected as WordPress/YPrint environment', 'fail');
+                }
+
+                // Check DesignerWidget
+                if (window.DesignerWidget) {
+                    this.addResult('✅ DesignerWidget is globally accessible', 'pass');
+                } else {
+                    this.addResult('❌ DesignerWidget not found globally', 'fail');
+                }
+
+                // Check for Fabric.js
+                if (window.fabric) {
+                    this.addResult('✅ Fabric.js library loaded', 'pass');
+                } else {
+                    this.addResult('❌ Fabric.js not found', 'fail');
+                }
+
+                // Check canvas elements
+                const canvasElements = document.querySelectorAll('canvas');
+                if (canvasElements.length > 0) {
+                    this.addResult(`✅ Found ${canvasElements.length} canvas element(s)`, 'pass');
+                } else {
+                    this.addResult('❌ No canvas elements found', 'fail');
+                }
+            }
+
+            async analyzeConsolePatterns() {
+                this.addResult('🧪 Analyzing Console Message Patterns...', 'info');
+
+                const totalMessages = this.consoleMessages.length;
+                const uniqueMessages = new Set(this.consoleMessages).size;
+                const duplicateRatio = ((totalMessages - uniqueMessages) / totalMessages * 100).toFixed(1);
+
+                if (duplicateRatio < 20) {
+                    this.addResult(`✅ Low duplicate ratio: ${duplicateRatio}%`, 'pass');
+                } else if (duplicateRatio < 50) {
+                    this.addResult(`⚠️ Moderate duplicate ratio: ${duplicateRatio}%`, 'fail');
+                } else {
+                    this.addResult(`❌ High duplicate ratio: ${duplicateRatio}%`, 'fail');
+                }
+
+                // Show most repetitive patterns
+                const sortedPatterns = Object.entries(this.repetitivePatterns)
+                    .filter(([message, count]) => count >= 3)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                if (sortedPatterns.length > 0) {
+                    this.addResult(`📊 Most repetitive patterns:`, 'info');
+                    sortedPatterns.forEach(([message, count]) => {
+                        const truncated = message.length > 40 ? message.substring(0, 40) + '...' : message;
+                        this.addResult(`   "${truncated}" (${count}x)`, 'info');
+                    });
+                }
+            }
+
+            async checkPerformanceMetrics() {
+                this.addResult('🧪 Checking Performance Metrics...', 'info');
+
+                const testDuration = (Date.now() - this.startTime) / 1000;
+                const messagesPerSecond = this.consoleMessages.length / testDuration;
+
+                // Production performance criteria (stricter than development)
+                if (this.consoleMessages.length < 20) {
+                    this.addResult(`✅ EXCELLENT: Very low console output (${this.consoleMessages.length})`, 'pass');
+                } else if (this.consoleMessages.length < 50) {
+                    this.addResult(`✅ GOOD: Low console output (${this.consoleMessages.length})`, 'pass');
+                } else {
+                    this.addResult(`❌ TOO HIGH: Excessive console output (${this.consoleMessages.length})`, 'fail');
+                }
+
+                if (this.webpackFailures === 0) {
+                    this.addResult('✅ No webpack integration failures', 'pass');
+                } else {
+                    this.addResult(`❌ CRITICAL: ${this.webpackFailures} webpack failures in production`, 'fail');
+                }
+
+                if (this.fabricAttempts <= 2) {
+                    this.addResult(`✅ Fabric detection efficient (${this.fabricAttempts} attempts)`, 'pass');
+                } else {
+                    this.addResult(`❌ Fabric detection inefficient (${this.fabricAttempts} attempts)`, 'fail');
+                }
+            }
+
+            async generateRecommendations() {
+                this.addResult('📋 Generating Production Recommendations...', 'info');
+
+                if (this.webpackFailures > 0) {
+                    this.addResult('🔧 URGENT: Fix webpack module exposure system', 'fail');
+                }
+
+                if (this.repetitiveCount > 0) {
+                    this.addResult('🔧 Optimize repetitive console logging patterns', 'fail');
+                }
+
+                if (this.hiddenMessageGroups > 5) {
+                    this.addResult('🔧 Review console.group() usage - may hide important info', 'fail');
+                }
+
+                if (this.initializationParadoxes > 0) {
+                    this.addResult('🔧 CRITICAL: Fix initialization paradox logic', 'fail');
+                }
+
+                const failCount = document.querySelectorAll('.fail').length;
+                const passCount = document.querySelectorAll('.pass').length;
+                const successRate = passCount / (passCount + failCount) * 100;
+
+                if (successRate >= 95) {
+                    this.addResult(`🎉 PRODUCTION READY: ${successRate.toFixed(1)}% success rate`, 'pass');
+                } else if (successRate >= 80) {
+                    this.addResult(`⚠️ NEEDS OPTIMIZATION: ${successRate.toFixed(1)}% success rate`, 'fail');
+                } else {
+                    this.addResult(`❌ NOT PRODUCTION READY: ${successRate.toFixed(1)}% success rate`, 'fail');
+                }
+            }
+
+            addResult(message, type) {
+                const results = document.getElementById('testResults');
+                const div = document.createElement('div');
+                div.className = `test-result ${type}`;
+                div.textContent = message;
+                div.style.fontSize = '10px';
+                results.appendChild(div);
+
+                // Scroll to bottom
+                results.scrollTop = results.scrollHeight;
+            }
+        }
+
+        let verifier;
+
+        function startRealTimeMonitoring() {
+            if (!verifier) {
+                verifier = new ProductionVerifier();
+            }
+            verifier.startMonitoring();
+        }
+
+        function runFullAnalysis() {
+            if (!verifier) {
+                verifier = new ProductionVerifier();
+            }
+            verifier.runFullAnalysis();
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('consoleOutput').innerHTML = '';
+            if (verifier) {
+                verifier.consoleMessages = [];
+                verifier.fabricAttempts = 0;
+                verifier.designErrors = 0;
+                verifier.webpackFailures = 0;
+                verifier.hiddenMessageGroups = 0;
+                verifier.repetitivePatterns = {};
+                verifier.repetitiveCount = 0;
+                verifier.updateStats();
+            }
+        }
+
+        function toggleMinimize() {
+            const body = document.body;
+            const button = document.querySelector('.minimize');
+            if (body.classList.contains('minimized')) {
+                body.classList.remove('minimized');
+                button.textContent = '−';
+            } else {
+                body.classList.add('minimized');
+                button.textContent = '+';
+            }
+        }
+
+        // Auto-initialize (but don't start monitoring)
+        window.addEventListener('load', () => {
+            verifier = new ProductionVerifier();
+        });
+    </script>
+</body>
+</html>

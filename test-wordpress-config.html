@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WordPress Config Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+        button { margin: 5px; padding: 10px; font-size: 14px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>WordPress AJAX Configuration Test</h1>
+    <p>Testing the availability of the WordPress AJAX configuration for PNG storage.</p>
+
+    <button onclick="testWordPressConfig()">Test WordPress Config</button>
+    <button onclick="testPNGStorage()">Test PNG Storage (Mock)</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="results"></div>
+
+    <script>
+        // Mock WordPress configuration (what should be available)
+        window.octo_print_designer_config = {
+            ajax_url: '/wp-admin/admin-ajax.php',
+            nonce: 'mock_nonce_12345',
+            plugin_url: '/wp-content/plugins/yprint_designtool/',
+            version: '1.0.0',
+            debug_mode: true,
+            png_only_system: true
+        };
+
+        function addResult(test, status, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            div.innerHTML = `<strong>${test}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+
+        function testWordPressConfig() {
+            addResult('WordPress Config Test', 'info', 'Testing WordPress AJAX configuration availability...');
+
+            const config = window.octo_print_designer_config;
+
+            if (!config) {
+                addResult('Config Existence', 'fail', '❌ window.octo_print_designer_config is undefined');
+                return;
+            }
+
+            addResult('Config Existence', 'pass', '✅ window.octo_print_designer_config exists');
+
+            // Test individual properties
+            const tests = [
+                { name: 'AJAX URL', prop: 'ajax_url', required: true },
+                { name: 'Nonce', prop: 'nonce', required: true },
+                { name: 'Plugin URL', prop: 'plugin_url', required: false },
+                { name: 'Version', prop: 'version', required: false },
+                { name: 'Debug Mode', prop: 'debug_mode', required: false },
+                { name: 'PNG Only System', prop: 'png_only_system', required: false }
+            ];
+
+            tests.forEach(test => {
+                const value = config[test.prop];
+                if (test.required && (!value || value === '')) {
+                    addResult(test.name, 'fail', `❌ ${test.prop} is missing or empty`);
+                } else if (value) {
+                    addResult(test.name, 'pass', `✅ ${test.prop}: ${value}`);
+                } else {
+                    addResult(test.name, 'info', `ℹ️ ${test.prop}: not set (optional)`);
+                }
+            });
+
+            // Display full config
+            addResult('Full Config', 'info', '<pre>' + JSON.stringify(config, null, 2) + '</pre>');
+        }
+
+        async function testPNGStorage() {
+            addResult('PNG Storage Test', 'info', 'Testing PNG storage with mock data...');
+
+            // Create a simple PNG storage test
+            const mockPNGData = {
+                design_id: 'test-design-' + Date.now(),
+                print_png: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                save_type: 'test_save',
+                generated_at: new Date().toISOString(),
+                print_area_px: JSON.stringify({ width: 800, height: 600 }),
+                print_area_mm: JSON.stringify({ width: 200, height: 150 }),
+                template_id: 'test-template'
+            };
+
+            // Test the configuration check logic (simulated)
+            const config = window.octo_print_designer_config;
+            if (!config || !config.ajax_url || !config.nonce) {
+                addResult('Config Check', 'fail', '❌ WordPress AJAX configuration missing');
+                addResult('Storage Test', 'fail', '❌ Cannot proceed without valid configuration');
+                return;
+            }
+
+            addResult('Config Check', 'pass', '✅ WordPress AJAX configuration is valid');
+
+            // Simulate the AJAX call (but don't actually send it)
+            const simulatedPayload = {
+                action: 'yprint_save_design_print_png',
+                nonce: config.nonce,
+                ...mockPNGData
+            };
+
+            addResult('Payload Generation', 'pass', '✅ AJAX payload created successfully');
+            addResult('Mock Data', 'info', '<pre>' + JSON.stringify(simulatedPayload, null, 2) + '</pre>');
+
+            // This is where the real AJAX call would happen
+            addResult('Storage Test', 'info', 'ℹ️ Mock test completed. In real scenario, this would send to: ' + config.ajax_url);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-run basic tests
+        setTimeout(() => {
+            addResult('Setup', 'info', 'Test environment ready. WordPress config has been mocked for testing.');
+        }, 100);
+    </script>
+</body>
+</html>

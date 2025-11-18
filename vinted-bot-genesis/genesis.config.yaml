@@ -1,0 +1,178 @@
+# Project Genesis v2.0 - VintedBot Trend-Analyse System
+# Autonome KI-gesteuerte Konfiguration
+
+## 🏗️ PROJEKT-GRUNDLAGEN
+project:
+  name: "VintedBot Genesis v2.0"
+  version: "2.0.0"
+  description: "Intelligentes Trend-Analyse System für Vinted mit Real-time Data Scraping"
+  type: "web-fullstack"
+  priority: "high"
+  deadline: "2025-09-25"
+  specialization: "trend-analysis-scraping"
+
+## 🎯 TECHNOLOGIE-STACK (Auto-Selected)
+technology:
+  frontend:
+    framework: "react"
+    language: "typescript"
+    styling: "tailwind"
+    build_tool: "vite"
+    state_management: "zustand"
+    ui_components: "lucide-react"
+
+  backend:
+    framework: "nodejs"
+    language: "typescript"
+    runtime: "node18"
+    database: "json-file"
+    scraping: "cheerio"
+    http_client: "axios"
+    anti_detection: "user-agent-rotation"
+
+  infrastructure:
+    deployment: "local-development"
+    monitoring: "console-logging"
+    real_time: "websockets"
+
+## 🤖 ENHANCED AGENT-KONFIGURATION v2.0
+agents:
+  coordinator:
+    model: "claude-3-5-sonnet"
+    temperature: 0.1
+    specialization: ["project-orchestration", "quality-assurance", "error-recovery"]
+    self_correction: true
+    decision_logging: true
+    autonomous_coordination: true
+
+  architect:
+    model: "claude-3-5-sonnet"
+    temperature: 0.05
+    specialization: ["system-architecture", "scraping-strategy", "anti-detection"]
+    validation_enabled: true
+    performance_prediction: true
+
+  developer:
+    frontend:
+      model: "claude-3-5-sonnet"
+      temperature: 0.2
+      specialization: ["react-typescript", "real-time-ui", "data-visualization"]
+      code_style: "prettier"
+      testing_framework: "vitest"
+
+    backend:
+      model: "claude-3-5-sonnet"
+      temperature: 0.15
+      specialization: ["web-scraping", "anti-detection", "data-processing"]
+      code_style: "eslint"
+      testing_framework: "jest"
+
+  quality:
+    testing:
+      model: "claude-3-5-sonnet"
+      temperature: 0.1
+      test_coverage_target: 90
+      data_accuracy_validation: true
+      scraping_reliability_tests: true
+
+    security:
+      model: "claude-3-5-sonnet"
+      compliance_checks: ["data-protection", "rate-limiting", "ethical-scraping"]
+      anti_detection_validation: true
+
+## 🔄 WORKFLOW-KONFIGURATION v2.0
+workflow:
+  phases:
+    - name: "initialization"
+      enabled: true
+      auto_proceed: true
+      agents: ["coordinator"]
+
+    - name: "intelligent_architecture"
+      enabled: true
+      auto_proceed: false
+      agents: ["architect", "coordinator"]
+      validation_required: true
+
+    - name: "parallel_development"
+      enabled: true
+      auto_proceed: false
+      parallel_execution: true
+      max_parallel_agents: 2
+      agents: ["frontend_developer", "backend_developer"]
+
+    - name: "data_accuracy_validation"
+      enabled: true
+      auto_proceed: false
+      agents: ["quality_testing", "coordinator"]
+      quality_gates:
+        - data_accuracy_threshold: 100
+        - scraping_success_rate: 95
+        - response_time_threshold: 3000
+
+    - name: "autonomous_deployment"
+      enabled: true
+      auto_proceed: false
+      agents: ["devops", "coordinator"]
+      validation_required: true
+
+  error_handling:
+    max_retry_attempts: 5
+    rollback_enabled: true
+    self_healing: true
+    root_cause_analysis: true
+    alternative_path_finding: true
+
+## 🎯 VINTED-SPEZIFISCHE KONFIGURATION
+vinted_config:
+  base_url: "https://www.vinted.de"
+  scraping_strategy: "individual_product_pages"
+  rate_limiting:
+    requests_per_minute: 30
+    delay_between_requests: 2000
+
+  anti_detection:
+    user_agent_rotation: true
+    random_delays: true
+    proxy_support: false
+
+  data_extraction:
+    authentic_data_only: true
+    mock_data_generation: false
+    validation_against_source: true
+
+## 📊 ENHANCED MONITORING v2.0
+metrics:
+  collection_enabled: true
+  real_time_monitoring: true
+  agent_performance_tracking: true
+  scraping_success_rates: true
+  data_accuracy_metrics: true
+
+  kpis:
+    - development_velocity
+    - data_accuracy_score
+    - scraping_reliability
+    - user_experience_rating
+    - system_uptime
+
+## 🔒 ENHANCED SECURITY
+security:
+  ethical_scraping: true
+  rate_limiting_enforcement: true
+  data_protection_compliance: true
+  audit_logging: true
+
+## 🚀 ADVANCED FEATURES v2.0
+advanced:
+  ai_assisted_debugging: true
+  automated_refactoring: true
+  predictive_error_detection: true
+  self_healing_scraping: true
+  intelligent_retry_mechanisms: true
+
+  experimental_features:
+    - dynamic_selector_adaptation
+    - ml_powered_trend_prediction
+    - autonomous_data_validation
+    - self_optimizing_scraping_patterns

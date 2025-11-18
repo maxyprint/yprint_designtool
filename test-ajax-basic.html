@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basic AJAX Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Basic AJAX Test</h1>
+
+    <button onclick="testBasicAjax()">🚀 Test WordPress AJAX</button>
+
+    <div id="results"></div>
+
+    <script>
+        function addResult(title, status, message) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${status}`;
+            resultDiv.innerHTML = `<strong>${title}:</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function testBasicAjax() {
+            document.getElementById('results').innerHTML = '';
+
+            try {
+                // Check config
+                const config = window.octo_print_designer_config;
+                if (!config) {
+                    addResult('Config', 'fail', 'No WordPress config found');
+                    return;
+                }
+
+                addResult('Config', 'pass', 'WordPress config found');
+
+                // Test basic heartbeat
+                const formData = new FormData();
+                formData.append('action', 'heartbeat');
+                formData.append('nonce', config.nonce);
+
+                const response = await fetch(config.ajax_url, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                addResult('Response', response.ok ? 'pass' : 'fail',
+                    `HTTP ${response.status} ${response.statusText}`);
+
+                const text = await response.text();
+                addResult('Response Body', 'info', text.substring(0, 200) + '...');
+
+            } catch (error) {
+                addResult('Error', 'fail', error.message);
+            }
+        }
+    </script>
+</body>
+</html>
