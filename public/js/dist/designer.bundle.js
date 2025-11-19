@@ -2241,7 +2241,8 @@ class DesignerWidget {
                 
                 // Load the image
                 const userImage = await Image.fromURL(imageData.url);
-                
+                if (!userImage) continue;
+
                 // Set position and transformation
                 userImage.set({
                     left: imageData.transform.left * widthRatio,
