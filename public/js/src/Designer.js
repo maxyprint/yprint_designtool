@@ -1504,7 +1504,7 @@ export class DesignerWidget {
                 this.currentDesignId = data.data.design_id;
     
                 setTimeout(() => {
-                    // window.location.href = data.data.redirect_url;
+                    window.location.href = data.data.redirect_url;
                 }, 1000);
     
             } else {
