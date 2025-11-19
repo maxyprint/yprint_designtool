@@ -1502,7 +1502,51 @@ export class DesignerWidget {
             if (data.success) {
                 this.toastManager.show('Design saved!', 'success');
                 this.currentDesignId = data.data.design_id;
-    
+
+                // Generate print-ready PNG file after successful save
+                try {
+                    console.log('🖨️ Generating print-ready PNG file...');
+
+                    if (typeof window.generatePNGForDownload === 'function') {
+                        const pngDataUrl = await window.generatePNGForDownload();
+
+                        if (pngDataUrl) {
+                            // Send PNG to backend for storage
+                            const pngFormData = new FormData();
+                            pngFormData.append('action', 'save_design_png');
+                            pngFormData.append('nonce', octoPrintDesigner.nonce);
+                            pngFormData.append('design_id', this.currentDesignId);
+
+                            // Convert data URL to blob
+                            const response = await fetch(pngDataUrl);
+                            const blob = await response.blob();
+                            pngFormData.append('png_file', blob, `design_${this.currentDesignId}.png`);
+
+                            const pngResponse = await fetch(octoPrintDesigner.ajaxUrl, {
+                                method: 'POST',
+                                body: pngFormData
+                            });
+
+                            const pngData = await pngResponse.json();
+
+                            if (pngData.success) {
+                                console.log('✅ Print-ready PNG saved successfully!');
+                                console.log('📁 PNG file location:', pngData.data.file_url);
+                                console.log('💾 PNG file path:', pngData.data.file_path);
+                            } else {
+                                console.warn('⚠️ PNG save failed:', pngData.data.message);
+                            }
+                        } else {
+                            console.warn('⚠️ PNG generation returned empty result');
+                        }
+                    } else {
+                        console.warn('⚠️ generatePNGForDownload function not available');
+                    }
+                } catch (pngError) {
+                    console.error('❌ PNG generation/save error:', pngError);
+                    // Don't block the redirect if PNG fails
+                }
+
                 setTimeout(() => {
                     window.location.href = data.data.redirect_url;
                 }, 1000);

@@ -13,6 +13,7 @@ class Octo_Print_Designer_Designer {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_user_images', $this, 'get_user_images');
 
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_design', $this, 'handle_save_design');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_design_png', $this, 'handle_save_design_png');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_load_design', $this, 'handle_load_design');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_get_user_designs', $this, 'get_user_designs');
 
@@ -56,6 +57,26 @@ class Octo_Print_Designer_Designer {
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+
+        // Add PNG file columns if they don't exist
+        self::add_png_columns();
+    }
+
+    /**
+     * Add PNG file columns to existing table
+     */
+    public static function add_png_columns() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'octo_user_designs';
+
+        // Check if columns already exist
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'print_file_%'");
+
+        if (empty($columns)) {
+            $wpdb->query("ALTER TABLE $table_name
+                ADD COLUMN print_file_path varchar(500) NULL DEFAULT NULL AFTER variations,
+                ADD COLUMN print_file_url varchar(500) NULL DEFAULT NULL AFTER print_file_path");
+        }
     }
 
     public function register_shortcodes() {
@@ -925,12 +946,125 @@ wp_add_inline_script('octo-print-designer-designer', '
     private function get_redirect_url($design_id) {
         $slug = Octo_Print_Designer_Settings::get_redirect_slug();
         $url = home_url($slug);
-        
+
         if ($design_id) {
             $url = add_query_arg('design_id', $design_id, $url);
         }
-        
+
         return $url;
+    }
+
+    /**
+     * Handle PNG file save for design
+     */
+    public function handle_save_design_png() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+            wp_send_json_error(array(
+                'message' => __('Security check failed', 'octo-print-designer')
+            ));
+        }
+
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array(
+                'message' => __('You must be logged in to save PNG files', 'octo-print-designer')
+            ));
+        }
+
+        // Validate required fields
+        if (!isset($_POST['design_id']) || !isset($_FILES['png_file'])) {
+            wp_send_json_error(array(
+                'message' => __('Missing required fields: design_id or png_file', 'octo-print-designer')
+            ));
+        }
+
+        $design_id = absint($_POST['design_id']);
+
+        if (!$design_id) {
+            wp_send_json_error(array(
+                'message' => __('Invalid design ID', 'octo-print-designer')
+            ));
+        }
+
+        // Verify design ownership
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'octo_user_designs';
+        $design = $wpdb->get_row($wpdb->prepare(
+            "SELECT id FROM {$table_name} WHERE id = %d AND user_id = %d",
+            $design_id,
+            get_current_user_id()
+        ));
+
+        if (!$design) {
+            wp_send_json_error(array(
+                'message' => __('Design not found or access denied', 'octo-print-designer')
+            ));
+        }
+
+        // Handle file upload
+        $file = $_FILES['png_file'];
+
+        // Validate file
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error(array(
+                'message' => __('File upload failed', 'octo-print-designer')
+            ));
+        }
+
+        // Validate file type
+        $allowed_types = array('image/png');
+        $file_type = wp_check_filetype($file['name']);
+
+        if (!in_array($file['type'], $allowed_types)) {
+            wp_send_json_error(array(
+                'message' => __('Only PNG files are allowed', 'octo-print-designer')
+            ));
+        }
+
+        // Create upload directory if it doesn't exist
+        $upload_dir = wp_upload_dir();
+        $design_dir = $upload_dir['basedir'] . '/design-pngs';
+
+        if (!file_exists($design_dir)) {
+            wp_mkdir_p($design_dir);
+        }
+
+        // Generate unique filename
+        $filename = 'design_' . $design_id . '_' . time() . '.png';
+        $file_path = $design_dir . '/' . $filename;
+        $file_url = $upload_dir['baseurl'] . '/design-pngs/' . $filename;
+
+        // Move uploaded file
+        if (!move_uploaded_file($file['tmp_name'], $file_path)) {
+            wp_send_json_error(array(
+                'message' => __('Failed to save PNG file', 'octo-print-designer')
+            ));
+        }
+
+        // Update design record with PNG path
+        $update_result = $wpdb->update(
+            $table_name,
+            array('print_file_path' => $file_path, 'print_file_url' => $file_url),
+            array('id' => $design_id),
+            array('%s', '%s'),
+            array('%d')
+        );
+
+        if ($update_result === false) {
+            // Clean up file if database update fails
+            unlink($file_path);
+            wp_send_json_error(array(
+                'message' => __('Failed to update design record', 'octo-print-designer')
+            ));
+        }
+
+        wp_send_json_success(array(
+            'message' => __('PNG file saved successfully', 'octo-print-designer'),
+            'file_path' => $file_path,
+            'file_url' => $file_url,
+            'design_id' => $design_id
+        ));
     }
 
     // 🎯 CLEAN SYSTEM: Design loading functionality moved to designer.bundle.js
