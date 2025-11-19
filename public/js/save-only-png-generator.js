@@ -132,18 +132,23 @@ class SaveOnlyPNGGenerator {
             this.pngEngine = {
                 exportEngine: {
                     exportForPrintMachine: async (options = {}) => {
-                        console.log('🔧 MINIMAL PNG: Exporting PRINT-READY PNG with template cropping...');
+                        console.log('🔧 DEBUG EXPORT: ==> exportForPrintMachine called with options:', options);
 
                         const canvas = designerWidget.fabricCanvas;
+                        console.log('🔧 DEBUG EXPORT: Canvas found:', !!canvas, 'Dimensions:', canvas ? `${canvas.width}x${canvas.height}` : 'N/A');
 
                         // 🎯 STEP 1: Get template print area from WordPress or URL
+                        console.log('🔧 DEBUG EXPORT: Step 1 - Getting template print area...');
                         let printArea = await this.getTemplatePrintArea();
                         if (!printArea) {
                             console.warn('⚠️ MINIMAL PNG: No template print area found, using fallback');
                             printArea = { x: 100, y: 100, width: 600, height: 400 };
+                            console.log('🔧 DEBUG EXPORT: Using fallback print area:', printArea);
+                        } else {
+                            console.log('🔧 DEBUG EXPORT: Got print area from template:', printArea);
                         }
 
-                        console.log('🎯 PRINT AREA:', printArea);
+                        console.log('🎯 DEBUG EXPORT: Final PRINT AREA coordinates:', printArea);
 
                         // 🚨 EMERGENCY DEBUG: Log ALL objects before filtering
                         const allObjects = canvas.getObjects();
@@ -227,9 +232,12 @@ class SaveOnlyPNGGenerator {
                         });
 
                         // 🎯 STEP 4: Create print-area-only canvas
+                        console.log('🔧 DEBUG EXPORT: Step 4 - Rendering canvas with visible design elements...');
                         canvas.renderAll();
 
                         const multiplier = options.dpi ? options.dpi / 72 : 4; // 300 DPI default
+                        console.log('🔧 DEBUG EXPORT: Using multiplier:', multiplier, 'for', options.dpi || 300, 'DPI');
+
                         const cropArea = {
                             left: printArea.x * multiplier,
                             top: printArea.y * multiplier,
@@ -237,28 +245,42 @@ class SaveOnlyPNGGenerator {
                             height: printArea.height * multiplier
                         };
 
-                        console.log('🎯 CROP AREA (with multiplier):', cropArea);
+                        console.log('🎯 DEBUG EXPORT: CROP AREA calculation:');
+                        console.log('  - Print area (base):', printArea);
+                        console.log('  - Multiplier:', multiplier);
+                        console.log('  - Crop area (scaled):', cropArea);
 
                         // Export full canvas first
+                        console.log('🔧 DEBUG EXPORT: Step 5 - Exporting full canvas to dataURL...');
                         const fullCanvasDataURL = canvas.toDataURL({
                             format: 'png',
                             quality: options.quality || 1.0,
                             multiplier: multiplier
                         });
+                        console.log('🔧 DEBUG EXPORT: Full canvas dataURL length:', fullCanvasDataURL ? fullCanvasDataURL.length : 'NULL');
 
                         // 🎯 STEP 5: Crop to print area using canvas manipulation
+                        console.log('🔧 DEBUG EXPORT: Step 6 - Cropping to print area...');
                         const croppedDataURL = await this.cropImageToArea(fullCanvasDataURL, cropArea);
+                        console.log('🔧 DEBUG EXPORT: Cropped dataURL result:', croppedDataURL ? `${croppedDataURL.length} chars` : 'NULL');
 
                         // 🎯 STEP 6: Restore visibility of hidden objects
+                        console.log('🔧 DEBUG EXPORT: Step 7 - Restoring hidden objects visibility...');
                         hiddenObjects.forEach(obj => {
                             obj.visible = true;
                         });
                         canvas.renderAll();
 
-                        console.log('✅ MINIMAL PNG: Print-ready PNG exported successfully with print area cropping');
-                        console.log(`🎯 FINAL PNG SIZE: ${printArea.width}x${printArea.height}px (print area only)`);
-
-                        return croppedDataURL;
+                        if (croppedDataURL && croppedDataURL.length > 100) {
+                            console.log('✅ DEBUG EXPORT: Print-ready PNG exported successfully!');
+                            console.log(`🎯 FINAL PNG SIZE: ${printArea.width}x${printArea.height}px (print area only)`);
+                            console.log('🎯 Final dataURL length:', croppedDataURL.length);
+                            return croppedDataURL;
+                        } else {
+                            console.error('❌ DEBUG EXPORT: Cropped PNG is empty or invalid!');
+                            console.log('❌ DEBUG EXPORT: cropImageToArea returned:', croppedDataURL);
+                            return null;
+                        }
                     },
                     printAreaPx: { width: 800, height: 600 },
                     printAreaMm: { width: 200, height: 150 },
@@ -1299,6 +1321,14 @@ class SaveOnlyPNGGenerator {
      */
     async getTemplatePrintArea() {
         try {
+            console.log('🔍 DEBUG PRINT AREA: Starting print area detection...');
+
+            // Get current canvas dimensions for coordinate transformation
+            const designerWidget = window.designerInstance || window.designerWidgetInstance;
+            const currentCanvasWidth = designerWidget?.fabricCanvas?.width || 656;
+            const currentCanvasHeight = designerWidget?.fabricCanvas?.height || 420;
+            console.log('🔍 DEBUG PRINT AREA: Current canvas dimensions:', { width: currentCanvasWidth, height: currentCanvasHeight });
+
             // Method 1: Try to get template ID from multiple sources
             const templateId = this.getCurrentTemplateId();
 
@@ -1308,6 +1338,7 @@ class SaveOnlyPNGGenerator {
                 // Try to get template data from WordPress
                 const config = window.octo_print_designer_config;
                 if (config && config.ajax_url && config.nonce) {
+                    console.log('🔍 DEBUG PRINT AREA: Making WordPress AJAX request...');
                     const response = await fetch(config.ajax_url, {
                         method: 'POST',
                         headers: {
@@ -1321,10 +1352,16 @@ class SaveOnlyPNGGenerator {
                     });
 
                     const result = await response.json();
+                    console.log('🔍 DEBUG PRINT AREA: WordPress AJAX response:', result);
                     if (result.success && result.data.printable_area_px) {
                         console.log('✅ PRINT AREA: Retrieved from WordPress:', result.data.printable_area_px);
+                        console.log('🔍 DEBUG PRINT AREA: Original template dimensions should be 800x600');
                         return result.data.printable_area_px;
+                    } else {
+                        console.log('❌ DEBUG PRINT AREA: WordPress AJAX failed or no printable_area_px');
                     }
+                } else {
+                    console.log('❌ DEBUG PRINT AREA: WordPress config missing');
                 }
             }
 
@@ -1333,17 +1370,32 @@ class SaveOnlyPNGGenerator {
             if (templateElement && templateElement.dataset.printArea) {
                 const printArea = JSON.parse(templateElement.dataset.printArea);
                 console.log('✅ PRINT AREA: Retrieved from DOM:', printArea);
+                console.log('🔍 DEBUG PRINT AREA: DOM print area coordinates:', printArea);
                 return printArea;
             }
 
             // Method 3: Check for existing high-DPI engine data
             if (window.highDPIPrintExportEngine && window.highDPIPrintExportEngine.printAreaPx) {
                 console.log('✅ PRINT AREA: Retrieved from existing engine:', window.highDPIPrintExportEngine.printAreaPx);
+                console.log('🔍 DEBUG PRINT AREA: High-DPI engine coordinates:', window.highDPIPrintExportEngine.printAreaPx);
                 return window.highDPIPrintExportEngine.printAreaPx;
             }
 
+            // Method 4: Use safe zone data from designer widget
+            console.log('🔍 DEBUG PRINT AREA: Checking for safe zone data in designer widget...');
+            const safeZoneData = this.getSafeZoneFromDesigner();
+            if (safeZoneData) {
+                console.log('✅ DEBUG PRINT AREA: Found safe zone data:', safeZoneData);
+                // Transform safe zone to print area coordinates
+                const transformedPrintArea = this.transformSafeZoneToPrintArea(safeZoneData, currentCanvasWidth, currentCanvasHeight);
+                console.log('🔍 DEBUG PRINT AREA: Transformed to print area:', transformedPrintArea);
+                return transformedPrintArea;
+            }
+
             console.warn('⚠️ PRINT AREA: No template data found, using intelligent fallback');
-            return this.calculateIntelligentPrintArea();
+            const fallbackArea = this.calculateIntelligentPrintArea();
+            console.log('🔍 DEBUG PRINT AREA: Using fallback area:', fallbackArea);
+            return fallbackArea;
 
         } catch (error) {
             console.error('❌ PRINT AREA: Error retrieving template data:', error);
@@ -1507,6 +1559,98 @@ class SaveOnlyPNGGenerator {
     }
 
     /**
+     * 🔍 Get safe zone data from designer widget
+     */
+    getSafeZoneFromDesigner() {
+        try {
+            console.log('🔍 DEBUG SAFE ZONE: Checking designer widget for safe zone data...');
+
+            const designerWidget = window.designerInstance || window.designerWidgetInstance;
+            if (!designerWidget) {
+                console.log('❌ DEBUG SAFE ZONE: No designer widget found');
+                return null;
+            }
+
+            // Check for current view's safe zone
+            const currentView = designerWidget.currentViewId || designerWidget.activeView;
+            console.log('🔍 DEBUG SAFE ZONE: Current view ID:', currentView);
+
+            // Try to get template variations data
+            if (designerWidget.templateData && designerWidget.templateData.variations) {
+                console.log('🔍 DEBUG SAFE ZONE: Found template data variations');
+                for (const [variationId, variation] of Object.entries(designerWidget.templateData.variations)) {
+                    console.log(`🔍 DEBUG SAFE ZONE: Checking variation ${variationId}:`, variation);
+                    if (variation.views && variation.views[currentView]) {
+                        const viewData = variation.views[currentView];
+                        console.log('🔍 DEBUG SAFE ZONE: Found view data for', currentView, ':', viewData);
+                        if (viewData.safeZone) {
+                            console.log('✅ DEBUG SAFE ZONE: Found safe zone in view data:', viewData.safeZone);
+                            return viewData.safeZone;
+                        }
+                    }
+                }
+            }
+
+            // Check print zone data from canvas analysis
+            if (window.designerInstance && window.designerInstance.printZoneData) {
+                console.log('🔍 DEBUG SAFE ZONE: Found print zone data:', window.designerInstance.printZoneData);
+                return window.designerInstance.printZoneData.using || window.designerInstance.printZoneData.safeZone;
+            }
+
+            console.log('❌ DEBUG SAFE ZONE: No safe zone data found');
+            return null;
+        } catch (error) {
+            console.error('❌ DEBUG SAFE ZONE: Error getting safe zone data:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 🔄 Transform safe zone coordinates to print area
+     */
+    transformSafeZoneToPrintArea(safeZone, currentCanvasWidth, currentCanvasHeight) {
+        try {
+            console.log('🔄 DEBUG TRANSFORM: Starting coordinate transformation...');
+            console.log('🔄 DEBUG TRANSFORM: Safe zone input:', safeZone);
+            console.log('🔄 DEBUG TRANSFORM: Current canvas:', { width: currentCanvasWidth, height: currentCanvasHeight });
+
+            // Original template dimensions (from database analysis)
+            const originalCanvasWidth = 800;
+            const originalCanvasHeight = 600;
+            console.log('🔄 DEBUG TRANSFORM: Original template dimensions:', { width: originalCanvasWidth, height: originalCanvasHeight });
+
+            // Calculate scale factors
+            const scaleX = currentCanvasWidth / originalCanvasWidth;
+            const scaleY = currentCanvasHeight / originalCanvasHeight;
+            console.log('🔄 DEBUG TRANSFORM: Scale factors:', { scaleX, scaleY });
+
+            // Transform percentage coordinates to pixels for current canvas
+            // Safe zone left/top are percentages, width/height are pixels
+            const centerX = (safeZone.left / 100) * currentCanvasWidth;
+            const centerY = (safeZone.top / 100) * currentCanvasHeight;
+            const scaledWidth = safeZone.width * scaleX;
+            const scaledHeight = safeZone.height * scaleY;
+
+            // Convert from center-based to top-left based coordinates
+            const printArea = {
+                x: centerX - (scaledWidth / 2),
+                y: centerY - (scaledHeight / 2),
+                width: scaledWidth,
+                height: scaledHeight
+            };
+
+            console.log('🔄 DEBUG TRANSFORM: Center coordinates:', { centerX, centerY });
+            console.log('🔄 DEBUG TRANSFORM: Scaled dimensions:', { scaledWidth, scaledHeight });
+            console.log('🔄 DEBUG TRANSFORM: Final print area:', printArea);
+
+            return printArea;
+        } catch (error) {
+            console.error('❌ DEBUG TRANSFORM: Error transforming coordinates:', error);
+            return null;
+        }
+    }
+
+    /**
      * Validates print area coordinates for production safety
      */
     validatePrintAreaCoordinates(area, fabricCanvas) {
@@ -1567,16 +1711,40 @@ class SaveOnlyPNGGenerator {
      */
     async cropImageToArea(dataURL, cropArea) {
         return new Promise((resolve) => {
+            console.log('✂️ DEBUG CROP: Starting image cropping...');
+            console.log('✂️ DEBUG CROP: Input dataURL length:', dataURL ? dataURL.length : 'NULL');
+            console.log('✂️ DEBUG CROP: Crop area:', cropArea);
+
             const img = new Image();
             img.onload = () => {
+                console.log('✂️ DEBUG CROP: Image loaded successfully');
+                console.log('✂️ DEBUG CROP: Image dimensions:', { width: img.width, height: img.height });
+
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
+
+                // Validate crop area against image dimensions
+                if (cropArea.left < 0 || cropArea.top < 0) {
+                    console.warn('✂️ DEBUG CROP: WARNING - Crop area has negative coordinates');
+                }
+                if (cropArea.left + cropArea.width > img.width || cropArea.top + cropArea.height > img.height) {
+                    console.warn('✂️ DEBUG CROP: WARNING - Crop area exceeds image bounds');
+                    console.log('✂️ DEBUG CROP: Image size vs crop area:', {
+                        imageSize: `${img.width}x${img.height}`,
+                        cropBounds: `${cropArea.left + cropArea.width}x${cropArea.top + cropArea.height}`
+                    });
+                }
 
                 // Set canvas to crop area size
                 canvas.width = cropArea.width;
                 canvas.height = cropArea.height;
+                console.log('✂️ DEBUG CROP: Created crop canvas:', { width: canvas.width, height: canvas.height });
 
                 // Draw cropped section
+                console.log('✂️ DEBUG CROP: Drawing image section...');
+                console.log('  - Source (sx, sy, sw, sh):', cropArea.left, cropArea.top, cropArea.width, cropArea.height);
+                console.log('  - Destination (dx, dy, dw, dh):', 0, 0, cropArea.width, cropArea.height);
+
                 ctx.drawImage(
                     img,
                     cropArea.left, cropArea.top, cropArea.width, cropArea.height,
@@ -1584,9 +1752,23 @@ class SaveOnlyPNGGenerator {
                 );
 
                 const croppedDataURL = canvas.toDataURL('image/png', 1.0);
-                console.log('✂️ CROP: Image cropped to print area successfully');
+                console.log('✂️ DEBUG CROP: Generated cropped dataURL length:', croppedDataURL ? croppedDataURL.length : 'NULL');
+
+                if (croppedDataURL && croppedDataURL.length > 100) {
+                    console.log('✅ CROP: Image cropped to print area successfully');
+                } else {
+                    console.error('❌ CROP: Failed to generate valid cropped image');
+                }
+
                 resolve(croppedDataURL);
             };
+
+            img.onerror = (error) => {
+                console.error('❌ DEBUG CROP: Image loading failed:', error);
+                resolve(null);
+            };
+
+            console.log('✂️ DEBUG CROP: Setting image source...');
             img.src = dataURL;
         });
     }
