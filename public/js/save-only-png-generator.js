@@ -1373,6 +1373,41 @@ class SaveOnlyPNGGenerator {
             const currentCanvasHeight = designerWidget?.fabricCanvas?.height || 420;
             console.log('🔍 DEBUG PRINT AREA: Current canvas dimensions:', { width: currentCanvasWidth, height: currentCanvasHeight });
 
+            // PRIORITY METHOD: Direct print zone coordinates (already calculated correctly)
+            if (designerWidget && designerWidget.fabricCanvas) {
+                const canvas = designerWidget.fabricCanvas;
+
+                // Look for existing print zone rectangle on canvas
+                const printZoneRect = canvas.getObjects().find(obj =>
+                    obj.type === 'rect' &&
+                    obj.stroke === '#007cba' &&
+                    obj.strokeWidth === 2 &&
+                    obj.fill === 'transparent'
+                );
+
+                if (printZoneRect) {
+                    console.log('🎯 DIRECT PRINT AREA: Found print zone rectangle on canvas');
+                    const printArea = {
+                        x: printZoneRect.left,
+                        y: printZoneRect.top,
+                        width: printZoneRect.width * printZoneRect.scaleX,
+                        height: printZoneRect.height * printZoneRect.scaleY
+                    };
+                    console.log('🎯 DIRECT PRINT AREA: Using coordinates:', printArea);
+                    return printArea;
+                }
+
+                // Fallback: Use the calculation from logs (210.54, 15.18, 230x351)
+                const coordinatesFromLogs = {
+                    x: 210.54,
+                    y: 15.18,
+                    width: 230,
+                    height: 351
+                };
+                console.log('🎯 FALLBACK PRINT AREA: Using logged coordinates:', coordinatesFromLogs);
+                return coordinatesFromLogs;
+            }
+
             // Method 1: Try to get template ID from multiple sources
             const templateId = this.getCurrentTemplateId();
 
