@@ -1874,9 +1874,9 @@ class DesignerWidget {
     setupModalEvents() {
         if (!this.saveDesignModal) return;
 
-        // Save button in footer
+        // Save button in footer - PNG generation instead of save modal
         const saveButton = this.container.querySelector('.designer-editor footer .designer-action-button');
-        saveButton.addEventListener('click', () => this.showSaveModal());
+        saveButton.addEventListener('click', () => this.generateAndShowPNG());
 
         // Modal events
         this.modalSaveButton.addEventListener('click', () => this.saveDesign());
@@ -1931,6 +1931,76 @@ class DesignerWidget {
     hideModal() {
         this.saveDesignModal.classList.remove('loading');
         this.saveDesignModal.classList.add('hidden');
+    }
+
+    async generateAndShowPNG() {
+        try {
+            console.log('🎨 PNG Generation: Starting PNG generation from save button...');
+
+            // Check if PNG generator is available
+            if (typeof window.generatePNGForDownload === 'function') {
+                console.log('✅ PNG Generation: generatePNGForDownload function found');
+
+                // Generate PNG using the existing function
+                const pngDataUrl = await window.generatePNGForDownload();
+
+                if (pngDataUrl) {
+                    this.displayPNGPreview(pngDataUrl);
+                } else {
+                    throw new Error('PNG generation returned empty result');
+                }
+            } else {
+                throw new Error('PNG generation function not available');
+            }
+        } catch (error) {
+            console.error('❌ PNG Generation Error:', error);
+            alert('Failed to generate PNG: ' + error.message);
+        }
+    }
+
+    displayPNGPreview(pngDataUrl) {
+        // Create modal overlay for PNG preview
+        const pngModal = document.createElement('div');
+        pngModal.className = 'designer-modal png-preview-modal';
+        pngModal.innerHTML = `
+            <div class="designer-modal-overlay"></div>
+            <div class="designer-modal-content" style="max-width: 80%; max-height: 80%;">
+                <div class="designer-modal-header">
+                    <h3>Generated PNG Preview</h3>
+                    <button type="button" class="designer-modal-close">
+                        <img src="${window.octo_print_designer_url}/public/img/close.svg" alt="Close Modal" />
+                    </button>
+                </div>
+                <div class="designer-modal-body" style="text-align: center; padding: 20px;">
+                    <img src="${pngDataUrl}" alt="Generated PNG" style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px;" />
+                </div>
+                <div class="designer-modal-footer">
+                    <a href="${pngDataUrl}" download="design.png" class="designer-action-button">
+                        Download PNG
+                    </a>
+                    <button type="button" class="designer-action-button designer-modal-close" style="margin-left: 10px;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add to DOM
+        document.body.appendChild(pngModal);
+
+        // Setup close events
+        const closeButtons = pngModal.querySelectorAll('.designer-modal-close');
+        const overlay = pngModal.querySelector('.designer-modal-overlay');
+
+        const closePNGModal = () => {
+            document.body.removeChild(pngModal);
+        };
+
+        closeButtons.forEach(button => button.addEventListener('click', closePNGModal));
+        overlay.addEventListener('click', closePNGModal);
+
+        // Show modal
+        setTimeout(() => pngModal.classList.add('show'), 10);
     }
 
     async saveDesign() {
