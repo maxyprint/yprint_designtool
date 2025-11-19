@@ -2114,7 +2114,8 @@ class SaveOnlyPNGGenerator {
                         png_url: 'debug://improved-export',
                         design_id: improvedPngData.design_id,
                         debug_mode: true,
-                        export_method: 'improved'
+                        export_method: 'improved',
+                        dataUrl: improvedPngData.print_png  // ← FIX: Include actual PNG data!
                     };
                 }
             }
@@ -2126,12 +2127,13 @@ class SaveOnlyPNGGenerator {
         console.log('🎨 DEBUG MODE: Displaying original PNG...');
         this.displayPNGDebugModal(pngData);
 
-        // Return mock success to prevent errors
+        // Return success with actual PNG data for validation
         return {
             success: true,
             png_url: 'debug://local-display',
             design_id: pngData.design_id,
-            debug_mode: true
+            debug_mode: true,
+            dataUrl: pngData.print_png  // ← FIX: Include actual PNG data!
         };
     }
 
