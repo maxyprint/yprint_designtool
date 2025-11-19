@@ -226,6 +226,20 @@ class SaveOnlyPNGGenerator {
                         canvas.renderAll();
 
                         const multiplier = options.dpi ? options.dpi / 72 : 4; // 300 DPI default
+
+                        // 🔍 DEBUG EXPORT: Detailed print area validation
+                        console.log('🔧 DEBUG EXPORT: Print area validation:', {
+                            printArea_raw: printArea,
+                            printArea_type: typeof printArea,
+                            printArea_x: printArea?.x,
+                            printArea_y: printArea?.y,
+                            printArea_width: printArea?.width,
+                            printArea_height: printArea?.height,
+                            multiplier: multiplier,
+                            canvas_width: canvas.width,
+                            canvas_height: canvas.height
+                        });
+
                         const cropArea = {
                             left: printArea.x * multiplier,
                             top: printArea.y * multiplier,
@@ -235,6 +249,21 @@ class SaveOnlyPNGGenerator {
 
                         console.log('🎯 CROP AREA (with multiplier):', cropArea);
 
+                        // 🔍 DEBUG EXPORT: Validate crop area bounds
+                        const fullCanvasWidth = canvas.width * multiplier;
+                        const fullCanvasHeight = canvas.height * multiplier;
+                        console.log('🔧 DEBUG EXPORT: Canvas vs crop validation:', {
+                            full_canvas: `${fullCanvasWidth}x${fullCanvasHeight}`,
+                            crop_area: `${cropArea.left},${cropArea.top} ${cropArea.width}x${cropArea.height}`,
+                            crop_right: cropArea.left + cropArea.width,
+                            crop_bottom: cropArea.top + cropArea.height,
+                            exceeds_width: (cropArea.left + cropArea.width) > fullCanvasWidth,
+                            exceeds_height: (cropArea.top + cropArea.height) > fullCanvasHeight,
+                            crop_valid: cropArea.left >= 0 && cropArea.top >= 0 &&
+                                       (cropArea.left + cropArea.width) <= fullCanvasWidth &&
+                                       (cropArea.top + cropArea.height) <= fullCanvasHeight
+                        });
+
                         // Export full canvas first
                         const fullCanvasDataURL = canvas.toDataURL({
                             format: 'png',
@@ -242,8 +271,24 @@ class SaveOnlyPNGGenerator {
                             multiplier: multiplier
                         });
 
+                        // 🔍 DEBUG EXPORT: Check full canvas data before cropping
+                        console.log('🔧 DEBUG EXPORT: Full canvas export validation:', {
+                            fullCanvasDataURL_exists: !!fullCanvasDataURL,
+                            fullCanvasDataURL_length: fullCanvasDataURL?.length || 0,
+                            fullCanvasDataURL_starts_with_data: fullCanvasDataURL?.startsWith?.('data:image') || false,
+                            fullCanvasDataURL_preview: fullCanvasDataURL?.substring(0, 100) || 'NULL'
+                        });
+
                         // 🎯 STEP 5: Crop to print area using canvas manipulation
                         const croppedDataURL = await this.cropImageToArea(fullCanvasDataURL, cropArea);
+
+                        // 🔍 DEBUG EXPORT: Check cropped result
+                        console.log('🔧 DEBUG EXPORT: Cropped PNG validation:', {
+                            croppedDataURL_exists: !!croppedDataURL,
+                            croppedDataURL_length: croppedDataURL?.length || 0,
+                            croppedDataURL_starts_with_data: croppedDataURL?.startsWith?.('data:image') || false,
+                            croppedDataURL_preview: croppedDataURL?.substring(0, 100) || 'NULL'
+                        });
 
                         // 🎯 STEP 6: Restore visibility of hidden objects
                         hiddenObjects.forEach(obj => {
@@ -1483,9 +1528,62 @@ class SaveOnlyPNGGenerator {
      * ✂️ IMAGE CROPPING - Crop canvas export to specific area
      */
     async cropImageToArea(dataURL, cropArea) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
+            console.log('✂️ DEBUG CROP: Starting image crop operation', {
+                dataURL_exists: !!dataURL,
+                dataURL_length: dataURL?.length || 0,
+                cropArea: cropArea,
+                cropArea_valid: !!(cropArea?.left !== undefined && cropArea?.top !== undefined && cropArea?.width > 0 && cropArea?.height > 0)
+            });
+
+            if (!dataURL) {
+                console.error('❌ DEBUG CROP: No dataURL provided');
+                resolve(null);
+                return;
+            }
+
+            if (!cropArea || cropArea.width <= 0 || cropArea.height <= 0) {
+                console.error('❌ DEBUG CROP: Invalid crop area:', cropArea);
+                resolve(null);
+                return;
+            }
+
             const img = new Image();
+
+            img.onerror = (error) => {
+                console.error('❌ DEBUG CROP: Image failed to load:', error);
+                resolve(null);
+            };
+
             img.onload = () => {
+                console.log('✅ DEBUG CROP: Image loaded successfully', {
+                    image_width: img.width,
+                    image_height: img.height,
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight
+                });
+
+                // Validate crop area against image bounds
+                const cropValid = cropArea.left >= 0 && cropArea.top >= 0 &&
+                                 (cropArea.left + cropArea.width) <= img.width &&
+                                 (cropArea.top + cropArea.height) <= img.height;
+
+                console.log('🔍 DEBUG CROP: Crop bounds validation:', {
+                    crop_left: cropArea.left,
+                    crop_top: cropArea.top,
+                    crop_right: cropArea.left + cropArea.width,
+                    crop_bottom: cropArea.top + cropArea.height,
+                    image_width: img.width,
+                    image_height: img.height,
+                    crop_valid: cropValid,
+                    exceeds_right: (cropArea.left + cropArea.width) > img.width,
+                    exceeds_bottom: (cropArea.top + cropArea.height) > img.height
+                });
+
+                if (!cropValid) {
+                    console.warn('⚠️ DEBUG CROP: WARNING - Crop area exceeds image bounds, proceeding anyway');
+                }
+
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
 
@@ -1493,17 +1591,47 @@ class SaveOnlyPNGGenerator {
                 canvas.width = cropArea.width;
                 canvas.height = cropArea.height;
 
-                // Draw cropped section
-                ctx.drawImage(
-                    img,
-                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
-                    0, 0, cropArea.width, cropArea.height
-                );
+                console.log('✂️ DEBUG CROP: Drawing cropped section', {
+                    canvas_size: `${canvas.width}x${canvas.height}`,
+                    drawImage_params: {
+                        source_x: cropArea.left,
+                        source_y: cropArea.top,
+                        source_width: cropArea.width,
+                        source_height: cropArea.height,
+                        dest_x: 0,
+                        dest_y: 0,
+                        dest_width: cropArea.width,
+                        dest_height: cropArea.height
+                    }
+                });
 
-                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
-                console.log('✂️ CROP: Image cropped to print area successfully');
-                resolve(croppedDataURL);
+                try {
+                    // Draw cropped section
+                    ctx.drawImage(
+                        img,
+                        cropArea.left, cropArea.top, cropArea.width, cropArea.height,
+                        0, 0, cropArea.width, cropArea.height
+                    );
+
+                    const croppedDataURL = canvas.toDataURL('image/png', 1.0);
+
+                    console.log('✅ DEBUG CROP: Image cropped successfully', {
+                        output_dataURL_length: croppedDataURL?.length || 0,
+                        output_starts_with_data: croppedDataURL?.startsWith('data:image') || false
+                    });
+
+                    if (!croppedDataURL || croppedDataURL.length < 100) {
+                        console.error('❌ DEBUG CROP: Cropped PNG is empty or invalid!');
+                        resolve(null);
+                    } else {
+                        resolve(croppedDataURL);
+                    }
+                } catch (drawError) {
+                    console.error('❌ DEBUG CROP: Error during drawImage:', drawError);
+                    resolve(null);
+                }
             };
+
             img.src = dataURL;
         });
     }
