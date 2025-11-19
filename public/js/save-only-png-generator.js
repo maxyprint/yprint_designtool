@@ -87,13 +87,17 @@ class SaveOnlyPNGGenerator {
                     attempts++;
                     console.log(`⏳ SAVE-ONLY PNG: Waiting for PNG integration... (attempt ${attempts}/${maxAttempts})`);
 
-                    // 🔧 ENHANCED DETECTION: Log what's available for faster debugging
+                    // 🔧 ENHANCED DETECTION: Check both possible designer instance names
+                    const designerWidget = window.designerInstance || window.designerWidgetInstance;
+                    const fabricCanvas = designerWidget?.fabricCanvas || designerWidget?.canvas;
+
                     console.log('🔍 Detection status:', {
                         pngIntegration: !!pngIntegration,
                         highDPIEngine: !!highDPIEngine,
-                        designerWidget: !!window.designerWidgetInstance,
-                        fabricCanvas: !!window.designerWidgetInstance?.fabricCanvas,
-                        fabric: !!window.fabric
+                        designerWidget: !!designerWidget,
+                        fabricCanvas: !!fabricCanvas,
+                        fabric: !!window.fabric,
+                        availableGlobals: Object.keys(window).filter(key => key.includes('designer') || key.includes('Designer'))
                     });
 
                     // After 3 attempts (1.5 seconds), trigger fallback loader if available
@@ -122,7 +126,7 @@ class SaveOnlyPNGGenerator {
 
         // Check if we have fabric and a designer instance available
         const fabric = window.fabric;
-        const designerWidget = window.designerWidgetInstance;
+        const designerWidget = window.designerInstance || window.designerWidgetInstance;
 
         if (fabric && designerWidget && designerWidget.fabricCanvas) {
             this.pngEngine = {
@@ -1545,9 +1549,16 @@ class SaveOnlyPNGGenerator {
     getDesignDataFromCanvas() {
         try {
             // Method 1: Via designerInstance
+            if (window.designerInstance && window.designerInstance.fabricCanvas) {
+                const canvas = window.designerInstance.fabricCanvas;
+                console.log('✅ SAVE-ONLY PNG: Found canvas via designerInstance.fabricCanvas');
+                return this.extractElementsFromFabricCanvas(canvas);
+            }
+
+            // Method 1b: Fallback to canvas property (legacy support)
             if (window.designerInstance && window.designerInstance.canvas) {
                 const canvas = window.designerInstance.canvas;
-                console.log('✅ SAVE-ONLY PNG: Found canvas via designerInstance');
+                console.log('✅ SAVE-ONLY PNG: Found canvas via designerInstance.canvas (legacy)');
                 return this.extractElementsFromFabricCanvas(canvas);
             }
 
