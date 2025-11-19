@@ -1066,6 +1066,85 @@ class SaveOnlyPNGGenerator {
             console.log('*** START ENHANCED EXPORT LOGIC ***');
             console.log('🖨️ SAVE-ONLY PNG: Generating enhanced PNG with metadata...');
 
+            // 🔧 FIX: Check for minimal PNG engine's exportForPrintMachine first
+            if (typeof this.pngEngine.exportEngine.exportForPrintMachine === 'function') {
+                console.log('✅ SAVE-ONLY PNG: Using minimal PNG engine exportForPrintMachine');
+
+                // Add timeout to prevent hanging
+                console.log('🔄 ENHANCED PNG: Starting Promise.race with 10s timeout...');
+                this.activeGeneration = {
+                    type: 'enhanced_png',
+                    startTime: Date.now(),
+                    designData: designData
+                };
+
+                const minimalResult = await Promise.race([
+                    this.pngEngine.exportEngine.exportForPrintMachine({
+                        dpi: 300,
+                        quality: 1.0,
+                        enableBleed: false,
+                        debugMode: true
+                    }),
+                    new Promise((_, reject) =>
+                        setTimeout(() => {
+                            console.log('>>> 10s TIMEOUT REACHED: Minimal PNG generation too slow <<<');
+                            reject(new Error('Minimal PNG timeout - try reducing design complexity'));
+                        }, 10000)
+                    )
+                ]);
+
+                // 🔧 FIX: Handle minimal engine response (string dataURL)
+                if (minimalResult && typeof minimalResult === 'string' && minimalResult.length > 100) {
+                    console.log('🎯 MINIMAL PNG SUCCESS:', {
+                        dataUrl_length: minimalResult.length,
+                        dataUrl_preview: minimalResult.substring(0, 50) + '...'
+                    });
+
+                    // Create enhanced result object for minimal PNG
+                    const enhancedResult = {
+                        dataUrl: minimalResult,
+                        metadata: {
+                            width: this.pngEngine.exportEngine.printAreaPx?.width || 800,
+                            height: this.pngEngine.exportEngine.printAreaPx?.height || 600,
+                            dpi: 300,
+                            elementsCount: designData?.elements?.length || 0
+                        },
+                        printSpecifications: {
+                            printAreaPX: this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 },
+                            printAreaMM: this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }
+                        },
+                        templateMetadata: {
+                            template_id: this.pngEngine.exportEngine.currentTemplateId || 'minimal'
+                        }
+                    };
+
+                    // Store enhanced PNG with all metadata
+                    const enhancedPngData = {
+                        design_id: this.generateDesignId(designData),
+                        print_png: enhancedResult.dataUrl,
+                        save_type: saveType,
+                        order_id: orderId,
+                        generated_at: new Date().toISOString(),
+                        print_area_px: JSON.stringify(enhancedResult.printSpecifications.printAreaPX),
+                        print_area_mm: JSON.stringify(enhancedResult.printSpecifications.printAreaMM),
+                        template_id: enhancedResult.templateMetadata?.template_id || this.pngEngine.exportEngine.currentTemplateId,
+                        metadata: JSON.stringify({
+                            ...enhancedResult.metadata,
+                            templateMetadata: enhancedResult.templateMetadata,
+                            printSpecifications: enhancedResult.printSpecifications
+                        })
+                    };
+
+                    return await this.storePNGInDatabase(enhancedPngData);
+                } else {
+                    console.error('❌ MINIMAL PNG VALIDATION FAILED:', {
+                        minimalResult_exists: !!minimalResult,
+                        minimalResult_type: typeof minimalResult,
+                        minimalResult_length: minimalResult?.length || 0
+                    });
+                }
+            }
+
             // Check if enhanced metadata export is available
             if (typeof this.pngEngine.exportEngine.exportWithTemplateMetadata === 'function') {
                 console.log('✅ SAVE-ONLY PNG: Using template metadata enhanced export');
@@ -1138,8 +1217,8 @@ class SaveOnlyPNGGenerator {
         } catch (error) {
             console.log('🚨 ENHANCED PNG CATCH BLOCK REACHED!');
             console.error('❌ ENHANCED PNG GENERATION: Failed:', error);
-            if (error.message === 'Enhanced PNG timeout') {
-                console.log('⏰ ENHANCED PNG: Timed out after 5 seconds, falling back to standard generation');
+            if (error.message === 'Enhanced PNG timeout' || error.message === 'Minimal PNG timeout') {
+                console.log('⏰ ENHANCED PNG: Timed out, falling back to standard generation');
             }
             console.log('🔄 ENHANCED PNG: Returning null to trigger fallback generation with Q1/Q3 logs');
             return null;
