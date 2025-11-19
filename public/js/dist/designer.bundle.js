@@ -2189,7 +2189,8 @@ class DesignerWidget {
     
             // Add template background with same settings as main canvas
             const backgroundImage = await Image.fromURL(view.image_url);
-            backgroundImage.set({
+            if (backgroundImage) {
+                backgroundImage.set({
                 ...view.imageZone,
                 selectable: false,
                 evented: false,
@@ -2199,17 +2200,18 @@ class DesignerWidget {
                 originY: 'center'
             });
     
-            // Add color overlay if enabled
-            if (view.colorOverlayEnabled) {
-                backgroundImage.filters.push(new fabric.Image.filters.BlendColor({
-                    color: variation?.color,
-                    mode: 'multiply',
-                    alpha: view.overlayOpacity || 0.5
-                }));
-                backgroundImage.applyFilters();
+                // Add color overlay if enabled
+                if (view.colorOverlayEnabled) {
+                    backgroundImage.filters.push(new fabric.Image.filters.BlendColor({
+                        color: variation?.color,
+                        mode: 'multiply',
+                        alpha: view.overlayOpacity || 0.5
+                    }));
+                    backgroundImage.applyFilters();
+                }
+
+                tempCanvas.add(backgroundImage);
             }
-    
-            tempCanvas.add(backgroundImage);
     
             // Get current user images for this view
             const key = `${this.currentVariation}_${this.currentView}`;
