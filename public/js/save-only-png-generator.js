@@ -2058,6 +2058,48 @@ if (document.readyState === 'loading') {
     new SaveOnlyPNGGenerator();
 }
 
+// 🎯 OFFICIAL PNG GENERATION FUNCTION - Required by save button
+window.generatePNGForDownload = async function() {
+    try {
+        console.log('🎨 Official PNG Generation: Starting live canvas export...');
+
+        // Check if PNG generator is available and initialized
+        if (!window.saveOnlyPNGGenerator) {
+            throw new Error('PNG Generator not initialized');
+        }
+
+        if (!window.saveOnlyPNGGenerator.pngEngine) {
+            throw new Error('PNG Engine not loaded');
+        }
+
+        // Get current live design data from canvas
+        const designData = window.saveOnlyPNGGenerator.getCurrentDesignData();
+        if (!designData || !designData.elements || designData.elements.length === 0) {
+            throw new Error('No design elements found on canvas');
+        }
+
+        console.log(`✅ Official PNG Generation: Found ${designData.elements.length} design elements`);
+
+        // Generate enhanced PNG with 300 DPI, transparent background, design elements only
+        const enhancedResult = await window.saveOnlyPNGGenerator.generateEnhancedPNG(
+            designData,
+            'save_button_request'
+        );
+
+        // Extract clean PNG data URL from enhanced result
+        if (enhancedResult && enhancedResult.dataUrl) {
+            console.log('🎯 Official PNG Generation: Success - PNG generated');
+            return enhancedResult.dataUrl;
+        } else {
+            throw new Error('PNG generation returned empty result');
+        }
+
+    } catch (error) {
+        console.error('❌ Official PNG Generation Error:', error);
+        throw error; // Re-throw for save button error handling
+    }
+};
+
 // 🧪 GLOBAL TEST FUNCTION - Easy access for testing
 window.testDesignSave = async function(designName = 'test_design') {
     console.log('🧪 Running comprehensive design save test...');
