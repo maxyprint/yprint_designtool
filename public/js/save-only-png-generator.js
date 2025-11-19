@@ -1754,7 +1754,6 @@ class SaveOnlyPNGGenerator {
      * ✂️ IMAGE CROPPING - Crop canvas export to specific area
      */
     async cropImageToArea(dataURL, cropArea) {
-<<<<<<< HEAD
         return new Promise((resolve, reject) => {
             console.log('✂️ DEBUG CROP: Starting image crop operation', {
                 dataURL_exists: !!dataURL,
@@ -1774,12 +1773,6 @@ class SaveOnlyPNGGenerator {
                 resolve(null);
                 return;
             }
-=======
-        return new Promise((resolve) => {
-            console.log('✂️ DEBUG CROP: Starting image cropping...');
-            console.log('✂️ DEBUG CROP: Input dataURL length:', dataURL ? dataURL.length : 'NULL');
-            console.log('✂️ DEBUG CROP: Crop area:', cropArea);
->>>>>>> 49b3729802b032f3745c3c0ccc2e2063e7e8c98b
 
             const img = new Image();
 
@@ -1789,7 +1782,6 @@ class SaveOnlyPNGGenerator {
             };
 
             img.onload = () => {
-<<<<<<< HEAD
                 console.log('✅ DEBUG CROP: Image loaded successfully', {
                     image_width: img.width,
                     image_height: img.height,
@@ -1817,10 +1809,6 @@ class SaveOnlyPNGGenerator {
                 if (!cropValid) {
                     console.warn('⚠️ DEBUG CROP: WARNING - Crop area exceeds image bounds, proceeding anyway');
                 }
-=======
-                console.log('✂️ DEBUG CROP: Image loaded successfully');
-                console.log('✂️ DEBUG CROP: Image dimensions:', { width: img.width, height: img.height });
->>>>>>> 49b3729802b032f3745c3c0ccc2e2063e7e8c98b
 
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
@@ -1842,7 +1830,6 @@ class SaveOnlyPNGGenerator {
                 canvas.height = cropArea.height;
                 console.log('✂️ DEBUG CROP: Created crop canvas:', { width: canvas.width, height: canvas.height });
 
-<<<<<<< HEAD
                 console.log('✂️ DEBUG CROP: Drawing cropped section', {
                     canvas_size: `${canvas.width}x${canvas.height}`,
                     drawImage_params: {
@@ -1884,37 +1871,7 @@ class SaveOnlyPNGGenerator {
                 }
             };
 
-=======
-                // Draw cropped section
-                console.log('✂️ DEBUG CROP: Drawing image section...');
-                console.log('  - Source (sx, sy, sw, sh):', cropArea.left, cropArea.top, cropArea.width, cropArea.height);
-                console.log('  - Destination (dx, dy, dw, dh):', 0, 0, cropArea.width, cropArea.height);
-
-                ctx.drawImage(
-                    img,
-                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
-                    0, 0, cropArea.width, cropArea.height
-                );
-
-                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
-                console.log('✂️ DEBUG CROP: Generated cropped dataURL length:', croppedDataURL ? croppedDataURL.length : 'NULL');
-
-                if (croppedDataURL && croppedDataURL.length > 100) {
-                    console.log('✅ CROP: Image cropped to print area successfully');
-                } else {
-                    console.error('❌ CROP: Failed to generate valid cropped image');
-                }
-
-                resolve(croppedDataURL);
-            };
-
-            img.onerror = (error) => {
-                console.error('❌ DEBUG CROP: Image loading failed:', error);
-                resolve(null);
-            };
-
             console.log('✂️ DEBUG CROP: Setting image source...');
->>>>>>> 49b3729802b032f3745c3c0ccc2e2063e7e8c98b
             img.src = dataURL;
         });
     }
