@@ -1518,7 +1518,7 @@ class SaveOnlyPNGGenerator {
         console.log('🔍 window.enhancedJSONSystem exists:', !!window.enhancedJSONSystem);
         console.log('🔍 window.generateDesignData function:', window.generateDesignData);
 
-        // Get current design data from global function
+        // Priority 1: Try original generateDesignData function
         if (typeof window.generateDesignData === 'function') {
             console.log('✅ SAVE-ONLY PNG: generateDesignData function found, calling it...');
             const result = window.generateDesignData();
@@ -1526,9 +1526,120 @@ class SaveOnlyPNGGenerator {
             return result;
         }
 
-        console.warn('❌ SAVE-ONLY PNG: generateDesignData function not available');
+        // Priority 2: Direct fabric canvas access via designerInstance
+        console.log('🔄 SAVE-ONLY PNG: Falling back to direct fabric canvas access...');
+        const canvasData = this.getDesignDataFromCanvas();
+        if (canvasData && canvasData.elements && canvasData.elements.length > 0) {
+            console.log('✅ SAVE-ONLY PNG: Design data extracted from fabric canvas:', canvasData.elements.length, 'elements');
+            return canvasData;
+        }
+
+        console.warn('❌ SAVE-ONLY PNG: No design elements found via any method');
         console.log('🔍 Available window functions:', Object.keys(window).filter(key => key.includes('generate') || key.includes('design') || key.includes('JSON')));
         return null;
+    }
+
+    /**
+     * 🎨 Extract design data directly from fabric canvas
+     */
+    getDesignDataFromCanvas() {
+        try {
+            // Method 1: Via designerInstance
+            if (window.designerInstance && window.designerInstance.canvas) {
+                const canvas = window.designerInstance.canvas;
+                console.log('✅ SAVE-ONLY PNG: Found canvas via designerInstance');
+                return this.extractElementsFromFabricCanvas(canvas);
+            }
+
+            // Method 2: Direct canvas element lookup
+            const canvasElement = document.getElementById('octo-print-designer-canvas');
+            if (canvasElement && canvasElement.__fabric) {
+                const canvas = canvasElement.__fabric;
+                console.log('✅ SAVE-ONLY PNG: Found canvas via DOM element.__fabric');
+                return this.extractElementsFromFabricCanvas(canvas);
+            }
+
+            // Method 3: Global fabric canvas search
+            if (window.fabric && window.fabric.getCanvases) {
+                const canvases = window.fabric.getCanvases();
+                if (canvases && canvases.length > 0) {
+                    console.log('✅ SAVE-ONLY PNG: Found canvas via fabric.getCanvases()');
+                    return this.extractElementsFromFabricCanvas(canvases[0]);
+                }
+            }
+
+            console.warn('❌ SAVE-ONLY PNG: Could not find fabric canvas via any method');
+            return null;
+
+        } catch (error) {
+            console.error('❌ SAVE-ONLY PNG: Error extracting design data from canvas:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 🎯 Extract design elements from fabric canvas instance
+     */
+    extractElementsFromFabricCanvas(canvas) {
+        if (!canvas || typeof canvas.getObjects !== 'function') {
+            console.warn('❌ SAVE-ONLY PNG: Invalid canvas object provided');
+            return null;
+        }
+
+        try {
+            const allObjects = canvas.getObjects();
+            console.log('🔍 SAVE-ONLY PNG: Total canvas objects:', allObjects.length);
+
+            // Filter design elements (exclude background, print zones, etc.)
+            const designElements = allObjects.filter(obj => {
+                // Skip invisible objects
+                if (!obj.visible) return false;
+
+                // Skip print zone elements (blue stroke)
+                if (obj.stroke === '#007cba') return false;
+
+                // Skip background elements (typically not selectable)
+                if (obj.selectable === false && obj.type === 'image') return false;
+
+                // Skip system objects
+                if (obj.isSystemObject) return false;
+
+                // Include all other objects (uploaded images, text, shapes)
+                return true;
+            });
+
+            console.log('🎯 SAVE-ONLY PNG: Filtered design elements:', designElements.length);
+
+            if (designElements.length === 0) {
+                return null;
+            }
+
+            // Convert fabric objects to design data format
+            const elements = designElements.map((obj, index) => ({
+                id: obj.id || `element_${index}`,
+                type: obj.type,
+                left: obj.left,
+                top: obj.top,
+                width: obj.width,
+                height: obj.height,
+                scaleX: obj.scaleX || 1,
+                scaleY: obj.scaleY || 1,
+                angle: obj.angle || 0,
+                visible: obj.visible,
+                fabricObject: obj // Keep reference for PNG generation
+            }));
+
+            return {
+                elements: elements,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                timestamp: Date.now()
+            };
+
+        } catch (error) {
+            console.error('❌ SAVE-ONLY PNG: Error extracting elements from fabric canvas:', error);
+            return null;
+        }
     }
 
     hasDesignElements(designData) {
