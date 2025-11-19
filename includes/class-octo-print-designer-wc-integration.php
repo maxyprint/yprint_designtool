@@ -3289,9 +3289,10 @@ private function build_print_provider_email_content($order, $design_items, $note
                         if (response.success) {
                             $('#design-preview-content').html(response.data.html);
 
-                            // Initialize canvas if design data is available
-                            if (response.data.design_data) {
-                                initializeDesignCanvas(response.data.design_data, response.data.template_data);
+                            // 🖼️ PNG PREVIEW: Simple success message
+                            console.log('✅ Print files loaded:', response.data.files_count, 'files found');
+                            if (response.data.print_files) {
+                                console.log('📁 Print files:', response.data.print_files);
                             }
                         } else {
                             $('#design-preview-content').html(`
@@ -3671,7 +3672,7 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load design preview data
+     * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load and display print PNG files
      */
     public function ajax_load_design_preview() {
         // 🧠 AGENT FIX: AjaxCorsResolver - CORS headers for admin-ajax.php
@@ -3706,124 +3707,132 @@ private function build_print_provider_email_content($order, $design_items, $note
             wp_send_json_error(array('message' => __('Order not found', 'octo-print-designer')));
         }
 
-        // Get stored design data
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
-        $design_data = null;
+        // 🖨️ EFFICIENT PNG PREVIEW: Get print PNG files from design database
+        global $wpdb;
+        $design_table = $wpdb->prefix . 'octo_user_designs';
 
-        if ($stored_design_data) {
-            // 🧠 DATABASE OPTIMIZER: Efficient JSON processing with caching
-            $processing_start = microtime(true);
+        $print_files = array();
+        $design_items_found = false;
 
-            // Check if we have a cached parsed version
-            $cache_key = 'design_data_parsed_' . md5($stored_design_data);
-            $design_data = wp_cache_get($cache_key, 'octo_design_preview');
+        // Get design IDs from order items
+        foreach ($order->get_items() as $item) {
+            $design_id = $this->get_design_meta($item, 'design_id');
+            if ($design_id) {
+                $design_items_found = true;
 
-            if ($design_data === false) {
-                $design_data = json_decode($stored_design_data, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    // Cache for 5 minutes to avoid repeated JSON parsing
-                    wp_cache_set($cache_key, $design_data, 'octo_design_preview', 300);
-                } else {
-                    error_log("🔥 [DB OPTIMIZER] JSON decode error: " . json_last_error_msg());
-                    wp_send_json_error(array('message' => __('Invalid design data format in database', 'octo-print-designer')));
+                // Get print file info from database
+                $print_file_data = $wpdb->get_row($wpdb->prepare(
+                    "SELECT name, print_file_path, print_file_url FROM {$design_table} WHERE id = %d",
+                    $design_id
+                ));
+
+                if ($print_file_data && $print_file_data->print_file_url) {
+                    $print_files[] = array(
+                        'design_id' => $design_id,
+                        'design_name' => $print_file_data->name ?: 'Design #' . $design_id,
+                        'print_file_url' => $print_file_data->print_file_url,
+                        'print_file_path' => $print_file_data->print_file_path,
+                        'item_name' => $item->get_name()
+                    );
                 }
             }
-
-            $processing_time = (microtime(true) - $processing_start) * 1000;
-            error_log(sprintf("📊 [DB OPTIMIZER] JSON processing: %.2fms", $processing_time));
         }
 
-        // Build preview HTML with professional design controls
+        if (!$design_items_found) {
+            wp_send_json_error(array('message' => __('No design items found in this order', 'octo-print-designer')));
+        }
+
+        if (empty($print_files)) {
+            wp_send_json_error(array('message' => __('No print files available. Please ensure designs have been saved with PNG generation.', 'octo-print-designer')));
+        }
+
+        // 🖼️ SIMPLE PNG PREVIEW: Build clean PNG display HTML
         ob_start();
         ?>
-        <!-- Design Control Panel -->
-        <div class="design-control-panel">
+        <!-- Print Files Preview Controls -->
+        <div class="print-files-control-panel">
             <div class="control-group">
-                <label for="zoom-control">Zoom:</label>
-                <div style="display: flex; gap: 4px;">
-                    <button type="button" class="control-button" data-zoom="0.25">25%</button>
-                    <button type="button" class="control-button" data-zoom="0.5">50%</button>
-                    <button type="button" class="control-button active" data-zoom="1">100%</button>
-                    <button type="button" class="control-button" data-zoom="2">200%</button>
-                    <button type="button" class="control-button" data-zoom="fit">Fit</button>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>View:</label>
-                <div style="display: flex; gap: 4px;">
-                    <button type="button" class="control-button active" data-view="front">Front</button>
-                    <button type="button" class="control-button" data-view="back" disabled>Back</button>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Export:</label>
-                <div style="display: flex; gap: 4px;">
-                    <button type="button" class="control-button" id="export-png">
-                        <span class="dashicons dashicons-download" style="font-size: 12px;"></span>
-                        PNG
+                <label>Actions:</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="button button-secondary" onclick="window.print()">
+                        <span class="dashicons dashicons-printer"></span>
+                        Print Preview
                     </button>
-                    <button type="button" class="control-button" id="export-print">
-                        <span class="dashicons dashicons-printer" style="font-size: 12px;"></span>
-                        Print
+                    <button type="button" class="button button-secondary" id="download-all-pngs">
+                        <span class="dashicons dashicons-download"></span>
+                        Download All
                     </button>
+                    <span style="font-size: 12px; color: #646970;">📁 Print-ready files from saved designs</span>
                 </div>
             </div>
         </div>
 
-        <div class="design-preview-info">
+        <!-- Print Files Display -->
+        <div class="print-files-preview">
             <div class="info-card">
                 <h4 class="info-card-header">
-                    <span class="dashicons dashicons-info-outline"></span>
-                    Order Information
+                    <span class="dashicons dashicons-format-image"></span>
+                    Print-Ready Files (<?php echo count($print_files); ?>)
                 </h4>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <strong>Order Number</strong>
-                        #<?php echo esc_html($order->get_order_number()); ?>
-                    </div>
-                    <div class="info-item">
-                        <strong>Order Date</strong>
-                        <?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?>
-                    </div>
-                    <div class="info-item">
-                        <strong>Customer</strong>
-                        <?php echo esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()); ?>
-                    </div>
-                    <div class="info-item">
-                        <strong>Status</strong>
-                        <?php echo esc_html(wc_get_order_status_name($order->get_status())); ?>
-                    </div>
-                </div>
-            </div>
+                <p style="margin: 8px 0; font-size: 13px; color: #646970;">High-resolution PNG files generated during design save process</p>
 
-            <div class="info-card">
-                <h4 class="info-card-header">
-                    <span class="dashicons dashicons-cart"></span>
-                    Order Items
-                </h4>
-                <div style="max-height: 240px; overflow-y: auto;">
-                    <?php foreach ($order->get_items() as $item_id => $item): ?>
-                        <div style="padding: 12px; margin-bottom: 8px; background: #f6f7f7; border-radius: 4px; border-left: 4px solid <?php echo $this->get_design_meta($item, 'design_id') ? '#00a32a' : '#646970'; ?>;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px;">
-                                <div style="flex: 1;">
-                                    <strong style="color: #1d2327;"><?php echo esc_html($item->get_name()); ?></strong>
-                                    <?php if ($this->get_design_meta($item, 'design_id')): ?>
-                                        <br><span style="color: #00a32a; font-size: 11px; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                            <span class="dashicons dashicons-art" style="font-size: 12px;"></span>
-                                            Design Item (ID: <?php echo esc_html($this->get_design_meta($item, 'design_id')); ?>)
-                                        </span>
-                                    <?php else: ?>
-                                        <br><span style="color: #646970; font-size: 11px; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                            <span class="dashicons dashicons-products" style="font-size: 12px;"></span>
-                                            Standard Item
-                                        </span>
-                                    <?php endif; ?>
+                <!-- Print Files Gallery -->
+                <div class="print-files-gallery" style="margin-top: 15px;">
+                    <?php foreach ($print_files as $index => $file): ?>
+                        <div class="print-file-item" style="background: #fff; border: 1px solid #c3c4c7; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="display: flex; gap: 15px; align-items: flex-start;">
+                                <!-- PNG Preview -->
+                                <div style="flex-shrink: 0;">
+                                    <img
+                                        src="<?php echo esc_url($file['print_file_url']); ?>"
+                                        alt="<?php echo esc_attr($file['design_name']); ?> Preview"
+                                        style="
+                                            max-width: 200px;
+                                            height: auto;
+                                            border: 1px solid #ddd;
+                                            border-radius: 4px;
+                                            cursor: pointer;
+                                            transition: transform 0.2s ease;
+                                        "
+                                        onclick="window.open('<?php echo esc_url($file['print_file_url']); ?>', '_blank')"
+                                        onmouseover="this.style.transform='scale(1.05)'"
+                                        onmouseout="this.style.transform='scale(1)'"
+                                    />
                                 </div>
-                                <div style="text-align: right;">
-                                    <strong>Qty: <?php echo esc_html($item->get_quantity()); ?></strong><br>
-                                    <span style="font-size: 12px;"><?php echo wp_kses_post($order->get_formatted_line_subtotal($item)); ?></span>
+
+                                <!-- File Info -->
+                                <div style="flex: 1;">
+                                    <h5 style="margin: 0 0 8px 0; font-size: 14px; color: #1d2327;">
+                                        <span class="dashicons dashicons-art" style="font-size: 16px; margin-right: 5px; color: #00a32a;"></span>
+                                        <?php echo esc_html($file['design_name']); ?>
+                                    </h5>
+
+                                    <div style="font-size: 12px; color: #646970; margin-bottom: 10px;">
+                                        <strong>Product:</strong> <?php echo esc_html($file['item_name']); ?><br>
+                                        <strong>Design ID:</strong> #<?php echo esc_html($file['design_id']); ?><br>
+                                        <strong>File Path:</strong> <code style="background: #f6f7f7; padding: 2px 4px; border-radius: 3px;"><?php echo esc_html(basename($file['print_file_path'])); ?></code>
+                                    </div>
+
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                        <a
+                                            href="<?php echo esc_url($file['print_file_url']); ?>"
+                                            target="_blank"
+                                            class="button button-small"
+                                            style="font-size: 11px; padding: 4px 8px;"
+                                        >
+                                            <span class="dashicons dashicons-external" style="font-size: 12px;"></span>
+                                            Open Full Size
+                                        </a>
+                                        <a
+                                            href="<?php echo esc_url($file['print_file_url']); ?>"
+                                            download
+                                            class="button button-small"
+                                            style="font-size: 11px; padding: 4px 8px;"
+                                        >
+                                            <span class="dashicons dashicons-download" style="font-size: 12px;"></span>
+                                            Download
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3831,132 +3840,46 @@ private function build_print_provider_email_content($order, $design_items, $note
                 </div>
             </div>
 
-            <?php if ($design_data): ?>
-                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: #28a745;">✅ Design Data Available</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 13px;">
-                        <div>
-                            <strong>Template View ID:</strong><br>
-                            <?php echo esc_html($design_data['template_view_id'] ?? 'N/A'); ?>
-                        </div>
-                        <div>
-                            <strong>Elements Count:</strong><br>
-                            <?php echo esc_html(isset($design_data['elements']) ? count($design_data['elements']) : 0); ?>
-                        </div>
-                        <div>
-                            <strong>Timestamp:</strong><br>
-                            <?php
-                            if (isset($design_data['timestamp'])) {
-                                echo esc_html(date('d.m.Y H:i:s', $design_data['timestamp']));
-                            } else {
-                                echo 'N/A';
-                            }
-                            ?>
-                        </div>
-                        <div>
-                            <strong>Data Size:</strong><br>
-                            <?php echo esc_html(strlen($stored_design_data) . ' chars'); ?>
-                        </div>
-                    </div>
-
-                    <!-- 🎨 AGENT 3: NEW CANVAS PREVIEW CONTAINER -->
-                    <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 15px; border: 2px solid #28a745;">
-                        <h4 style="margin-top: 0; color: #007cba;">🎨 Canvas Preview - Agent 3 System</h4>
-
-                        <div style="margin-bottom: 15px;">
-                            <button type="button" id="agent3-render-canvas" class="button button-primary" style="margin-right: 10px;">
-                                🎯 Render Canvas Preview
-                            </button>
-                            <button type="button" id="agent3-export-preview" class="button button-secondary" style="margin-right: 10px;">
-                                📷 Export Preview
-                            </button>
-                            <span id="agent3-status" style="color: #666; font-size: 12px; font-style: italic;">
-                                Ready to render...
-                            </span>
-                        </div>
-
-                        <!-- Canvas Container for Agent 3 System -->
-                        <div id="agent3-canvas-container" style="
-                            min-height: 300px;
-                            border: 1px solid #ddd;
-                            border-radius: 4px;
-                            background: #f9f9f9;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 14px;
-                            color: #666;
-                        ">
-                            <div style="text-align: center;">
-                                <div style="font-size: 32px; margin-bottom: 10px;">🎨</div>
-                                <div>Click "Render Canvas Preview" to generate design preview</div>
-                                <div style="font-size: 12px; margin-top: 5px; color: #999;">
-                                    Using Agent 3 Canvas Rendering System
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <?php if (isset($design_data['elements']) && is_array($design_data['elements'])): ?>
-                        <details style="margin-top: 15px;">
-                            <summary style="cursor: pointer; font-weight: bold; color: #007cba;">📝 Design Elements Details</summary>
-                            <div style="margin-top: 10px; max-height: 300px; overflow-y: auto; background: white; padding: 10px; border-radius: 4px;">
-                                <?php foreach ($design_data['elements'] as $index => $element): ?>
-                                    <div style="padding: 8px; margin-bottom: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px;">
-                                        <strong>Element <?php echo ($index + 1); ?>:</strong>
-                                        <?php echo esc_html($element['type'] ?? 'unknown'); ?>
-                                        <?php if (isset($element['text'])): ?>
-                                            - "<?php echo esc_html($element['text']); ?>"
-                                        <?php elseif (isset($element['src'])): ?>
-                                            - Image: <?php echo esc_html(basename($element['src'])); ?>
-                                        <?php endif; ?>
-                                        <br>
-                                        <small style="color: #666;">
-                                            Position: (<?php echo esc_html($element['left'] ?? '0'); ?>, <?php echo esc_html($element['top'] ?? '0'); ?>)
-                                            <?php if (isset($element['width']) && isset($element['height'])): ?>
-                                                | Size: <?php echo esc_html($element['width'] . 'x' . $element['height']); ?>
-                                            <?php endif; ?>
-                                        </small>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </details>
-                    <?php endif; ?>
+            <!-- Order Summary -->
+            <div class="info-card" style="margin-top: 20px;">
+                <h4 class="info-card-header">
+                    <span class="dashicons dashicons-info-outline"></span>
+                    Order Summary
+                </h4>
+                <div style="font-size: 13px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                    <div><strong>Order:</strong> #<?php echo esc_html($order->get_order_number()); ?></div>
+                    <div><strong>Date:</strong> <?php echo esc_html($order->get_date_created()->format('d.m.Y H:i')); ?></div>
+                    <div><strong>Customer:</strong> <?php echo esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()); ?></div>
+                    <div><strong>Status:</strong> <?php echo esc_html(wc_get_order_status_name($order->get_status())); ?></div>
                 </div>
-            <?php else: ?>
-                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: #856404;">⚠️ No Design Preview Data</h4>
-                    <p style="margin: 0; font-size: 13px;">
-                        No design canvas data found for this order. This could happen if:
-                    </p>
-                    <ul style="margin: 10px 0 0 20px; font-size: 13px;">
-                        <li>The order was placed before the preview system was implemented</li>
-                        <li>The customer did not complete the design process properly</li>
-                        <li>There was an issue saving the design data during checkout</li>
-                    </ul>
-                </div>
-            <?php endif; ?>
+            </div>
         </div>
+
+        <script>
+        // Simple download all functionality
+        document.getElementById('download-all-pngs')?.addEventListener('click', function() {
+            const links = document.querySelectorAll('.print-file-item a[download]');
+            let delay = 0;
+            links.forEach(link => {
+                setTimeout(() => link.click(), delay);
+                delay += 100; // Stagger downloads
+            });
+        });
+        </script>
         <?php
 
         $html = ob_get_clean();
 
-        // 🎨 AGENT 3: JavaScript Integration - Add canvas initialization script
-        if ($design_data) {
-            $html .= $this->generateAgent3CanvasScript($design_data, $order_id);
-        }
-
         wp_send_json_success(array(
             'html' => $html,
-            'design_data' => $design_data,
-            'template_data' => null, // Could be expanded later
-            'agent3_ready' => !empty($design_data),
+            'print_files' => $print_files,
+            'files_count' => count($print_files),
             'order_info' => array(
                 'id' => $order_id,
                 'number' => $order->get_order_number(),
                 'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
             ),
-            'message' => __('Design preview loaded successfully', 'octo-print-designer')
+            'message' => sprintf(__('Found %d print-ready PNG files', 'octo-print-designer'), count($print_files))
         ));
     }
 
