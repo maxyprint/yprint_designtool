@@ -1874,9 +1874,9 @@ class DesignerWidget {
     setupModalEvents() {
         if (!this.saveDesignModal) return;
 
-        // Save button in footer - PNG generation instead of save modal
+        // Save button in footer
         const saveButton = this.container.querySelector('.designer-editor footer .designer-action-button');
-        saveButton.addEventListener('click', () => this.generateAndShowPNG());
+        saveButton.addEventListener('click', () => this.showSaveModal());
 
         // Modal events
         this.modalSaveButton.addEventListener('click', () => this.saveDesign());
