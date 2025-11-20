@@ -3801,17 +3801,7 @@ private function build_print_provider_email_content($order, $design_items, $note
      * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load and display print PNG files
      */
     public function ajax_load_design_preview() {
-        // 🧠 AGENT FIX: AjaxCorsResolver - CORS headers for admin-ajax.php
-        header('Access-Control-Allow-Origin: ' . get_site_url());
-        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
-        header('Access-Control-Allow-Credentials: true');
-
-        // Handle preflight OPTIONS request
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
+        // WordPress admin-ajax.php doesn't need custom CORS headers
 
         // Security check - Accept both admin and regular preview nonces
         $nonce_valid = false;
