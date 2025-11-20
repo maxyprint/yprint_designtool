@@ -3362,9 +3362,16 @@ private function build_print_provider_email_content($order, $design_items, $note
         </div>
 
         <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            // 🔧 ADMIN PREVIEW FIX: Enhanced preview button handler
-            $('#design-preview-btn').on('click', function() {
+        // 🔧 FIX: Robust jQuery handler with $ fallback for WordPress admin
+        (function() {
+            function initPreviewButton() {
+                var $ = jQuery; // Ensure $ is available
+
+                // Remove any existing handlers to prevent duplicates
+                $('#design-preview-btn').off('click.admin-preview');
+
+                // Register the click handler with namespace
+                $('#design-preview-btn').on('click.admin-preview', function() {
                 var button = $(this);
                 var orderId = button.data('order-id');
 
@@ -3462,20 +3469,47 @@ private function build_print_provider_email_content($order, $design_items, $note
                         `);
                     }
                 });
+                });
+            }
+
+            // Initialize button and modal handlers
+            function setupModalHandlers() {
+                var $ = jQuery; // Ensure $ is available
+
+                // Close modal
+                $('#close-preview-modal, #design-preview-modal').off('click.admin-preview').on('click.admin-preview', function(e) {
+                    if (e.target === this) {
+                        $('#design-preview-modal').hide();
+                    }
+                });
+
+                // Prevent modal content clicks from closing modal
+                $('#design-preview-modal > div').off('click.admin-preview').on('click.admin-preview', function(e) {
+                    e.stopPropagation();
+                });
+            }
+
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    initPreviewButton();
+                    setupModalHandlers();
+                });
+            } else {
+                // DOM already ready
+                initPreviewButton();
+                setupModalHandlers();
+            }
+
+            // Also initialize when jQuery is ready (belt and suspenders approach)
+            jQuery(document).ready(function() {
+                initPreviewButton();
+                setupModalHandlers();
             });
 
-            // Close modal
-            $('#close-preview-modal, #design-preview-modal').on('click', function(e) {
-                if (e.target === this) {
-                    $('#design-preview-modal').hide();
-                }
-            });
-
-            // Prevent modal content clicks from closing modal
-            $('#design-preview-modal > div').on('click', function(e) {
-                e.stopPropagation();
-            });
-        });
+            // Debug info
+            console.log('🔧 [ADMIN PREVIEW] Robust event handler system initialized');
+        })();
 
         // Initialize design canvas with professional UI (will be called after AJAX loads design data)
         function initializeDesignCanvas(designData, templateData) {
