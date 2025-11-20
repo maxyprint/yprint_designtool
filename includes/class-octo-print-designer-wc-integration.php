@@ -3363,7 +3363,7 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         <script type="text/javascript">
         jQuery(document).ready(function($) {
-            // Design Preview Button
+            // 🔧 ADMIN PREVIEW FIX: Enhanced preview button handler
             $('#design-preview-btn').on('click', function() {
                 var button = $(this);
                 var orderId = button.data('order-id');
@@ -3372,19 +3372,30 @@ private function build_print_provider_email_content($order, $design_items, $note
                     return;
                 }
 
+                console.log('🖼️ [ADMIN PREVIEW] Starting preview for order:', orderId);
+
                 // Show modal
                 $('#design-preview-modal').show();
                 $('#design-preview-loading').show();
                 $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
 
-                // 🧠 AGENT FIX: AjaxCorsResolver - Enhanced AJAX with CORS support
+                // 🔧 FIXED: Use working admin nonce with fallback
+                var nonce = '';
+                if (typeof octoAdminContext !== 'undefined' && octoAdminContext.nonce) {
+                    nonce = octoAdminContext.nonce;
+                    console.log('✅ [ADMIN PREVIEW] Using octoAdminContext nonce');
+                } else {
+                    nonce = '<?php echo wp_create_nonce('design_preview_nonce'); ?>';
+                    console.log('⚠️ [ADMIN PREVIEW] Using fallback nonce');
+                }
+
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
                     data: {
                         action: 'octo_load_design_preview',
                         order_id: orderId,
-                        nonce: '<?php echo wp_create_nonce('design_preview_nonce'); ?>'
+                        nonce: nonce
                     },
                     // CORS optimization
                     crossDomain: false,
@@ -3396,7 +3407,10 @@ private function build_print_provider_email_content($order, $design_items, $note
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
                     },
                     success: function(response) {
+                        console.log('✅ [ADMIN PREVIEW] AJAX Success:', response);
+
                         if (response.success) {
+                            console.log('🖼️ [ADMIN PREVIEW] HTML received, length:', response.data.html.length);
                             $('#design-preview-content').html(response.data.html);
 
                             // 🖼️ PNG PREVIEW: Simple success message
@@ -3405,6 +3419,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 console.log('📁 Print files:', response.data.print_files);
                             }
                         } else {
+                            console.error('❌ [ADMIN PREVIEW] Invalid response:', response);
                             $('#design-preview-content').html(`
                                 <div class="design-error">
                                     <h3>
@@ -3421,6 +3436,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                         }
                     },
                     error: function(xhr, status, error) {
+                        console.error('❌ [ADMIN PREVIEW] AJAX Error:', {status, error, xhr});
                         $('#design-preview-content').html(`
                             <div class="design-error">
                                 <h3>
@@ -3797,8 +3813,14 @@ private function build_print_provider_email_content($order, $design_items, $note
             exit();
         }
 
-        // Security check
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'design_preview_nonce')) {
+        // Security check - Accept both admin and regular preview nonces
+        $nonce_valid = false;
+        if (isset($_POST['nonce'])) {
+            $nonce_valid = wp_verify_nonce($_POST['nonce'], 'design_preview_nonce') ||
+                          wp_verify_nonce($_POST['nonce'], 'admin_design_preview_nonce');
+        }
+
+        if (!$nonce_valid) {
             wp_send_json_error(array('message' => __('Security check failed', 'octo-print-designer')));
         }
 

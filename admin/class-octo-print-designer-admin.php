@@ -1154,7 +1154,7 @@ class Octo_Print_Designer_Admin {
             'enable_selective_detection' => true, // Allow canvas detection only when needed
             'enable_modal_preview' => true,
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('design_preview_nonce')
+            'nonce' => wp_create_nonce('admin_design_preview_nonce') // 🔧 FIX: Use admin-specific nonce
         ]);
 
         echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - selective canvas detection enabled');</script>";
