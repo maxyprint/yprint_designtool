@@ -73,9 +73,20 @@ class Octo_Print_Designer_Designer {
         $columns = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'print_file_%'");
 
         if (empty($columns)) {
-            $wpdb->query("ALTER TABLE $table_name
+            error_log('🔧 Adding PNG columns to table: ' . $table_name);
+
+            $result = $wpdb->query("ALTER TABLE $table_name
                 ADD COLUMN print_file_path varchar(500) NULL DEFAULT NULL AFTER variations,
                 ADD COLUMN print_file_url varchar(500) NULL DEFAULT NULL AFTER print_file_path");
+
+            if ($result === false) {
+                error_log('🚨 Failed to add PNG columns: ' . $wpdb->last_error);
+                error_log('🚨 Failed query: ' . $wpdb->last_query);
+            } else {
+                error_log('✅ Successfully added PNG columns');
+            }
+        } else {
+            error_log('ℹ️ PNG columns already exist');
         }
     }
 
@@ -1042,6 +1053,9 @@ wp_add_inline_script('octo-print-designer-designer', '
             ));
         }
 
+        // 🔧 Ensure PNG columns exist before updating
+        self::add_png_columns();
+
         // Update design record with PNG path
         $update_result = $wpdb->update(
             $table_name,
@@ -1052,10 +1066,14 @@ wp_add_inline_script('octo-print-designer-designer', '
         );
 
         if ($update_result === false) {
+            // Log database error for debugging
+            error_log('🚨 PNG save database error: ' . $wpdb->last_error);
+            error_log('🚨 PNG save query: ' . $wpdb->last_query);
+
             // Clean up file if database update fails
             unlink($file_path);
             wp_send_json_error(array(
-                'message' => __('Failed to update design record', 'octo-print-designer')
+                'message' => __('Failed to update design record: ' . $wpdb->last_error, 'octo-print-designer')
             ));
         }
 
