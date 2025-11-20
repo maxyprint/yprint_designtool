@@ -1194,6 +1194,20 @@ private function check_yprint_dependency() {
                                 message: response.data?.message || 'no message',
                                 debug_entries: response.data?.debug ? response.data.debug.length : 0
                             });
+
+                            // 🖼️ [PNG DEBUG] Log PNG loading results
+                            console.group('🖼️ [PNG DEBUG] PNG File Information');
+                            console.log('PNG files found:', response.data?.png_files_count || 0);
+                            console.log('Preview available:', response.data?.preview_available || false);
+                            if (response.data?.png_files && response.data.png_files.length > 0) {
+                                console.log('PNG files details:', response.data.png_files);
+                                response.data.png_files.forEach((file, index) => {
+                                    console.log(`PNG ${index + 1}: Design ${file.design_id} → ${file.print_file_url}`);
+                                });
+                            } else {
+                                console.log('⚠️ No PNG files found in response');
+                            }
+                            console.groupEnd();
                             console.groupEnd();
 
                             progressText.html('📊 Verarbeite Server-Antwort...');
@@ -1207,20 +1221,36 @@ private function check_yprint_dependency() {
                                     var title = 'Druckdaten erfolgreich geladen!';
                                     var message = response.data.message || 'Daten wurden aus der Datenbank aktualisiert.';
                                     var details = response.data.debug || [];
+
+                                    // 🔧 FIX: Add PNG file information to success message
+                                    if (response.data.png_files_count && response.data.png_files_count > 0) {
+                                        details.push('✅ ' + response.data.png_files_count + ' PNG-Datei(en) gefunden - Preview verfügbar');
+                                        message += ' (' + response.data.png_files_count + ' PNG-Datei(en) verfügbar)';
+                                    } else {
+                                        details.push('⚠️ Keine PNG-Dateien gefunden - Erstelle Design zuerst');
+                                    }
                                     
                                     createStatusMessage('success', title, message, details)
                                         .insertBefore(button.parent());
                                     
                                     button.text('✅ Erfolgreich!').css('background-color', '#46b450');
                                     
+                                    // 🖼️ [PNG FINAL] Log final status before reload
+                                    console.group('🖼️ [PNG FINAL] Final Status Before Reload');
+                                    console.log('Total PNG files loaded:', response.data?.png_files_count || 0);
+                                    console.log('Preview will be available:', response.data?.preview_available || false);
+                                    console.log('Page will reload in 3 seconds to activate preview button...');
+                                    console.groupEnd();
+
                                     // Show countdown
                                     var countdown = 3;
                                     var countdownInterval = setInterval(function() {
                                         button.text('✅ Neu laden in ' + countdown + 's...');
                                         countdown--;
-                                        
+
                                         if (countdown < 0) {
                                             clearInterval(countdownInterval);
+                                            console.log('🔄 [RELOAD] Reloading page to activate preview functionality...');
                                             location.reload();
                                         }
                                     }, 1000);
@@ -2368,6 +2398,7 @@ private function build_print_provider_email_content($order, $design_items, $note
         // Refresh print data from database
         $refreshed_items = 0;
         $debug_info = array();
+        $png_files_found = array(); // 🔧 FIX: Collect PNG file information
         global $wpdb;
         $table_name = $wpdb->prefix . 'octo_user_designs';
         
@@ -2396,7 +2427,35 @@ private function build_print_provider_email_content($order, $design_items, $note
             }
             
             $debug_info[] = "Design {$design_id}: Found in database";
-            
+
+            // 🔧 FIX: Check for PNG file information with detailed logging
+            error_log("🖼️ [PNG CHECK] Design {$design_id}: Checking PNG fields...");
+            error_log("🖼️ [PNG CHECK] print_file_url: " . ($design['print_file_url'] ?? 'NULL'));
+            error_log("🖼️ [PNG CHECK] print_file_path: " . ($design['print_file_path'] ?? 'NULL'));
+
+            if (!empty($design['print_file_url']) && !empty($design['print_file_path'])) {
+                $png_files_found[] = array(
+                    'design_id' => $design_id,
+                    'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                    'print_file_url' => $design['print_file_url'],
+                    'print_file_path' => $design['print_file_path'],
+                    'item_name' => $item->get_name()
+                );
+                $debug_info[] = "Design {$design_id}: PNG file found - " . basename($design['print_file_path']);
+                error_log("✅ [PNG FOUND] Design {$design_id}: PNG available at " . $design['print_file_url']);
+            } else {
+                $debug_info[] = "Design {$design_id}: No PNG file information available";
+                error_log("❌ [PNG MISSING] Design {$design_id}: No PNG file information in database");
+
+                // Debug which fields are missing
+                if (empty($design['print_file_url'])) {
+                    error_log("❌ [PNG MISSING] Design {$design_id}: print_file_url is empty");
+                }
+                if (empty($design['print_file_path'])) {
+                    error_log("❌ [PNG MISSING] Design {$design_id}: print_file_path is empty");
+                }
+            }
+
             // Check which field contains the design data
             $design_data_raw = null;
             if (!empty($design['design_data'])) {
@@ -2514,10 +2573,23 @@ private function build_print_provider_email_content($order, $design_items, $note
             $debug_info[] = sprintf("❌ No design JSON data found (%.2fms)", $retrieval_time);
         }
 
+        // 🖼️ [PNG SUMMARY] Log final PNG loading results
+        error_log("🖼️ [PNG SUMMARY] Order {$order_id}: Found " . count($png_files_found) . " PNG file(s)");
+        if (count($png_files_found) > 0) {
+            foreach ($png_files_found as $png) {
+                error_log("🖼️ [PNG SUMMARY] - Design {$png['design_id']}: {$png['design_name']} → {$png['print_file_url']}");
+            }
+        }
+        error_log("🖼️ [PNG SUMMARY] Preview available: " . ((!empty($stored_design_data) || count($png_files_found) > 0) ? 'YES' : 'NO'));
+
         wp_send_json_success(array(
             'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
             'debug' => $debug_info,
-            'stored_design_data_size' => $stored_design_data ? strlen($stored_design_data) : 0
+            'stored_design_data_size' => $stored_design_data ? strlen($stored_design_data) : 0,
+            // 🔧 FIX: Include PNG file information for preview functionality
+            'png_files' => $png_files_found,
+            'png_files_count' => count($png_files_found),
+            'preview_available' => !empty($stored_design_data) || count($png_files_found) > 0
         ));
     }
 
@@ -2579,7 +2651,12 @@ private function build_print_provider_email_content($order, $design_items, $note
             // Store in order item meta
             $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
 
+            // 🔧 FIX: Also store in order meta for preview button functionality
+            // This ensures the "View Design Preview" button is enabled
+            $order->update_meta_data('_design_data', wp_slash(json_encode($design_data)));
+
             error_log("📦 Design data saved to order item: " . $item->get_id());
+            error_log("🔧 Design data also saved to order meta for preview functionality");
         }
     }
 
@@ -3146,8 +3223,22 @@ private function build_print_provider_email_content($order, $design_items, $note
             return; // No design items, no preview needed
         }
 
-        // Check if stored design data exists
+        // Check if stored design data exists OR if design items with design_id exist
         $stored_design_data = get_post_meta($order_id, '_design_data', true);
+
+        // 🔧 FIX: Also enable preview if we have design_id items (even without _design_data)
+        $has_design_ids = false;
+        if (!$stored_design_data) {
+            foreach ($order->get_items() as $item) {
+                if ($this->get_design_meta($item, 'design_id')) {
+                    $has_design_ids = true;
+                    break;
+                }
+            }
+        }
+
+        // Enable preview if we have design data OR design IDs
+        $preview_available = $stored_design_data || $has_design_ids;
         ?>
         <div id="design-preview-section">
             <div class="design-preview-header">
@@ -3161,7 +3252,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                 <div style="margin-bottom: 16px;">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                         <strong style="font-size: 13px; color: #1d2327;">Status:</strong>
-                        <?php if ($stored_design_data): ?>
+                        <?php if ($preview_available): ?>
                             <span class="design-status-indicator status-available">
                                 <span class="dashicons dashicons-yes-alt" style="font-size: 14px;"></span>
                                 Design data available
@@ -3175,7 +3266,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                     </div>
 
                     <p style="margin: 0; font-size: 12px; color: #646970; line-height: 1.4;">
-                        <?php if ($stored_design_data): ?>
+                        <?php if ($preview_available): ?>
                             Design data is available for interactive canvas preview with full editing capabilities.
                         <?php else: ?>
                             No design canvas data found. Preview may not be available for orders placed before the preview system was implemented.
@@ -3189,13 +3280,13 @@ private function build_print_provider_email_content($order, $design_items, $note
                         id="design-preview-btn"
                         class="button button-primary design-preview-btn"
                         data-order-id="<?php echo esc_attr($order_id); ?>"
-                        <?php echo $stored_design_data ? '' : 'disabled'; ?>
-                        aria-label="<?php echo $stored_design_data ? 'Open design preview modal' : 'Design preview not available'; ?>">
+                        <?php echo $preview_available ? '' : 'disabled'; ?>
+                        aria-label="<?php echo $preview_available ? 'Open design preview modal' : 'Design preview not available'; ?>">
                         <span class="dashicons dashicons-visibility" style="font-size: 16px; margin-right: -2px;"></span>
                         View Design Preview
                     </button>
 
-                    <?php if ($stored_design_data): ?>
+                    <?php if ($preview_available): ?>
                         <span style="font-size: 11px; color: #646970; display: flex; align-items: center; gap: 4px;">
                             <span class="dashicons dashicons-info" style="font-size: 14px;"></span>
                             Interactive preview with zoom and export options
@@ -3203,7 +3294,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                     <?php endif; ?>
                 </div>
 
-                <?php if (!$stored_design_data): ?>
+                <?php if (!$preview_available): ?>
                     <div style="margin-top: 16px; padding: 12px; background: #fff3cd; border-left: 4px solid #dba617; border-radius: 0 4px 4px 0;">
                         <div style="display: flex; align-items: flex-start; gap: 8px;">
                             <span class="dashicons dashicons-lightbulb" style="color: #b58900; margin-top: 2px;"></span>
