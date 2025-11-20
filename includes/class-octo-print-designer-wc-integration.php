@@ -3362,16 +3362,14 @@ private function build_print_provider_email_content($order, $design_items, $note
         </div>
 
         <script type="text/javascript">
-        // 🔧 FIX: Robust jQuery handler with $ fallback for WordPress admin
-        (function() {
-            function initPreviewButton() {
-                var $ = jQuery; // Ensure $ is available
+        // 🔧 SIMPLIFIED FIX: Clean jQuery handler for WordPress admin
+        jQuery(document).ready(function() {
+            var $ = jQuery; // Ensure $ is available
 
-                // Remove any existing handlers to prevent duplicates
-                $('#design-preview-btn').off('click.admin-preview');
+            console.log('🔧 [ADMIN PREVIEW] Initializing preview button...');
 
-                // Register the click handler with namespace
-                $('#design-preview-btn').on('click.admin-preview', function() {
+            // Clear any existing handlers and register new one
+            $('#design-preview-btn').off('click').on('click', function() {
                 var button = $(this);
                 var orderId = button.data('order-id');
 
@@ -3384,18 +3382,14 @@ private function build_print_provider_email_content($order, $design_items, $note
                 // Show modal
                 $('#design-preview-modal').show();
                 $('#design-preview-loading').show();
-                $('#design-preview-content').html($('#design-preview-loading').prop('outerHTML'));
+                $('#design-preview-content').hide();
 
-                // 🔧 FIXED: Use working admin nonce with fallback
-                var nonce = '';
-                if (typeof octoAdminContext !== 'undefined' && octoAdminContext.nonce) {
-                    nonce = octoAdminContext.nonce;
-                    console.log('✅ [ADMIN PREVIEW] Using octoAdminContext nonce');
-                } else {
-                    nonce = '<?php echo wp_create_nonce('design_preview_nonce'); ?>';
-                    console.log('⚠️ [ADMIN PREVIEW] Using fallback nonce');
-                }
+                // Get nonce
+                var nonce = (typeof octoAdminContext !== 'undefined' && octoAdminContext.nonce)
+                    ? octoAdminContext.nonce
+                    : '<?php echo wp_create_nonce('design_preview_nonce'); ?>';
 
+                // AJAX call
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
@@ -3404,112 +3398,36 @@ private function build_print_provider_email_content($order, $design_items, $note
                         order_id: orderId,
                         nonce: nonce
                     },
-                    // CORS optimization
-                    crossDomain: false,
-                    xhrFields: {
-                        withCredentials: true
-                    },
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                    },
                     success: function(response) {
-                        console.log('✅ [ADMIN PREVIEW] AJAX Success:', response);
-
+                        $('#design-preview-loading').hide();
                         if (response.success) {
-                            console.log('🖼️ [ADMIN PREVIEW] HTML received, length:', response.data.html.length);
-                            $('#design-preview-content').html(response.data.html);
-
-                            // 🖼️ PNG PREVIEW: Simple success message
-                            console.log('✅ Print files loaded:', response.data.files_count, 'files found');
-                            if (response.data.print_files) {
-                                console.log('📁 Print files:', response.data.print_files);
-                            }
+                            $('#design-preview-content').html(response.data.html).show();
+                            console.log('✅ [ADMIN PREVIEW] Preview loaded successfully');
                         } else {
-                            console.error('❌ [ADMIN PREVIEW] Invalid response:', response);
-                            $('#design-preview-content').html(`
-                                <div class="design-error">
-                                    <h3>
-                                        <span class="dashicons dashicons-warning" style="font-size: 18px;"></span>
-                                        Preview Error
-                                    </h3>
-                                    <p>${response.data && response.data.message ? response.data.message : 'Failed to load design preview'}</p>
-                                    <button type="button" class="button" onclick="$('#design-preview-btn').click();">
-                                        <span class="dashicons dashicons-update"></span>
-                                        Try Again
-                                    </button>
-                                </div>
-                            `);
+                            $('#design-preview-content').html('<div class="error">Error: ' + (response.data?.message || 'Unknown error') + '</div>').show();
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('❌ [ADMIN PREVIEW] AJAX Error:', {status, error, xhr});
-                        $('#design-preview-content').html(`
-                            <div class="design-error">
-                                <h3>
-                                    <span class="dashicons dashicons-cloud-upload" style="font-size: 18px;"></span>
-                                    Network Error
-                                </h3>
-                                <p>Failed to load design preview due to network error.</p>
-                                <div style="margin-top: 16px;">
-                                    <button type="button" class="button" onclick="$('#design-preview-btn').click();">
-                                        <span class="dashicons dashicons-update"></span>
-                                        Retry
-                                    </button>
-                                    <button type="button" class="button" onclick="$('#design-preview-modal').hide();" style="margin-left: 8px;">
-                                        <span class="dashicons dashicons-no-alt"></span>
-                                        Close
-                                    </button>
-                                </div>
-                                <details style="margin-top: 12px; font-size: 11px; color: #646970;">
-                                    <summary>Technical Details</summary>
-                                    <p>Status: ${status}<br>Error: ${error}</p>
-                                </details>
-                            </div>
-                        `);
+                        $('#design-preview-loading').hide();
+                        $('#design-preview-content').html('<div class="error">Network error: ' + error + '</div>').show();
+                        console.error('❌ [ADMIN PREVIEW] AJAX Error:', {status, error});
                     }
                 });
-                });
-            }
-
-            // Initialize button and modal handlers
-            function setupModalHandlers() {
-                var $ = jQuery; // Ensure $ is available
-
-                // Close modal
-                $('#close-preview-modal, #design-preview-modal').off('click.admin-preview').on('click.admin-preview', function(e) {
-                    if (e.target === this) {
-                        $('#design-preview-modal').hide();
-                    }
-                });
-
-                // Prevent modal content clicks from closing modal
-                $('#design-preview-modal > div').off('click.admin-preview').on('click.admin-preview', function(e) {
-                    e.stopPropagation();
-                });
-            }
-
-            // Initialize when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() {
-                    initPreviewButton();
-                    setupModalHandlers();
-                });
-            } else {
-                // DOM already ready
-                initPreviewButton();
-                setupModalHandlers();
-            }
-
-            // Also initialize when jQuery is ready (belt and suspenders approach)
-            jQuery(document).ready(function() {
-                initPreviewButton();
-                setupModalHandlers();
             });
 
-            // Debug info
-            console.log('🔧 [ADMIN PREVIEW] Robust event handler system initialized');
-        })();
+            // Modal close handlers
+            $('#close-preview-modal, #design-preview-modal').on('click', function(e) {
+                if (e.target === this) {
+                    $('#design-preview-modal').hide();
+                }
+            });
+
+            $('#design-preview-modal > div').on('click', function(e) {
+                e.stopPropagation();
+            });
+
+            console.log('✅ [ADMIN PREVIEW] Event handlers registered successfully');
+        });
 
         // Initialize design canvas with professional UI (will be called after AJAX loads design data)
         function initializeDesignCanvas(designData, templateData) {
