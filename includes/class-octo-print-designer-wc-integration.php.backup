@@ -410,17 +410,36 @@ private function check_yprint_dependency() {
         <style type="text/css">
             /* 🎨 PROFESSIONAL WORDPRESS ADMIN UI - Agent 6 Enhancement */
 
-            /* Design data info section */
-            .design-data-info {
+            /* Design Preview Section */
+            #design-preview-section {
                 margin: 20px 0;
-                padding: 12px;
-                background: #e7f3ff;
-                border-left: 4px solid #72aee6;
-                border-radius: 0 4px 4px 0;
+                padding: 0;
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
             }
 
+            .design-preview-header {
+                background: #f6f7f7;
+                border-bottom: 1px solid #c3c4c7;
+                padding: 12px 20px;
+                margin: 0;
+            }
 
+            .design-preview-header h3 {
+                margin: 0;
+                color: #1d2327;
+                font-size: 14px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
 
+            .design-preview-content {
+                padding: 20px;
+            }
 
             .design-status-indicator {
                 display: inline-flex;
@@ -2652,11 +2671,11 @@ private function build_print_provider_email_content($order, $design_items, $note
             $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
 
             // 🔧 FIX: Also store in order meta for preview button functionality
-            // This ensures the design data is available for PNG export
+            // This ensures the "View Design Preview" button is enabled
             $order->update_meta_data('_design_data', wp_slash(json_encode($design_data)));
 
             error_log("📦 Design data saved to order item: " . $item->get_id());
-            error_log("🔧 Design data also saved to order meta for PNG export functionality");
+            error_log("🔧 Design data also saved to order meta for preview functionality");
         }
     }
 
@@ -3251,6 +3270,428 @@ private function build_print_provider_email_content($order, $design_items, $note
                 </div>
             </div>
         </div>
+            <div class="design-preview-header">
+                <h3>
+                    <span class="dashicons dashicons-art" style="font-size: 16px;"></span>
+                    Design Preview System
+                </h3>
+            </div>
+
+            <div class="design-preview-content">
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <strong style="font-size: 13px; color: #1d2327;">Status:</strong>
+                        <?php if ($preview_available): ?>
+                            <span class="design-status-indicator status-available">
+                                <span class="dashicons dashicons-yes-alt" style="font-size: 14px;"></span>
+                                Design data available
+                            </span>
+                        <?php else: ?>
+                            <span class="design-status-indicator status-unavailable">
+                                <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
+                                No preview data found
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
+                    <p style="margin: 0; font-size: 12px; color: #646970; line-height: 1.4;">
+                        <?php if ($preview_available): ?>
+                            Design data is available for interactive canvas preview with full editing capabilities.
+                        <?php else: ?>
+                            No design canvas data found. Preview may not be available for orders placed before the preview system was implemented.
+                        <?php endif; ?>
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <button
+                        type="button"
+                        id="design-preview-btn"
+                        class="button button-primary design-preview-btn"
+                        data-order-id="<?php echo esc_attr($order_id); ?>"
+                        <?php echo $preview_available ? '' : 'disabled'; ?>
+                        aria-label="<?php echo $preview_available ? 'Open design preview modal' : 'Design preview not available'; ?>">
+                        <span class="dashicons dashicons-visibility" style="font-size: 16px; margin-right: -2px;"></span>
+                        View Design Preview
+                    </button>
+
+                    <?php if ($preview_available): ?>
+                        <span style="font-size: 11px; color: #646970; display: flex; align-items: center; gap: 4px;">
+                            <span class="dashicons dashicons-info" style="font-size: 14px;"></span>
+                            Interactive preview with zoom and export options
+                        </span>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!$preview_available): ?>
+                    <div style="margin-top: 16px; padding: 12px; background: #fff3cd; border-left: 4px solid #dba617; border-radius: 0 4px 4px 0;">
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span class="dashicons dashicons-lightbulb" style="color: #b58900; margin-top: 2px;"></span>
+                            <div>
+                                <strong style="font-size: 12px; color: #856404; display: block; margin-bottom: 4px;">
+                                    Design Preview Information
+                                </strong>
+                                <p style="margin: 0; font-size: 11px; color: #856404; line-height: 1.4;">
+                                    Design preview data is captured when customers complete their design process.
+                                    This ensures the exact customer design is preserved for production and review.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Design Preview Modal -->
+        <div id="design-preview-modal" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+            <div class="design-modal-container">
+                <div class="design-modal-header">
+                    <h3 id="modal-title" class="design-modal-title">
+                        <span class="dashicons dashicons-art"></span>
+                        Design Preview - Order #<?php echo $order->get_order_number(); ?>
+                    </h3>
+                    <button
+                        id="close-preview-modal"
+                        type="button"
+                        class="design-modal-close"
+                        aria-label="Close design preview modal">
+                        <span class="dashicons dashicons-no-alt"></span>
+                        Close
+                    </button>
+                </div>
+                <div class="design-modal-body">
+                    <div id="design-preview-content">
+                        <div id="design-preview-loading" class="design-loading">
+                            <div class="loading-spinner"></div>
+                            <p>Loading design preview...</p>
+                            <span class="sr-only">Please wait while the design preview loads</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+        // 🔧 SIMPLIFIED FIX: Clean jQuery handler for WordPress admin
+        jQuery(document).ready(function() {
+            var $ = jQuery; // Ensure $ is available
+
+            console.log('🔧 [ADMIN PREVIEW] Initializing preview button...');
+
+            // Clear any existing handlers and register new one
+            $('#design-preview-btn').off('click').on('click', function() {
+                var button = $(this);
+                var orderId = button.data('order-id');
+
+                if (button.prop('disabled')) {
+                    return;
+                }
+
+                console.log('🖼️ [ADMIN PREVIEW] Starting preview for order:', orderId);
+
+                // Show modal
+                $('#design-preview-modal').show();
+                $('#design-preview-loading').show();
+                $('#design-preview-content').hide();
+
+                // Get nonce
+                var nonce = (typeof octoAdminContext !== 'undefined' && octoAdminContext.nonce)
+                    ? octoAdminContext.nonce
+                    : '<?php echo wp_create_nonce('design_preview_nonce'); ?>';
+
+                // AJAX call
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'octo_load_design_preview',
+                        order_id: orderId,
+                        nonce: nonce
+                    },
+                    success: function(response) {
+                        $('#design-preview-loading').hide();
+                        if (response.success) {
+                            $('#design-preview-content').html(response.data.html).show();
+                            console.log('✅ [ADMIN PREVIEW] Preview loaded successfully');
+                        } else {
+                            $('#design-preview-content').html('<div class="error">Error: ' + (response.data?.message || 'Unknown error') + '</div>').show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#design-preview-loading').hide();
+                        $('#design-preview-content').html('<div class="error">Network error: ' + error + '</div>').show();
+                        console.error('❌ [ADMIN PREVIEW] AJAX Error:', {status, error});
+                    }
+                });
+            });
+
+            // Modal close handlers
+            $('#close-preview-modal, #design-preview-modal').on('click', function(e) {
+                if (e.target === this) {
+                    $('#design-preview-modal').hide();
+                }
+            });
+
+            $('#design-preview-modal > div').on('click', function(e) {
+                e.stopPropagation();
+            });
+
+            console.log('✅ [ADMIN PREVIEW] Event handlers registered successfully');
+        });
+
+        // Initialize design canvas with professional UI (will be called after AJAX loads design data)
+        function initializeDesignCanvas(designData, templateData) {
+            try {
+                console.log('🎨 Initializing professional design canvas...', designData);
+
+                // Create canvas wrapper with professional styling
+                var canvasWrapper = $(`
+                    <div class="design-canvas-wrapper">
+                        <div class="info-card-header" style="text-align: center; margin-bottom: 16px;">
+                            <span class="dashicons dashicons-editor-paste-word"></span>
+                            Interactive Design Preview
+                        </div>
+                        <div class="design-canvas-container" id="design-canvas-container">
+                            <canvas id="design-preview-canvas" width="600" height="400"></canvas>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 11px; color: #646970; text-align: center;">
+                            <span class="dashicons dashicons-info" style="font-size: 12px;"></span>
+                            Use zoom controls above to adjust view • Export options available
+                        </div>
+                    </div>
+                `);
+
+                $('#design-preview-content').append(canvasWrapper);
+
+                // Initialize Fabric.js canvas
+                if (typeof fabric !== 'undefined') {
+                    window.designPreviewCanvas = new fabric.Canvas('design-preview-canvas');
+                    window.designPreviewCanvas.setWidth(600);
+                    window.designPreviewCanvas.setHeight(400);
+
+                    // Process and add elements to canvas
+                    if (designData.elements && Array.isArray(designData.elements)) {
+                        designData.elements.forEach(function(element, index) {
+                            console.log('Adding element to canvas:', element);
+
+                            if (element.type === 'image' && element.src) {
+                                fabric.Image.fromURL(element.src, function(img) {
+                                    img.set({
+                                        left: element.left || 0,
+                                        top: element.top || 0,
+                                        scaleX: element.scaleX || 1,
+                                        scaleY: element.scaleY || 1,
+                                        angle: element.angle || 0,
+                                        selectable: false
+                                    });
+                                    window.designPreviewCanvas.add(img);
+                                    window.designPreviewCanvas.renderAll();
+                                });
+                            } else if (element.type === 'text' && element.text) {
+                                var text = new fabric.Text(element.text, {
+                                    left: element.left || 0,
+                                    top: element.top || 0,
+                                    fontSize: element.fontSize || 20,
+                                    fill: element.fill || '#000000',
+                                    fontFamily: element.fontFamily || 'Arial',
+                                    angle: element.angle || 0,
+                                    selectable: false
+                                });
+                                window.designPreviewCanvas.add(text);
+                            }
+                        });
+                    }
+
+                    window.designPreviewCanvas.renderAll();
+
+                    // Initialize professional controls
+                    initializeDesignControls();
+
+                    console.log('✅ Professional canvas initialized successfully');
+                } else {
+                    $('#design-canvas-container').html('<div class="design-error"><h3>Canvas Unavailable</h3><p>Fabric.js library not loaded - canvas preview unavailable</p></div>');
+                }
+
+            } catch (error) {
+                console.error('❌ Error initializing canvas:', error);
+                $('#design-canvas-container').html('<div class="design-error"><h3>Initialization Error</h3><p>Error initializing canvas preview</p></div>');
+            }
+        }
+
+        // Initialize professional design controls
+        function initializeDesignControls() {
+            // Zoom controls
+            $('.control-button[data-zoom]').on('click', function() {
+                var $this = $(this);
+                var zoom = $this.data('zoom');
+
+                $('.control-button[data-zoom]').removeClass('active');
+                $this.addClass('active');
+
+                if (window.designPreviewCanvas) {
+                    if (zoom === 'fit') {
+                        // Fit canvas to container
+                        var container = $('#design-canvas-container');
+                        var containerWidth = container.width() - 40; // Account for padding
+                        var canvasWidth = window.designPreviewCanvas.getWidth();
+                        var scale = Math.min(containerWidth / canvasWidth, 1);
+
+                        window.designPreviewCanvas.setZoom(scale);
+                    } else {
+                        window.designPreviewCanvas.setZoom(parseFloat(zoom));
+                    }
+                    window.designPreviewCanvas.renderAll();
+                }
+            });
+
+            // View controls (Front/Back)
+            $('.control-button[data-view]').on('click', function() {
+                var $this = $(this);
+                if ($this.prop('disabled')) return;
+
+                $('.control-button[data-view]').removeClass('active');
+                $this.addClass('active');
+
+                // TODO: Implement view switching when multiple views are available
+                console.log('View switched to:', $this.data('view'));
+            });
+
+            // Export controls
+            $('#export-png').on('click', function() {
+                if (window.designPreviewCanvas) {
+                    // Export as PNG
+                    var link = document.createElement('a');
+                    link.download = 'design-preview.png';
+                    link.href = window.designPreviewCanvas.toDataURL('image/png');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Show success feedback
+                    $(this).html('<span class="dashicons dashicons-yes-alt" style="font-size: 12px;"></span> Downloaded!').prop('disabled', true);
+                    setTimeout(() => {
+                        $(this).html('<span class="dashicons dashicons-download" style="font-size: 12px;"></span> PNG').prop('disabled', false);
+                    }, 2000);
+                }
+            });
+
+            $('#export-print').on('click', function() {
+                if (window.designPreviewCanvas) {
+                    // Open print dialog with canvas
+                    var printWindow = window.open('', '_blank');
+                    var canvas = window.designPreviewCanvas.toDataURL('image/png');
+
+                    printWindow.document.write(`
+                        <html>
+                            <head>
+                                <title>Design Preview - Print</title>
+                                <style>
+                                    body { margin: 0; padding: 20px; text-align: center; }
+                                    img { max-width: 100%; height: auto; }
+                                    h1 { font-family: Arial, sans-serif; color: #333; }
+                                </style>
+                            </head>
+                            <body>
+                                <h1>Design Preview</h1>
+                                <img src="${canvas}" alt="Design Preview" />
+                                <script>window.onload = function() { window.print(); }</script>
+                            </body>
+                        </html>
+                    `);
+                    printWindow.document.close();
+                }
+            });
+
+            // Keyboard shortcuts
+            $(document).on('keydown.design-preview', function(e) {
+                if (!$('#design-preview-modal').is(':visible')) return;
+
+                switch(e.key) {
+                    case 'Escape':
+                        $('#close-preview-modal').click();
+                        break;
+                    case '1':
+                        $('.control-button[data-zoom="1"]').click();
+                        break;
+                    case '2':
+                        $('.control-button[data-zoom="2"]').click();
+                        break;
+                    case 'f':
+                        $('.control-button[data-zoom="fit"]').click();
+                        break;
+                }
+            });
+
+            // Clean up keyboard shortcuts when modal closes
+            $('#close-preview-modal, #design-preview-modal').on('click', function() {
+                $(document).off('keydown.design-preview');
+            });
+
+            // Mobile touch enhancements
+            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                // Add mobile-specific touch feedback
+                $('.control-button').on('touchstart', function() {
+                    $(this).addClass('touching');
+                }).on('touchend', function() {
+                    $(this).removeClass('touching');
+                });
+
+                // Enable canvas pan/zoom on mobile
+                if (window.designPreviewCanvas) {
+                    var hammertime = null;
+
+                    // Check if Hammer.js is available for advanced touch gestures
+                    if (typeof Hammer !== 'undefined') {
+                        hammertime = new Hammer(window.designPreviewCanvas.upperCanvasEl);
+                        hammertime.get('pinch').set({ enable: true });
+
+                        hammertime.on('pinchstart pinchmove', function(ev) {
+                            var zoom = window.designPreviewCanvas.getZoom() * ev.scale;
+                            zoom = Math.max(0.1, Math.min(3, zoom)); // Limit zoom range
+                            window.designPreviewCanvas.setZoom(zoom);
+                            window.designPreviewCanvas.renderAll();
+                        });
+                    }
+
+                    // Basic touch scrolling fallback
+                    var lastTouchY = 0;
+                    $(window.designPreviewCanvas.upperCanvasEl).on('touchstart', function(e) {
+                        lastTouchY = e.originalEvent.touches[0].clientY;
+                    }).on('touchmove', function(e) {
+                        e.preventDefault(); // Prevent page scroll
+                        var currentY = e.originalEvent.touches[0].clientY;
+                        var deltaY = lastTouchY - currentY;
+
+                        // Simple zoom on vertical scroll
+                        if (Math.abs(deltaY) > 5) {
+                            var zoom = window.designPreviewCanvas.getZoom();
+                            zoom += deltaY * 0.002;
+                            zoom = Math.max(0.25, Math.min(2, zoom));
+                            window.designPreviewCanvas.setZoom(zoom);
+                            window.designPreviewCanvas.renderAll();
+
+                            // Update active zoom button
+                            $('.control-button[data-zoom]').removeClass('active');
+                            var closestZoom = zoom <= 0.375 ? '0.25' :
+                                            zoom <= 0.75 ? '0.5' :
+                                            zoom <= 1.5 ? '1' : '2';
+                            $('.control-button[data-zoom="' + closestZoom + '"]').addClass('active');
+                        }
+
+                        lastTouchY = currentY;
+                    });
+                }
+            }
+
+            // Auto-adjust initial zoom on small screens
+            if ($(window).width() < 768) {
+                setTimeout(function() {
+                    $('.control-button[data-zoom="fit"]').click();
+                }, 100);
+            }
+        }
+        </script>
+        <?php
     }
 
     /**
