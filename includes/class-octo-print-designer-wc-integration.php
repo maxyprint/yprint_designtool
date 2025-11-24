@@ -45,7 +45,7 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_print_provider_api'));
         add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
 
-        // 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Simplified order interface
+        // 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Simplified WooCommerce Admin Integration
         add_action('woocommerce_admin_order_data_after_order_details', array($this, 'add_design_info_section'));
 
         // 🖼️ PNG PLUGIN INTEGRATION: Separate AJAX handlers for plugin PNG uploads
@@ -409,17 +409,36 @@ private function check_yprint_dependency() {
         <style type="text/css">
             /* 🎨 PROFESSIONAL WORDPRESS ADMIN UI - Agent 6 Enhancement */
 
-            /* Design data info section */
-            .design-data-info {
+            /* Design Preview Section */
+            #design-preview-section {
                 margin: 20px 0;
-                padding: 12px;
-                background: #e7f3ff;
-                border-left: 4px solid #72aee6;
-                border-radius: 0 4px 4px 0;
+                padding: 0;
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
             }
 
+            .design-preview-header {
+                background: #f6f7f7;
+                border-bottom: 1px solid #c3c4c7;
+                padding: 12px 20px;
+                margin: 0;
+            }
 
+            .design-preview-header h3 {
+                margin: 0;
+                color: #1d2327;
+                font-size: 14px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
 
+            .design-preview-content {
+                padding: 20px;
+            }
 
             .design-status-indicator {
                 display: inline-flex;
@@ -2651,11 +2670,11 @@ private function build_print_provider_email_content($order, $design_items, $note
             $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
 
             // 🔧 FIX: Also store in order meta for preview button functionality
-            // This ensures the design data is available for PNG export
+            // This ensures the "View Design Preview" button is enabled
             $order->update_meta_data('_design_data', wp_slash(json_encode($design_data)));
 
             error_log("📦 Design data saved to order item: " . $item->get_id());
-            error_log("🔧 Design data also saved to order meta for PNG export functionality");
+            error_log("🔧 Design data also saved to order meta for preview functionality");
         }
     }
 
@@ -3200,7 +3219,10 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Add design info section to WooCommerce order details
+     * 🎨 DESIGN PREVIEW SYSTEM: Add preview button to WooCommerce order details
+     */
+    /**
+     * 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Add design info to WooCommerce order details
      */
     public function add_design_info_section($order) {
         if (!$order instanceof WC_Order) {
@@ -3209,49 +3231,26 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         $order_id = $order->get_id();
 
-        // Check if order has design items
-        $has_design_items = false;
-        foreach ($order->get_items() as $item) {
-            if ($this->get_design_meta($item, 'design_id')) {
-                $has_design_items = true;
-                break;
-            }
-        }
+        // Check if we have design data stored for this order
+        $stored_design_data = $order->get_meta('_design_data');
+        $has_design_data = !empty($stored_design_data);
 
-        if (!$has_design_items) {
-            return; // No design items, no preview needed
-        }
-
-        // Check if stored design data exists OR if design items with design_id exist
-        $stored_design_data = get_post_meta($order_id, '_design_data', true);
-
-        // 🔧 FIX: Also enable preview if we have design_id items (even without _design_data)
-        $has_design_ids = false;
-        if (!$stored_design_data) {
-            foreach ($order->get_items() as $item) {
-                if ($this->get_design_meta($item, 'design_id')) {
-                    $has_design_ids = true;
-                    break;
-                }
-            }
-        }
-
-        // Design Preview System removed - simplified order interface
-        ?>
-        <div style="margin: 20px 0; padding: 12px; background: #e7f3ff; border-left: 4px solid #72aee6; border-radius: 0 4px 4px 0;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="dashicons dashicons-info" style="color: #0073aa; font-size: 16px;"></span>
-                <div>
-                    <strong style="font-size: 12px; color: #0073aa; display: block;">Design Data Available</strong>
-                    <p style="margin: 0; font-size: 11px; color: #005a87; line-height: 1.4;">
-                        Design data is stored and available for PNG export and production processing.
-                        The preview system has been removed to improve performance.
-                    </p>
+        if ($has_design_data) {
+            ?>
+            <div style="margin: 20px 0; padding: 12px; background: #e7f3ff; border-left: 4px solid #72aee6; border-radius: 0 4px 4px 0;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="dashicons dashicons-info" style="color: #0073aa; font-size: 16px;"></span>
+                    <div>
+                        <strong style="font-size: 12px; color: #0073aa; display: block;">Design Data Available</strong>
+                        <p style="margin: 0; font-size: 11px; color: #005a87; line-height: 1.4;">
+                            Design data is stored and available for PNG export and production processing.
+                        </p>
+                    </div>
                 </div>
             </div>
-        </div>
+            <?php
+        }
     }
-
     /**
      * 🖨️ PNG-ONLY SYSTEM: Trigger PNG generation after design data is saved
      */
