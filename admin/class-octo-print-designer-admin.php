@@ -230,60 +230,8 @@ class Octo_Print_Designer_Admin {
             true
         );
 
-        // 🎯 ARTEFAKT-GESTEUERTES SYSTEM: Admin Webpack Fabric Extraction
-        // Phase 1: Immediate Fabric Extraction from Webpack Bundle
-        wp_enqueue_script(
-            'octo-webpack-fabric-extractor-admin',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/webpack-fabric-extractor.js',
-            ['octo-print-designer-vendor'], // Load immediately after vendor bundle
-            $this->version . '.extractor-admin-v2',
-            true
-        );
+        // Preview system removed - problematic scripts causing 404 errors cleaned up
 
-        // Phase 2: Fabric Singleton Wrapper (only after extraction)
-        wp_enqueue_script(
-            'octo-fabric-canvas-singleton',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/fabric-canvas-singleton.js',
-            ['octo-webpack-fabric-extractor-admin', 'jquery'], // After fabric is extracted and globally available
-            $this->version . '.1-singleton',
-            true
-        );
-
-        // Phase 3: Canvas Initialization Controller
-        wp_enqueue_script(
-            'octo-canvas-initialization-controller',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/canvas-initialization-controller.js',
-            ['octo-fabric-canvas-singleton', 'jquery'],
-            $this->version . '.1-controller',
-            true
-        );
-
-        // Phase 4: Script Load Coordinator
-        wp_enqueue_script(
-            'octo-script-load-coordinator',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/script-load-coordinator.js',
-            ['octo-canvas-initialization-controller', 'jquery'],
-            $this->version . '.1-coordinator',
-            true
-        );
-
-        // Phase 4: Fabric Global Exposure (Enhanced)
-        wp_enqueue_script(
-            'octo-fabric-global-exposure',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-global-exposure.js',
-            ['octo-script-load-coordinator', 'octo-print-designer-admin', 'jquery'],
-            $this->version . '.4-enhanced',
-            true
-        );
-
-        // Phase 4.5: Fabric Canvas Element Fix (Safari toCanvasElement bug fix)
-        wp_enqueue_script(
-            'octo-fabric-canvas-element-fix',
-            OCTO_PRINT_DESIGNER_URL . 'admin/js/fabric-canvas-element-fix.js',
-            ['octo-fabric-global-exposure'], // After fabric is globally available
-            $this->version . '.canvas-fix-v1',
-            true
-        );
 
         // 🎯 FIX: Canvas detection scripts only needed in template editor context
         if ($is_template_page) {
@@ -291,7 +239,7 @@ class Octo_Print_Designer_Admin {
             wp_enqueue_script(
                 'octo-template-editor-canvas-hook',
                 OCTO_PRINT_DESIGNER_URL . 'admin/js/template-editor-canvas-hook.js',
-                ['octo-fabric-canvas-element-fix', 'octo-canvas-initialization-controller'], // REMOVED jQuery dependency, added canvas fix
+                ['jquery'], // Dependencies cleaned up - removed problematic references
                 $this->version . '.5-jquery-free',
                 true
             );
@@ -299,7 +247,7 @@ class Octo_Print_Designer_Admin {
             wp_enqueue_script(
                 'octo-reference-line-system',
                 OCTO_PRINT_DESIGNER_URL . 'admin/js/reference-line-system.js',
-                ['octo-fabric-global-exposure', 'octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
+                ['octo-print-designer-vendor', 'octo-print-designer-admin', 'octo-template-editor-canvas-hook', 'jquery'],
                 $this->version . '.5',
                 true
             );
@@ -1098,7 +1046,7 @@ class Octo_Print_Designer_Admin {
                 break;
 
             case 'woocommerce_admin':
-                $this->load_preview_only_scripts();
+                // Preview system removed - no scripts needed for WooCommerce admin
                 break;
 
             default:
@@ -1117,48 +1065,6 @@ class Octo_Print_Designer_Admin {
         // (keeping existing enqueue logic intact)
     }
 
-    /**
-     * 🧠 AGENT METHOD: AdminContextOptimizer - Load preview-only scripts (lightweight)
-     */
-    private function load_preview_only_scripts() {
-        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Loading lightweight preview scripts');</script>";
-
-        // Load only essential scripts for design preview
-        wp_enqueue_script('jquery');
-
-        // Emergency Fabric.js loader (bypasses webpack issues)
-        wp_enqueue_script(
-            'octo-emergency-fabric-loader',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/emergency-fabric-loader.js',
-            ['jquery'],
-            $this->version . '-emergency',
-            true
-        );
-
-        // 🎯 7-AGENT FIX: Optimized Design Data Capture for WooCommerce Admin
-        // CRITICAL: This script provides generateDesignData() function required by "Designdaten laden" button
-        // Agent Analysis: Script was referenced but NEVER enqueued, causing wp_localize_script() to fail silently
-        wp_enqueue_script(
-            'octo-admin-optimized-capture',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/optimized-design-data-capture.js',
-            ['octo-emergency-fabric-loader'], // Load after Fabric.js is available
-            $this->version . '.wc-admin-capture',
-            true
-        );
-
-        // Admin context flag - AGENT 2 FIX: Allow selective canvas detection
-        // Now properly localizes the ENQUEUED script above
-        wp_localize_script('octo-admin-optimized-capture', 'octoAdminContext', [
-            'context' => 'woocommerce_admin',
-            'skip_canvas_polling' => false, // CRITICAL: Enable canvas detection for template editor
-            'enable_selective_detection' => true, // Allow canvas detection only when needed
-            'enable_modal_preview' => true,
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('admin_design_preview_nonce') // 🔧 FIX: Use admin-specific nonce
-        ]);
-
-        echo "<script>console.log('🧠 [ADMIN OPTIMIZER] Preview scripts loaded - selective canvas detection enabled');</script>";
-    }
 
     // 🧠 AGENT 3 DELIVERABLE: Measurement Database AJAX Handler Methods
 
