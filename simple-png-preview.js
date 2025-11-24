@@ -116,7 +116,102 @@ class SimplePNGPreview {
     }
 
     /**
-     * Try to load PNG from database via AJAX with filesystem discovery
+     * Try intelligent PNG discovery system (NEW primary method)
+     */
+    async tryIntelligentDiscovery(designId) {
+        console.log('🧠 SIMPLE PNG PREVIEW: Starting intelligent discovery', {
+            designId: designId,
+            orderId: this.orderId,
+            ajaxUrl: window.ajaxurl || 'undefined'
+        });
+
+        if (!window.ajaxurl) {
+            console.warn('⚠️ SIMPLE PNG PREVIEW: No AJAX URL available for intelligent discovery');
+            return null;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'yprint_discover_png_files');
+            formData.append('identifier', designId);
+
+            console.log('📡 SIMPLE PNG PREVIEW: Using INTELLIGENT discovery system first');
+
+            // Pass order_id if available for intelligent design data lookup
+            if (this.orderId) {
+                formData.append('order_id', this.orderId);
+                console.log('📡 SIMPLE PNG PREVIEW: Including order_id for intelligent search: ' + this.orderId);
+            }
+
+            // Try to get nonce from various sources (prioritize existing ones)
+            const nonce = window.octo_print_designer_config?.nonce ||
+                         document.querySelector('input[name="_wpnonce"]')?.value ||
+                         document.querySelector('#_wpnonce')?.value ||
+                         window.ajaxurl?.split('admin-ajax.php')[0] + 'admin.php?_wpnonce=' ||
+                         'admin_fallback';
+
+            formData.append('nonce', nonce);
+
+            console.log('📡 SIMPLE PNG PREVIEW: Sending intelligent discovery request', {
+                action: 'yprint_discover_png_files',
+                identifier: designId,
+                orderId: this.orderId,
+                nonce: nonce,
+                formData: Array.from(formData.entries())
+            });
+
+            const response = await fetch(window.ajaxurl, {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log('📡 SIMPLE PNG PREVIEW: Intelligent discovery response received', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            console.log('📡 SIMPLE PNG PREVIEW: Intelligent discovery data', {
+                success: data.success,
+                data: data.data,
+                fullResponse: data
+            });
+
+            if (data.success && data.data?.files && data.data.files.length > 0) {
+                const latestFile = data.data.files[0]; // Most recent/relevant file
+                console.log('✅ SIMPLE PNG PREVIEW: PNG discovered via intelligent system', {
+                    file: latestFile,
+                    totalFiles: data.data.files.length,
+                    searchIdentifiers: data.data.search_identifiers,
+                    designMetadata: data.data.design_metadata
+                });
+                return latestFile.url;
+            } else {
+                console.log('ℹ️ SIMPLE PNG PREVIEW: No PNG files discovered via intelligent system', {
+                    reason: data.data?.message || 'No files found',
+                    searchIdentifiers: data.data?.search_identifiers,
+                    designMetadata: data.data?.design_metadata
+                });
+                return null;
+            }
+
+        } catch (error) {
+            console.error('❌ SIMPLE PNG PREVIEW: Intelligent discovery failed', {
+                error: error.message,
+                stack: error.stack
+            });
+            return null;
+        }
+    }
+
+    /**
+     * Try to load PNG from database via AJAX with filesystem discovery (LEGACY)
      */
     async tryAJAXRetrieval(designId) {
         console.log('📡 SIMPLE PNG PREVIEW: Attempting AJAX retrieval', {
@@ -133,6 +228,8 @@ class SimplePNGPreview {
             const formData = new FormData();
             formData.append('action', 'yprint_discover_png_files');
             formData.append('identifier', designId);
+
+            console.log('📡 SIMPLE PNG PREVIEW: Using INTELLIGENT discovery system first');
 
             // Pass order_id if available for intelligent design data lookup
             if (this.orderId) {
@@ -423,9 +520,18 @@ ${JSON.stringify(debugInfo, null, 2)}
             // Show loading state
             this.container.innerHTML = '<div style="text-align: center; padding: 20px;">🔄 Searching for PNG...</div>';
 
-            // Step 1: Try AJAX database retrieval
-            console.log('🔄 SIMPLE PNG PREVIEW: Step 1 - AJAX database retrieval');
-            const ajaxUrl = await this.tryAJAXRetrieval(designId);
+            // Step 1: Try INTELLIGENT PNG discovery (new system)
+            console.log('🔄 SIMPLE PNG PREVIEW: Step 1 - Intelligent PNG discovery');
+            const discoveredUrl = await this.tryIntelligentDiscovery(designId);
+
+            if (discoveredUrl) {
+                this.displayPNG(discoveredUrl);
+                return;
+            }
+
+            // Step 1.5: Try old AJAX database retrieval as fallback
+            console.log('🔄 SIMPLE PNG PREVIEW: Step 1.5 - Legacy AJAX database retrieval');
+            const ajaxUrl = await this.tryOriginalAJAXRetrieval(designId);
 
             if (ajaxUrl) {
                 this.displayPNG(ajaxUrl);

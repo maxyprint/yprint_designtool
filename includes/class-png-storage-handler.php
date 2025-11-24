@@ -381,9 +381,31 @@ class PNG_Storage_Handler {
      * Used by "Designdaten laden" and preview system
      */
     public function handle_get_existing_png() {
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
-            wp_send_json_error('Invalid nonce');
+        // Use same flexible nonce verification as discovery system
+        $nonce_valid = false;
+
+        if (isset($_POST['nonce'])) {
+            $nonce_actions = [
+                'octo_print_designer_nonce',
+                'wp_rest',
+                '_wpnonce',
+                '_ajax_nonce'
+            ];
+
+            foreach ($nonce_actions as $action) {
+                if (wp_verify_nonce($_POST['nonce'], $action)) {
+                    $nonce_valid = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$nonce_valid && current_user_can('manage_options')) {
+            $nonce_valid = true;
+        }
+
+        if (!$nonce_valid) {
+            wp_send_json_error('Invalid nonce - admin permissions required');
             return;
         }
 
