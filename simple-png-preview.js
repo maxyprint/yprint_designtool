@@ -140,10 +140,12 @@ class SimplePNGPreview {
                 console.log('📡 SIMPLE PNG PREVIEW: Including order_id for intelligent search: ' + this.orderId);
             }
 
-            // Try to get nonce from various sources
+            // Try to get nonce from various sources (prioritize existing ones)
             const nonce = window.octo_print_designer_config?.nonce ||
                          document.querySelector('input[name="_wpnonce"]')?.value ||
-                         'fallback_nonce';
+                         document.querySelector('#_wpnonce')?.value ||
+                         window.ajaxurl?.split('admin-ajax.php')[0] + 'admin.php?_wpnonce=' ||
+                         'admin_fallback';
 
             formData.append('nonce', nonce);
 

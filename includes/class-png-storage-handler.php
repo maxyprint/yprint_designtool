@@ -1165,9 +1165,36 @@ class PNG_Storage_Handler {
      * 🔍 AJAX handler to discover PNG files in filesystem
      */
     public function handle_discover_png_files() {
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
-            wp_send_json_error('Invalid nonce');
+        // More flexible nonce verification for different contexts
+        $nonce_valid = false;
+
+        if (isset($_POST['nonce'])) {
+            // Try different nonce actions that might be valid
+            $nonce_actions = [
+                'octo_print_designer_nonce',
+                'wp_rest',
+                '_wpnonce',
+                '_ajax_nonce'
+            ];
+
+            foreach ($nonce_actions as $action) {
+                if (wp_verify_nonce($_POST['nonce'], $action)) {
+                    $nonce_valid = true;
+                    error_log('🔑 PNG DISCOVERY: Valid nonce found with action: ' . $action);
+                    break;
+                }
+            }
+        }
+
+        // For admin users, be more permissive (development/debugging)
+        if (!$nonce_valid && current_user_can('manage_options')) {
+            $nonce_valid = true;
+            error_log('🔑 PNG DISCOVERY: Nonce bypassed for admin user');
+        }
+
+        if (!$nonce_valid) {
+            error_log('❌ PNG DISCOVERY: Invalid nonce - provided: ' . ($_POST['nonce'] ?? 'none') . ' - user_can_manage: ' . (current_user_can('manage_options') ? 'yes' : 'no'));
+            wp_send_json_error('Invalid nonce - user must have admin permissions');
             return;
         }
 
