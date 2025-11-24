@@ -10,13 +10,15 @@
  */
 
 class SimplePNGPreview {
-    constructor(containerId) {
+    constructor(containerId, orderId = null) {
         console.log('🎯 SIMPLE PNG PREVIEW: Constructor called', {
             containerId: containerId,
+            orderId: orderId,
             timestamp: new Date().toISOString()
         });
 
         this.container = document.getElementById(containerId);
+        this.orderId = orderId; // Store order ID for intelligent design data lookup
         this.debug = true; // Enable detailed logging
 
         if (!this.container) {
@@ -29,7 +31,8 @@ class SimplePNGPreview {
 
         console.log('✅ SIMPLE PNG PREVIEW: Container found', {
             container: this.container,
-            containerHTML: this.container.outerHTML
+            containerHTML: this.container.outerHTML,
+            orderId: this.orderId
         });
 
         this.init();
@@ -130,6 +133,12 @@ class SimplePNGPreview {
             const formData = new FormData();
             formData.append('action', 'yprint_discover_png_files');
             formData.append('identifier', designId);
+
+            // Pass order_id if available for intelligent design data lookup
+            if (this.orderId) {
+                formData.append('order_id', this.orderId);
+                console.log('📡 SIMPLE PNG PREVIEW: Including order_id for intelligent search: ' + this.orderId);
+            }
 
             // Try to get nonce from various sources
             const nonce = window.octo_print_designer_config?.nonce ||

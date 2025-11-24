@@ -1173,8 +1173,57 @@ class PNG_Storage_Handler {
 
         try {
             $identifier = sanitize_text_field($_POST['identifier']);
+            $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : null;
 
-            error_log('🔍 PNG DISCOVERY: Searching for PNG files for identifier: ' . $identifier);
+            error_log('🔍 PNG DISCOVERY: Searching for PNG files for identifier: ' . $identifier . ' (order_id: ' . $order_id . ')');
+
+            // INTELLIGENT SEARCH: Try to get real design data from order if provided
+            $search_identifiers = [$identifier];
+            $design_metadata = [];
+
+            if ($order_id) {
+                // Get order and extract real design identifiers
+                $order = wc_get_order($order_id);
+                if ($order) {
+                    error_log('🔍 PNG DISCOVERY: Analyzing order #' . $order_id . ' for design data');
+
+                    // Check order meta for design data
+                    $stored_design_data = $order->get_meta('_design_data');
+                    if ($stored_design_data) {
+                        $design_data = is_string($stored_design_data) ? json_decode($stored_design_data, true) : $stored_design_data;
+                        if (isset($design_data['design_id'])) {
+                            $search_identifiers[] = $design_data['design_id'];
+                        }
+                        $design_metadata['order_design_data'] = $design_data;
+                    }
+
+                    // Check order items for design data
+                    $order_items = $order->get_items();
+                    foreach ($order_items as $item_id => $item) {
+                        $item_design_id = $item->get_meta('_design_id');
+                        $item_design_data = $item->get_meta('_design_data');
+                        $item_png_data = $item->get_meta('print_png_data');
+
+                        if ($item_design_id) {
+                            $search_identifiers[] = $item_design_id;
+                        }
+
+                        if ($item_design_data) {
+                            $design_metadata['item_' . $item_id] = [
+                                'design_id' => $item_design_id,
+                                'design_data' => $item_design_data,
+                                'png_data' => $item_png_data
+                            ];
+                        }
+
+                        error_log('🔍 PNG DISCOVERY: Item #' . $item_id . ' - design_id: ' . $item_design_id);
+                    }
+                }
+            }
+
+            // Remove duplicates and empty values
+            $search_identifiers = array_unique(array_filter($search_identifiers));
+            error_log('🔍 PNG DISCOVERY: Final search identifiers: ' . implode(', ', $search_identifiers));
 
             // Get WordPress upload directory info
             $wp_upload_dir = wp_upload_dir();
@@ -1183,38 +1232,51 @@ class PNG_Storage_Handler {
 
             $discovered_files = [];
 
+            // Build search patterns for all identifiers
+            $all_patterns = [];
+
+            foreach ($search_identifiers as $search_id) {
+                $all_patterns = array_merge($all_patterns, [
+                    "design_{$search_id}_*.png",
+                    "{$search_id}.png",
+                    "design_*_{$search_id}.png",
+                    "*{$search_id}*.png"
+                ]);
+            }
+
             // Define search directories and their patterns
             $search_patterns = [
                 // design-pngs directory (current storage location)
                 [
                     'dir' => $upload_base_path . '/design-pngs/',
                     'url_base' => $upload_base_url . '/design-pngs/',
-                    'patterns' => [
-                        "design_{$identifier}_*.png",
-                        "{$identifier}.png",
-                        "design_*_{$identifier}.png"
-                    ]
+                    'patterns' => $all_patterns
                 ],
                 // yprint-print-pngs directory
                 [
                     'dir' => $upload_base_path . '/yprint-print-pngs/',
                     'url_base' => $upload_base_url . '/yprint-print-pngs/',
-                    'patterns' => [
-                        "{$identifier}.png",
-                        "design_{$identifier}.png"
-                    ]
-                ],
-                // octo-print-designer previews
-                [
-                    'dir' => $upload_base_path . '/octo-print-designer/previews/' . $identifier . '/',
-                    'url_base' => $upload_base_url . '/octo-print-designer/previews/' . $identifier . '/',
-                    'patterns' => [
-                        'preview.png',
-                        'shirt-preview-front.png',
-                        'preview-*.png'
-                    ]
+                    'patterns' => $all_patterns
                 ]
             ];
+
+            // Add octo-print-designer preview directories for each identifier
+            foreach ($search_identifiers as $search_id) {
+                $preview_dir = $upload_base_path . '/octo-print-designer/previews/' . $search_id . '/';
+                $preview_url = $upload_base_url . '/octo-print-designer/previews/' . $search_id . '/';
+
+                if (is_dir($preview_dir)) {
+                    $search_patterns[] = [
+                        'dir' => $preview_dir,
+                        'url_base' => $preview_url,
+                        'patterns' => [
+                            'preview.png',
+                            'shirt-preview-front.png',
+                            'preview-*.png'
+                        ]
+                    ];
+                }
+            }
 
             // Search each directory
             foreach ($search_patterns as $search) {
@@ -1230,13 +1292,24 @@ class PNG_Storage_Handler {
                             $filename = basename($file_path);
                             $file_url = $search['url_base'] . $filename;
 
+                            // Try to determine which identifier matched this file
+                            $matched_identifier = null;
+                            foreach ($search_identifiers as $search_id) {
+                                if (strpos($filename, $search_id) !== false) {
+                                    $matched_identifier = $search_id;
+                                    break;
+                                }
+                            }
+
                             $file_info = [
                                 'path' => $file_path,
                                 'url' => $file_url,
                                 'filename' => $filename,
                                 'size' => filesize($file_path),
                                 'modified' => filemtime($file_path),
-                                'modified_readable' => date('Y-m-d H:i:s', filemtime($file_path))
+                                'modified_readable' => date('Y-m-d H:i:s', filemtime($file_path)),
+                                'matched_identifier' => $matched_identifier,
+                                'directory' => basename(dirname($file_path))
                             ];
 
                             $discovered_files[] = $file_info;
@@ -1258,15 +1331,21 @@ class PNG_Storage_Handler {
                 wp_send_json_success([
                     'files' => $discovered_files,
                     'count' => count($discovered_files),
-                    'identifier' => $identifier,
+                    'original_identifier' => $identifier,
+                    'search_identifiers' => $search_identifiers,
+                    'design_metadata' => $design_metadata,
+                    'order_id' => $order_id,
                     'message' => 'PNG files discovered successfully'
                 ]);
             } else {
                 wp_send_json_success([
                     'files' => [],
                     'count' => 0,
-                    'identifier' => $identifier,
-                    'message' => 'No PNG files found for identifier'
+                    'original_identifier' => $identifier,
+                    'search_identifiers' => $search_identifiers,
+                    'design_metadata' => $design_metadata,
+                    'order_id' => $order_id,
+                    'message' => 'No PNG files found for any identifier'
                 ]);
             }
 

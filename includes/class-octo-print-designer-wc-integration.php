@@ -3238,7 +3238,25 @@ private function build_print_provider_email_content($order, $design_items, $note
         $stored_design_data = $order->get_meta('_design_data');
         $has_design_data = !empty($stored_design_data);
 
-        error_log("🎯 PNG PREVIEW DEBUG: Order #" . $order_id . " - has_design_data: " . ($has_design_data ? 'YES' : 'NO') . " - stored_data: " . substr(print_r($stored_design_data, true), 0, 200));
+        error_log("🎯 PNG PREVIEW DEBUG: Order #" . $order_id . " - has_design_data: " . ($has_design_data ? 'YES' : 'NO') . " - stored_data: " . substr(print_r($stored_design_data, true), 0, 500));
+
+        // EXTENSIVE DEBUG: Get ALL order meta to understand data structure
+        $all_order_meta = get_post_meta($order_id);
+        error_log("🔍 PNG PREVIEW DEBUG: ALL ORDER META for #" . $order_id . ": " . substr(print_r($all_order_meta, true), 0, 1000));
+
+        // EXTENSIVE DEBUG: Check order items for design data
+        $order_items = $order->get_items();
+        foreach ($order_items as $item_id => $item) {
+            $item_meta = $item->get_meta_data();
+            error_log("🔍 PNG PREVIEW DEBUG: ORDER ITEM #" . $item_id . " META: " . substr(print_r($item_meta, true), 0, 800));
+
+            // Check for design-related meta
+            $design_id = $item->get_meta('_design_id');
+            $design_data = $item->get_meta('_design_data');
+            $png_data = $item->get_meta('print_png_data');
+
+            error_log("🔍 PNG PREVIEW DEBUG: ITEM #" . $item_id . " - design_id: " . $design_id . " - design_data: " . substr(print_r($design_data, true), 0, 300) . " - png_data: " . substr(print_r($png_data, true), 0, 300));
+        }
 
         // TEMPORARY: Show for ALL orders to test the system
         $show_preview_section = true; // Change this back to $has_design_data later
@@ -3324,7 +3342,7 @@ private function build_print_provider_email_content($order, $design_items, $note
                         console.log('🔧 WC INTEGRATION: Added fallback design_id', designData.design_id);
                     }
 
-                    const preview = new SimplePNGPreview('simple-png-preview-<?php echo $order_id; ?>');
+                    const preview = new SimplePNGPreview('simple-png-preview-<?php echo $order_id; ?>', <?php echo $order_id; ?>);
                     preview.showPreview(designData);
 
                 } catch (error) {
