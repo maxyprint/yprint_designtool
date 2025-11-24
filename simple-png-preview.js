@@ -58,11 +58,26 @@ class SimplePNGPreview {
         });
 
         const designId = designData?.design_id || designData?.id || 'test';
+        const orderId = designData?.order_id || designId;
         const baseUrl = window.location.origin;
+
+        // Generate timestamp-based variants for recent designs
+        const now = Date.now();
+        const timestampVariants = [];
+
+        // Try timestamps from the last 24 hours (common PNG generation window)
+        for (let hours = 0; hours < 24; hours++) {
+            const timestamp = Math.floor((now - (hours * 60 * 60 * 1000)) / 1000);
+            timestampVariants.push(timestamp);
+        }
 
         const urls = [
             // Primary: yprint-print-pngs directory (from PNG storage handler)
             `${baseUrl}/wp-content/uploads/yprint-print-pngs/${designId}.png`,
+
+            // NEW: design-pngs directory with design_id_timestamp pattern (actual storage pattern)
+            `${baseUrl}/wp-content/uploads/design-pngs/design_${designId}_${Math.floor(now/1000)}.png`,
+            `${baseUrl}/wp-content/uploads/design-pngs/design_${orderId}_${Math.floor(now/1000)}.png`,
 
             // Secondary: octo-print-designer previews (from API docs)
             `${baseUrl}/wp-content/uploads/octo-print-designer/previews/${designId}/preview.png`,
@@ -70,6 +85,7 @@ class SimplePNGPreview {
 
             // Tertiary: design-pngs directory (from public class)
             `${baseUrl}/wp-content/uploads/design-pngs/${designId}.png`,
+            `${baseUrl}/wp-content/uploads/design-pngs/${orderId}.png`,
 
             // Quaternary: yprint-designs directory (from test files)
             `${baseUrl}/wp-content/uploads/yprint-designs/design-${designId}.png`,
@@ -78,16 +94,26 @@ class SimplePNGPreview {
             `${baseUrl}/wp-content/uploads/octo-print-designer/previews/${designId}/preview-5338.png`
         ];
 
+        // Add recent timestamp variants for design_pngs (last 3 hours)
+        for (let i = 0; i < 3; i++) {
+            const recentTimestamp = Math.floor((now - (i * 60 * 60 * 1000)) / 1000);
+            urls.push(`${baseUrl}/wp-content/uploads/design-pngs/design_${designId}_${recentTimestamp}.png`);
+            urls.push(`${baseUrl}/wp-content/uploads/design-pngs/design_${orderId}_${recentTimestamp}.png`);
+        }
+
         console.log('🔗 SIMPLE PNG PREVIEW: Generated URL list', {
             totalUrls: urls.length,
-            urls: urls
+            urls: urls,
+            designId: designId,
+            orderId: orderId,
+            timestampNow: Math.floor(now/1000)
         });
 
         return urls;
     }
 
     /**
-     * Try to load PNG from database via AJAX
+     * Try to load PNG from database via AJAX with filesystem discovery
      */
     async tryAJAXRetrieval(designId) {
         console.log('📡 SIMPLE PNG PREVIEW: Attempting AJAX retrieval', {
@@ -102,7 +128,7 @@ class SimplePNGPreview {
 
         try {
             const formData = new FormData();
-            formData.append('action', 'yprint_get_existing_png');
+            formData.append('action', 'yprint_discover_png_files');
             formData.append('identifier', designId);
 
             // Try to get nonce from various sources
@@ -112,8 +138,8 @@ class SimplePNGPreview {
 
             formData.append('nonce', nonce);
 
-            console.log('📡 SIMPLE PNG PREVIEW: Sending AJAX request', {
-                action: 'yprint_get_existing_png',
+            console.log('📡 SIMPLE PNG PREVIEW: Sending PNG discovery request', {
+                action: 'yprint_discover_png_files',
                 identifier: designId,
                 nonce: nonce,
                 formData: Array.from(formData.entries())
@@ -131,31 +157,88 @@ class SimplePNGPreview {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                // Fallback to original method
+                return this.tryOriginalAJAXRetrieval(designId);
             }
 
             const data = await response.json();
 
-            console.log('📡 SIMPLE PNG PREVIEW: AJAX response data', {
+            console.log('📡 SIMPLE PNG PREVIEW: PNG discovery response', {
                 success: data.success,
                 data: data.data,
                 fullResponse: data
             });
 
+            if (data.success && data.data?.files && data.data.files.length > 0) {
+                const latestFile = data.data.files[0]; // Most recent file
+                console.log('✅ SIMPLE PNG PREVIEW: PNG discovered via filesystem', {
+                    file: latestFile,
+                    totalFiles: data.data.files.length
+                });
+                return latestFile.url;
+            } else {
+                console.log('ℹ️ SIMPLE PNG PREVIEW: No PNG files discovered', {
+                    reason: data.data?.message || 'No files found'
+                });
+                // Fallback to original method
+                return this.tryOriginalAJAXRetrieval(designId);
+            }
+
+        } catch (error) {
+            console.error('❌ SIMPLE PNG PREVIEW: PNG discovery failed', {
+                error: error.message,
+                stack: error.stack
+            });
+            // Fallback to original method
+            return this.tryOriginalAJAXRetrieval(designId);
+        }
+    }
+
+    /**
+     * Fallback to original AJAX retrieval method
+     */
+    async tryOriginalAJAXRetrieval(designId) {
+        try {
+            const formData = new FormData();
+            formData.append('action', 'yprint_get_existing_png');
+            formData.append('identifier', designId);
+
+            const nonce = window.octo_print_designer_config?.nonce ||
+                         document.querySelector('input[name="_wpnonce"]')?.value ||
+                         'fallback_nonce';
+
+            formData.append('nonce', nonce);
+
+            console.log('📡 SIMPLE PNG PREVIEW: Trying original AJAX method', {
+                action: 'yprint_get_existing_png',
+                identifier: designId
+            });
+
+            const response = await fetch(window.ajaxurl, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
             if (data.success && data.data?.url) {
-                console.log('✅ SIMPLE PNG PREVIEW: PNG found via AJAX', {
+                console.log('✅ SIMPLE PNG PREVIEW: PNG found via original AJAX', {
                     pngUrl: data.data.url
                 });
                 return data.data.url;
             } else {
-                console.log('ℹ️ SIMPLE PNG PREVIEW: No PNG found via AJAX', {
+                console.log('ℹ️ SIMPLE PNG PREVIEW: No PNG found via original AJAX', {
                     reason: data.data?.message || 'Unknown'
                 });
                 return null;
             }
 
         } catch (error) {
-            console.error('❌ SIMPLE PNG PREVIEW: AJAX retrieval failed', {
+            console.error('❌ SIMPLE PNG PREVIEW: Original AJAX failed', {
                 error: error.message,
                 stack: error.stack
             });

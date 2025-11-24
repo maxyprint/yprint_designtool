@@ -54,6 +54,10 @@ class PNG_Storage_Handler {
         add_action('wp_ajax_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
         add_action('wp_ajax_nopriv_yprint_get_existing_png', array($this, 'handle_get_existing_png'));
 
+        // 🔍 PNG DISCOVERY: Handler to discover PNG files in filesystem
+        add_action('wp_ajax_yprint_discover_png_files', array($this, 'handle_discover_png_files'));
+        add_action('wp_ajax_nopriv_yprint_discover_png_files', array($this, 'handle_discover_png_files'));
+
         add_action('wp_ajax_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
         add_action('wp_ajax_nopriv_yprint_get_template_print_area', array($this, 'handle_get_template_print_area'));
 
@@ -1154,6 +1158,121 @@ class PNG_Storage_Handler {
         } catch (Exception $e) {
             error_log('❌ DATABASE SAVE: Exception occurred: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * 🔍 AJAX handler to discover PNG files in filesystem
+     */
+    public function handle_discover_png_files() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'octo_print_designer_nonce')) {
+            wp_send_json_error('Invalid nonce');
+            return;
+        }
+
+        try {
+            $identifier = sanitize_text_field($_POST['identifier']);
+
+            error_log('🔍 PNG DISCOVERY: Searching for PNG files for identifier: ' . $identifier);
+
+            // Get WordPress upload directory info
+            $wp_upload_dir = wp_upload_dir();
+            $upload_base_path = $wp_upload_dir['basedir'];
+            $upload_base_url = $wp_upload_dir['baseurl'];
+
+            $discovered_files = [];
+
+            // Define search directories and their patterns
+            $search_patterns = [
+                // design-pngs directory (current storage location)
+                [
+                    'dir' => $upload_base_path . '/design-pngs/',
+                    'url_base' => $upload_base_url . '/design-pngs/',
+                    'patterns' => [
+                        "design_{$identifier}_*.png",
+                        "{$identifier}.png",
+                        "design_*_{$identifier}.png"
+                    ]
+                ],
+                // yprint-print-pngs directory
+                [
+                    'dir' => $upload_base_path . '/yprint-print-pngs/',
+                    'url_base' => $upload_base_url . '/yprint-print-pngs/',
+                    'patterns' => [
+                        "{$identifier}.png",
+                        "design_{$identifier}.png"
+                    ]
+                ],
+                // octo-print-designer previews
+                [
+                    'dir' => $upload_base_path . '/octo-print-designer/previews/' . $identifier . '/',
+                    'url_base' => $upload_base_url . '/octo-print-designer/previews/' . $identifier . '/',
+                    'patterns' => [
+                        'preview.png',
+                        'shirt-preview-front.png',
+                        'preview-*.png'
+                    ]
+                ]
+            ];
+
+            // Search each directory
+            foreach ($search_patterns as $search) {
+                if (!is_dir($search['dir'])) {
+                    continue;
+                }
+
+                foreach ($search['patterns'] as $pattern) {
+                    $files = glob($search['dir'] . $pattern);
+
+                    foreach ($files as $file_path) {
+                        if (is_file($file_path) && file_exists($file_path)) {
+                            $filename = basename($file_path);
+                            $file_url = $search['url_base'] . $filename;
+
+                            $file_info = [
+                                'path' => $file_path,
+                                'url' => $file_url,
+                                'filename' => $filename,
+                                'size' => filesize($file_path),
+                                'modified' => filemtime($file_path),
+                                'modified_readable' => date('Y-m-d H:i:s', filemtime($file_path))
+                            ];
+
+                            $discovered_files[] = $file_info;
+
+                            error_log('🔍 PNG DISCOVERY: Found file: ' . $filename . ' (' . $file_info['size'] . ' bytes)');
+                        }
+                    }
+                }
+            }
+
+            // Sort files by modification time (newest first)
+            usort($discovered_files, function($a, $b) {
+                return $b['modified'] - $a['modified'];
+            });
+
+            error_log('🔍 PNG DISCOVERY: Found ' . count($discovered_files) . ' PNG files for identifier: ' . $identifier);
+
+            if (!empty($discovered_files)) {
+                wp_send_json_success([
+                    'files' => $discovered_files,
+                    'count' => count($discovered_files),
+                    'identifier' => $identifier,
+                    'message' => 'PNG files discovered successfully'
+                ]);
+            } else {
+                wp_send_json_success([
+                    'files' => [],
+                    'count' => 0,
+                    'identifier' => $identifier,
+                    'message' => 'No PNG files found for identifier'
+                ]);
+            }
+
+        } catch (Exception $e) {
+            error_log('❌ PNG DISCOVERY: Exception: ' . $e->getMessage());
+            wp_send_json_error('PNG discovery failed: ' . $e->getMessage());
         }
     }
 }
