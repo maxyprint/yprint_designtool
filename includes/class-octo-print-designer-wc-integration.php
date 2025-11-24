@@ -3234,48 +3234,20 @@ private function build_print_provider_email_content($order, $design_items, $note
         // DEBUG: Always show this section for testing
         error_log("🎯 PNG PREVIEW DEBUG: add_design_info_section called for order #" . $order_id);
 
-        // Check if we have design data stored for this order
-        $stored_design_data = $order->get_meta('_design_data');
-        $has_design_data = !empty($stored_design_data);
+        // 🔧 FIXED: Comprehensive design data extraction from multiple sources
+        $design_data = $this->extract_real_design_data($order);
+        $has_design_data = !empty($design_data);
 
-        error_log("🎯 PNG PREVIEW DEBUG: Order #" . $order_id . " - has_design_data: " . ($has_design_data ? 'YES' : 'NO') . " - stored_data: " . substr(print_r($stored_design_data, true), 0, 500));
+        error_log("🎯 PNG PREVIEW: Order #" . $order_id . " - Real design data found: " . ($has_design_data ? 'YES' : 'NO'));
 
-        // EXTENSIVE DEBUG: Get ALL order meta to understand data structure
-        $all_order_meta = get_post_meta($order_id);
-        error_log("🔍 PNG PREVIEW DEBUG: ALL ORDER META for #" . $order_id . ": " . substr(print_r($all_order_meta, true), 0, 1000));
-
-        // EXTENSIVE DEBUG: Check order items for design data
-        $order_items = $order->get_items();
-        foreach ($order_items as $item_id => $item) {
-            $item_meta = $item->get_meta_data();
-            error_log("🔍 PNG PREVIEW DEBUG: ORDER ITEM #" . $item_id . " META: " . substr(print_r($item_meta, true), 0, 800));
-
-            // Check for design-related meta
-            $design_id = $item->get_meta('_design_id');
-            $design_data = $item->get_meta('_design_data');
-            $png_data = $item->get_meta('print_png_data');
-
-            error_log("🔍 PNG PREVIEW DEBUG: ITEM #" . $item_id . " - design_id: " . $design_id . " - design_data: " . substr(print_r($design_data, true), 0, 300) . " - png_data: " . substr(print_r($png_data, true), 0, 300));
+        if ($has_design_data) {
+            error_log("🎯 PNG PREVIEW: Real design data - " . substr(json_encode($design_data), 0, 500));
         }
 
-        // TEMPORARY: Show for ALL orders to test the system
-        $show_preview_section = true; // Change this back to $has_design_data later
-
-        if ($show_preview_section) {
-            // Decode design data for preview
-            $design_data = is_string($stored_design_data) ? json_decode($stored_design_data, true) : $stored_design_data;
-
-            // TEMPORARY: Create test design data if none exists
-            if (empty($design_data)) {
-                $design_data = array(
-                    'design_id' => $order_id,
-                    'order_id' => $order_id,
-                    'template_view_id' => '189542',
-                    'test_mode' => true,
-                    'elements' => array()
-                );
-                error_log("🎯 PNG PREVIEW DEBUG: Created test design data for order #" . $order_id);
-            }
+        if ($has_design_data) {
+            // Mark as real data, not test mode
+            $design_data['test_mode'] = false;
+            $design_data['order_id'] = $order_id;
 
             ?>
             <div style="margin: 20px 0; padding: 12px; background: #e7f3ff; border-left: 4px solid #72aee6; border-radius: 0 4px 4px 0;">
@@ -4203,6 +4175,112 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("❌ [PNG AUTO-GEN] Design {$design_id}: Exception during PNG generation: " . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * 🔧 FIXED: Extract real design data from WooCommerce order
+     * Checks multiple sources: order meta, order items, and legacy storage
+     *
+     * @param WC_Order $order
+     * @return array|null Real design data or null if none found
+     */
+    private function extract_real_design_data($order) {
+        $order_id = $order->get_id();
+
+        error_log("🔍 PNG PREVIEW: Extracting real design data for order #" . $order_id);
+
+        // 🔧 SOURCE 1: Order meta '_design_data' (primary source)
+        $stored_design_data = $order->get_meta('_design_data');
+        if (!empty($stored_design_data)) {
+            error_log("🎯 PNG PREVIEW: Found design data in order meta");
+
+            $design_data = is_string($stored_design_data) ? json_decode($stored_design_data, true) : $stored_design_data;
+
+            if (is_array($design_data) && !empty($design_data)) {
+                // Validate it's real design data, not test data
+                if (!isset($design_data['test_mode']) || $design_data['test_mode'] !== true) {
+                    if (isset($design_data['design_id']) || isset($design_data['elements'])) {
+                        error_log("✅ PNG PREVIEW: Valid real design data found in order meta");
+                        return $design_data;
+                    }
+                }
+            }
+        }
+
+        // 🔧 SOURCE 2: Order items '_design_data' meta (secondary source)
+        $order_items = $order->get_items();
+        foreach ($order_items as $item_id => $item) {
+            $item_design_data = $item->get_meta('_design_data');
+
+            if (!empty($item_design_data)) {
+                error_log("🎯 PNG PREVIEW: Found design data in order item #" . $item_id);
+
+                $design_data = is_string($item_design_data) ? json_decode($item_design_data, true) : $item_design_data;
+
+                if (is_array($design_data) && !empty($design_data)) {
+                    // Validate it's real design data, not test data
+                    if (!isset($design_data['test_mode']) || $design_data['test_mode'] !== true) {
+                        if (isset($design_data['design_id']) || isset($design_data['elements'])) {
+                            error_log("✅ PNG PREVIEW: Valid real design data found in order item #" . $item_id);
+                            return $design_data;
+                        }
+                    }
+                }
+            }
+
+            // Also check for legacy '_design_id' meta
+            $design_id = $item->get_meta('_design_id');
+            if (!empty($design_id) && $design_id != $order_id) {
+                error_log("🎯 PNG PREVIEW: Found legacy design_id in order item: " . $design_id);
+
+                // Try to load design data from wp_octo_user_designs table
+                global $wpdb;
+                $table_name = $wpdb->prefix . 'octo_user_designs';
+
+                $design = $wpdb->get_row($wpdb->prepare(
+                    "SELECT * FROM {$table_name} WHERE id = %d",
+                    $design_id
+                ));
+
+                if ($design && !empty($design->design_data)) {
+                    error_log("✅ PNG PREVIEW: Loaded design data from database for design_id: " . $design_id);
+
+                    $design_data = is_string($design->design_data) ? json_decode($design->design_data, true) : $design->design_data;
+
+                    if (is_array($design_data) && !empty($design_data)) {
+                        // Add the real design_id to the data
+                        $design_data['design_id'] = $design_id;
+                        $design_data['from_database'] = true;
+                        return $design_data;
+                    }
+                }
+            }
+        }
+
+        // 🔧 SOURCE 3: Legacy order meta patterns (tertiary source)
+        $all_order_meta = get_post_meta($order_id);
+        foreach ($all_order_meta as $meta_key => $meta_values) {
+            if (strpos($meta_key, 'design') !== false || strpos($meta_key, '_design') !== false) {
+                foreach ($meta_values as $meta_value) {
+                    if (is_string($meta_value) && (strpos($meta_value, 'design_id') !== false || strpos($meta_value, 'elements') !== false)) {
+                        $design_data = json_decode($meta_value, true);
+
+                        if (is_array($design_data) && !empty($design_data)) {
+                            // Validate it's real design data, not test data
+                            if (!isset($design_data['test_mode']) || $design_data['test_mode'] !== true) {
+                                if (isset($design_data['design_id']) || isset($design_data['elements'])) {
+                                    error_log("✅ PNG PREVIEW: Valid real design data found in legacy meta key: " . $meta_key);
+                                    return $design_data;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        error_log("❌ PNG PREVIEW: No real design data found for order #" . $order_id);
+        return null;
     }
 
 }
