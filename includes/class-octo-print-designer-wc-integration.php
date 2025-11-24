@@ -3231,13 +3231,33 @@ private function build_print_provider_email_content($order, $design_items, $note
 
         $order_id = $order->get_id();
 
+        // DEBUG: Always show this section for testing
+        error_log("🎯 PNG PREVIEW DEBUG: add_design_info_section called for order #" . $order_id);
+
         // Check if we have design data stored for this order
         $stored_design_data = $order->get_meta('_design_data');
         $has_design_data = !empty($stored_design_data);
 
-        if ($has_design_data) {
+        error_log("🎯 PNG PREVIEW DEBUG: Order #" . $order_id . " - has_design_data: " . ($has_design_data ? 'YES' : 'NO') . " - stored_data: " . substr(print_r($stored_design_data, true), 0, 200));
+
+        // TEMPORARY: Show for ALL orders to test the system
+        $show_preview_section = true; // Change this back to $has_design_data later
+
+        if ($show_preview_section) {
             // Decode design data for preview
             $design_data = is_string($stored_design_data) ? json_decode($stored_design_data, true) : $stored_design_data;
+
+            // TEMPORARY: Create test design data if none exists
+            if (empty($design_data)) {
+                $design_data = array(
+                    'design_id' => $order_id,
+                    'order_id' => $order_id,
+                    'template_view_id' => '189542',
+                    'test_mode' => true,
+                    'elements' => array()
+                );
+                error_log("🎯 PNG PREVIEW DEBUG: Created test design data for order #" . $order_id);
+            }
 
             ?>
             <div style="margin: 20px 0; padding: 12px; background: #e7f3ff; border-left: 4px solid #72aee6; border-radius: 0 4px 4px 0;">
