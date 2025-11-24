@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Simple PNG Preview Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: #f1f1f1;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+
+        .preview-container {
+            margin: 20px 0;
+            min-height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        button {
+            background: #0073aa;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: #005a87;
+        }
+
+        .console-output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .debug-info {
+            background: #e7f3ff;
+            border-left: 4px solid #72aee6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 0 4px 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Simple PNG Preview Test System</h1>
+        <p>Testing the new ultra-simple PNG preview system with comprehensive debugging</p>
+
+        <div class="debug-info">
+            <strong>Test Environment:</strong>
+            <ul>
+                <li>Base URL: <span id="base-url"></span></li>
+                <li>AJAX Available: <span id="ajax-available"></span></li>
+                <li>Console Logging: Enabled</li>
+            </ul>
+        </div>
+
+        <!-- Test Section 1: Known Design ID -->
+        <div class="test-section">
+            <h3>Test 1: Known Design ID (Order #5391)</h3>
+            <p>Testing with design ID from order #5391 that should have existing PNG data</p>
+
+            <button onclick="testKnownDesignId()">🧪 Test Known Design</button>
+            <button onclick="clearPreview('test1-preview')">🗑️ Clear</button>
+
+            <div id="test1-preview" class="preview-container"></div>
+        </div>
+
+        <!-- Test Section 2: Test Design ID -->
+        <div class="test-section">
+            <h3>Test 2: Test Design ID</h3>
+            <p>Testing with a generic test design ID to see URL patterns</p>
+
+            <button onclick="testGenericDesignId()">🧪 Test Generic Design</button>
+            <button onclick="clearPreview('test2-preview')">🗑️ Clear</button>
+
+            <div id="test2-preview" class="preview-container"></div>
+        </div>
+
+        <!-- Test Section 3: Manual Design Data -->
+        <div class="test-section">
+            <h3>Test 3: Manual Design Data Input</h3>
+            <p>Enter your own design data to test the preview system</p>
+
+            <div style="margin-bottom: 10px;">
+                <label>Design ID: <input type="text" id="manual-design-id" value="test_design_123" style="margin-left: 10px; padding: 5px; width: 200px;"></label>
+            </div>
+
+            <button onclick="testManualDesignId()">🧪 Test Manual Design</button>
+            <button onclick="clearPreview('test3-preview')">🗑️ Clear</button>
+
+            <div id="test3-preview" class="preview-container"></div>
+        </div>
+
+        <!-- Test Section 4: AJAX Testing -->
+        <div class="test-section">
+            <h3>Test 4: AJAX Database Retrieval</h3>
+            <p>Testing the AJAX retrieval system independently</p>
+
+            <button onclick="testAJAXRetrieval()">📡 Test AJAX</button>
+            <button onclick="clearPreview('test4-preview')">🗑️ Clear</button>
+
+            <div id="test4-preview" class="preview-container"></div>
+        </div>
+
+        <!-- Console Output -->
+        <div class="test-section">
+            <h3>🖥️ Console Output</h3>
+            <p>Real-time console output for debugging</p>
+            <button onclick="clearConsoleOutput()">🗑️ Clear Console</button>
+            <div id="console-output" class="console-output">
+                Console output will appear here...
+            </div>
+        </div>
+    </div>
+
+    <!-- Load SimplePNGPreview -->
+    <script src="simple-png-preview.js"></script>
+
+    <script>
+        // Setup environment info
+        document.getElementById('base-url').textContent = window.location.origin;
+        document.getElementById('ajax-available').textContent = window.ajaxurl ? 'Yes' : 'No (simulated)';
+
+        // Mock AJAX URL if not available (for testing)
+        if (!window.ajaxurl) {
+            window.ajaxurl = window.location.origin + '/wp-admin/admin-ajax.php';
+            console.log('🔧 TEST SETUP: Mock AJAX URL created:', window.ajaxurl);
+        }
+
+        // Capture console output for display
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        function addToConsoleOutput(type, message) {
+            const consoleDiv = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            const colorMap = {
+                log: '#0f0',
+                error: '#f00',
+                warn: '#ff0'
+            };
+
+            consoleDiv.innerHTML += `<div style="color: ${colorMap[type] || '#0f0'};">
+[${timestamp}] ${type.toUpperCase()}: ${message}
+</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            addToConsoleOutput('log', args.join(' '));
+            originalConsoleLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            addToConsoleOutput('error', args.join(' '));
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            addToConsoleOutput('warn', args.join(' '));
+            originalConsoleWarn.apply(console, args);
+        };
+
+        // Test functions
+        function testKnownDesignId() {
+            console.log('🧪 TEST 1: Testing known design ID (5391)');
+
+            const designData = {
+                design_id: '5391',
+                order_id: 5391,
+                template_view_id: '189542',
+                elements: [
+                    {
+                        id: 'img_test',
+                        url: 'https://yprint.de/wp-content/uploads/octo-print-designer/user-images/17/yprint-logo.png',
+                        transform: { left: 100, top: 100, scaleX: 1, scaleY: 1, angle: 0 }
+                    }
+                ]
+            };
+
+            const preview = new SimplePNGPreview('test1-preview');
+            preview.showPreview(designData);
+        }
+
+        function testGenericDesignId() {
+            console.log('🧪 TEST 2: Testing generic design ID');
+
+            const designData = {
+                design_id: 'test_design_generic',
+                id: 'fallback_id',
+                timestamp: Date.now()
+            };
+
+            const preview = new SimplePNGPreview('test2-preview');
+            preview.showPreview(designData);
+        }
+
+        function testManualDesignId() {
+            console.log('🧪 TEST 3: Testing manual design ID');
+
+            const designId = document.getElementById('manual-design-id').value;
+
+            const designData = {
+                design_id: designId,
+                manual_test: true,
+                timestamp: Date.now()
+            };
+
+            const preview = new SimplePNGPreview('test3-preview');
+            preview.showPreview(designData);
+        }
+
+        async function testAJAXRetrieval() {
+            console.log('🧪 TEST 4: Testing AJAX retrieval independently');
+
+            try {
+                const preview = new SimplePNGPreview('test4-preview');
+                const result = await preview.tryAJAXRetrieval('5391');
+
+                if (result) {
+                    preview.displayPNG(result);
+                } else {
+                    document.getElementById('test4-preview').innerHTML =
+                        '<div style="text-align: center; padding: 20px; color: #dc3545;">AJAX retrieval returned null</div>';
+                }
+            } catch (error) {
+                console.error('AJAX test failed:', error);
+                document.getElementById('test4-preview').innerHTML =
+                    '<div style="text-align: center; padding: 20px; color: #dc3545;">AJAX test error: ' + error.message + '</div>';
+            }
+        }
+
+        function clearPreview(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+            console.log('🗑️ Cleared preview container:', containerId);
+        }
+
+        function clearConsoleOutput() {
+            document.getElementById('console-output').innerHTML = 'Console output cleared...\n';
+        }
+
+        // Auto-test on page load
+        setTimeout(() => {
+            console.log('🚀 AUTO-TEST: Starting automatic test sequence...');
+            testKnownDesignId();
+        }, 1000);
+    </script>
+</body>
+</html>

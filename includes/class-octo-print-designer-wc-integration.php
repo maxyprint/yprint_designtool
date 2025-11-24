@@ -3236,18 +3236,89 @@ private function build_print_provider_email_content($order, $design_items, $note
         $has_design_data = !empty($stored_design_data);
 
         if ($has_design_data) {
+            // Decode design data for preview
+            $design_data = is_string($stored_design_data) ? json_decode($stored_design_data, true) : $stored_design_data;
+
             ?>
             <div style="margin: 20px 0; padding: 12px; background: #e7f3ff; border-left: 4px solid #72aee6; border-radius: 0 4px 4px 0;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="dashicons dashicons-info" style="color: #0073aa; font-size: 16px;"></span>
                     <div>
                         <strong style="font-size: 12px; color: #0073aa; display: block;">Design Data Available</strong>
-                        <p style="margin: 0; font-size: 11px; color: #005a87; line-height: 1.4;">
+                        <p style="margin: 0; font-size: 11px; color: #005a87; line-height: 1.4; margin-bottom: 10px;">
                             Design data is stored and available for PNG export and production processing.
                         </p>
                     </div>
                 </div>
+
+                <!-- PNG Preview Container -->
+                <div id="simple-png-preview-<?php echo $order_id; ?>"
+                     style="margin-top: 15px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+                    <div style="text-align: center; padding: 20px; color: #666;">
+                        🔄 Initializing PNG preview...
+                    </div>
+                </div>
             </div>
+
+            <!-- Load SimplePNGPreview Script -->
+            <script>
+            console.log('🎯 WC INTEGRATION: Loading SimplePNGPreview for order <?php echo $order_id; ?>');
+
+            // Load the SimplePNGPreview script if not already loaded
+            if (!window.SimplePNGPreview) {
+                console.log('📡 WC INTEGRATION: Loading SimplePNGPreview script...');
+
+                const script = document.createElement('script');
+                script.src = '<?php echo OCTO_PRINT_DESIGNER_URL; ?>simple-png-preview.js';
+                script.onload = function() {
+                    console.log('✅ WC INTEGRATION: SimplePNGPreview script loaded successfully');
+                    initializePNGPreview();
+                };
+                script.onerror = function() {
+                    console.error('❌ WC INTEGRATION: Failed to load SimplePNGPreview script');
+                    document.getElementById('simple-png-preview-<?php echo $order_id; ?>').innerHTML =
+                        '<div style="text-align: center; padding: 20px; color: #dc3545;">❌ PNG preview script failed to load</div>';
+                };
+                document.head.appendChild(script);
+            } else {
+                console.log('✅ WC INTEGRATION: SimplePNGPreview already available');
+                initializePNGPreview();
+            }
+
+            function initializePNGPreview() {
+                console.log('🔧 WC INTEGRATION: Initializing PNG preview for order <?php echo $order_id; ?>');
+
+                try {
+                    const designData = <?php echo json_encode($design_data); ?>;
+
+                    console.log('📊 WC INTEGRATION: Design data for preview', {
+                        orderId: <?php echo $order_id; ?>,
+                        designData: designData,
+                        hasDesignId: !!(designData && (designData.design_id || designData.id)),
+                        dataKeys: designData ? Object.keys(designData) : []
+                    });
+
+                    // Add fallback design_id if missing
+                    if (designData && !designData.design_id && !designData.id) {
+                        designData.design_id = '<?php echo $order_id; ?>';
+                        console.log('🔧 WC INTEGRATION: Added fallback design_id', designData.design_id);
+                    }
+
+                    const preview = new SimplePNGPreview('simple-png-preview-<?php echo $order_id; ?>');
+                    preview.showPreview(designData);
+
+                } catch (error) {
+                    console.error('❌ WC INTEGRATION: PNG preview initialization failed', {
+                        error: error.message,
+                        stack: error.stack,
+                        orderId: <?php echo $order_id; ?>
+                    });
+
+                    document.getElementById('simple-png-preview-<?php echo $order_id; ?>').innerHTML =
+                        '<div style="text-align: center; padding: 20px; color: #dc3545;">❌ PNG preview initialization failed: ' + error.message + '</div>';
+                }
+            }
+            </script>
             <?php
         }
     }
