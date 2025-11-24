@@ -45,9 +45,8 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_ajax_octo_send_print_provider_api', array($this, 'ajax_send_print_provider_api'));
         add_action('wp_ajax_octo_preview_api_payload', array($this, 'ajax_preview_api_payload'));
 
-        // 🎨 DESIGN PREVIEW SYSTEM: WooCommerce Admin Integration
-        add_action('woocommerce_admin_order_data_after_order_details', array($this, 'add_design_preview_button'));
-        add_action('wp_ajax_octo_load_design_preview', array($this, 'ajax_load_design_preview'));
+        // 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Simplified order interface
+        add_action('woocommerce_admin_order_data_after_order_details', array($this, 'add_design_info_section'));
 
         // 🖼️ PNG PLUGIN INTEGRATION: Separate AJAX handlers for plugin PNG uploads
         add_action('wp_ajax_yprint_upload_png', array($this, 'handle_plugin_png_upload'));
@@ -3201,9 +3200,9 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * 🎨 DESIGN PREVIEW SYSTEM: Add preview button to WooCommerce order details
+     * 🗑️ DESIGN PREVIEW SYSTEM REMOVED: Add design info section to WooCommerce order details
      */
-    public function add_design_preview_button($order) {
+    public function add_design_info_section($order) {
         if (!$order instanceof WC_Order) {
             return;
         }
