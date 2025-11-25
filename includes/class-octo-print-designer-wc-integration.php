@@ -3331,6 +3331,71 @@ private function build_print_provider_email_content($order, $design_items, $note
             </script>
             <?php
         }
+
+        // 🔍 ALWAYS SHOW: PNG Discovery Section (independent of design data)
+        ?>
+        <div style="margin: 20px 0; padding: 12px; background: #f0f8ff; border-left: 4px solid #0073aa; border-radius: 0 4px 4px 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="dashicons dashicons-search" style="color: #0073aa; font-size: 16px;"></span>
+                <div>
+                    <strong style="font-size: 12px; color: #0073aa; display: block;">PNG Discovery System</strong>
+                    <p style="margin: 0; font-size: 11px; color: #005a87; line-height: 1.4; margin-bottom: 10px;">
+                        Intelligent PNG discovery for Order #<?php echo $order_id; ?>
+                    </p>
+                </div>
+            </div>
+
+            <!-- PNG Discovery Container -->
+            <div id="png-discovery-<?php echo $order_id; ?>"
+                 style="margin-top: 15px; background: #fff; border-radius: 4px; border: 1px solid #ddd; padding: 15px;">
+                <div style="text-align: center; color: #666;">
+                    🔄 Click "Discover PNGs" to find associated PNG files...
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button type="button" onclick="discoverPNGsForOrder(<?php echo $order_id; ?>)"
+                            style="background: #0073aa; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        🔍 Discover PNGs
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        async function discoverPNGsForOrder(orderId) {
+            const container = document.getElementById('png-discovery-' + orderId);
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">🔄 Searching for PNGs...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'yprint_discover_png_files');
+                formData.append('identifier', orderId);
+                formData.append('order_id', orderId);
+                formData.append('nonce', '<?php echo wp_create_nonce("admin"); ?>');
+
+                const response = await fetch(window.ajaxurl, { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success && data.data?.files?.length > 0) {
+                    let html = '<div style="font-weight: bold; margin-bottom: 10px; color: #0073aa;">📁 Found ' + data.data.files.length + ' PNG file(s):</div>';
+
+                    data.data.files.forEach((file, i) => {
+                        html += '<div style="margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">';
+                        html += '<strong>📄 ' + file.filename + '</strong><br>';
+                        html += '<small>🆔 Design ID: ' + file.matched_identifier + ' | 📏 Size: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB</small><br>';
+                        html += '<a href="' + file.url + '" target="_blank" style="color: #0073aa; text-decoration: none;">🔗 View PNG</a>';
+                        html += '</div>';
+                    });
+
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #dc3545;">❌ No PNG files found for this order</div>';
+                }
+            } catch (error) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #dc3545;">❌ Error: ' + error.message + '</div>';
+            }
+        }
+        </script>
+        <?php
     }
     /**
      * 🖨️ PNG-ONLY SYSTEM: Trigger PNG generation after design data is saved
