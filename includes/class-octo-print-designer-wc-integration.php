@@ -2400,16 +2400,29 @@ private function build_print_provider_email_content($order, $design_items, $note
         $png_files_found = array(); // 🔧 FIX: Collect PNG file information
         global $wpdb;
         $table_name = $wpdb->prefix . 'octo_user_designs';
-        
+
+        // 🔍 CLEAR DEBUG: Start PNG analysis for order
+        error_log("🔍 [PNG DEBUG] ==================== PNG ANALYSIS START ====================");
+        error_log("🔍 [PNG DEBUG] Order ID: {$order_id}");
+        error_log("🔍 [PNG DEBUG] Total order items: " . count($order->get_items()));
+
+        $item_counter = 0;
         foreach ($order->get_items() as $item_id => $item) {
+            $item_counter++;
+            error_log("🔍 [PNG DEBUG] --- Processing Item #{$item_counter} (ID: {$item_id}) ---");
             $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
-            
+
+            error_log("🔍 [PNG DEBUG] Item {$item_counter} product name: " . $item->get_name());
+            error_log("🔍 [PNG DEBUG] Item {$item_counter} design_id: " . ($design_id ?: 'NONE'));
+
             if (!$design_id) {
                 $debug_info[] = "Item {$item_id}: No design_id found (checked _design_id and yprint_design_id)";
+                error_log("🔍 [PNG DEBUG] Item {$item_counter}: No design_id - SKIPPING (not a design item)");
                 continue; // Skip non-design items
             }
-            
+
             $debug_info[] = "Item {$item_id}: Found design_id = {$design_id}";
+            error_log("🔍 [PNG DEBUG] Item {$item_counter}: HAS DESIGN - design_id = {$design_id}");
             
             // Get complete design record from database
             $design = $wpdb->get_row(
@@ -2427,34 +2440,30 @@ private function build_print_provider_email_content($order, $design_items, $note
             
             $debug_info[] = "Design {$design_id}: Found in database";
 
-            // 🔧 FIX: Check for PNG file information with detailed logging
-            error_log("🖼️ [PNG CHECK] Design {$design_id}: Checking PNG fields...");
-            error_log("🖼️ [PNG CHECK] print_file_url: " . ($design['print_file_url'] ?? 'NULL'));
-            error_log("🖼️ [PNG CHECK] print_file_path: " . ($design['print_file_path'] ?? 'NULL'));
+            // 🎯 PRECISION FIX: Use improved PNG lookup with order-specific matching
+            error_log("🎯 [PNG PRECISION] Starting precise PNG lookup for Design {$design_id}, Order {$order_id}");
 
-            if (!empty($design['print_file_url']) && !empty($design['print_file_path'])) {
-                $png_files_found[] = array(
-                    'design_id' => $design_id,
-                    'design_name' => $design['name'] ?: 'Design #' . $design_id,
-                    'print_file_url' => $design['print_file_url'],
-                    'print_file_path' => $design['print_file_path'],
-                    'item_name' => $item->get_name()
-                );
-                $debug_info[] = "Design {$design_id}: PNG file found - " . basename($design['print_file_path']);
-                error_log("✅ [PNG FOUND] Design {$design_id}: PNG available at " . $design['print_file_url']);
+            $precise_pngs = $this->get_precise_png_for_order_item($design_id, $order_id, $item_id, $design);
+
+            if (!empty($precise_pngs)) {
+                error_log("🔍 [PNG DEBUG] Item {$item_counter}: Found " . count($precise_pngs) . " PNG(s) for design_id {$design_id}");
+
+                foreach ($precise_pngs as $png_info) {
+                    $png_files_found[] = $png_info;
+                    $debug_info[] = sprintf(
+                        "Design %s: ✅ Precise PNG found (%s) - %s",
+                        $design_id,
+                        $png_info["source"],
+                        basename($png_info["print_file_url"] ?: 'database_stored')
+                    );
+                    error_log("🔍 [PNG DEBUG] Item {$item_counter}: ADDED PNG to results - Source: " . $png_info["source"] . ", Score: " . $png_info["precision_score"]);
+                }
+                error_log("🔍 [PNG DEBUG] Item {$item_counter}: Total PNGs in results so far: " . count($png_files_found));
             } else {
-                $debug_info[] = "Design {$design_id}: No PNG file information available";
-                error_log("❌ [PNG MISSING] Design {$design_id}: No PNG file information in database");
+                $debug_info[] = "Design {$design_id}: ❌ No PNG files found with precision matching";
+                error_log("🔍 [PNG DEBUG] Item {$item_counter}: NO PNG found for design_id {$design_id}");
 
-                // Debug which fields are missing
-                if (empty($design['print_file_url'])) {
-                    error_log("❌ [PNG MISSING] Design {$design_id}: print_file_url is empty");
-                }
-                if (empty($design['print_file_path'])) {
-                    error_log("❌ [PNG MISSING] Design {$design_id}: print_file_path is empty");
-                }
-
-                // 🔧 AUTO-GENERATE MISSING PNG FILES for existing designs
+                // 🔧 AUTO-GENERATE MISSING PNG FILES as last resort
                 error_log("🔄 [PNG AUTO-GEN] Attempting to auto-generate PNG for design {$design_id}...");
                 $generated_png = $this->auto_generate_png_for_design($design_id, $design);
 
@@ -2464,7 +2473,9 @@ private function build_print_provider_email_content($order, $design_items, $note
                         'design_name' => $design['name'] ?: 'Design #' . $design_id,
                         'print_file_url' => $generated_png['file_url'],
                         'print_file_path' => $generated_png['file_path'],
-                        'item_name' => $item->get_name()
+                        'item_name' => $item->get_name(),
+                        'source' => 'auto_generated',
+                        'precision_score' => 30
                     );
                     $debug_info[] = "Design {$design_id}: ✅ PNG auto-generated - " . basename($generated_png['file_path']);
                     error_log("✅ [PNG AUTO-GEN] Design {$design_id}: Successfully generated PNG at " . $generated_png['file_url']);
@@ -2600,6 +2611,37 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
         error_log("🖼️ [PNG SUMMARY] Preview available: " . ((!empty($stored_design_data) || count($png_files_found) > 0) ? 'YES' : 'NO'));
 
+        // 🔍 CLEAR DEBUG: Final PNG analysis summary
+        error_log("🔍 [PNG DEBUG] ==================== PNG ANALYSIS COMPLETE ====================");
+        error_log("🔍 [PNG DEBUG] Order ID: {$order_id}");
+        error_log("🔍 [PNG DEBUG] Total items processed: {$item_counter}");
+        error_log("🔍 [PNG DEBUG] Total PNGs found: " . count($png_files_found));
+        error_log("🔍 [PNG DEBUG] RESULT ANALYSIS:");
+
+        if (count($png_files_found) === 0) {
+            error_log("🔍 [PNG DEBUG] ❌ NO PNGs found - This is a problem if order has designs");
+        } else if (count($png_files_found) === 1) {
+            error_log("🔍 [PNG DEBUG] ✅ SINGLE PNG found - This is CORRECT if order has 1 design item");
+        } else {
+            error_log("🔍 [PNG DEBUG] ⚠️  MULTIPLE PNGs found (" . count($png_files_found) . ")");
+            error_log("🔍 [PNG DEBUG] This is CORRECT if order has multiple design items");
+            error_log("🔍 [PNG DEBUG] This is INCORRECT if order has only 1 design item");
+
+            // Show breakdown of what was found
+            $design_ids_found = array();
+            foreach ($png_files_found as $png) {
+                $design_ids_found[] = $png['design_id'];
+            }
+            error_log("🔍 [PNG DEBUG] Design IDs found: " . implode(', ', $design_ids_found));
+
+            if (count(array_unique($design_ids_found)) < count($design_ids_found)) {
+                error_log("🔍 [PNG DEBUG] 🚨 DUPLICATE DESIGN IDs DETECTED - This indicates a bug!");
+            } else {
+                error_log("🔍 [PNG DEBUG] ✅ All design IDs are unique - Multiple PNGs are from different designs");
+            }
+        }
+        error_log("🔍 [PNG DEBUG] ================================================================");
+
         wp_send_json_success(array(
             'message' => sprintf(__('Print data refreshed for %d items', 'octo-print-designer'), $refreshed_items),
             'debug' => $debug_info,
@@ -2638,6 +2680,159 @@ private function build_print_provider_email_content($order, $design_items, $note
         }
 
         return true;
+    }
+
+    /**
+     * 🎯 PRECISION PNG MATCHING: Get precise PNG for specific order item
+     * Fixes the "3 PNGs shown instead of 1" issue by finding the exact PNG for this order
+     */
+    private function get_precise_png_for_order_item($design_id, $order_id, $item_id, $design) {
+        global $wpdb;
+
+        error_log("🎯 [PNG PRECISION] Starting precise PNG lookup for Design {$design_id}, Order {$order_id}, Item {$item_id}");
+
+        $png_results = array();
+
+        // METHOD 1: Check yprint_design_pngs table for order-specific PNGs
+        $png_table = $wpdb->prefix . 'yprint_design_pngs';
+
+        // Check if table exists first
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $png_table));
+
+        if ($table_exists) {
+            // First: Look for PNGs specifically saved for this order (take only the most recent one)
+            $order_specific_pngs = $wpdb->get_results($wpdb->prepare(
+                "SELECT design_id, print_png, generated_at, save_type, order_id, template_id, metadata_json
+                 FROM {$png_table}
+                 WHERE design_id = %s AND order_id = %s
+                 ORDER BY generated_at DESC
+                 LIMIT 1",
+                $design_id,
+                $order_id
+            ), ARRAY_A);
+
+            if (!empty($order_specific_pngs)) {
+                // Take only the first (most recent) order-specific PNG
+                $png_record = $order_specific_pngs[0];
+                error_log("🎯 [PNG PRECISION] Found order-specific PNG for Design {$design_id}, Order {$order_id}");
+
+                // Generate temporary URL for this PNG
+                $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, $order_id);
+
+                if ($temp_url) {
+                    $png_results[] = array(
+                        'design_id' => $design_id,
+                        'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                        'print_file_url' => $temp_url,
+                        'print_file_path' => 'database_stored', // Stored in DB
+                        'item_name' => "Order-specific: " . ($design['name'] ?: 'Design #' . $design_id),
+                        'source' => 'order_specific',
+                        'generated_at' => $png_record['generated_at'],
+                        'save_type' => $png_record['save_type'],
+                        'precision_score' => 100 // Highest priority
+                    );
+                }
+            }
+
+            // METHOD 2: Check for design-specific PNGs (without order_id) if no order-specific found
+            if (empty($png_results)) {
+                $design_pngs = $wpdb->get_results($wpdb->prepare(
+                    "SELECT design_id, print_png, generated_at, save_type, template_id
+                     FROM {$png_table}
+                     WHERE design_id = %s AND (order_id IS NULL OR order_id = '' OR order_id = '0')
+                     ORDER BY generated_at DESC
+                     LIMIT 1", // Only get the latest one to avoid multiple PNGs
+                    $design_id
+                ), ARRAY_A);
+
+                if (!empty($design_pngs)) {
+                    // Take only the first (most recent) design-specific PNG
+                    $png_record = $design_pngs[0];
+                    error_log("🎯 [PNG PRECISION] Found design-specific PNG for Design {$design_id}");
+
+                    $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'generic');
+
+                    if ($temp_url) {
+                        $png_results[] = array(
+                            'design_id' => $design_id,
+                            'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                            'print_file_url' => $temp_url,
+                            'print_file_path' => 'database_stored',
+                            'item_name' => "Design: " . ($design['name'] ?: 'Design #' . $design_id),
+                            'source' => 'design_specific',
+                            'generated_at' => $png_record['generated_at'],
+                            'save_type' => $png_record['save_type'],
+                            'precision_score' => 80 // Lower priority than order-specific
+                        );
+                    }
+                }
+            }
+        } else {
+            error_log("⚠️ [PNG PRECISION] PNG table {$png_table} does not exist, falling back to legacy method");
+        }
+
+        // METHOD 3: Fallback to old method (octo_user_designs table) if no modern PNGs found
+        if (empty($png_results)) {
+            if (!empty($design['print_file_url']) && !empty($design['print_file_path'])) {
+                error_log("🎯 [PNG PRECISION] Falling back to legacy method for Design {$design_id}");
+
+                $png_results[] = array(
+                    'design_id' => $design_id,
+                    'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                    'print_file_url' => $design['print_file_url'],
+                    'print_file_path' => $design['print_file_path'],
+                    'item_name' => "Legacy: " . ($design['name'] ?: 'Design #' . $design_id),
+                    'source' => 'legacy_file',
+                    'generated_at' => 'unknown',
+                    'save_type' => 'legacy',
+                    'precision_score' => 50 // Lower priority
+                );
+            }
+        }
+
+        error_log("🎯 [PNG PRECISION] Final result for Design {$design_id}: " . count($png_results) . " PNG(s) found");
+
+        // Return the single PNG found (order-specific has priority, then design-specific, then legacy)
+        return $png_results;
+    }
+
+    /**
+     * 🎯 Generate temporary URL for PNG stored in database
+     */
+    private function generate_temp_png_url($png_binary_data, $design_id, $order_context) {
+        // Create temporary file
+        $upload_dir = wp_upload_dir();
+        $temp_dir = $upload_dir['basedir'] . '/yprint-temp-pngs/';
+
+        if (!file_exists($temp_dir)) {
+            wp_mkdir_p($temp_dir);
+
+            // Create .htaccess for security
+            $htaccess_content = "Options -Indexes\n";
+            $htaccess_content .= "<Files *.png>\n";
+            $htaccess_content .= "    Header set Content-Type \"image/png\"\n";
+            $htaccess_content .= "</Files>\n";
+            file_put_contents($temp_dir . '.htaccess', $htaccess_content);
+        }
+
+        $temp_filename = sprintf(
+            'temp_png_%s_%s_%s.png',
+            $design_id,
+            $order_context,
+            uniqid()
+        );
+
+        $temp_path = $temp_dir . $temp_filename;
+        $temp_url = $upload_dir['baseurl'] . '/yprint-temp-pngs/' . $temp_filename;
+
+        // Write PNG binary data to temporary file
+        if (file_put_contents($temp_path, $png_binary_data)) {
+            error_log("🎯 [PNG TEMP] Created temporary PNG: {$temp_url}");
+            return $temp_url;
+        }
+
+        error_log("❌ [PNG TEMP] Failed to create temporary PNG for Design {$design_id}");
+        return null;
     }
 
     /**
