@@ -3244,6 +3244,19 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("🎯 PNG PREVIEW: Real design data - " . substr(json_encode($design_data), 0, 500));
         }
 
+        // 🔧 DEBUG: Always show section for troubleshooting
+        $debug_mode = false; // Set to true for debugging
+
+        if ($has_design_data || $debug_mode) {
+            if (!$has_design_data && $debug_mode) {
+                // Create debug design data for testing
+                $design_data = array(
+                    'debug_mode' => true,
+                    'order_id' => $order_id,
+                    'message' => 'No real design data found - showing debug section'
+                );
+            }
+
         if ($has_design_data) {
             // Mark as real data, not test mode
             $design_data['test_mode'] = false;

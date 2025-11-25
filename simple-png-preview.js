@@ -184,14 +184,13 @@ class SimplePNGPreview {
             });
 
             if (data.success && data.data?.files && data.data.files.length > 0) {
-                const latestFile = data.data.files[0]; // Most recent/relevant file
                 console.log('✅ SIMPLE PNG PREVIEW: PNG discovered via intelligent system', {
-                    file: latestFile,
                     totalFiles: data.data.files.length,
+                    files: data.data.files,
                     searchIdentifiers: data.data.search_identifiers,
                     designMetadata: data.data.design_metadata
                 });
-                return latestFile.url;
+                return data.data.files; // Return ALL files for multi-display
             } else {
                 console.log('ℹ️ SIMPLE PNG PREVIEW: No PNG files discovered via intelligent system', {
                     reason: data.data?.message || 'No files found',
@@ -480,6 +479,112 @@ class SimplePNGPreview {
     }
 
     /**
+     * Display multiple PNG files in a gallery format
+     */
+    displayMultiplePNGs(files) {
+        console.log('🖼️ SIMPLE PNG PREVIEW: Displaying multiple PNGs', {
+            fileCount: files.length,
+            files: files
+        });
+
+        // Clear container
+        this.container.innerHTML = '';
+
+        // Create gallery container
+        const galleryContainer = document.createElement('div');
+        galleryContainer.style.cssText = 'padding: 15px;';
+
+        // Add title
+        const title = document.createElement('div');
+        title.innerHTML = `📁 Found ${files.length} PNG file${files.length > 1 ? 's' : ''}`;
+        title.style.cssText = 'font-weight: bold; margin-bottom: 15px; color: #0073aa; text-align: center;';
+        galleryContainer.appendChild(title);
+
+        // Create grid for files
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; gap: 15px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));';
+
+        files.forEach((file, index) => {
+            const fileCard = document.createElement('div');
+            fileCard.style.cssText = `
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 10px;
+                background: #fff;
+                text-align: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `;
+
+            // File info
+            const fileInfo = document.createElement('div');
+            fileInfo.style.cssText = 'margin-bottom: 10px; font-size: 12px; color: #666;';
+            fileInfo.innerHTML = `
+                <div><strong>📄 ${file.filename}</strong></div>
+                <div>🆔 ID: ${file.matched_identifier}</div>
+                <div>📏 Size: ${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+            `;
+            fileCard.appendChild(fileInfo);
+
+            // Image preview
+            const img = document.createElement('img');
+            img.style.cssText = `
+                max-width: 100%;
+                height: auto;
+                max-height: 200px;
+                border: 1px solid #eee;
+                border-radius: 4px;
+                cursor: pointer;
+            `;
+
+            // Click to open full size
+            img.onclick = () => window.open(file.url, '_blank');
+            img.title = 'Click to view full size';
+
+            // Loading placeholder
+            const loadingDiv = document.createElement('div');
+            loadingDiv.innerHTML = '🔄 Loading...';
+            loadingDiv.style.cssText = 'padding: 20px; color: #666;';
+            fileCard.appendChild(loadingDiv);
+
+            img.onload = () => {
+                fileCard.removeChild(loadingDiv);
+                fileCard.appendChild(img);
+                console.log(`✅ SIMPLE PNG PREVIEW: File ${index + 1} loaded successfully`);
+            };
+
+            img.onerror = () => {
+                loadingDiv.innerHTML = '❌ Failed to load';
+                loadingDiv.style.color = '#dc3545';
+                console.warn(`⚠️ SIMPLE PNG PREVIEW: File ${index + 1} failed to load:`, file.url);
+            };
+
+            img.src = file.url;
+
+            // Download button
+            const downloadBtn = document.createElement('a');
+            downloadBtn.href = file.url;
+            downloadBtn.download = file.filename;
+            downloadBtn.innerHTML = '⬇️ Download';
+            downloadBtn.style.cssText = `
+                display: inline-block;
+                margin-top: 8px;
+                padding: 4px 8px;
+                background: #0073aa;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                font-size: 11px;
+            `;
+            fileCard.appendChild(downloadBtn);
+
+            grid.appendChild(fileCard);
+        });
+
+        galleryContainer.appendChild(grid);
+        this.container.appendChild(galleryContainer);
+    }
+
+    /**
      * Show error message with debug info
      */
     showError(message, debugInfo = {}) {
@@ -522,10 +627,16 @@ ${JSON.stringify(debugInfo, null, 2)}
 
             // Step 1: Try INTELLIGENT PNG discovery (new system)
             console.log('🔄 SIMPLE PNG PREVIEW: Step 1 - Intelligent PNG discovery');
-            const discoveredUrl = await this.tryIntelligentDiscovery(designId);
+            const discoveredResult = await this.tryIntelligentDiscovery(designId);
 
-            if (discoveredUrl) {
-                this.displayPNG(discoveredUrl);
+            if (discoveredResult) {
+                if (Array.isArray(discoveredResult)) {
+                    // Multiple files discovered - show all
+                    this.displayMultiplePNGs(discoveredResult);
+                } else {
+                    // Single URL (fallback compatibility)
+                    this.displayPNG(discoveredResult);
+                }
                 return;
             }
 
