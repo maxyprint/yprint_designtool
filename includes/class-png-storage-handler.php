@@ -1378,7 +1378,27 @@ class PNG_Storage_Handler {
                 return $b['modified'] - $a['modified'];
             });
 
-            error_log('🔍 PNG DISCOVERY: Found ' . count($discovered_files) . ' PNG files for identifier: ' . $identifier);
+            // 🔧 FIX: Only return the most recent PNG per design_id to avoid duplicates
+            $unique_files = [];
+            $seen_identifiers = [];
+
+            foreach ($discovered_files as $file) {
+                $identifier = $file['matched_identifier'] ?? 'unknown';
+
+                // Only keep the first (newest) file per identifier
+                if (!in_array($identifier, $seen_identifiers)) {
+                    $unique_files[] = $file;
+                    $seen_identifiers[] = $identifier;
+                    error_log('🔍 PNG DISCOVERY: Keeping newest PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                } else {
+                    error_log('🔍 PNG DISCOVERY: Skipping older PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                }
+            }
+
+            error_log('🔍 PNG DISCOVERY: Found ' . count($discovered_files) . ' total PNG files, returning ' . count($unique_files) . ' unique files for identifier: ' . $identifier);
+
+            // Use the filtered unique files list
+            $discovered_files = $unique_files;
 
             if (!empty($discovered_files)) {
                 wp_send_json_success([
