@@ -2381,7 +2381,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                     error_log("✅ [PHP STORE] Design data successfully stored in database for order {$order_id}");
                     error_log("📊 [PHP STORE] Stored data size: " . strlen(json_encode($design_data_json)) . " characters");
 
-                    // PNG generation handled separately
+                    // 🖨️ PNG-ONLY SYSTEM: Trigger PNG generation after design data is saved
+                    $this->trigger_png_generation_for_order($order_id, $design_data_json);
                 } else {
                     error_log("❌ [PHP STORE] Failed to store design data in database for order {$order_id}");
                 }
@@ -3243,19 +3244,6 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("🎯 PNG PREVIEW: Real design data - " . substr(json_encode($design_data), 0, 500));
         }
 
-        // 🔧 DEBUG: Always show section for PNG testing
-        $debug_mode = true; // Set to false when debugging is complete
-
-        if ($has_design_data || $debug_mode) {
-            if (!$has_design_data && $debug_mode) {
-                // Create debug design data for testing
-                $design_data = array(
-                    'debug_mode' => true,
-                    'order_id' => $order_id,
-                    'message' => 'No real design data found - showing debug section'
-                );
-            }
-
         if ($has_design_data) {
             // Mark as real data, not test mode
             $design_data['test_mode'] = false;
@@ -3344,8 +3332,70 @@ private function build_print_provider_email_content($order, $design_items, $note
             <?php
         }
     }
-
     /**
+     * 🖨️ PNG-ONLY SYSTEM: Trigger PNG generation after design data is saved
+     */
+    private function trigger_png_generation_for_order($order_id, $design_data) {
+        try {
+            error_log("🖨️ [PNG TRIGGER] Triggering PNG generation for order {$order_id}");
+
+            // Extract design information for PNG generation
+            $template_id = isset($design_data['template_view_id']) ? $design_data['template_view_id'] : null;
+            $product_id = null;
+
+            // Get product ID from order
+            $order = wc_get_order($order_id);
+            if ($order) {
+                foreach ($order->get_items() as $item_id => $item) {
+                    $product_id = $item->get_product_id();
+                    break; // Use first product for now
+                }
+            }
+
+            if ($template_id && $product_id) {
+                // Generate a unique design ID for this order
+                $design_id = "order_{$order_id}_template_{$template_id}_" . time();
+
+                // Store design data for PNG generation
+                $png_design_data = array(
+                    'order_id' => $order_id,
+                    'product_id' => $product_id,
+                    'template_id' => $template_id,
+                    'design_data' => $design_data,
+                    'created' => current_time('mysql'),
+                    'status' => 'pending_png_generation'
+                );
+
+                update_option('yprint_design_' . $design_id . '_order_data', $png_design_data);
+
+                // Add a JavaScript trigger for frontend PNG generation
+                add_action('wp_footer', function() use ($design_id) {
+                    ?>
+                    <script>
+                    // Trigger PNG generation for order design
+                    if (window.pngOnlySystemIntegration && window.pngOnlySystemIntegration.initialized) {
+                        console.log('🖨️ [PNG TRIGGER] Order design loaded, triggering PNG generation...');
+                        // Store design ID for PNG generation
+                        window.currentOrderDesignId = '<?php echo esc_js($design_id); ?>';
+
+                        // Dispatch event for PNG generation
+                        window.dispatchEvent(new CustomEvent('yprintOrderDesignLoaded', {
+                            detail: { designId: '<?php echo esc_js($design_id); ?>' }
+                        }));
+                    }
+                    </script>
+                    <?php
+                });
+
+                error_log("✅ [PNG TRIGGER] PNG generation triggered for design ID: {$design_id}");
+            } else {
+                error_log("⚠️ [PNG TRIGGER] Missing template_id or product_id - PNG generation skipped");
+            }
+
+        } catch (Exception $e) {
+            error_log("❌ [PNG TRIGGER] Failed to trigger PNG generation: " . $e->getMessage());
+        }
+    }
 
     /**
      * 🎨 DESIGN PREVIEW SYSTEM: AJAX handler to load and display print PNG files
