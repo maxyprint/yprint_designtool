@@ -1246,15 +1246,19 @@ class PNG_Storage_Handler {
                         $design_metadata['order_design_data'] = $design_data;
                     }
 
-                    // Check order items for design data
+                    // Check order items for design data (using same logic as working octo_refresh_print_data)
                     $order_items = $order->get_items();
                     foreach ($order_items as $item_id => $item) {
-                        $item_design_id = $item->get_meta('_design_id');
+                        // 🔧 FIX: Check multiple meta keys like the working system does
+                        $item_design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
                         $item_design_data = $item->get_meta('_design_data');
                         $item_png_data = $item->get_meta('print_png_data');
 
                         if ($item_design_id) {
                             $search_identifiers[] = $item_design_id;
+                            error_log("🔍 PNG DISCOVERY: Item #{$item_id} - Found design_id = {$item_design_id}");
+                        } else {
+                            error_log("🔍 PNG DISCOVERY: Item #{$item_id} - No design_id found (checked _design_id, yprint_design_id, _yprint_design_id)");
                         }
 
                         if ($item_design_data) {
