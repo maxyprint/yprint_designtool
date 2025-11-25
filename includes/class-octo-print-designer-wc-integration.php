@@ -2303,10 +2303,30 @@ private function build_print_provider_email_content($order, $design_items, $note
     public function ajax_refresh_print_data() {
         // 🎯 7-AGENT FIX: CORS headers for admin-ajax.php (Safari compatibility)
         // Agent 3 identified missing CORS headers compared to ajax_load_design_preview()
-        header('Access-Control-Allow-Origin: ' . get_site_url());
+
+        // More flexible CORS handling for different domain setups
+        $allowed_origin = get_site_url();
+        if (isset($_SERVER['HTTP_ORIGIN'])) {
+            $origin = $_SERVER['HTTP_ORIGIN'];
+            // Allow same domain with different protocols/subdomains
+            $site_domain = parse_url(get_site_url(), PHP_URL_HOST);
+            $origin_domain = parse_url($origin, PHP_URL_HOST);
+
+            if ($origin_domain === $site_domain || $origin_domain === 'yprint.de' || strpos($origin_domain, $site_domain) !== false) {
+                $allowed_origin = $origin;
+            }
+        }
+
+        header('Access-Control-Allow-Origin: ' . $allowed_origin);
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
         header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization');
         header('Access-Control-Allow-Credentials: true');
+
+        // Debug CORS headers
+        error_log('🌐 [CORS DEBUG] Request Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? 'none'));
+        error_log('🌐 [CORS DEBUG] Site URL: ' . get_site_url());
+        error_log('🌐 [CORS DEBUG] Allowed Origin: ' . $allowed_origin);
+        error_log('🌐 [CORS DEBUG] Request Method: ' . $_SERVER['REQUEST_METHOD']);
 
         // Handle preflight OPTIONS request
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
