@@ -67,6 +67,9 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_checkout_scripts'));
         add_action('wp_localize_script', array($this, 'localize_checkout_scripts'));
 
+        // 🎯 MULTI-VIEW PNG SYSTEM: Enqueue admin scripts for WooCommerce admin pages
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+
     }
 
     /**
@@ -4338,6 +4341,69 @@ private function build_print_provider_email_content($order, $design_items, $note
         $this->localize_checkout_scripts();
 
         error_log('🚨 CHECKOUT FIX: All checkout scripts enqueued successfully');
+    }
+
+    /**
+     * 🎯 MULTI-VIEW PNG SYSTEM: Enqueue admin scripts for WooCommerce admin pages
+     * Loads the multi-view PNG system for intelligent content detection and generation
+     */
+    public function enqueue_admin_scripts($hook) {
+        // Only load on WooCommerce admin pages (orders, products, etc.)
+        if (!is_admin()) {
+            return;
+        }
+
+        // Check if we're on a WooCommerce admin page
+        $wc_admin_pages = array(
+            'woocommerce_page_wc-orders',
+            'edit.php',
+            'post.php',
+            'post-new.php'
+        );
+
+        $current_screen = get_current_screen();
+        $is_wc_page = false;
+
+        if ($current_screen) {
+            // Check for WooCommerce order pages
+            $is_wc_page = (
+                strpos($hook, 'woocommerce') !== false ||
+                strpos($current_screen->id, 'shop_order') !== false ||
+                strpos($current_screen->id, 'woocommerce') !== false ||
+                $current_screen->post_type === 'shop_order' ||
+                $current_screen->post_type === 'product'
+            );
+        }
+
+        if (!$is_wc_page) {
+            return;
+        }
+
+        error_log("🎯 [MULTI-VIEW PNG] Loading admin scripts for hook: {$hook}");
+
+        // 1. Multi-View PNG System - Intelligent content detection
+        wp_enqueue_script(
+            'yprint-multi-view-png-system',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/multi-view-png-system.js',
+            array(), // No dependencies to avoid conflicts
+            OCTO_PRINT_DESIGNER_VERSION,
+            true
+        );
+
+        // 2. Localize with admin context
+        wp_localize_script(
+            'yprint-multi-view-png-system',
+            'yprintMultiViewConfig',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('yprint_multiview_nonce'),
+                'adminContext' => true,
+                'currentHook' => $hook,
+                'debugMode' => WP_DEBUG
+            )
+        );
+
+        error_log("✅ [MULTI-VIEW PNG] Admin scripts enqueued successfully");
     }
 
     /**
