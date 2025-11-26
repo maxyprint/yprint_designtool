@@ -2703,74 +2703,59 @@ private function build_print_provider_email_content($order, $design_items, $note
     }
 
     /**
-     * 🎯 PRECISION PNG MATCHING: Get precise PNG for specific order item
-     * Fixes the "3 PNGs shown instead of 1" issue by finding the exact PNG for this order
+     * 🎯 MULTI-VIEW PNG MATCHING: Get all view-specific PNGs for order item
+     * Enhanced version that supports multiple views (Front, Back, etc.)
+     * Backward compatible with single-PNG designs
      */
     private function get_precise_png_for_order_item($design_id, $order_id, $item_id, $design) {
+        // Call the enhanced multi-view function
+        return $this->get_multi_view_pngs_for_order_item($design_id, $order_id, $item_id, $design);
+    }
+
+    /**
+     * 🎯 MULTI-VIEW PNG LOOKUP: Enhanced multi-view PNG lookup function
+     * Returns ALL view-specific PNGs for a design, properly labeled by view
+     */
+    private function get_multi_view_pngs_for_order_item($design_id, $order_id, $item_id, $design) {
         global $wpdb;
 
-        error_log("🎯 [PNG PRECISION] Starting precise PNG lookup for Design {$design_id}, Order {$order_id}, Item {$item_id}");
+        error_log("🎯 [MULTI-VIEW PNG] Starting multi-view PNG lookup for Design {$design_id}, Order {$order_id}, Item {$item_id}");
 
         $png_results = array();
-
-        // METHOD 1: Check yprint_design_pngs table for order-specific PNGs
         $png_table = $wpdb->prefix . 'yprint_design_pngs';
 
         // Check if table exists first
         $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $png_table));
 
-        if ($table_exists) {
-            // First: Look for PNGs specifically saved for this order (take only the most recent one)
+        if (!$table_exists) {
+            error_log("❌ [MULTI-VIEW PNG] Table {$png_table} does not exist");
+            return $png_results;
+        }
+
+        // Check if table has view_id column (multi-view support)
+        $table_columns = $wpdb->get_col("DESCRIBE {$png_table}");
+        $has_view_support = in_array('view_id', $table_columns) && in_array('view_name', $table_columns);
+
+        if ($has_view_support) {
+            error_log("✅ [MULTI-VIEW PNG] Table supports multi-view (view_id column exists)");
+
+            // METHOD 1: Multi-view order-specific PNGs
             $order_specific_pngs = $wpdb->get_results($wpdb->prepare(
-                "SELECT design_id, print_png, generated_at, save_type, order_id, template_id, metadata_json
+                "SELECT design_id, print_png, generated_at, save_type, order_id, template_id, metadata_json, view_id, view_name
                  FROM {$png_table}
                  WHERE design_id = %s AND order_id = %s
-                 ORDER BY generated_at DESC
-                 LIMIT 1",
+                 ORDER BY view_name ASC, generated_at DESC",
                 $design_id,
                 $order_id
             ), ARRAY_A);
 
             if (!empty($order_specific_pngs)) {
-                // Take only the first (most recent) order-specific PNG
-                $png_record = $order_specific_pngs[0];
-                error_log("🎯 [PNG PRECISION] Found order-specific PNG for Design {$design_id}, Order {$order_id}");
+                foreach ($order_specific_pngs as $png_record) {
+                    $view_label = $png_record['view_name'] ?: ($png_record['view_id'] ? "View {$png_record['view_id']}" : 'Main');
+                    error_log("🎯 [MULTI-VIEW PNG] Found order-specific PNG: Design {$design_id}, View: {$view_label}");
 
-                // Generate temporary URL for this PNG
-                $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, $order_id);
-
-                if ($temp_url) {
-                    $png_results[] = array(
-                        'design_id' => $design_id,
-                        'design_name' => $design['name'] ?: 'Design #' . $design_id,
-                        'print_file_url' => $temp_url,
-                        'print_file_path' => 'database_stored', // Stored in DB
-                        'item_name' => "Order-specific: " . ($design['name'] ?: 'Design #' . $design_id),
-                        'source' => 'order_specific',
-                        'generated_at' => $png_record['generated_at'],
-                        'save_type' => $png_record['save_type'],
-                        'precision_score' => 100 // Highest priority
-                    );
-                }
-            }
-
-            // METHOD 2: Check for design-specific PNGs (without order_id) if no order-specific found
-            if (empty($png_results)) {
-                $design_pngs = $wpdb->get_results($wpdb->prepare(
-                    "SELECT design_id, print_png, generated_at, save_type, template_id
-                     FROM {$png_table}
-                     WHERE design_id = %s AND (order_id IS NULL OR order_id = '' OR order_id = '0')
-                     ORDER BY generated_at DESC
-                     LIMIT 1", // Only get the latest one to avoid multiple PNGs
-                    $design_id
-                ), ARRAY_A);
-
-                if (!empty($design_pngs)) {
-                    // Take only the first (most recent) design-specific PNG
-                    $png_record = $design_pngs[0];
-                    error_log("🎯 [PNG PRECISION] Found design-specific PNG for Design {$design_id}");
-
-                    $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'generic');
+                    // Generate temporary URL for this PNG
+                    $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, $order_id . '_' . ($png_record['view_id'] ?: 'main'));
 
                     if ($temp_url) {
                         $png_results[] = array(
@@ -2778,41 +2763,125 @@ private function build_print_provider_email_content($order, $design_items, $note
                             'design_name' => $design['name'] ?: 'Design #' . $design_id,
                             'print_file_url' => $temp_url,
                             'print_file_path' => 'database_stored',
-                            'item_name' => "Design: " . ($design['name'] ?: 'Design #' . $design_id),
-                            'source' => 'design_specific',
+                            'item_name' => "Order-specific {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
+                            'source' => 'order_specific_multiview',
                             'generated_at' => $png_record['generated_at'],
                             'save_type' => $png_record['save_type'],
-                            'precision_score' => 80 // Lower priority than order-specific
+                            'view_id' => $png_record['view_id'],
+                            'view_name' => $view_label,
+                            'precision_score' => 100 // Highest priority
                         );
                     }
                 }
             }
+
+            // METHOD 2: Multi-view design-specific PNGs (if no order-specific found)
+            if (empty($png_results)) {
+                $design_pngs = $wpdb->get_results($wpdb->prepare(
+                    "SELECT design_id, print_png, generated_at, save_type, template_id, view_id, view_name
+                     FROM {$png_table}
+                     WHERE design_id = %s AND (order_id IS NULL OR order_id = '')
+                     ORDER BY view_name ASC, generated_at DESC",
+                    $design_id
+                ), ARRAY_A);
+
+                if (!empty($design_pngs)) {
+                    foreach ($design_pngs as $png_record) {
+                        $view_label = $png_record['view_name'] ?: ($png_record['view_id'] ? "View {$png_record['view_id']}" : 'Main');
+                        error_log("🎯 [MULTI-VIEW PNG] Found design-specific PNG: Design {$design_id}, View: {$view_label}");
+
+                        $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'generic_' . ($png_record['view_id'] ?: 'main'));
+
+                        if ($temp_url) {
+                            $png_results[] = array(
+                                'design_id' => $design_id,
+                                'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                                'print_file_url' => $temp_url,
+                                'print_file_path' => 'database_stored',
+                                'item_name' => "Design {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
+                                'source' => 'design_specific_multiview',
+                                'generated_at' => $png_record['generated_at'],
+                                'save_type' => $png_record['save_type'],
+                                'view_id' => $png_record['view_id'],
+                                'view_name' => $view_label,
+                                'precision_score' => 80
+                            );
+                        }
+                    }
+                }
+            }
+
         } else {
-            error_log("⚠️ [PNG PRECISION] PNG table {$png_table} does not exist, falling back to legacy method");
+            error_log("⚠️ [MULTI-VIEW PNG] Table doesn't support multi-view yet - falling back to legacy mode");
+
+            // Fallback to original single-PNG lookup for backward compatibility
+            $legacy_pngs = $wpdb->get_results($wpdb->prepare(
+                "SELECT design_id, print_png, generated_at, save_type, order_id, template_id
+                 FROM {$png_table}
+                 WHERE design_id = %s
+                 ORDER BY generated_at DESC
+                 LIMIT 1",
+                $design_id
+            ), ARRAY_A);
+
+            if (!empty($legacy_pngs)) {
+                $png_record = $legacy_pngs[0];
+                error_log("🎯 [MULTI-VIEW PNG] Found legacy PNG for Design {$design_id}");
+
+                $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'legacy');
+
+                if ($temp_url) {
+                    $png_results[] = array(
+                        'design_id' => $design_id,
+                        'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                        'print_file_url' => $temp_url,
+                        'print_file_path' => 'database_stored',
+                        'item_name' => "Legacy: " . ($design['name'] ?: 'Design #' . $design_id),
+                        'source' => 'legacy_single',
+                        'generated_at' => $png_record['generated_at'],
+                        'save_type' => $png_record['save_type'],
+                        'view_id' => null,
+                        'view_name' => 'Single View',
+                        'precision_score' => 50
+                    );
+                }
+            }
         }
 
-        // METHOD 3: Fallback to old method (octo_user_designs table) if no modern PNGs found
+        // METHOD 3: Fallback to old file-based method if no database results
         if (empty($png_results)) {
             if (!empty($design['print_file_url']) && !empty($design['print_file_path'])) {
-                error_log("🎯 [PNG PRECISION] Falling back to legacy method for Design {$design_id}");
+                error_log("🎯 [MULTI-VIEW PNG] Falling back to file-based method for Design {$design_id}");
 
                 $png_results[] = array(
                     'design_id' => $design_id,
                     'design_name' => $design['name'] ?: 'Design #' . $design_id,
                     'print_file_url' => $design['print_file_url'],
                     'print_file_path' => $design['print_file_path'],
-                    'item_name' => "Legacy: " . ($design['name'] ?: 'Design #' . $design_id),
+                    'item_name' => "File-based: " . ($design['name'] ?: 'Design #' . $design_id),
                     'source' => 'legacy_file',
                     'generated_at' => 'unknown',
                     'save_type' => 'legacy',
-                    'precision_score' => 50 // Lower priority
+                    'view_id' => null,
+                    'view_name' => 'File-based',
+                    'precision_score' => 25
                 );
             }
         }
 
-        error_log("🎯 [PNG PRECISION] Final result for Design {$design_id}: " . count($png_results) . " PNG(s) found");
+        // Sort by precision score (highest first), then by view_name for consistent ordering
+        usort($png_results, function($a, $b) {
+            if ($a['precision_score'] !== $b['precision_score']) {
+                return $b['precision_score'] - $a['precision_score'];
+            }
+            return strcmp($a['view_name'] ?? '', $b['view_name'] ?? '');
+        });
 
-        // Return the single PNG found (order-specific has priority, then design-specific, then legacy)
+        $view_count = count($png_results);
+        $view_names = array_map(function($png) { return $png['view_name']; }, $png_results);
+
+        error_log("🎯 [MULTI-VIEW PNG] Final result for Design {$design_id}: {$view_count} PNG(s) found - Views: " . implode(', ', $view_names));
+
         return $png_results;
     }
 

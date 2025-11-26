@@ -986,7 +986,28 @@ class SaveOnlyPNGGenerator {
                 console.log('🔥 EMERGENCY PNG CREATED: Length =', printPNG.length);
             }
 
-            // Store PNG with metadata
+            // 🎯 MULTI-VIEW: Get view information from design data or current state
+            const viewId = designData.view_id || (window.designerWidgetInstance?.currentView);
+            const variationId = designData.variation_id || (window.designerWidgetInstance?.currentVariation);
+            let viewName = designData.view_name;
+
+            // Get view name from template if not provided
+            if (!viewName && window.designerWidgetInstance) {
+                const activeTemplate = window.designerWidgetInstance.templates?.get(window.designerWidgetInstance.activeTemplateId);
+                const variation = activeTemplate?.variations.find(v => v.id == variationId);
+                const viewData = variation?.views.get(viewId);
+                viewName = viewData?.name || `View ${viewId}`;
+            }
+
+            console.log('🎯 MULTI-VIEW PNG DATA:', {
+                design_id: this.generateDesignId(designData),
+                view_id: viewId,
+                view_name: viewName,
+                variation_id: variationId,
+                save_type: saveType
+            });
+
+            // Store PNG with metadata including view information
             const pngData = {
                 design_id: this.generateDesignId(designData),
                 print_png: printPNG,
@@ -995,7 +1016,11 @@ class SaveOnlyPNGGenerator {
                 generated_at: new Date().toISOString(),
                 print_area_px: JSON.stringify(this.pngEngine.exportEngine.printAreaPx || { width: 800, height: 600 }),
                 print_area_mm: JSON.stringify(this.pngEngine.exportEngine.printAreaMm || { width: 200, height: 150 }),
-                template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback'
+                template_id: this.pngEngine.exportEngine.currentTemplateId || 'fallback',
+                // 🎯 MULTI-VIEW: Add view identification
+                view_id: viewId,
+                view_name: viewName,
+                variation_id: variationId
             };
 
             // Save to WordPress database

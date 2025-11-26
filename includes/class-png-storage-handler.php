@@ -1043,7 +1043,25 @@ class PNG_Storage_Handler {
         global $wpdb;
 
         try {
-            error_log('🗄️ DATABASE SAVE: Starting save_to_database_table method');
+            error_log('🎯 MULTI-VIEW DATABASE SAVE: Starting save_to_database_table method');
+
+            // 🎯 MULTI-VIEW: Extract view information from design_meta or POST data
+            $view_id = null;
+            $view_name = null;
+
+            // Check for view data in design_meta
+            if (isset($design_meta['view_id'])) {
+                $view_id = $design_meta['view_id'];
+                $view_name = $design_meta['view_name'];
+            }
+
+            // Fallback: Check POST data directly
+            if (!$view_id && (isset($_POST['view_id']) || isset($_REQUEST['view_id']))) {
+                $view_id = sanitize_text_field($_POST['view_id'] ?? $_REQUEST['view_id']);
+                $view_name = sanitize_text_field($_POST['view_name'] ?? $_REQUEST['view_name'] ?? '');
+            }
+
+            error_log('🎯 MULTI-VIEW DATABASE SAVE: Design ID: ' . $design_id . ', View ID: ' . ($view_id ?: 'NULL') . ', View Name: ' . ($view_name ?: 'NULL'));
 
             // Extract base64 data from data URL
             $base64_data = substr($print_png, strpos($print_png, ',') + 1);
@@ -1089,7 +1107,17 @@ class PNG_Storage_Handler {
                 return false;
             }
 
-            // Prepare data for database
+            // 🎯 MULTI-VIEW: Check if view_id column exists
+            $table_columns = $wpdb->get_col("DESCRIBE {$table_name}");
+            $has_view_columns = in_array('view_id', $table_columns) && in_array('view_name', $table_columns);
+
+            if (!$has_view_columns) {
+                error_log('⚠️ MULTI-VIEW: view_id/view_name columns missing. Run add-view-id-column.sql first!');
+            } else {
+                error_log('✅ MULTI-VIEW: view_id and view_name columns available');
+            }
+
+            // 🎯 MULTI-VIEW: Prepare data for database with view support
             $insert_data = array(
                 'design_id' => $design_id,
                 'print_png' => $binary_data,
@@ -1108,6 +1136,15 @@ class PNG_Storage_Handler {
                 '%s', // order_id
                 '%s'  // template_id
             );
+
+            // 🎯 MULTI-VIEW: Add view data if columns exist
+            if ($has_view_columns) {
+                $insert_data['view_id'] = $view_id;
+                $insert_data['view_name'] = $view_name;
+                $format_array[] = '%s'; // view_id
+                $format_array[] = '%s'; // view_name
+                error_log('🎯 MULTI-VIEW: Added view data to insert: view_id=' . ($view_id ?: 'NULL') . ', view_name=' . ($view_name ?: 'NULL'));
+            }
 
             // Add enhanced metadata if available (only if field exists in table)
             $table_has_metadata_field = false;
