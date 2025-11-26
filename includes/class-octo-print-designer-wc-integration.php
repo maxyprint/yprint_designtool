@@ -67,9 +67,6 @@ class Octo_Print_Designer_WC_Integration {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_checkout_scripts'));
         add_action('wp_localize_script', array($this, 'localize_checkout_scripts'));
 
-        // 🎯 MULTI-VIEW PNG SYSTEM: Enqueue admin scripts for WooCommerce admin pages
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
-
     }
 
     /**
@@ -3662,8 +3659,42 @@ private function build_print_provider_email_content($order, $design_items, $note
                 const response = await fetch(window.ajaxurl, { method: 'POST', body: formData });
                 const data = await response.json();
 
-                if (data.success && data.data?.files?.length > 0) {
-                    let html = '<div style="font-weight: bold; margin-bottom: 10px; color: #0073aa;">📁 Found ' + data.data.files.length + ' PNG file(s):</div>';
+                // 🎯 ENHANCED PREVIEW: Use database PNG data with dynamic view names
+                if (data.success && data.data?.png_files?.length > 0) {
+                    let html = '<div style="font-weight: bold; margin-bottom: 10px; color: #0073aa;">📁 Found ' + data.data.png_files.length + ' PNG file(s):</div>';
+
+                    data.data.png_files.forEach((png_info, i) => {
+                        html += '<div style="margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">';
+
+                        // 🎯 DYNAMIC VIEW NAMES: Show actual view names from database
+                        let displayTitle = png_info.view_name ?
+                            '🎨 ' + png_info.view_name + ': ' + png_info.design_name :
+                            '📄 ' + (png_info.design_name || 'Design #' + png_info.design_id);
+
+                        html += '<strong>' + displayTitle + '</strong><br>';
+
+                        // Enhanced metadata with source and precision information
+                        let metadata = [];
+                        metadata.push('🆔 Design: ' + png_info.design_id);
+                        if (png_info.view_id) {
+                            metadata.push('👁️ View ID: ' + png_info.view_id);
+                        }
+                        metadata.push('📊 Source: ' + png_info.source);
+                        metadata.push('⚡ Score: ' + png_info.precision_score);
+                        if (png_info.generated_at && png_info.generated_at !== 'unknown') {
+                            const genDate = new Date(png_info.generated_at);
+                            metadata.push('⏰ Generated: ' + genDate.toLocaleDateString());
+                        }
+
+                        html += '<small>' + metadata.join(' | ') + '</small><br>';
+                        html += '<a href="' + png_info.print_file_url + '" target="_blank" style="color: #0073aa; text-decoration: none;">🔗 View PNG</a>';
+                        html += '</div>';
+                    });
+
+                    container.innerHTML = html;
+                } else if (data.success && data.data?.files?.length > 0) {
+                    // Fallback to legacy file-based display if no database PNG data
+                    let html = '<div style="font-weight: bold; margin-bottom: 10px; color: #0073aa;">📁 Found ' + data.data.files.length + ' PNG file(s) (legacy mode):</div>';
 
                     data.data.files.forEach((file, i) => {
                         html += '<div style="margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">';
@@ -4343,68 +4374,6 @@ private function build_print_provider_email_content($order, $design_items, $note
         error_log('🚨 CHECKOUT FIX: All checkout scripts enqueued successfully');
     }
 
-    /**
-     * 🎯 MULTI-VIEW PNG SYSTEM: Enqueue admin scripts for WooCommerce admin pages
-     * Loads the multi-view PNG system for intelligent content detection and generation
-     */
-    public function enqueue_admin_scripts($hook) {
-        // Only load on WooCommerce admin pages (orders, products, etc.)
-        if (!is_admin()) {
-            return;
-        }
-
-        // Check if we're on a WooCommerce admin page
-        $wc_admin_pages = array(
-            'woocommerce_page_wc-orders',
-            'edit.php',
-            'post.php',
-            'post-new.php'
-        );
-
-        $current_screen = get_current_screen();
-        $is_wc_page = false;
-
-        if ($current_screen) {
-            // Check for WooCommerce order pages
-            $is_wc_page = (
-                strpos($hook, 'woocommerce') !== false ||
-                strpos($current_screen->id, 'shop_order') !== false ||
-                strpos($current_screen->id, 'woocommerce') !== false ||
-                $current_screen->post_type === 'shop_order' ||
-                $current_screen->post_type === 'product'
-            );
-        }
-
-        if (!$is_wc_page) {
-            return;
-        }
-
-        error_log("🎯 [MULTI-VIEW PNG] Loading admin scripts for hook: {$hook}");
-
-        // 1. Multi-View PNG System - Intelligent content detection
-        wp_enqueue_script(
-            'yprint-multi-view-png-system',
-            OCTO_PRINT_DESIGNER_URL . 'public/js/multi-view-png-system.js',
-            array(), // No dependencies to avoid conflicts
-            OCTO_PRINT_DESIGNER_VERSION,
-            true
-        );
-
-        // 2. Localize with admin context
-        wp_localize_script(
-            'yprint-multi-view-png-system',
-            'yprintMultiViewConfig',
-            array(
-                'ajaxUrl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('yprint_multiview_nonce'),
-                'adminContext' => true,
-                'currentHook' => $hook,
-                'debugMode' => WP_DEBUG
-            )
-        );
-
-        error_log("✅ [MULTI-VIEW PNG] Admin scripts enqueued successfully");
-    }
 
     /**
      * 🚨 CHECKOUT SYSTEM FIX: Localize checkout scripts with required data

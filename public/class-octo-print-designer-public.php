@@ -174,13 +174,23 @@ class Octo_Print_Designer_Public {
             true
         );
 
+        // 🎯 STEP 6: Multi-View PNG System - Intelligent Front/Back view detection and generation
+        wp_register_script(
+            'yprint-multi-view-png-system',
+            OCTO_PRINT_DESIGNER_URL . 'public/js/multi-view-png-system.js',
+            ['yprint-png-integration'],
+            $this->version . '.multi-view-png-v1',
+            true
+        );
+
         // 🎯 CLEAN STAGING: Load only essential scripts
         $clean_scripts = [
             'octo-fabric-cdn-loader',
             'octo-print-designer-designer',
             'yprint-high-dpi-export',
             'yprint-save-only-png',
-            'yprint-png-integration'
+            'yprint-png-integration',
+            'yprint-multi-view-png-system'
         ];
 
         // 🎯 AUTO-ENQUEUE: Load essential scripts automatically on designer pages
@@ -210,9 +220,19 @@ class Octo_Print_Designer_Public {
             'loginUrl' => class_exists('Octo_Print_Designer_Settings') ? Octo_Print_Designer_Settings::get_login_url() : wp_login_url(),
         ]);
 
-        error_log("🔧 DATABASE FIX: octoPrintDesigner config added for template loading");
+        // 🎯 MULTI-VIEW PNG CONFIG: Configuration for intelligent Front/Back view detection
+        wp_localize_script('yprint-multi-view-png-system', 'yprintMultiViewConfig', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('yprint_multiview_nonce'),
+            'debugMode' => WP_DEBUG,
+            'designerContext' => true,
+            'version' => $this->version
+        ]);
 
-        error_log("✅ CLEAN SYSTEM: All 5 essential scripts processed");
+        error_log("🔧 DATABASE FIX: octoPrintDesigner config added for template loading");
+        error_log("🎯 MULTI-VIEW CONFIG: Multi-view PNG system configured for designer context");
+
+        error_log("✅ CLEAN SYSTEM: All 6 essential scripts processed (including multi-view PNG)");
         error_log("🔍 DEBUG CHECKPOINT 2 COMPLETE: Script registration phase finished");
 
         // 🔍 FINAL VERIFICATION: Log all registered scripts
