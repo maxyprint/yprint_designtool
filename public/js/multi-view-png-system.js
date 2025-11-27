@@ -122,18 +122,36 @@ class MultiViewPNGSystem {
         // Template System erkennen
         try {
             // Verschiedene Wege zur Template-Erkennung
-            if (this.designerWidget.templates) {
+            if (this.designerWidget && this.designerWidget.templates) {
                 this.viewTemplates = this.designerWidget.templates;
                 console.log('✅ MULTI-VIEW: Templates found via designerWidget.templates');
+
+                // Convert Map to object for easier handling
+                if (this.viewTemplates instanceof Map) {
+                    const templateMap = {};
+                    this.viewTemplates.forEach((template, templateId) => {
+                        templateMap[templateId] = template;
+                        // Extract views from template variations
+                        if (template.variations && template.variations instanceof Map) {
+                            template.variations.forEach((variation, variationId) => {
+                                if (variation.views && variation.views instanceof Map) {
+                                    console.log(`🎯 MULTI-VIEW: Found views in template ${templateId}, variation ${variationId}:`, Array.from(variation.views.keys()));
+                                }
+                            });
+                        }
+                    });
+                    this.viewTemplates = templateMap;
+                }
             } else if (window.templateData) {
                 this.viewTemplates = window.templateData;
                 console.log('✅ MULTI-VIEW: Templates found via window.templateData');
-            } else if (this.designerWidget.productTemplates) {
+            } else if (this.designerWidget && this.designerWidget.productTemplates) {
                 this.viewTemplates = this.designerWidget.productTemplates;
                 console.log('✅ MULTI-VIEW: Templates found via designerWidget.productTemplates');
             }
 
-            console.log('🎯 MULTI-VIEW: Detected templates:', Object.keys(this.viewTemplates).length);
+            const templateCount = this.viewTemplates instanceof Map ? this.viewTemplates.size : Object.keys(this.viewTemplates || {}).length;
+            console.log('🎯 MULTI-VIEW: Detected templates:', templateCount);
 
         } catch (error) {
             console.warn('⚠️ MULTI-VIEW: Template detection failed:', error);
@@ -221,65 +239,167 @@ class MultiViewPNGSystem {
         }
     }
 
+    getAvailableViews() {
+        try {
+            const views = [];
+
+            // Get current template and variation
+            const currentTemplateId = this.designerWidget.currentTemplateId || '3657';
+            const currentVariation = this.designerWidget.currentVariation || '167359';
+
+            console.log('🔍 MULTI-VIEW: Looking for views in template:', currentTemplateId, 'variation:', currentVariation);
+
+            // Access designer widget templates (Map structure)
+            if (this.designerWidget && this.designerWidget.templates) {
+                const template = this.designerWidget.templates.get(currentTemplateId);
+                if (template && template.variations) {
+                    const variation = template.variations.get(currentVariation);
+                    if (variation && variation.views) {
+                        variation.views.forEach((view, viewId) => {
+                            views.push({
+                                id: viewId,
+                                name: view.name || `View ${viewId}`,
+                                printArea: view.printArea
+                            });
+                        });
+                    }
+                }
+            }
+
+            console.log('🎯 MULTI-VIEW: Found views:', views);
+            return views;
+        } catch (error) {
+            console.warn('⚠️ MULTI-VIEW: Error getting available views:', error);
+            return [];
+        }
+    }
+
     async generateMultiViewPNGs() {
         if (!this.initialized) {
             console.warn('⚠️ MULTI-VIEW: System not initialized - falling back to single PNG');
             return this.generateSinglePNG();
         }
 
-        const pngResults = {};
-        const viewsWithContent = Object.keys(this.contentStatus).filter(
-            view => this.contentStatus[view]
-        );
+        console.log('🎯 MULTI-VIEW: Starting intelligent multi-view PNG generation...');
 
-        console.log('🎯 MULTI-VIEW: Generating PNGs for views with content:', viewsWithContent);
+        // Get available views from current template
+        const availableViews = this.getAvailableViews();
+        console.log('🎯 MULTI-VIEW: Available views:', availableViews);
 
-        if (viewsWithContent.length === 0) {
-            console.log('ℹ️ MULTI-VIEW: No content found - generating current view');
+        if (availableViews.length === 0) {
+            console.log('ℹ️ MULTI-VIEW: No views detected - generating current view');
             return this.generateSinglePNG();
         }
 
-        for (const viewKey of viewsWithContent) {
-            try {
-                // Zu View wechseln
-                await this.switchToView(viewKey);
+        const pngResults = {};
+        const currentView = this.designerWidget.currentView;
 
-                // PNG generieren
-                const pngData = await this.generateViewPNG(viewKey);
-                if (pngData) {
-                    pngResults[viewKey] = pngData;
-                    console.log(`✅ MULTI-VIEW: PNG generated for view: ${viewKey}`);
+        for (const viewInfo of availableViews) {
+            try {
+                console.log(`🔄 MULTI-VIEW: Switching to view ${viewInfo.id} (${viewInfo.name})...`);
+
+                // Switch to view using designer widget
+                await this.switchToView(viewInfo.id);
+
+                // Wait for view to load
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                // Check if this view has content
+                const hasContent = this.getCanvasObjectCount() > 0;
+                console.log(`🔍 MULTI-VIEW: View ${viewInfo.name} has content:`, hasContent ? '✅ YES' : '❌ NO');
+
+                if (hasContent) {
+                    // Generate PNG for this view
+                    const pngData = await this.generateViewPNG(viewInfo.id, viewInfo.name);
+                    if (pngData && pngData.success) {
+                        pngResults[viewInfo.id] = {
+                            viewId: viewInfo.id,
+                            viewName: viewInfo.name,
+                            dataUrl: pngData.dataUrl,
+                            metadata: pngData.metadata
+                        };
+                        console.log(`✅ MULTI-VIEW: PNG generated for view: ${viewInfo.name}`);
+                    }
                 }
 
             } catch (error) {
-                console.error(`❌ MULTI-VIEW: PNG generation failed for view ${viewKey}:`, error);
+                console.error(`❌ MULTI-VIEW: PNG generation failed for view ${viewInfo.name}:`, error);
             }
         }
+
+        // Switch back to original view
+        if (currentView) {
+            await this.switchToView(currentView);
+        }
+
+        const resultCount = Object.keys(pngResults).length;
+        console.log(`🎉 MULTI-VIEW: Generated ${resultCount} PNGs from ${availableViews.length} available views`);
 
         return pngResults;
     }
 
     async switchToView(viewKey) {
-        if (this.designerWidget.switchView) {
-            return this.designerWidget.switchView(viewKey);
-        }
+        try {
+            console.log(`🔄 MULTI-VIEW: Attempting to switch to view: ${viewKey}`);
 
-        // DOM-basiertes View-Switching
-        const viewButton = document.querySelector(`[data-view-id="${viewKey}"]`);
-        if (viewButton) {
-            viewButton.click();
-            return new Promise(resolve => setTimeout(resolve, 300));
+            // Method 1: Use designer widget switchView method
+            if (this.designerWidget && typeof this.designerWidget.switchView === 'function') {
+                console.log('🎯 MULTI-VIEW: Using designerWidget.switchView()');
+                await this.designerWidget.switchView(viewKey);
+                return;
+            }
+
+            // Method 2: Direct property assignment (if switchView method doesn't exist)
+            if (this.designerWidget && this.designerWidget.currentView !== undefined) {
+                console.log('🎯 MULTI-VIEW: Setting currentView directly');
+                this.designerWidget.currentView = viewKey;
+
+                // Trigger any necessary updates
+                if (typeof this.designerWidget.updateView === 'function') {
+                    this.designerWidget.updateView();
+                }
+                return;
+            }
+
+            // Method 3: DOM-based view switching fallback
+            console.log('🎯 MULTI-VIEW: Using DOM-based view switching fallback');
+            const viewButton = document.querySelector(`[data-view-id="${viewKey}"]`);
+            if (viewButton) {
+                viewButton.click();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return;
+            }
+
+            console.warn('⚠️ MULTI-VIEW: No view switching method available');
+        } catch (error) {
+            console.error('❌ MULTI-VIEW: View switching failed:', error);
         }
     }
 
-    async generateViewPNG(viewKey) {
+    async generateViewPNG(viewId, viewName = 'Unknown View') {
         if (this.saveOnlyPNGGenerator) {
-            return await this.saveOnlyPNGGenerator.generatePNG({
-                viewId: viewKey,
-                viewName: viewKey
-            });
+            try {
+                console.log(`🎨 MULTI-VIEW: Generating PNG for view ${viewName} (ID: ${viewId})`);
+                const result = await this.saveOnlyPNGGenerator.generatePNG({
+                    viewId: viewId,
+                    viewName: viewName,
+                    saveType: 'multi_view_generation'
+                });
+
+                if (result && result.success) {
+                    console.log(`✅ MULTI-VIEW: PNG generation successful for ${viewName}`);
+                } else {
+                    console.warn(`⚠️ MULTI-VIEW: PNG generation returned unsuccessful result for ${viewName}:`, result);
+                }
+
+                return result;
+            } catch (error) {
+                console.error(`❌ MULTI-VIEW: PNG generation error for ${viewName}:`, error);
+                return { success: false, error: error.message };
+            }
         }
-        return null;
+        console.warn('⚠️ MULTI-VIEW: No PNG generator available');
+        return { success: false, error: 'No PNG generator available' };
     }
 
     async generateSinglePNG() {
