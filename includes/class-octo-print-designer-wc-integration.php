@@ -2449,6 +2449,8 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 $fallback_debug[] = "✅ [ADMIN FALLBACK] Successfully extracted design data via AdminDesignDataReader";
                                 $fallback_debug[] = "📊 [ADMIN FALLBACK] Extracted data size: " . $extracted_data['data_size'] . " bytes";
                                 $fallback_debug[] = "📊 [ADMIN FALLBACK] Views found: " . count($extracted_data['data']['views'] ?? []);
+                                $fallback_debug[] = "📊 [ADMIN FALLBACK] Elements found: " . count($extracted_data['data']['elements'] ?? []);
+                                $fallback_debug[] = "📊 [ADMIN FALLBACK] Data structure: " . json_encode(array_keys($extracted_data['data'] ?? []));
 
                                 error_log("✅ [ADMIN FALLBACK] Successfully extracted design data via AdminDesignDataReader");
                                 error_log("📊 [ADMIN FALLBACK] Extracted data size: " . $extracted_data['data_size'] . " bytes");
