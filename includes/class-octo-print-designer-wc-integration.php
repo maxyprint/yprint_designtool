@@ -1194,6 +1194,15 @@ private function check_yprint_dependency() {
                                 debug_entries: response.data?.debug ? response.data.debug.length : 0
                             });
 
+                            // 🎯 [ADMIN FALLBACK DEBUG] Log fallback attempt results
+                            if (response.data?.admin_fallback_debug && response.data.admin_fallback_debug.length > 0) {
+                                console.group('🎯 [ADMIN FALLBACK DEBUG] AdminDesignDataReader Results');
+                                response.data.admin_fallback_debug.forEach(debugMsg => {
+                                    console.log(debugMsg);
+                                });
+                                console.groupEnd();
+                            }
+
                             // 🖼️ [PNG DEBUG] Log PNG loading results
                             console.group('🖼️ [PNG DEBUG] PNG File Information');
                             console.log('PNG files found:', response.data?.png_files_count || 0);
@@ -2414,14 +2423,22 @@ private function build_print_provider_email_content($order, $design_items, $note
             error_log("⚠️ [PHP RECEIVE] No design data JSON received in request for order {$order_id}");
 
             // 🎯 MULTI-VIEW ADMIN FALLBACK: Try to extract design data using AdminDesignDataReader
+            $fallback_debug = array();
+            $fallback_debug[] = "🔄 [ADMIN FALLBACK] Starting fallback process for order {$order_id}";
+
             if (class_exists('AdminDesignDataReader')) {
+                $fallback_debug[] = "✅ [ADMIN FALLBACK] AdminDesignDataReader class available";
                 error_log("🔄 [ADMIN FALLBACK] Attempting to use AdminDesignDataReader for missing design data...");
 
+                $design_found = false;
                 // Try to find design IDs in order items for fallback extraction
                 foreach ($order->get_items() as $item_id => $item) {
                     $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
+                    $fallback_debug[] = "🔍 [ADMIN FALLBACK] Item {$item_id}: design_id = " . ($design_id ?: 'NONE');
 
                     if ($design_id) {
+                        $design_found = true;
+                        $fallback_debug[] = "🎯 [ADMIN FALLBACK] Found design_id {$design_id} for item {$item_id}, attempting extraction...";
                         error_log("🎯 [ADMIN FALLBACK] Found design_id {$design_id} for item {$item_id}, attempting extraction...");
 
                         try {
@@ -2429,6 +2446,10 @@ private function build_print_provider_email_content($order, $design_items, $note
                             $extracted_data = $admin_reader->extractDesignDataFromDatabase($design_id);
 
                             if ($extracted_data['success'] && $extracted_data['has_design_data']) {
+                                $fallback_debug[] = "✅ [ADMIN FALLBACK] Successfully extracted design data via AdminDesignDataReader";
+                                $fallback_debug[] = "📊 [ADMIN FALLBACK] Extracted data size: " . $extracted_data['data_size'] . " bytes";
+                                $fallback_debug[] = "📊 [ADMIN FALLBACK] Views found: " . count($extracted_data['data']['views'] ?? []);
+
                                 error_log("✅ [ADMIN FALLBACK] Successfully extracted design data via AdminDesignDataReader");
                                 error_log("📊 [ADMIN FALLBACK] Extracted data size: " . $extracted_data['data_size'] . " bytes");
 
@@ -2441,21 +2462,33 @@ private function build_print_provider_email_content($order, $design_items, $note
                                 $meta_result = update_post_meta($order_id, '_admin_extracted_design_data', wp_slash($json_string));
 
                                 if ($meta_result) {
+                                    $fallback_debug[] = "✅ [ADMIN FALLBACK] Admin-extracted design data stored successfully for order {$order_id}";
                                     error_log("✅ [ADMIN FALLBACK] Admin-extracted design data stored successfully for order {$order_id}");
                                 }
 
                                 break; // Successfully extracted data for one design, that's enough
                             } else {
+                                $fallback_debug[] = "⚠️ [ADMIN FALLBACK] AdminDesignDataReader found no data for design {$design_id}";
+                                $fallback_debug[] = "📊 [ADMIN FALLBACK] Extraction result: " . json_encode($extracted_data);
                                 error_log("⚠️ [ADMIN FALLBACK] AdminDesignDataReader found no data for design {$design_id}");
                             }
                         } catch (Exception $e) {
+                            $fallback_debug[] = "❌ [ADMIN FALLBACK] AdminDesignDataReader error: " . $e->getMessage();
                             error_log("❌ [ADMIN FALLBACK] AdminDesignDataReader error: " . $e->getMessage());
                         }
                     }
                 }
+
+                if (!$design_found) {
+                    $fallback_debug[] = "❌ [ADMIN FALLBACK] No design IDs found in order items";
+                }
             } else {
+                $fallback_debug[] = "❌ [ADMIN FALLBACK] AdminDesignDataReader class not available";
                 error_log("❌ [ADMIN FALLBACK] AdminDesignDataReader class not available");
             }
+
+            // Store debug info for response (will be visible in browser console)
+            $GLOBALS['admin_fallback_debug'] = $fallback_debug;
         }
 
         // Refresh print data from database
@@ -2713,7 +2746,9 @@ private function build_print_provider_email_content($order, $design_items, $note
             // 🔧 FIX: Include PNG file information for preview functionality
             'png_files' => $png_files_found,
             'png_files_count' => count($png_files_found),
-            'preview_available' => !empty($stored_design_data) || count($png_files_found) > 0
+            'preview_available' => !empty($stored_design_data) || count($png_files_found) > 0,
+            // 🎯 MULTI-VIEW DEBUG: Include fallback debug information for browser console
+            'admin_fallback_debug' => isset($GLOBALS['admin_fallback_debug']) ? $GLOBALS['admin_fallback_debug'] : array('No fallback attempted')
         ));
     }
 
