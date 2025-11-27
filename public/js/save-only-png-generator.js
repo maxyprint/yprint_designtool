@@ -2484,6 +2484,64 @@ class SaveOnlyPNGGenerator {
 
         console.log('✅ SAVE-ONLY PNG: Auto-generation triggers removed');
     }
+
+    /**
+     * 🎯 PUBLIC API: Generate PNG for multi-view system
+     * Used by multi-view-png-system.js for view-specific PNG generation
+     */
+    async generatePNG(options = {}) {
+        try {
+            console.log('🎨 SAVE-ONLY PNG: generatePNG called with options:', options);
+
+            // Extract options with defaults
+            const {
+                viewId = 'current',
+                viewName = 'Current View',
+                saveType = 'multi_view_generation'
+            } = options;
+
+            // Get current design data
+            const designData = this.getCurrentDesignData();
+            if (!designData) {
+                throw new Error('No design data available');
+            }
+
+            // Add view information to design data
+            designData.viewId = viewId;
+            designData.viewName = viewName;
+
+            console.log(`🎯 SAVE-ONLY PNG: Generating PNG for view "${viewName}" (${viewId})`);
+
+            // Use existing enhanced PNG generation
+            const result = await this.generateEnhancedPNG(designData, saveType);
+
+            if (result && result.success && result.dataUrl) {
+                console.log(`✅ SAVE-ONLY PNG: PNG generated successfully for view "${viewName}"`);
+                return {
+                    success: true,
+                    dataUrl: result.dataUrl,
+                    viewId: viewId,
+                    viewName: viewName,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        saveType: saveType,
+                        printArea: result.printArea
+                    }
+                };
+            } else {
+                throw new Error('PNG generation failed');
+            }
+
+        } catch (error) {
+            console.error('❌ SAVE-ONLY PNG: generatePNG failed:', error);
+            return {
+                success: false,
+                error: error.message,
+                viewId: options.viewId || 'current',
+                viewName: options.viewName || 'Current View'
+            };
+        }
+    }
 }
 
 // Auto-initialize when DOM is ready

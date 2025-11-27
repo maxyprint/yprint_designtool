@@ -174,11 +174,11 @@ class Octo_Print_Designer_Public {
             true
         );
 
-        // 🎯 STEP 6: Multi-View PNG System - Intelligent Front/Back view detection and generation
+        // 🎯 STEP 6: Multi-View PNG System - Robuste Implementierung
         wp_register_script(
-            'yprint-multi-view-png-system',
+            'yprint-multi-view-png',
             OCTO_PRINT_DESIGNER_URL . 'public/js/multi-view-png-system.js',
-            ['yprint-png-integration'],
+            ['yprint-save-only-png'],
             $this->version . '.multi-view-png-v1',
             true
         );
@@ -190,7 +190,7 @@ class Octo_Print_Designer_Public {
             'yprint-high-dpi-export',
             'yprint-save-only-png',
             'yprint-png-integration',
-            'yprint-multi-view-png-system'
+            'yprint-multi-view-png'
         ];
 
         // 🎯 AUTO-ENQUEUE: Load essential scripts automatically on designer pages

@@ -1,405 +1,340 @@
 /**
- * 🎯 MULTI-VIEW PNG SYSTEM
- * Intelligent view-specific PNG generation and storage
- *
- * FEATURES:
- * - Detects views with actual design content
- * - Generates PNG only for designed views
- * - Stores view-specific PNGs with view identification
- * - Maintains backward compatibility with single-view designs
+ * Multi-View PNG System - Robuste Implementierung
+ * Erkennt automatisch Front/Back Views und generiert PNGs nur für Views mit Inhalt
  */
-
-console.log('🎯 MULTI-VIEW PNG: Loading intelligent multi-view PNG system...');
-
 class MultiViewPNGSystem {
     constructor() {
-        this.initialized = false;
         this.designerWidget = null;
         this.saveOnlyPNGGenerator = null;
-        this.viewContentMap = new Map(); // Tracks which views have content
+        this.initialized = false;
+        this.currentViewKey = "N/A";
+        this.viewTemplates = {};
+        this.contentStatus = {};
 
-        console.log('🎯 MULTI-VIEW PNG: Initializing system...');
+        console.log('🎯 MULTI-VIEW: Initializing system...');
         this.init();
     }
 
     async init() {
-        // Wait for required systems
-        await this.waitForDependencies();
+        try {
+            await this.waitForDependencies();
+            this.hookIntoDesigner();
+            this.detectTemplateSystem();
+            this.setupViewSwitchingHooks();
+            this.initialized = true;
+            console.log('✅ MULTI-VIEW: System fully initialized');
 
-        // Setup view content tracking
-        this.setupViewContentTracking();
+            // Initial content check
+            this.updateViewContentStatus();
 
-        // Hook into existing save system
-        this.hookIntoSaveSystem();
-
-        // Expose global instance
-        window.multiViewPNGSystem = this;
-
-        this.initialized = true;
-        console.log('✅ MULTI-VIEW PNG: System initialized successfully');
+        } catch (error) {
+            console.error('❌ MULTI-VIEW: Initialization failed:', error);
+            this.fallbackToLegacyMode();
+        }
     }
 
     async waitForDependencies() {
         return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 20;
-
-            const checkDependencies = () => {
-                this.designerWidget = window.designerWidgetInstance;
+            const checkDeps = () => {
+                // DIREKT auf window.designerInstance zugreifen, keine Fallbacks
+                this.designerWidget = window.designerInstance;
                 this.saveOnlyPNGGenerator = window.saveOnlyPNGGenerator;
 
                 if (this.designerWidget && this.saveOnlyPNGGenerator) {
-                    console.log('✅ MULTI-VIEW PNG: All dependencies found');
+                    console.log('✅ MULTI-VIEW: Dependencies found');
+                    console.log('   - designerWidget:', typeof this.designerWidget);
+                    console.log('   - saveOnlyPNGGenerator:', typeof this.saveOnlyPNGGenerator);
                     resolve();
-                    return;
+                    return true;
                 }
-
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    console.warn('⚠️ MULTI-VIEW PNG: Dependencies not found, using fallback mode');
-                    resolve();
-                    return;
-                }
-
-                setTimeout(checkDependencies, 250);
+                return false;
             };
 
-            checkDependencies();
-        });
-    }
+            // Sofort prüfen
+            if (checkDeps()) return;
 
-    /**
-     * 🎯 CONTENT DETECTION: Track which views have actual design content
-     */
-    setupViewContentTracking() {
-        if (!this.designerWidget) {
-            console.warn('⚠️ MULTI-VIEW PNG: Designer widget not available for content tracking');
-            return;
-        }
-
-        console.log('🎯 MULTI-VIEW PNG: Setting up view content tracking...');
-
-        // Track canvas modifications
-        if (this.designerWidget.fabricCanvas) {
-            this.designerWidget.fabricCanvas.on('object:added', () => {
-                this.updateViewContentStatus();
-            });
-
-            this.designerWidget.fabricCanvas.on('object:removed', () => {
-                this.updateViewContentStatus();
-            });
-
-            this.designerWidget.fabricCanvas.on('object:modified', () => {
-                this.updateViewContentStatus();
-            });
-        }
-
-        // Initial content check
-        this.scanAllViewsForContent();
-    }
-
-    /**
-     * 🔍 CONTENT SCANNING: Check all views for existing content
-     */
-    scanAllViewsForContent() {
-        if (!this.designerWidget || !this.designerWidget.templates) {
-            return;
-        }
-
-        console.log('🔍 MULTI-VIEW PNG: Scanning all views for existing content...');
-
-        // Get current template and its views
-        const activeTemplate = this.designerWidget.templates.get(this.designerWidget.activeTemplateId);
-        if (!activeTemplate || !activeTemplate.variations) {
-            console.warn('⚠️ MULTI-VIEW PNG: No active template found for content scanning');
-            return;
-        }
-
-        // Scan each variation and view
-        activeTemplate.variations.forEach(variation => {
-            if (variation.views) {
-                variation.views.forEach((viewData, viewId) => {
-                    const hasContent = this.checkViewHasContent(variation.id, viewId);
-                    const viewKey = `${variation.id}_${viewId}`;
-
-                    this.viewContentMap.set(viewKey, {
-                        variationId: variation.id,
-                        viewId: viewId,
-                        viewName: viewData.name || `View ${viewId}`,
-                        hasContent: hasContent,
-                        lastUpdated: Date.now()
-                    });
-
-                    console.log(`🔍 MULTI-VIEW PNG: View ${viewData.name} (${viewId}) has content: ${hasContent}`);
-                });
-            }
-        });
-
-        console.log('✅ MULTI-VIEW PNG: Content scan completed. Found views:', this.viewContentMap.size);
-    }
-
-    /**
-     * 🎯 CONTENT CHECK: Determine if a view has actual design content
-     */
-    checkViewHasContent(variationId, viewId) {
-        if (!this.designerWidget) return false;
-
-        const viewKey = `${variationId}_${viewId}`;
-
-        // Check variationImages Map for custom images
-        const viewImages = this.designerWidget.variationImages?.get(viewKey);
-        if (viewImages && viewImages.length > 0) {
-            console.log(`🎯 MULTI-VIEW PNG: View ${viewId} has ${viewImages.length} custom image(s)`);
-            return true;
-        }
-
-        // Check if currently active view and has canvas objects
-        if (this.designerWidget.currentView == viewId && this.designerWidget.currentVariation == variationId) {
-            const canvasObjects = this.designerWidget.fabricCanvas?.getObjects() || [];
-            const hasDesignObjects = canvasObjects.length > 0;
-
-            if (hasDesignObjects) {
-                console.log(`🎯 MULTI-VIEW PNG: Active view ${viewId} has ${canvasObjects.length} canvas object(s)`);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 🔄 UPDATE: Update content status for current view
-     */
-    updateViewContentStatus() {
-        if (!this.designerWidget || !this.designerWidget.currentView || !this.designerWidget.currentVariation) {
-            return;
-        }
-
-        const viewKey = `${this.designerWidget.currentVariation}_${this.designerWidget.currentView}`;
-        const hasContent = this.checkViewHasContent(this.designerWidget.currentVariation, this.designerWidget.currentView);
-
-        // Get view name from template
-        const activeTemplate = this.designerWidget.templates.get(this.designerWidget.activeTemplateId);
-        const variation = activeTemplate?.variations.find(v => v.id == this.designerWidget.currentVariation);
-        const viewData = variation?.views.get(this.designerWidget.currentView);
-        const viewName = viewData?.name || `View ${this.designerWidget.currentView}`;
-
-        this.viewContentMap.set(viewKey, {
-            variationId: this.designerWidget.currentVariation,
-            viewId: this.designerWidget.currentView,
-            viewName: viewName,
-            hasContent: hasContent,
-            lastUpdated: Date.now()
-        });
-
-        console.log(`🔄 MULTI-VIEW PNG: Updated content status for ${viewName}: ${hasContent}`);
-    }
-
-    /**
-     * 🚀 MULTI-VIEW SAVE: Generate PNGs for all views with content
-     */
-    async saveAllViewsWithContent(designData = {}) {
-        console.log('🚀 MULTI-VIEW PNG: Starting multi-view PNG generation...');
-
-        if (!this.designerWidget) {
-            throw new Error('Designer widget not available');
-        }
-
-        // Update content status first
-        this.scanAllViewsForContent();
-
-        // Filter views that have content
-        const viewsWithContent = Array.from(this.viewContentMap.values()).filter(view => view.hasContent);
-
-        console.log(`🎯 MULTI-VIEW PNG: Found ${viewsWithContent.length} view(s) with content:`,
-            viewsWithContent.map(v => `${v.viewName}(${v.viewId})`).join(', '));
-
-        if (viewsWithContent.length === 0) {
-            console.warn('⚠️ MULTI-VIEW PNG: No views with content found - nothing to save');
-            return { success: false, message: 'No views with content to save' };
-        }
-
-        const savedPNGs = [];
-        const errors = [];
-
-        // Store current view state
-        const originalView = this.designerWidget.currentView;
-        const originalVariation = this.designerWidget.currentVariation;
-
-        try {
-            // Generate PNG for each view with content
-            for (const viewInfo of viewsWithContent) {
-                try {
-                    console.log(`🔄 MULTI-VIEW PNG: Processing view: ${viewInfo.viewName} (${viewInfo.viewId})`);
-
-                    // Switch to the view
-                    await this.switchToView(viewInfo.variationId, viewInfo.viewId);
-
-                    // Generate PNG for this view
-                    const pngData = await this.generatePNGForCurrentView(viewInfo, designData);
-
-                    if (pngData) {
-                        savedPNGs.push({
-                            viewId: viewInfo.viewId,
-                            viewName: viewInfo.viewName,
-                            variationId: viewInfo.variationId,
-                            pngData: pngData
-                        });
-                        console.log(`✅ MULTI-VIEW PNG: Successfully saved PNG for ${viewInfo.viewName}`);
-                    } else {
-                        errors.push(`Failed to generate PNG for ${viewInfo.viewName}`);
-                    }
-
-                } catch (viewError) {
-                    console.error(`❌ MULTI-VIEW PNG: Error processing view ${viewInfo.viewName}:`, viewError);
-                    errors.push(`Error processing ${viewInfo.viewName}: ${viewError.message}`);
-                }
-            }
-
-        } finally {
-            // Restore original view state
-            if (originalView && originalVariation) {
-                await this.switchToView(originalVariation, originalView);
-                console.log(`🔄 MULTI-VIEW PNG: Restored original view: ${originalView}`);
-            }
-        }
-
-        const result = {
-            success: savedPNGs.length > 0,
-            savedPNGs: savedPNGs,
-            errors: errors,
-            totalProcessed: viewsWithContent.length,
-            message: `Processed ${viewsWithContent.length} view(s), saved ${savedPNGs.length} PNG(s)`
-        };
-
-        console.log('🎯 MULTI-VIEW PNG: Multi-view save completed:', result);
-        return result;
-    }
-
-    /**
-     * 🔄 VIEW SWITCHING: Switch to specific view for PNG generation
-     */
-    async switchToView(variationId, viewId) {
-        if (!this.designerWidget) {
-            throw new Error('Designer widget not available for view switching');
-        }
-
-        console.log(`🔄 MULTI-VIEW PNG: Switching to variation ${variationId}, view ${viewId}`);
-
-        // Update current view state
-        this.designerWidget.currentVariation = variationId;
-        this.designerWidget.currentView = viewId;
-
-        // Load the view if method exists
-        if (typeof this.designerWidget.loadTemplateView === 'function') {
-            await this.designerWidget.loadTemplateView(viewId);
-        }
-
-        // Give time for view to load
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    /**
-     * 🖼️ PNG GENERATION: Generate PNG for currently active view
-     */
-    async generatePNGForCurrentView(viewInfo, designData) {
-        console.log(`🖼️ MULTI-VIEW PNG: Generating PNG for view: ${viewInfo.viewName}`);
-
-        if (!this.saveOnlyPNGGenerator || typeof this.saveOnlyPNGGenerator.generateDesignPNG !== 'function') {
-            console.error('❌ MULTI-VIEW PNG: SaveOnlyPNGGenerator not available');
-            return null;
-        }
-
-        try {
-            // Prepare design data with view information
-            const viewDesignData = {
-                ...designData,
-                view_id: viewInfo.viewId,
-                view_name: viewInfo.viewName,
-                variation_id: viewInfo.variationId,
-                save_type: 'multi_view'
+            // Auf designerReady Event hören (gefeuert um Zeile 2754 in designer.bundle.js)
+            const designerReadyHandler = () => {
+                console.log('🎯 MULTI-VIEW: designerReady event received');
+                checkDeps();
             };
 
-            // Generate PNG using existing system
-            const pngResult = await this.saveOnlyPNGGenerator.generateDesignPNG(viewDesignData, 'multi_view_save');
+            window.addEventListener('designerReady', designerReadyHandler, {once: true});
 
-            console.log(`✅ MULTI-VIEW PNG: PNG generated for ${viewInfo.viewName}:`, {
-                result_exists: !!pngResult,
-                result_keys: pngResult ? Object.keys(pngResult) : []
+            // Polling als zusätzliche Sicherheit
+            const pollInterval = setInterval(() => {
+                if (checkDeps()) {
+                    clearInterval(pollInterval);
+                    window.removeEventListener('designerReady', designerReadyHandler);
+                }
+            }, 100);
+
+            // Fallback Timer nach 5 Sekunden
+            setTimeout(() => {
+                clearInterval(pollInterval);
+                window.removeEventListener('designerReady', designerReadyHandler);
+                if (!this.designerWidget || !this.saveOnlyPNGGenerator) {
+                    console.warn('⚠️ MULTI-VIEW: Dependencies timeout - proceeding anyway');
+                }
+                resolve();
+            }, 5000);
+        });
+    }
+
+    hookIntoDesigner() {
+        if (!this.designerWidget) {
+            console.warn('⚠️ MULTI-VIEW: No designer widget to hook into');
+            return;
+        }
+
+        // Hook in view switching wenn verfügbar
+        if (typeof this.designerWidget.switchView === 'function') {
+            const originalSwitchView = this.designerWidget.switchView.bind(this.designerWidget);
+            this.designerWidget.switchView = (viewId) => {
+                console.log('🔄 MULTI-VIEW: View switching to:', viewId);
+                const result = originalSwitchView(viewId);
+
+                // Content status nach view switch aktualisieren
+                setTimeout(() => {
+                    this.updateViewContentStatus();
+                }, 100);
+
+                return result;
+            };
+            console.log('✅ MULTI-VIEW: Hooked into view switching');
+        }
+
+        // Hook in canvas change events wenn verfügbar
+        if (this.designerWidget.canvas && this.designerWidget.canvas.on) {
+            this.designerWidget.canvas.on('object:added', () => {
+                this.updateViewContentStatus();
             });
 
-            return pngResult;
+            this.designerWidget.canvas.on('object:removed', () => {
+                this.updateViewContentStatus();
+            });
+
+            console.log('✅ MULTI-VIEW: Hooked into canvas events');
+        }
+    }
+
+    detectTemplateSystem() {
+        // Template System erkennen
+        try {
+            // Verschiedene Wege zur Template-Erkennung
+            if (this.designerWidget.templates) {
+                this.viewTemplates = this.designerWidget.templates;
+                console.log('✅ MULTI-VIEW: Templates found via designerWidget.templates');
+            } else if (window.templateData) {
+                this.viewTemplates = window.templateData;
+                console.log('✅ MULTI-VIEW: Templates found via window.templateData');
+            } else if (this.designerWidget.productTemplates) {
+                this.viewTemplates = this.designerWidget.productTemplates;
+                console.log('✅ MULTI-VIEW: Templates found via designerWidget.productTemplates');
+            }
+
+            console.log('🎯 MULTI-VIEW: Detected templates:', Object.keys(this.viewTemplates).length);
 
         } catch (error) {
-            console.error(`❌ MULTI-VIEW PNG: Error generating PNG for ${viewInfo.viewName}:`, error);
-            throw error;
+            console.warn('⚠️ MULTI-VIEW: Template detection failed:', error);
         }
     }
 
-    /**
-     * 🔗 INTEGRATION: Hook into existing save system
-     */
-    hookIntoSaveSystem() {
-        console.log('🔗 MULTI-VIEW PNG: Hooking into existing save system...');
+    setupViewSwitchingHooks() {
+        // Events für View-Switching überwachen
+        document.addEventListener('click', (event) => {
+            // View-Buttons erkennen (häufige Selektoren)
+            const viewButton = event.target.closest('[data-view-id], .view-selector, .template-view');
+            if (viewButton) {
+                setTimeout(() => {
+                    this.updateViewContentStatus();
+                }, 200);
+            }
+        });
+    }
 
-        // Override saveOnlyPNGGenerator's generateDesignPNG method if it exists
-        if (this.saveOnlyPNGGenerator && this.saveOnlyPNGGenerator.generateDesignPNG) {
-            const originalGenerateDesignPNG = this.saveOnlyPNGGenerator.generateDesignPNG.bind(this.saveOnlyPNGGenerator);
+    updateViewContentStatus() {
+        if (!this.designerWidget) return;
 
-            this.saveOnlyPNGGenerator.generateDesignPNG = async (designData, saveType = 'standard') => {
-                // Check if this is a multi-view save request
-                if (saveType === 'multi_view_trigger') {
-                    console.log('🎯 MULTI-VIEW PNG: Multi-view save triggered');
-                    return await this.saveAllViewsWithContent(designData);
+        try {
+            // Aktuelle View ermitteln
+            this.currentViewKey = this.getCurrentViewKey();
+
+            // Canvas-Objekte zählen
+            const canvasObjects = this.getCanvasObjectCount();
+
+            // Content Status aktualisieren
+            const hasContent = canvasObjects > 0;
+            this.contentStatus[this.currentViewKey] = hasContent;
+
+            console.log('🔍 MULTI-VIEW: Content Status Update');
+            console.log('   - Current View:', this.currentViewKey);
+            console.log('   - Canvas Objects:', canvasObjects);
+            console.log('   - Has Content:', hasContent ? '✅ JA' : '❌ NEIN');
+
+        } catch (error) {
+            console.warn('⚠️ MULTI-VIEW: Content status update failed:', error);
+        }
+    }
+
+    getCurrentViewKey() {
+        // Verschiedene Wege zur View-Erkennung
+        if (this.designerWidget.currentView) {
+            return this.designerWidget.currentView;
+        }
+
+        if (this.designerWidget.activeView) {
+            return this.designerWidget.activeView;
+        }
+
+        if (this.designerWidget.selectedView) {
+            return this.designerWidget.selectedView;
+        }
+
+        // DOM-basierte Erkennung
+        const activeViewElement = document.querySelector('.view-selector.active, .template-view.active');
+        if (activeViewElement) {
+            return activeViewElement.getAttribute('data-view-id') ||
+                   activeViewElement.textContent.trim();
+        }
+
+        return "Unknown";
+    }
+
+    getCanvasObjectCount() {
+        try {
+            if (this.designerWidget.canvas && this.designerWidget.canvas.getObjects) {
+                const objects = this.designerWidget.canvas.getObjects();
+                // Background-Objekte ausfiltern
+                return objects.filter(obj => obj.type !== 'rect' || !obj.isBackground).length;
+            }
+
+            if (this.designerWidget.fabricCanvas) {
+                const objects = this.designerWidget.fabricCanvas.getObjects();
+                return objects.filter(obj => obj.type !== 'rect' || !obj.isBackground).length;
+            }
+
+            return 0;
+        } catch (error) {
+            console.warn('⚠️ MULTI-VIEW: Canvas object count failed:', error);
+            return 0;
+        }
+    }
+
+    async generateMultiViewPNGs() {
+        if (!this.initialized) {
+            console.warn('⚠️ MULTI-VIEW: System not initialized - falling back to single PNG');
+            return this.generateSinglePNG();
+        }
+
+        const pngResults = {};
+        const viewsWithContent = Object.keys(this.contentStatus).filter(
+            view => this.contentStatus[view]
+        );
+
+        console.log('🎯 MULTI-VIEW: Generating PNGs for views with content:', viewsWithContent);
+
+        if (viewsWithContent.length === 0) {
+            console.log('ℹ️ MULTI-VIEW: No content found - generating current view');
+            return this.generateSinglePNG();
+        }
+
+        for (const viewKey of viewsWithContent) {
+            try {
+                // Zu View wechseln
+                await this.switchToView(viewKey);
+
+                // PNG generieren
+                const pngData = await this.generateViewPNG(viewKey);
+                if (pngData) {
+                    pngResults[viewKey] = pngData;
+                    console.log(`✅ MULTI-VIEW: PNG generated for view: ${viewKey}`);
                 }
 
-                // For single view saves (legacy), call original method
-                return await originalGenerateDesignPNG(designData, saveType);
-            };
-
-            console.log('✅ MULTI-VIEW PNG: Successfully hooked into save system');
+            } catch (error) {
+                console.error(`❌ MULTI-VIEW: PNG generation failed for view ${viewKey}:`, error);
+            }
         }
 
-        // Expose global trigger function
-        window.triggerMultiViewPNGSave = (designData) => {
-            return this.saveAllViewsWithContent(designData);
+        return pngResults;
+    }
+
+    async switchToView(viewKey) {
+        if (this.designerWidget.switchView) {
+            return this.designerWidget.switchView(viewKey);
+        }
+
+        // DOM-basiertes View-Switching
+        const viewButton = document.querySelector(`[data-view-id="${viewKey}"]`);
+        if (viewButton) {
+            viewButton.click();
+            return new Promise(resolve => setTimeout(resolve, 300));
+        }
+    }
+
+    async generateViewPNG(viewKey) {
+        if (this.saveOnlyPNGGenerator) {
+            return await this.saveOnlyPNGGenerator.generatePNG({
+                viewId: viewKey,
+                viewName: viewKey
+            });
+        }
+        return null;
+    }
+
+    async generateSinglePNG() {
+        if (this.saveOnlyPNGGenerator) {
+            return await this.saveOnlyPNGGenerator.generatePNG();
+        }
+        return null;
+    }
+
+    fallbackToLegacyMode() {
+        console.log('🔄 MULTI-VIEW: Falling back to legacy single-PNG mode');
+        this.initialized = false;
+    }
+
+    // Debug Interface
+    getDebugInfo() {
+        return {
+            initialized: this.initialized,
+            designerWidget: !!this.designerWidget,
+            saveOnlyPNGGenerator: !!this.saveOnlyPNGGenerator,
+            currentView: this.currentViewKey,
+            templates: Object.keys(this.viewTemplates).length,
+            contentStatus: this.contentStatus,
+            hasContent: Object.values(this.contentStatus).some(Boolean) ? '✅ JA' : '❌ NEIN'
         };
     }
 
-    /**
-     * 📊 STATUS: Get current view content status
-     */
-    getViewContentStatus() {
-        const status = {
-            totalViews: this.viewContentMap.size,
-            viewsWithContent: Array.from(this.viewContentMap.values()).filter(v => v.hasContent).length,
-            viewDetails: Array.from(this.viewContentMap.values())
-        };
-
-        console.log('📊 MULTI-VIEW PNG: Current status:', status);
-        return status;
-    }
-
-    /**
-     * 🧹 CLEANUP: Clear view content tracking
-     */
-    clearViewTracking() {
-        this.viewContentMap.clear();
-        console.log('🧹 MULTI-VIEW PNG: View tracking cleared');
+    checkDependencies() {
+        return this.getDebugInfo();
     }
 }
 
-// Auto-initialize when dependencies are ready
+// Global instantiation
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 MULTI-VIEW PNG: DOM ready, starting initialization...');
+    console.log('🎯 MULTI-VIEW: DOM ready, initializing...');
+    window.multiViewPNGSystem = new MultiViewPNGSystem();
 
-    // Small delay to ensure other systems are loaded
-    setTimeout(() => {
-        if (!window.multiViewPNGSystem) {
-            new MultiViewPNGSystem();
-        }
-    }, 1000);
+    // Debug interface
+    window.multiViewPNGDebug = {
+        checkDependencies: () => window.multiViewPNGSystem.checkDependencies(),
+        getInfo: () => window.multiViewPNGSystem.getDebugInfo(),
+        forceInit: () => window.multiViewPNGSystem.init(),
+        updateContent: () => window.multiViewPNGSystem.updateViewContentStatus()
+    };
 });
 
-// Expose class globally
-window.MultiViewPNGSystem = MultiViewPNGSystem;
+// Falls DOM bereits geladen
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    console.log('🎯 MULTI-VIEW: DOM already ready, initializing immediately...');
+    window.multiViewPNGSystem = new MultiViewPNGSystem();
+
+    window.multiViewPNGDebug = {
+        checkDependencies: () => window.multiViewPNGSystem.checkDependencies(),
+        getInfo: () => window.multiViewPNGSystem.getDebugInfo(),
+        forceInit: () => window.multiViewPNGSystem.init(),
+        updateContent: () => window.multiViewPNGSystem.updateViewContentStatus()
+    };
+}
