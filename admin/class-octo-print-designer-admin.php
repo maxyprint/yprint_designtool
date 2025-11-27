@@ -4,6 +4,7 @@ class Octo_Print_Designer_Admin {
     private $version;
     private $template_manager;
     private $point_to_point_admin;
+    private $admin_design_data_reader;
 
     public function __construct($plugin_name, $version) {
         $this->plugin_name = $plugin_name;
@@ -14,6 +15,10 @@ class Octo_Print_Designer_Admin {
         // Gap 2: Point-to-Point Admin Integration
         require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-point-to-point-admin.php';
         $this->point_to_point_admin = new Octo_Print_Designer_Point_To_Point_Admin($plugin_name, $version);
+
+        // 🎯 MULTI-VIEW ADMIN: AdminDesignDataReader for backend design data extraction
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-admin-design-data-reader.php';
+        $this->admin_design_data_reader = new AdminDesignDataReader();
 
         $this->define_hooks();
     }
@@ -43,6 +48,10 @@ class Octo_Print_Designer_Admin {
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_save_template_measurements_from_admin', $this, 'save_template_measurements_from_admin');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_validate_template_measurements', $this, 'validate_template_measurements');
         Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_sync_template_sizes_measurements', $this, 'sync_template_sizes_measurements');
+
+        // 🎯 MULTI-VIEW ADMIN: New AJAX handlers for admin design data extraction
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_admin_get_design_data', $this, 'admin_get_design_data');
+        Octo_Print_Designer_Loader::$instance->add_action('wp_ajax_admin_get_multi_view_pngs', $this, 'admin_get_multi_view_pngs');
     
     }
 
@@ -1262,6 +1271,95 @@ class Octo_Print_Designer_Admin {
             }
         } else {
             wp_send_json_error('TemplateMeasurementManager not available');
+        }
+    }
+
+    /**
+     * AJAX handler for admin design data extraction
+     * Replaces missing frontend generateDesignData() function
+     */
+    public function admin_get_design_data() {
+        error_log("🎯 [ADMIN AJAX] admin_get_design_data called");
+
+        if (!check_ajax_referer('octo_print_designer_nonce', 'nonce', false)) {
+            error_log("❌ [ADMIN AJAX] Nonce verification failed");
+            wp_send_json_error('Security check failed');
+            return;
+        }
+
+        $design_id = sanitize_text_field($_POST['design_id'] ?? '');
+        if (empty($design_id)) {
+            error_log("❌ [ADMIN AJAX] No design ID provided");
+            wp_send_json_error('Design ID required');
+            return;
+        }
+
+        if (!$this->admin_design_data_reader) {
+            error_log("❌ [ADMIN AJAX] AdminDesignDataReader not available");
+            wp_send_json_error('Design data reader not available');
+            return;
+        }
+
+        try {
+            $result = $this->admin_design_data_reader->extractDesignDataFromDatabase($design_id);
+            error_log("✅ [ADMIN AJAX] Design data extracted for {$design_id}: " . json_encode([
+                'success' => $result['success'],
+                'has_design_data' => $result['has_design_data'] ?? false,
+                'data_size' => $result['data_size'] ?? 0
+            ]));
+
+            wp_send_json($result);
+
+        } catch (Exception $e) {
+            error_log("❌ [ADMIN AJAX] Error extracting design data: " . $e->getMessage());
+            wp_send_json_error('Error extracting design data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX handler for admin multi-view PNG lookup
+     * Integrates with existing multi-view PNG system
+     */
+    public function admin_get_multi_view_pngs() {
+        error_log("🎯 [ADMIN AJAX] admin_get_multi_view_pngs called");
+
+        if (!check_ajax_referer('octo_print_designer_nonce', 'nonce', false)) {
+            error_log("❌ [ADMIN AJAX] Nonce verification failed");
+            wp_send_json_error('Security check failed');
+            return;
+        }
+
+        $design_id = sanitize_text_field($_POST['design_id'] ?? '');
+        $order_id = sanitize_text_field($_POST['order_id'] ?? '');
+
+        if (empty($design_id)) {
+            error_log("❌ [ADMIN AJAX] No design ID provided");
+            wp_send_json_error('Design ID required');
+            return;
+        }
+
+        if (!$this->admin_design_data_reader) {
+            error_log("❌ [ADMIN AJAX] AdminDesignDataReader not available");
+            wp_send_json_error('Multi-view PNG reader not available');
+            return;
+        }
+
+        try {
+            $png_results = $this->admin_design_data_reader->getMultiViewPNGsForDesign($design_id, $order_id);
+
+            error_log("✅ [ADMIN AJAX] Multi-view PNGs found for {$design_id}: " . count($png_results) . " PNG(s)");
+
+            wp_send_json([
+                'success' => true,
+                'design_id' => $design_id,
+                'order_id' => $order_id,
+                'png_count' => count($png_results),
+                'pngs' => $png_results
+            ]);
+
+        } catch (Exception $e) {
+            error_log("❌ [ADMIN AJAX] Error getting multi-view PNGs: " . $e->getMessage());
+            wp_send_json_error('Error getting multi-view PNGs: ' . $e->getMessage());
         }
     }
 }

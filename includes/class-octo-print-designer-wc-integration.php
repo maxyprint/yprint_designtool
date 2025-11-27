@@ -3881,64 +3881,120 @@ private function build_print_provider_email_content($order, $design_items, $note
                 </h4>
                 <p style="margin: 8px 0; font-size: 13px; color: #646970;">High-resolution PNG files generated during design save process</p>
 
-                <!-- Print Files Gallery -->
+                <!-- Multi-View Print Files Gallery -->
                 <div class="print-files-gallery" style="margin-top: 15px;">
-                    <?php foreach ($print_files as $index => $file): ?>
-                        <div class="print-file-item" style="background: #fff; border: 1px solid #c3c4c7; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                            <div style="display: flex; gap: 15px; align-items: flex-start;">
-                                <!-- PNG Preview -->
-                                <div style="flex-shrink: 0;">
-                                    <img
-                                        src="<?php echo esc_url($file['print_file_url']); ?>"
-                                        alt="<?php echo esc_attr($file['design_name']); ?> Preview"
-                                        style="
-                                            max-width: 200px;
-                                            height: auto;
-                                            border: 1px solid #ddd;
-                                            border-radius: 4px;
-                                            cursor: pointer;
-                                            transition: transform 0.2s ease;
-                                        "
-                                        onclick="window.open('<?php echo esc_url($file['print_file_url']); ?>', '_blank')"
-                                        onmouseover="this.style.transform='scale(1.05)'"
-                                        onmouseout="this.style.transform='scale(1)'"
-                                    />
-                                </div>
+                    <?php
+                    // Group files by design and view for better organization
+                    $grouped_files = [];
+                    foreach ($print_files as $file) {
+                        $design_id = $file['design_id'];
+                        $view_name = $file['view_name'] ?? 'Main';
+                        $view_id = $file['view_id'] ?? null;
 
-                                <!-- File Info -->
-                                <div style="flex: 1;">
-                                    <h5 style="margin: 0 0 8px 0; font-size: 14px; color: #1d2327;">
-                                        <span class="dashicons dashicons-art" style="font-size: 16px; margin-right: 5px; color: #00a32a;"></span>
-                                        <?php echo esc_html($file['design_name']); ?>
-                                    </h5>
+                        if (!isset($grouped_files[$design_id])) {
+                            $grouped_files[$design_id] = [
+                                'design_name' => $file['design_name'],
+                                'views' => []
+                            ];
+                        }
 
-                                    <div style="font-size: 12px; color: #646970; margin-bottom: 10px;">
-                                        <strong>Product:</strong> <?php echo esc_html($file['item_name']); ?><br>
-                                        <strong>Design ID:</strong> #<?php echo esc_html($file['design_id']); ?><br>
-                                        <strong>File Path:</strong> <code style="background: #f6f7f7; padding: 2px 4px; border-radius: 3px;"><?php echo esc_html(basename($file['print_file_path'])); ?></code>
+                        $grouped_files[$design_id]['views'][$view_name] = $file;
+                    }
+                    ?>
+
+                    <?php foreach ($grouped_files as $design_id => $design_group): ?>
+                        <div class="multi-view-design-group" style="background: #fff; border: 1px solid #c3c4c7; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <!-- Design Header -->
+                            <h4 style="margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #e1e5e9; font-size: 16px; color: #1d2327;">
+                                <span class="dashicons dashicons-art" style="font-size: 18px; margin-right: 8px; color: #00a32a;"></span>
+                                <?php echo esc_html($design_group['design_name']); ?>
+                                <span style="font-size: 12px; color: #646970; font-weight: normal;">
+                                    (Design #<?php echo $design_id; ?> - <?php echo count($design_group['views']); ?> view<?php echo count($design_group['views']) > 1 ? 's' : ''; ?>)
+                                </span>
+                            </h4>
+
+                            <!-- Views Grid -->
+                            <div class="multi-view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                                <?php foreach ($design_group['views'] as $view_name => $file): ?>
+                                    <div class="view-item" style="background: #f9f9f9; border: 1px solid #e1e5e9; border-radius: 6px; padding: 12px;">
+                                        <!-- View Header -->
+                                        <div style="display: flex; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e1e5e9;">
+                                            <?php
+                                            $view_icon = 'dashicons-format-image';
+                                            $view_color = '#0073aa';
+
+                                            // Set view-specific icons and colors
+                                            if (stripos($view_name, 'front') !== false) {
+                                                $view_icon = 'dashicons-visibility';
+                                                $view_color = '#00a32a';
+                                            } elseif (stripos($view_name, 'back') !== false) {
+                                                $view_icon = 'dashicons-hidden';
+                                                $view_color = '#d63384';
+                                            }
+                                            ?>
+                                            <span class="dashicons <?php echo $view_icon; ?>" style="font-size: 16px; margin-right: 6px; color: <?php echo $view_color; ?>;"></span>
+                                            <strong style="font-size: 13px; color: #1d2327;"><?php echo esc_html($view_name); ?></strong>
+                                            <?php if (!empty($file['view_id'])): ?>
+                                                <span style="font-size: 11px; color: #646970; margin-left: auto;">ID: <?php echo esc_html($file['view_id']); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <!-- PNG Preview -->
+                                        <div style="text-align: center; margin-bottom: 10px;">
+                                            <img
+                                                src="<?php echo esc_url($file['print_file_url']); ?>"
+                                                alt="<?php echo esc_attr($view_name . ' - ' . $file['design_name']); ?>"
+                                                style="
+                                                    max-width: 180px;
+                                                    height: auto;
+                                                    border: 2px solid <?php echo $view_color; ?>;
+                                                    border-radius: 6px;
+                                                    cursor: pointer;
+                                                    transition: all 0.3s ease;
+                                                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                                "
+                                                onclick="window.open('<?php echo esc_url($file['print_file_url']); ?>', '_blank')"
+                                                onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 16px rgba(0,0,0,0.2)'"
+                                                onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'"
+                                            />
+                                        </div>
+
+                                        <!-- View Details -->
+                                        <div style="font-size: 11px; color: #646970; margin-bottom: 8px;">
+                                            <?php if (!empty($file['generated_at'])): ?>
+                                                <div><strong>Generated:</strong> <?php echo date('M j, Y H:i', strtotime($file['generated_at'])); ?></div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($file['save_type'])): ?>
+                                                <div><strong>Type:</strong> <?php echo esc_html($file['save_type']); ?></div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($file['source'])): ?>
+                                                <div><strong>Source:</strong> <?php echo esc_html(str_replace('_', ' ', $file['source'])); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <!-- View Actions -->
+                                        <div style="display: flex; gap: 6px; justify-content: center;">
+                                            <a
+                                                href="<?php echo esc_url($file['print_file_url']); ?>"
+                                                target="_blank"
+                                                class="button button-small"
+                                                style="font-size: 10px; padding: 3px 6px; border-color: <?php echo $view_color; ?>; color: <?php echo $view_color; ?>;"
+                                            >
+                                                <span class="dashicons dashicons-external" style="font-size: 10px;"></span>
+                                                Open
+                                            </a>
+                                            <a
+                                                href="<?php echo esc_url($file['print_file_url']); ?>"
+                                                download="<?php echo sanitize_file_name($file['design_name'] . '_' . $view_name . '.png'); ?>"
+                                                class="button button-small"
+                                                style="font-size: 10px; padding: 3px 6px;"
+                                            >
+                                                <span class="dashicons dashicons-download" style="font-size: 10px;"></span>
+                                                Download
+                                            </a>
+                                        </div>
                                     </div>
-
-                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                        <a
-                                            href="<?php echo esc_url($file['print_file_url']); ?>"
-                                            target="_blank"
-                                            class="button button-small"
-                                            style="font-size: 11px; padding: 4px 8px;"
-                                        >
-                                            <span class="dashicons dashicons-external" style="font-size: 12px;"></span>
-                                            Open Full Size
-                                        </a>
-                                        <a
-                                            href="<?php echo esc_url($file['print_file_url']); ?>"
-                                            download
-                                            class="button button-small"
-                                            style="font-size: 11px; padding: 4px 8px;"
-                                        >
-                                            <span class="dashicons dashicons-download" style="font-size: 12px;"></span>
-                                            Download
-                                        </a>
-                                    </div>
-                                </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
