@@ -116,6 +116,49 @@ class MultiViewPNGSystem {
 
             console.log('✅ MULTI-VIEW: Hooked into canvas events');
         }
+
+        // Hook into save events to trigger multi-view PNG generation
+        document.addEventListener('designerShortcodeSave', async (event) => {
+            console.log('🎯 MULTI-VIEW: Save event detected, checking for multi-view PNG generation...');
+
+            if (this.initialized) {
+                try {
+                    // Get available views
+                    const availableViews = this.getAvailableViews();
+                    console.log('🔍 MULTI-VIEW: Available views for PNG generation:', availableViews);
+
+                    if (availableViews.length > 1) {
+                        console.log('🎯 MULTI-VIEW: Multiple views detected - generating multi-view PNGs...');
+
+                        // Prevent default single PNG generation
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        // Generate PNGs for all views with content
+                        const pngResults = await this.generateMultiViewPNGs();
+                        console.log('✅ MULTI-VIEW: Multi-view PNG generation completed:', pngResults);
+
+                        // Fire a custom event with the results
+                        document.dispatchEvent(new CustomEvent('multiViewPNGsGenerated', {
+                            detail: {
+                                originalSaveEvent: event,
+                                pngResults: pngResults,
+                                viewCount: Object.keys(pngResults).length
+                            }
+                        }));
+                    } else {
+                        console.log('ℹ️ MULTI-VIEW: Single view or no views - allowing default PNG generation...');
+                    }
+                } catch (error) {
+                    console.error('❌ MULTI-VIEW: Error in save event handler:', error);
+                    // Allow default save to proceed on error
+                }
+            } else {
+                console.log('ℹ️ MULTI-VIEW: System not initialized - allowing default PNG generation...');
+            }
+        });
+
+        console.log('✅ MULTI-VIEW: Save event handler registered');
     }
 
     detectTemplateSystem() {
@@ -442,7 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
         checkDependencies: () => window.multiViewPNGSystem.checkDependencies(),
         getInfo: () => window.multiViewPNGSystem.getDebugInfo(),
         forceInit: () => window.multiViewPNGSystem.init(),
-        updateContent: () => window.multiViewPNGSystem.updateViewContentStatus()
+        updateContent: () => window.multiViewPNGSystem.updateViewContentStatus(),
+        testMultiViewGeneration: () => window.multiViewPNGSystem.generateMultiViewPNGs(),
+        simulateSaveEvent: () => {
+            console.log('🧪 DEBUG: Simulating save event...');
+            document.dispatchEvent(new CustomEvent('designerShortcodeSave', {
+                detail: {
+                    button: { textContent: 'Test Save' },
+                    designData: { test: true }
+                }
+            }));
+        }
     };
 });
 

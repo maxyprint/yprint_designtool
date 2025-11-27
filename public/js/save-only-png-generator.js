@@ -412,14 +412,7 @@ class SaveOnlyPNGGenerator {
 
                         // Add click listener
                         button.addEventListener('click', (event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            if (window.PrintZonePNGGenerator && window.designerInstance?.fabricCanvas) {
-                                const generator = new window.PrintZonePNGGenerator();
-                                const pngInfo = generator.generatePrintZonePNG(window.designerInstance.fabricCanvas);
-                                generator.showPNGPreview(pngInfo);
-                            }
-                            return false;
+                            console.log('🎯 SAVE-ONLY PNG: Save button clicked, triggering multi-view PNG generation...');
 
                             // Short delay to allow design data to be updated
                             setTimeout(() => {
