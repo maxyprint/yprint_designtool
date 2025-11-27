@@ -2412,6 +2412,50 @@ private function build_print_provider_email_content($order, $design_items, $note
             }
         } else {
             error_log("⚠️ [PHP RECEIVE] No design data JSON received in request for order {$order_id}");
+
+            // 🎯 MULTI-VIEW ADMIN FALLBACK: Try to extract design data using AdminDesignDataReader
+            if (class_exists('AdminDesignDataReader')) {
+                error_log("🔄 [ADMIN FALLBACK] Attempting to use AdminDesignDataReader for missing design data...");
+
+                // Try to find design IDs in order items for fallback extraction
+                foreach ($order->get_items() as $item_id => $item) {
+                    $design_id = $item->get_meta('_design_id') ?: $item->get_meta('yprint_design_id') ?: $item->get_meta('_yprint_design_id');
+
+                    if ($design_id) {
+                        error_log("🎯 [ADMIN FALLBACK] Found design_id {$design_id} for item {$item_id}, attempting extraction...");
+
+                        try {
+                            $admin_reader = new AdminDesignDataReader();
+                            $extracted_data = $admin_reader->extractDesignDataFromDatabase($design_id);
+
+                            if ($extracted_data['success'] && $extracted_data['has_design_data']) {
+                                error_log("✅ [ADMIN FALLBACK] Successfully extracted design data via AdminDesignDataReader");
+                                error_log("📊 [ADMIN FALLBACK] Extracted data size: " . $extracted_data['data_size'] . " bytes");
+
+                                // Use the extracted design data as if it came from frontend
+                                $design_data_json = $extracted_data['data'];
+
+                                // Store the extracted data in order meta (same as if it came from frontend)
+                                $json_string = json_encode($design_data_json);
+                                $meta_result = update_post_meta($order_id, '_design_data', wp_slash($json_string));
+                                $meta_result = update_post_meta($order_id, '_admin_extracted_design_data', wp_slash($json_string));
+
+                                if ($meta_result) {
+                                    error_log("✅ [ADMIN FALLBACK] Admin-extracted design data stored successfully for order {$order_id}");
+                                }
+
+                                break; // Successfully extracted data for one design, that's enough
+                            } else {
+                                error_log("⚠️ [ADMIN FALLBACK] AdminDesignDataReader found no data for design {$design_id}");
+                            }
+                        } catch (Exception $e) {
+                            error_log("❌ [ADMIN FALLBACK] AdminDesignDataReader error: " . $e->getMessage());
+                        }
+                    }
+                }
+            } else {
+                error_log("❌ [ADMIN FALLBACK] AdminDesignDataReader class not available");
+            }
         }
 
         // Refresh print data from database
