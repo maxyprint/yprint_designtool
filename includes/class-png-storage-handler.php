@@ -1322,6 +1322,69 @@ class PNG_Storage_Handler {
 
             $discovered_files = [];
 
+            // 🎯 MULTI-VIEW DATABASE SEARCH: Check database for view-specific PNGs first
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'yprint_design_pngs';
+
+            // Check if multi-view columns exist
+            $table_columns = $wpdb->get_col("DESC {$table_name}", 0);
+            $has_view_columns = in_array('view_id', $table_columns) && in_array('view_name', $table_columns);
+
+            if ($has_view_columns) {
+                foreach ($search_identifiers as $search_id) {
+                    error_log('🎯 [MULTI-VIEW PNG] Searching database for design_id: ' . $search_id);
+
+                    // Search for all view-specific PNGs for this design
+                    $db_pngs = $wpdb->get_results($wpdb->prepare("
+                        SELECT design_id, view_id, view_name, print_png, generated_at, template_id, save_type
+                        FROM {$table_name}
+                        WHERE design_id = %s
+                        AND print_png IS NOT NULL
+                        AND print_png != ''
+                        ORDER BY generated_at DESC
+                    ", $search_id));
+
+                    if (!empty($db_pngs)) {
+                        error_log('🎯 [MULTI-VIEW PNG] Found ' . count($db_pngs) . ' database PNG(s) for design: ' . $search_id);
+
+                        foreach ($db_pngs as $db_png) {
+                            // Determine view label
+                            $view_label = 'Single View'; // Default for legacy
+                            if (!empty($db_png->view_name)) {
+                                $view_label = $db_png->view_name;
+                            } elseif (!empty($db_png->view_id)) {
+                                $view_label = 'View ' . $db_png->view_id;
+                            }
+
+                            // Create a virtual file entry for database PNG
+                            $file_info = [
+                                'type' => 'database',
+                                'design_id' => $db_png->design_id,
+                                'view_id' => $db_png->view_id,
+                                'view_name' => $db_png->view_name,
+                                'view_label' => $view_label,
+                                'data' => $db_png->print_png,
+                                'filename' => "design_{$db_png->design_id}_{$view_label}_database.png",
+                                'size' => strlen($db_png->print_png),
+                                'modified' => strtotime($db_png->generated_at),
+                                'modified_readable' => $db_png->generated_at,
+                                'matched_identifier' => $search_id,
+                                'template_id' => $db_png->template_id,
+                                'save_type' => $db_png->save_type,
+                                'directory' => 'database'
+                            ];
+
+                            $discovered_files[] = $file_info;
+                            error_log('🎯 [MULTI-VIEW PNG] Added database PNG: ' . $view_label . ' for design ' . $search_id);
+                        }
+                    } else {
+                        error_log('🎯 [MULTI-VIEW PNG] No database PNGs found for design: ' . $search_id);
+                    }
+                }
+            } else {
+                error_log('⚠️ [MULTI-VIEW PNG] Database table missing view columns - falling back to file search only');
+            }
+
             // Build search patterns for all identifiers
             $all_patterns = [];
 
@@ -1415,24 +1478,35 @@ class PNG_Storage_Handler {
                 return $b['modified'] - $a['modified'];
             });
 
-            // 🔧 FIX: Only return the most recent PNG per design_id to avoid duplicates
+            // 🎯 MULTI-VIEW DEDUPLICATION: Keep newest PNG per design_id AND view combination
             $unique_files = [];
-            $seen_identifiers = [];
+            $seen_combinations = [];
 
             foreach ($discovered_files as $file) {
                 $identifier = $file['matched_identifier'] ?? 'unknown';
 
-                // Only keep the first (newest) file per identifier
-                if (!in_array($identifier, $seen_identifiers)) {
-                    $unique_files[] = $file;
-                    $seen_identifiers[] = $identifier;
-                    error_log('🔍 PNG DISCOVERY: Keeping newest PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                // Create unique key based on design_id and view for multi-view support
+                if ($file['type'] ?? '' === 'database') {
+                    // For database PNGs, use design_id + view_id combination
+                    $unique_key = $identifier . '_' . ($file['view_id'] ?? 'null');
+                    $display_label = $file['view_label'] ?? 'Single View';
                 } else {
-                    error_log('🔍 PNG DISCOVERY: Skipping older PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                    // For file PNGs, use traditional identifier-only approach
+                    $unique_key = $identifier . '_file';
+                    $display_label = 'File PNG';
+                }
+
+                // Only keep the first (newest) file per unique combination
+                if (!in_array($unique_key, $seen_combinations)) {
+                    $unique_files[] = $file;
+                    $seen_combinations[] = $unique_key;
+                    error_log('🎯 [MULTI-VIEW PNG] Keeping newest PNG: ' . $display_label . ' for design ' . $identifier . ' (key: ' . $unique_key . ')');
+                } else {
+                    error_log('🎯 [MULTI-VIEW PNG] Skipping older PNG: ' . $display_label . ' for design ' . $identifier . ' (key: ' . $unique_key . ')');
                 }
             }
 
-            error_log('🔍 PNG DISCOVERY: Found ' . count($discovered_files) . ' total PNG files, returning ' . count($unique_files) . ' unique files for identifier: ' . $identifier);
+            error_log('🎯 [MULTI-VIEW PNG] Found ' . count($discovered_files) . ' total PNG files, returning ' . count($unique_files) . ' unique files (multi-view aware)');
 
             // Use the filtered unique files list
             $discovered_files = $unique_files;
