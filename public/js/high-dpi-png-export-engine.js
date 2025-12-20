@@ -32,7 +32,7 @@ class HighDPIPrintExportEngine {
 
         try {
             // Get fabric canvas instance
-            const fabricCanvas = canvas || window.designerWidgetInstance?.fabricCanvas;
+            const fabricCanvas = canvas || window.designerInstance?.fabricCanvas;
             if (!fabricCanvas) {
                 throw new Error('No fabric canvas available for export');
             }
@@ -167,7 +167,7 @@ class HighDPIPrintExportEngine {
 
         try {
             // Get fabric canvas instance
-            const fabricCanvas = window.designerWidgetInstance?.fabricCanvas;
+            const fabricCanvas = window.designerInstance?.fabricCanvas;
             if (!fabricCanvas) {
                 throw new Error('No fabric canvas available for print export');
             }
