@@ -2825,34 +2825,35 @@ private function build_print_provider_email_content($order, $design_items, $note
                 "SELECT design_id, print_png, generated_at, save_type, order_id, template_id, metadata_json, view_id, view_name
                  FROM {$png_table}
                  WHERE design_id = %s AND order_id = %s
-                 ORDER BY view_name ASC, generated_at DESC",
+                 ORDER BY view_name ASC, generated_at DESC
+                 LIMIT 1",
                 $design_id,
                 $order_id
             ), ARRAY_A);
 
             if (!empty($order_specific_pngs)) {
-                foreach ($order_specific_pngs as $png_record) {
+                // Take only the first (most recent) order-specific PNG
+                $png_record = $order_specific_pngs[0];
                     $view_label = $png_record['view_name'] ?: ($png_record['view_id'] ? "View {$png_record['view_id']}" : 'Main');
                     error_log("🎯 [MULTI-VIEW PNG] Found order-specific PNG: Design {$design_id}, View: {$view_label}");
 
                     // Generate temporary URL for this PNG
                     $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, $order_id . '_' . ($png_record['view_id'] ?: 'main'));
 
-                    if ($temp_url) {
-                        $png_results[] = array(
-                            'design_id' => $design_id,
-                            'design_name' => $design['name'] ?: 'Design #' . $design_id,
-                            'print_file_url' => $temp_url,
-                            'print_file_path' => 'database_stored',
-                            'item_name' => "Order-specific {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
-                            'source' => 'order_specific_multiview',
-                            'generated_at' => $png_record['generated_at'],
-                            'save_type' => $png_record['save_type'],
-                            'view_id' => $png_record['view_id'],
-                            'view_name' => $view_label,
-                            'precision_score' => 100 // Highest priority
-                        );
-                    }
+                if ($temp_url) {
+                    $png_results[] = array(
+                        'design_id' => $design_id,
+                        'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                        'print_file_url' => $temp_url,
+                        'print_file_path' => 'database_stored',
+                        'item_name' => "Order-specific {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
+                        'source' => 'order_specific_multiview',
+                        'generated_at' => $png_record['generated_at'],
+                        'save_type' => $png_record['save_type'],
+                        'view_id' => $png_record['view_id'],
+                        'view_name' => $view_label,
+                        'precision_score' => 100 // Highest priority
+                    );
                 }
             }
 
@@ -2862,32 +2863,33 @@ private function build_print_provider_email_content($order, $design_items, $note
                     "SELECT design_id, print_png, generated_at, save_type, template_id, view_id, view_name
                      FROM {$png_table}
                      WHERE design_id = %s AND (order_id IS NULL OR order_id = '')
-                     ORDER BY view_name ASC, generated_at DESC",
+                     ORDER BY view_name ASC, generated_at DESC
+                     LIMIT 1",
                     $design_id
                 ), ARRAY_A);
 
                 if (!empty($design_pngs)) {
-                    foreach ($design_pngs as $png_record) {
-                        $view_label = $png_record['view_name'] ?: ($png_record['view_id'] ? "View {$png_record['view_id']}" : 'Main');
-                        error_log("🎯 [MULTI-VIEW PNG] Found design-specific PNG: Design {$design_id}, View: {$view_label}");
+                    // Take only the first (most recent) design-specific PNG
+                    $png_record = $design_pngs[0];
+                    $view_label = $png_record['view_name'] ?: ($png_record['view_id'] ? "View {$png_record['view_id']}" : 'Main');
+                    error_log("🎯 [MULTI-VIEW PNG] Found design-specific PNG: Design {$design_id}, View: {$view_label}");
 
-                        $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'generic_' . ($png_record['view_id'] ?: 'main'));
+                    $temp_url = $this->generate_temp_png_url($png_record['print_png'], $design_id, 'generic_' . ($png_record['view_id'] ?: 'main'));
 
-                        if ($temp_url) {
-                            $png_results[] = array(
-                                'design_id' => $design_id,
-                                'design_name' => $design['name'] ?: 'Design #' . $design_id,
-                                'print_file_url' => $temp_url,
-                                'print_file_path' => 'database_stored',
-                                'item_name' => "Design {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
-                                'source' => 'design_specific_multiview',
-                                'generated_at' => $png_record['generated_at'],
-                                'save_type' => $png_record['save_type'],
-                                'view_id' => $png_record['view_id'],
-                                'view_name' => $view_label,
-                                'precision_score' => 80
-                            );
-                        }
+                    if ($temp_url) {
+                        $png_results[] = array(
+                            'design_id' => $design_id,
+                            'design_name' => $design['name'] ?: 'Design #' . $design_id,
+                            'print_file_url' => $temp_url,
+                            'print_file_path' => 'database_stored',
+                            'item_name' => "Design {$view_label}: " . ($design['name'] ?: 'Design #' . $design_id),
+                            'source' => 'design_specific_multiview',
+                            'generated_at' => $png_record['generated_at'],
+                            'save_type' => $png_record['save_type'],
+                            'view_id' => $png_record['view_id'],
+                            'view_name' => $view_label,
+                            'precision_score' => 80
+                        );
                     }
                 }
             }
