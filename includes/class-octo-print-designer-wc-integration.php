@@ -19,8 +19,6 @@ class Octo_Print_Designer_WC_Integration {
         add_action('woocommerce_before_calculate_totals', array($this, 'calculate_custom_price'), 10);
         add_filter('woocommerce_cart_item_price', array($this, 'modify_cart_item_price_display'), 10, 3);
         
-        // Order items customization
-        add_action('woocommerce_checkout_create_order_line_item', array($this, 'add_custom_data_to_order_items'), 10, 4);
         
         // Add design preview to order emails
         add_filter('woocommerce_order_item_name', array($this, 'modify_order_item_name'), 10, 2);
@@ -29,8 +27,6 @@ class Octo_Print_Designer_WC_Integration {
         // NEW: Cart integration hook for JSON design data
         add_filter('woocommerce_add_cart_item_data', array($this, 'add_design_data_to_cart'), 10, 3);
 
-        // NEW: Order integration hook for JSON design data persistence
-        add_action('woocommerce_checkout_create_order_line_item', array($this, 'save_design_data_to_order'), 10, 4);
 
         add_filter('woocommerce_order_item_display_meta_key', array($this, 'format_order_item_meta_display'), 10, 3);
         add_filter('woocommerce_order_item_display_meta_value', array($this, 'format_order_item_meta_value'), 10, 3);
@@ -165,53 +161,6 @@ private function check_yprint_dependency() {
         return $price_html;
     }
 
-    /**
-     * Add custom data to order items during checkout
-     */
-    public function add_custom_data_to_order_items($item, $cart_item_key, $values, $order) {
-        if (isset($values['print_design'])) {
-            $design = $values['print_design'];
-            
-            // Add basic design metadata to order item
-            $item->add_meta_data('_design_id', $design['design_id']);
-            $item->add_meta_data('_design_name', $design['name']);
-            $item->add_meta_data('_design_color', $design['variation_name']);
-            $item->add_meta_data('_design_size', $design['size_name']);
-            $item->add_meta_data('_design_preview_url', $design['preview_url']);
-            
-            // Store the largest dimensions for price calculation reference
-            $item->add_meta_data('_design_width_cm', $design['design_width_cm']);
-            $item->add_meta_data('_design_height_cm', $design['design_height_cm']);
-            
-            // New field to indicate multiple images support
-            $item->add_meta_data('_design_has_multiple_images', true);
-            
-            // Store all product images with view information
-            if (isset($design['product_images']) && is_array($design['product_images'])) {
-                $item->add_meta_data('_design_product_images', wp_json_encode($design['product_images']));
-            }
-            
-            // Get all design images from the design data
-            if (isset($design['design_images']) && is_array($design['design_images'])) {
-                // Store images as JSON array
-                $item->add_meta_data('_design_images', wp_json_encode($design['design_images']));
-            } else {
-                // Backward compatibility - create an array with the single image data
-                $single_image = [
-                    'url' => $design['design_image_url'] ?? '',
-                    'scaleX' => $design['design_scaleX'] ?? 1,
-                    'scaleY' => $design['design_scaleY'] ?? 1,
-                    'width_cm' => $design['design_width_cm'] ?? 0,
-                    'height_cm' => $design['design_height_cm'] ?? 0
-                ];
-                
-                $item->add_meta_data('_design_images', wp_json_encode([$single_image]));
-                
-                // Still maintain the old field for backward compatibility
-                $item->add_meta_data('_design_image_url', $design['design_image_url'] ?? '');
-            }
-        }
-    }
 
     /**
      * Modify order item name in emails and order details
@@ -3026,21 +2975,6 @@ private function build_print_provider_email_content($order, $design_items, $note
     /**
      * NEW: Order Line Item Persistence
      */
-    public function save_design_data_to_order($item, $cart_item_key, $values, $order) {
-        if (!empty($values['_design_data_json'])) {
-            $design_data = $values['_design_data_json'];
-
-            // Store in order item meta
-            $item->add_meta_data('_design_data', wp_slash(json_encode($design_data)), true);
-
-            // 🔧 FIX: Also store in order meta for preview button functionality
-            // This ensures the "View Design Preview" button is enabled
-            $order->update_meta_data('_design_data', wp_slash(json_encode($design_data)));
-
-            error_log("📦 Design data saved to order item: " . $item->get_id());
-            error_log("🔧 Design data also saved to order meta for preview functionality");
-        }
-    }
 
     /**
      * AJAX handler for email preview
