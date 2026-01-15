@@ -3778,8 +3778,24 @@ private function build_print_provider_email_content($order, $design_items, $note
 
                     data.data.files.forEach((file, i) => {
                         html += '<div style="margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">';
-                        html += '<strong>📄 ' + file.filename + '</strong><br>';
-                        html += '<small>🆔 Design ID: ' + file.matched_identifier + ' | 📏 Size: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB</small><br>';
+
+                        // 🎯 MULTI-VIEW: Show view information in filename
+                        let displayTitle = file.filename;
+                        if (file.view_id && file.view_id !== 'main') {
+                            displayTitle = '🎨 View ' + file.view_id + ': ' + file.filename;
+                        }
+
+                        html += '<strong>📄 ' + displayTitle + '</strong><br>';
+
+                        // Enhanced metadata with view information
+                        let metadata = [];
+                        metadata.push('🆔 Design: ' + file.matched_identifier);
+                        if (file.view_id && file.view_id !== 'main') {
+                            metadata.push('👁️ View ID: ' + file.view_id);
+                        }
+                        metadata.push('📏 Size: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB');
+
+                        html += '<small>' + metadata.join(' | ') + '</small><br>';
                         html += '<a href="' + file.url + '" target="_blank" style="color: #0073aa; text-decoration: none;">🔗 View PNG</a>';
                         html += '</div>';
                     });
