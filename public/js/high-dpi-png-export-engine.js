@@ -362,19 +362,101 @@ class HighDPIPrintExportEngine {
             }
         }
 
-        // Method 4: From designerWidgetInstance (MOST RELIABLE after URL cleaning)
-        if (window.designerWidgetInstance?.activeTemplateId) {
-            console.log('✅ Template ID from designerWidgetInstance.activeTemplateId:', window.designerWidgetInstance.activeTemplateId);
-            return window.designerWidgetInstance.activeTemplateId;
+        // Method 4: From designer instances (MOST RELIABLE after URL cleaning)
+        // Check both possible instance names: designerInstance and designerWidgetInstance
+        const designer = window.designerInstance || window.designerWidgetInstance;
+        if (designer) {
+
+            // Check all possible template ID properties
+            const templateProperties = [
+                'activeTemplateId',
+                'templateId',
+                'currentTemplateId',
+                'template_id',
+                'templateID',
+                'config.templateId',
+                'config.template_id',
+                'currentTemplate',
+                'selectedTemplate'
+            ];
+
+            for (const prop of templateProperties) {
+                let value;
+                try {
+                    // Support nested properties like config.templateId
+                    if (prop.includes('.')) {
+                        const parts = prop.split('.');
+                        value = parts.reduce((obj, part) => obj?.[part], designer);
+                    } else {
+                        value = designer[prop];
+                    }
+
+                    if (value) {
+                        console.log(`✅ Template ID from designerWidgetInstance.${prop}:`, value);
+                        return String(value);
+                    }
+                } catch (e) {
+                    // Continue checking other properties
+                }
+            }
+
+            // Check Fabric.js canvas for template data
+            if (designer.fabricCanvas && typeof designer.fabricCanvas.getObjects === 'function') {
+                try {
+                    // Check canvas metadata or objects for template info
+                    const canvasData = designer.fabricCanvas.toObject();
+                    if (canvasData.templateId || canvasData.template_id) {
+                        const canvasTemplateId = canvasData.templateId || canvasData.template_id;
+                        console.log('✅ Template ID from fabricCanvas data:', canvasTemplateId);
+                        return String(canvasTemplateId);
+                    }
+                } catch (e) {
+                    // Ignore canvas access errors
+                }
+            }
+
+            // Debug: Log all available properties to identify the correct one
+            const instanceName = window.designerInstance ? 'designerInstance' : 'designerWidgetInstance';
+            console.log(`🔍 Available ${instanceName} properties:`, Object.keys(designer));
+
+            // Enhanced debug: Check for properties that might contain template info
+            Object.keys(designer).forEach(key => {
+                if (key.toLowerCase().includes('template')) {
+                    console.log(`🔍 Template-related property ${key}:`, designer[key]);
+                }
+            });
         }
 
-        // Method 5: From various config objects
+        // Method 5: From window.currentTemplate or similar globals
+        const additionalGlobals = [
+            'currentTemplate',
+            'activeTemplate',
+            'selectedTemplateId',
+            'currentTemplateData'
+        ];
+
+        for (const globalVar of additionalGlobals) {
+            if (window[globalVar]) {
+                const value = window[globalVar];
+                // Extract ID if it's an object
+                const extractedId = typeof value === 'object' ? (value.id || value.template_id || value.templateId) : value;
+                if (extractedId) {
+                    console.log(`✅ Template ID from window.${globalVar}:`, extractedId);
+                    return String(extractedId);
+                }
+            }
+        }
+
+        // Method 6: From various config objects
         const configSources = [
             () => window.octo_print_designer_config?.template_id,
             () => window.yprint_config?.template_id,
             () => window.designerConfig?.templateId,
-            () => window.designerWidgetInstance?.templateId,
-            () => window.designerWidgetInstance?.config?.templateId
+            () => (window.designerInstance || window.designerWidgetInstance)?.templateId,
+            () => (window.designerInstance || window.designerWidgetInstance)?.config?.templateId,
+            () => (window.designerInstance || window.designerWidgetInstance)?.currentTemplateInfo?.id,
+            () => (window.designerInstance || window.designerWidgetInstance)?.template?.id,
+            () => (window.designerInstance || window.designerWidgetInstance)?.template?.template_id
         ];
 
         for (const configGetter of configSources) {
@@ -389,7 +471,7 @@ class HighDPIPrintExportEngine {
             }
         }
 
-        // Method 6: From URL path (e.g., /designer/123)
+        // Method 7: From URL path (e.g., /designer/123)
         const pathMatch = window.location.pathname.match(/\/designer\/(\d+)/);
         if (pathMatch) {
             templateId = pathMatch[1];
@@ -405,7 +487,7 @@ class HighDPIPrintExportEngine {
      * 🎯 Fallback print area when template data unavailable
      */
     getFallbackPrintArea() {
-        const canvas = window.designerWidgetInstance?.fabricCanvas;
+        const canvas = (window.designerInstance || window.designerWidgetInstance)?.fabricCanvas;
         const canvasWidth = canvas ? canvas.getWidth() : 656;
         const canvasHeight = canvas ? canvas.getHeight() : 420;
 
@@ -430,7 +512,7 @@ class HighDPIPrintExportEngine {
      */
     getExistingClipMask() {
         // Priorität 1: Designer Widget clipMask
-        const designerClipMask = window.designerWidgetInstance?.clipMask;
+        const designerClipMask = (window.designerInstance || window.designerWidgetInstance)?.clipMask;
         if (designerClipMask) {
             console.log('✅ Using existing designer clipMask');
             return designerClipMask;
@@ -453,8 +535,9 @@ class HighDPIPrintExportEngine {
      */
     reconstructClipMaskFromSafeZone() {
         try {
-            const template = window.designerWidgetInstance?.templates?.[window.designerWidgetInstance?.activeTemplateId];
-            const view = template?.views?.[window.designerWidgetInstance?.currentView];
+            const designer = window.designerInstance || window.designerWidgetInstance;
+            const template = designer?.templates?.[designer?.activeTemplateId];
+            const view = template?.views?.[designer?.currentView];
             const safeZone = view?.safeZone;
 
             if (safeZone && window.fabric?.Rect) {
@@ -617,7 +700,7 @@ class HighDPIPrintExportEngine {
         if (obj.type !== 'image') return false;
 
         const bounds = obj.getBoundingRect();
-        const canvas = window.designerWidgetInstance?.fabricCanvas;
+        const canvas = (window.designerInstance || window.designerWidgetInstance)?.fabricCanvas;
         if (!canvas) return false;
 
         const canvasWidth = canvas.width || 656;
