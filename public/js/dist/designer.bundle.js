@@ -1945,7 +1945,7 @@ class DesignerWidget {
                 const pngDataUrl = await window.generatePNGForDownload();
 
                 if (pngDataUrl) {
-                    this.displayPNGPreview(pngDataUrl);
+                    // Debug PNG preview removed
                 } else {
                     throw new Error('PNG generation returned empty result');
                 }

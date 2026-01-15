@@ -1415,20 +1415,34 @@ class PNG_Storage_Handler {
                 return $b['modified'] - $a['modified'];
             });
 
-            // 🔧 FIX: Only return the most recent PNG per design_id to avoid duplicates
+            // 🎯 MULTI-VIEW FIX: Keep the most recent PNG per design_id AND view combination
             $unique_files = [];
-            $seen_identifiers = [];
+            $seen_combinations = [];
 
             foreach ($discovered_files as $file) {
                 $identifier = $file['matched_identifier'] ?? 'unknown';
+                $filename = $file['filename'] ?? '';
 
-                // Only keep the first (newest) file per identifier
-                if (!in_array($identifier, $seen_identifiers)) {
+                // Extract view information from filename (e.g., design_358_view_189542_xxx.png)
+                $view_id = 'main'; // Default view
+                if (preg_match('/design_\d+_view_(\d+)/', $filename, $matches)) {
+                    $view_id = $matches[1];
+                } elseif (preg_match('/_(\d{6})_/', $filename, $matches)) {
+                    // Alternative pattern for view IDs in filenames
+                    $view_id = $matches[1];
+                }
+
+                // Create unique combination key: design_id + view_id
+                $combination_key = $identifier . '_view_' . $view_id;
+
+                // Only keep the first (newest) file per design+view combination
+                if (!in_array($combination_key, $seen_combinations)) {
+                    $file['view_id'] = $view_id; // Add view info to file data
                     $unique_files[] = $file;
-                    $seen_identifiers[] = $identifier;
-                    error_log('🔍 PNG DISCOVERY: Keeping newest PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                    $seen_combinations[] = $combination_key;
+                    error_log('🎯 PNG DISCOVERY: Keeping newest PNG for design: ' . $identifier . ', view: ' . $view_id . ' - ' . $file['filename']);
                 } else {
-                    error_log('🔍 PNG DISCOVERY: Skipping older PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
+                    error_log('🔄 PNG DISCOVERY: Skipping older PNG for design: ' . $identifier . ', view: ' . $view_id . ' - ' . $file['filename']);
                 }
             }
 

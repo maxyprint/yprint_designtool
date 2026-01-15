@@ -2125,7 +2125,7 @@ class SaveOnlyPNGGenerator {
                         actual_dimensions: `${improvedResult.metadata.width}x${improvedResult.metadata.height}px`
                     };
 
-                    this.displayPNGDebugModal(improvedPngData);
+                    // Debug mode removed - PNG generation only
 
                     return {
                         success: true,
@@ -2141,9 +2141,8 @@ class SaveOnlyPNGGenerator {
             console.log('🔄 DEBUG: New system failed, showing original:', error.message);
         }
 
-        // Fallback: show original
-        console.log('🎨 DEBUG MODE: Displaying original PNG...');
-        this.displayPNGDebugModal(pngData);
+        // Fallback: generate original PNG without debug display
+        console.log('🎨 PNG Generation: Using original method...');
 
         // Return success with actual PNG data for validation
         return {
