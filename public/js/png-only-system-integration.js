@@ -283,7 +283,8 @@ class PNGOnlySystemIntegration {
                     // Save PNG for later 'Designdaten laden' access
                     await this.savePrintPNGToCurrentDesign(printPNG);
 
-                    this.showPrintPreview(printPNG);
+                    // Debug preview removed per user request
+                    console.log('✅ PNG-ONLY INTEGRATION: Print PNG generated successfully');
 
                 } catch (error) {
                     console.error('❌ PNG-ONLY INTEGRATION: PNG generation failed:', error);
