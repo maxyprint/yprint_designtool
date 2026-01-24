@@ -20,8 +20,9 @@ window.generatePNGForDownload = async function() {
         const views = await getAvailableViews(designer);
         console.log('🔍 CLEAN PNG: Found views:', Object.keys(views));
 
-        // Generate PNGs for both views
+        // Generate PNGs for both views and upload separately
         const results = {};
+        const uploadPromises = [];
 
         for (const [viewId, viewData] of Object.entries(views)) {
             console.log(`🎯 CLEAN PNG: Processing view ${viewData.name} (${viewId})`);
@@ -29,15 +30,28 @@ window.generatePNGForDownload = async function() {
             // Switch to view
             await switchToView(designer, viewId);
 
-            // Generate PNG for this view (print zone only, no background)
+            // Generate PNG for this view (print zone cropped)
             const pngData = await generateViewPNG(designer, viewId, viewData.name);
             if (pngData) {
                 results[viewId] = pngData;
                 console.log(`✅ CLEAN PNG: Generated ${viewData.name} - ${pngData.length} chars`);
+
+                // Upload this view's PNG separately
+                uploadPromises.push(uploadViewPNG(pngData, viewId, viewData.name, designer.currentDesignId));
             }
         }
 
-        // Return first successful PNG for compatibility
+        // Wait for all uploads to complete
+        const uploadResults = await Promise.all(uploadPromises);
+
+        // Log all PNG URLs
+        uploadResults.forEach(result => {
+            if (result.success) {
+                console.log(`🔗 CLEAN PNG: ${result.viewName} URL:`, result.url);
+            }
+        });
+
+        // Return first successful PNG for compatibility with existing save system
         const firstPng = Object.values(results)[0];
         console.log('🎯 CLEAN PNG: Multi-view generation complete, returning:', firstPng ? 'SUCCESS' : 'FAILED');
         return firstPng || null;
@@ -95,7 +109,7 @@ async function switchToView(designer, viewId) {
     }
 }
 
-// Helper: Generate PNG for specific view (print zone only, no background)
+// Helper: Generate PNG for specific view (print zone cropped)
 async function generateViewPNG(designer, viewId, viewName) {
     try {
         const canvas = designer.fabricCanvas;
@@ -117,33 +131,42 @@ async function generateViewPNG(designer, viewId, viewName) {
             return null;
         }
 
-        // Create temporary canvas with print area size
+        // Get print area coordinates from view data
         const printArea = getPrintArea(designer);
-        const tempCanvas = new fabric.Canvas(null, {
-            width: printArea.width,
-            height: printArea.height,
-            backgroundColor: 'transparent'
+        console.log(`📐 CLEAN PNG: Print area for ${viewName}:`, printArea);
+
+        // Hide background objects temporarily
+        const hiddenObjects = [];
+        canvas.getObjects().forEach(obj => {
+            const isBackground = obj.isBackground === true ||
+                               (obj.type === 'image' && obj.selectable === false) ||
+                               obj.excludeFromExport === true;
+            if (isBackground && obj.visible) {
+                obj.visible = false;
+                hiddenObjects.push(obj);
+            }
         });
 
-        // Copy design objects to temp canvas (positioned relative to print area)
-        designObjects.forEach(obj => {
-            const cloned = fabric.util.object.clone(obj);
-            cloned.left = obj.left - printArea.left;
-            cloned.top = obj.top - printArea.top;
-            tempCanvas.add(cloned);
-        });
+        canvas.renderAll();
 
-        tempCanvas.renderAll();
-
-        // Generate high-DPI PNG
-        const dataUrl = tempCanvas.toDataURL({
+        // Use fabric.js toDataURL with crop parameters - NO coordinate math!
+        const dataUrl = canvas.toDataURL({
             format: 'png',
             quality: 1,
-            multiplier: 4.17 // 300 DPI
+            multiplier: 4.17, // 300 DPI
+            left: printArea.left,
+            top: printArea.top,
+            width: printArea.width,
+            height: printArea.height
         });
 
-        // Cleanup
-        tempCanvas.dispose();
+        // Restore hidden objects
+        hiddenObjects.forEach(obj => {
+            obj.visible = true;
+        });
+        canvas.renderAll();
+
+        console.log(`✂️ CLEAN PNG: Cropped ${viewName} to print zone (${printArea.width}x${printArea.height})`);
 
         return dataUrl;
 
@@ -178,6 +201,54 @@ function getPrintArea(designer) {
         width: canvasWidth * 0.8,
         height: canvasHeight * 0.8
     };
+}
+
+// Helper: Upload individual view PNG to server
+async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
+    try {
+        console.log(`📤 CLEAN PNG: Uploading ${viewName} PNG...`);
+
+        const formData = new FormData();
+        formData.append('action', 'save_design_png');
+        formData.append('nonce', window.octoPrintDesigner?.nonce || '');
+        formData.append('design_id', designId);
+        formData.append('view_id', viewId);
+        formData.append('view_name', viewName);
+
+        // Convert data URL to blob
+        const response = await fetch(pngDataUrl);
+        const blob = await response.blob();
+        formData.append('png_file', blob, `design_${designId}_${viewName.toLowerCase()}_${viewId}.png`);
+
+        // Upload to server
+        const uploadResponse = await fetch(window.octoPrintDesigner?.ajaxUrl || window.octo_print_designer_config?.ajax_url, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (uploadResponse.ok) {
+            const result = await uploadResponse.json();
+            if (result.success) {
+                console.log(`✅ CLEAN PNG: ${viewName} uploaded successfully!`);
+                return {
+                    success: true,
+                    viewId: viewId,
+                    viewName: viewName,
+                    url: result.data.png_url
+                };
+            } else {
+                console.error(`❌ CLEAN PNG: ${viewName} upload failed:`, result.data);
+            }
+        } else {
+            console.error(`❌ CLEAN PNG: ${viewName} upload HTTP error:`, uploadResponse.status);
+        }
+
+        return { success: false, viewId: viewId, viewName: viewName };
+
+    } catch (error) {
+        console.error(`❌ CLEAN PNG: ${viewName} upload error:`, error);
+        return { success: false, viewId: viewId, viewName: viewName };
+    }
 }
 
 console.log('✅ MINIMAL PNG: Clean PNG system ready');
