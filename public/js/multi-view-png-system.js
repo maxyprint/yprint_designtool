@@ -1,7 +1,12 @@
 /**
- * Multi-View PNG System - Robuste Implementierung
- * Erkennt automatisch Front/Back Views und generiert PNGs nur für Views mit Inhalt
+ * 🚫 SYSTEM DISABLED: Multi-View PNG System
+ * This system is redundant - designer.bundle.js handles PNG generation
  */
+
+// Early exit to prevent initialization
+console.log('🚫 MULTI-VIEW: System disabled - using designer.bundle.js for PNG generation');
+return;
+
 class MultiViewPNGSystem {
     constructor() {
         this.designerWidget = null;

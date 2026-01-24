@@ -9,8 +9,9 @@
  * - Load Events = Retrieve existing PNG (NO generation)
  */
 
-// 🔍 STARTUP DEBUG: Check WordPress configuration availability
-console.log('🔧 SAVE-ONLY PNG: Script loading, checking WordPress configuration...');
+// 🚫 SYSTEM DISABLED: This PNG system is redundant - designer.bundle.js handles PNG generation
+console.log('🚫 SAVE-ONLY PNG: System disabled - using designer.bundle.js for PNG generation');
+return; // Exit early to prevent initialization
 setTimeout(() => {
     const config = window.octo_print_designer_config;
     if (config) {
