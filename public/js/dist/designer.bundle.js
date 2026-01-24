@@ -2074,11 +2074,77 @@ class DesignerWidget {
                 this.toastManager.show('Design saved!', 'success');
                 this.currentDesignId = data.data.design_id;
 
-                // Generate print-ready PNG file after successful save
+                // Generate print-ready PNG files after successful save - ENHANCED MULTI-VIEW INTEGRATION
                 try {
-                    console.log('🖨️ Generating print-ready PNG file...');
+                    console.log('🖨️ Generating print-ready PNG files with validated design ID...');
 
-                    if (typeof window.generatePNGForDownload === 'function') {
+                    // Use enhanced PNG generation function with design ID validation
+                    if (typeof window.generatePNGForSave === 'function') {
+                        console.log('🎯 Using enhanced multi-view PNG generation with design ID:', this.currentDesignId);
+
+                        const pngResult = await window.generatePNGForSave(this.currentDesignId);
+
+                        if (pngResult && pngResult.success) {
+                            console.log('✅ Multi-view PNG generation completed successfully!');
+                            console.log(`📊 Generated: ${pngResult.totalGenerated} PNGs, Uploaded: ${pngResult.successfulUploads}/${pngResult.totalGenerated}`);
+
+                            // Log all successful PNG URLs
+                            if (pngResult.urls && pngResult.urls.length > 0) {
+                                console.log('🔗 All PNG URLs:', pngResult.urls);
+
+                                // Store PNG URLs in designer instance for future reference
+                                this._savedPNGs = {
+                                    designId: this.currentDesignId,
+                                    urls: pngResult.urls,
+                                    uploads: pngResult.uploads,
+                                    timestamp: Date.now()
+                                };
+                            }
+
+                            // Also maintain backward compatibility with single PNG
+                            if (pngResult.mainPNG) {
+                                console.log('📁 Main PNG available for backward compatibility');
+
+                                // Send main PNG to backend for legacy support
+                                const pngFormData = new FormData();
+                                pngFormData.append('action', 'save_design_png');
+                                pngFormData.append('nonce', octoPrintDesigner.nonce);
+                                pngFormData.append('design_id', this.currentDesignId);
+
+                                // Convert data URL to blob
+                                const response = await fetch(pngResult.mainPNG);
+                                const blob = await response.blob();
+                                pngFormData.append('png_file', blob, `design_${this.currentDesignId}.png`);
+
+                                const pngResponse = await fetch(octoPrintDesigner.ajaxUrl, {
+                                    method: 'POST',
+                                    body: pngFormData
+                                });
+
+                                const pngData = await pngResponse.json();
+
+                                if (pngData.success) {
+                                    console.log('✅ Legacy PNG saved successfully!');
+                                    console.log('📁 PNG file location:', pngData.data.file_url);
+                                    console.log('💾 PNG file path:', pngData.data.file_path);
+                                } else {
+                                    console.warn('⚠️ Legacy PNG save failed:', pngData.data.message);
+                                }
+                            }
+
+                            // Handle partial failures
+                            if (pngResult.failedUploads > 0) {
+                                console.warn(`⚠️ ${pngResult.failedUploads} PNG uploads failed - check individual errors above`);
+                            }
+
+                        } else {
+                            throw new Error('Multi-view PNG generation failed');
+                        }
+                    }
+                    // Fallback to old system if new function not available
+                    else if (typeof window.generatePNGForDownload === 'function') {
+                        console.warn('⚠️ Falling back to legacy PNG generation');
+
                         const pngDataUrl = await window.generatePNGForDownload();
 
                         if (pngDataUrl) {
@@ -2101,17 +2167,17 @@ class DesignerWidget {
                             const pngData = await pngResponse.json();
 
                             if (pngData.success) {
-                                console.log('✅ Print-ready PNG saved successfully!');
+                                console.log('✅ Legacy PNG saved successfully!');
                                 console.log('📁 PNG file location:', pngData.data.file_url);
                                 console.log('💾 PNG file path:', pngData.data.file_path);
                             } else {
-                                console.warn('⚠️ PNG save failed:', pngData.data.message);
+                                console.warn('⚠️ Legacy PNG save failed:', pngData.data.message);
                             }
                         } else {
-                            console.warn('⚠️ PNG generation returned empty result');
+                            console.warn('⚠️ Legacy PNG generation returned empty result');
                         }
                     } else {
-                        console.warn('⚠️ generatePNGForDownload function not available');
+                        console.warn('⚠️ No PNG generation function available');
                     }
                 } catch (pngError) {
                     console.error('❌ PNG generation/save error:', pngError);

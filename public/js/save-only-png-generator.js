@@ -52,12 +52,23 @@ window.generatePNGForDownload = async function() {
         // Wait for all uploads to complete
         const uploadResults = await Promise.all(validResults.map(result => result.uploadPromise));
 
-        // Log all PNG URLs
+        // Log all PNG URLs and collect successful ones
+        const successfulUploads = [];
         uploadResults.forEach(result => {
             if (result.success) {
                 console.log(`🔗 OPTIMIZED PNG: ${result.viewName} URL:`, result.url);
+                successfulUploads.push(result);
             }
         });
+
+        // Store upload results for designer.bundle.js integration
+        if (window.designerInstance) {
+            window.designerInstance._lastMultiViewPNGs = {
+                uploads: uploadResults,
+                successful: successfulUploads,
+                timestamp: Date.now()
+            };
+        }
 
         // Restore original view (should be unchanged anyway)
         if (designer.currentView !== originalView) {
@@ -276,5 +287,99 @@ async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
         };
     }
 }
+
+// Enhanced function for designer.bundle.js integration - ensures proper design ID validation
+window.generatePNGForSave = async function(designId) {
+    try {
+        console.log('🎯 SAVE-INTEGRATED PNG: Starting generation with validated design ID:', designId);
+
+        const designer = window.designerInstance;
+        if (!designer?.fabricCanvas) {
+            console.error('❌ SAVE-INTEGRATED PNG: No designer or canvas');
+            throw new Error('Designer or canvas not available');
+        }
+
+        if (!designId || designId === 'temp') {
+            console.error('❌ SAVE-INTEGRATED PNG: Invalid design ID:', designId);
+            throw new Error('Valid design ID required for PNG generation');
+        }
+
+        // Store original view to restore later
+        const originalView = designer.currentView;
+        console.log(`🔄 SAVE-INTEGRATED PNG: Original view: ${originalView}`);
+
+        // Get all available views with their complete data
+        const views = await getAvailableViewsWithData(designer);
+        console.log('🔍 SAVE-INTEGRATED PNG: Found views:', Object.keys(views));
+
+        // Process all views in parallel - NO VIEW SWITCHING
+        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
+            console.log(`🎯 SAVE-INTEGRATED PNG: Processing view ${viewData.name} (${viewId}) in parallel`);
+
+            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
+
+            if (pngData) {
+                console.log(`✅ SAVE-INTEGRATED PNG: Generated ${viewData.name} - ${pngData.length} chars`);
+                return {
+                    viewId,
+                    viewData,
+                    pngData,
+                    uploadPromise: uploadViewPNG(pngData, viewId, viewData.name, designId)
+                };
+            }
+            return null;
+        });
+
+        // Wait for all PNG generations to complete
+        const pngResults = await Promise.all(pngPromises);
+        const validResults = pngResults.filter(result => result !== null);
+
+        if (validResults.length === 0) {
+            throw new Error('No PNGs could be generated');
+        }
+
+        // Wait for all uploads to complete
+        const uploadResults = await Promise.all(validResults.map(result => result.uploadPromise));
+
+        // Log all PNG URLs and collect results
+        const successfulUploads = [];
+        const failedUploads = [];
+
+        uploadResults.forEach(result => {
+            if (result.success) {
+                console.log(`🔗 SAVE-INTEGRATED PNG: ${result.viewName} URL:`, result.url);
+                successfulUploads.push(result);
+            } else {
+                console.error(`❌ SAVE-INTEGRATED PNG: ${result.viewName} upload failed:`, result.error);
+                failedUploads.push(result);
+            }
+        });
+
+        // Restore original view (should be unchanged anyway)
+        if (designer.currentView !== originalView) {
+            console.log(`🔄 SAVE-INTEGRATED PNG: Restoring original view: ${originalView}`);
+            designer.currentView = originalView;
+        }
+
+        // Return comprehensive results
+        const result = {
+            success: successfulUploads.length > 0,
+            totalGenerated: validResults.length,
+            successfulUploads: successfulUploads.length,
+            failedUploads: failedUploads.length,
+            uploads: uploadResults,
+            mainPNG: validResults[0]?.pngData, // For backward compatibility
+            urls: successfulUploads.map(upload => upload.url)
+        };
+
+        console.log(`🎯 SAVE-INTEGRATED PNG: Complete - ${result.successfulUploads}/${result.totalGenerated} uploads successful`);
+
+        return result;
+
+    } catch (error) {
+        console.error('❌ SAVE-INTEGRATED PNG: Generation failed:', error);
+        throw error; // Re-throw for saveDesign() error handling
+    }
+};
 
 console.log('✅ OPTIMIZED PNG: Parallel multi-view PNG system ready - NO VIEW SWITCHING!');
