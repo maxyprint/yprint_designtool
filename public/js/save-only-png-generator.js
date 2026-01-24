@@ -194,33 +194,35 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
 
 // Helper: Get print area coordinates for specific view
 function getPrintAreaForView(designer, viewId, viewData) {
-    // Try to get print zone from specific view data
+    // Use safeZone from template data - this is the real print area
     try {
         const template = designer.templates?.get(designer.activeTemplateId);
         const variation = template?.variations?.get(designer.currentVariation?.toString());
         const view = variation?.views?.get(viewId?.toString());
 
-        if (view?.printArea) {
-            return view.printArea;
-        }
-
-        // Try from passed viewData
-        if (viewData?.printArea) {
-            return viewData.printArea;
+        if (view?.safeZone) {
+            console.log(`✅ Using safeZone for ${viewId}:`, view.safeZone);
+            return {
+                left: view.safeZone.left,
+                top: view.safeZone.top,
+                width: view.safeZone.width,
+                height: view.safeZone.height
+            };
         }
     } catch (error) {
-        console.warn(`⚠️ OPTIMIZED PNG: Could not get print area for view ${viewId}`);
+        console.warn(`⚠️ OPTIMIZED PNG: Could not get safeZone for view ${viewId}`);
     }
 
     // Fallback: Use safe zone or default area
     const canvasWidth = designer.fabricCanvas.width;
     const canvasHeight = designer.fabricCanvas.height;
 
+    console.warn(`⚠️ Using fallback print area for ${viewId}`);
     return {
         left: canvasWidth * 0.1,
         top: canvasHeight * 0.1,
         width: canvasWidth * 0.8,
-        height: canvasHeight * 0.8
+        height: canvasWidth * 0.8
     };
 }
 
@@ -250,13 +252,15 @@ async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
 
         if (uploadResponse.ok) {
             const result = await uploadResponse.json();
+            console.log(`🔍 OPTIMIZED PNG: Server response for ${viewName}:`, result);
             if (result.success) {
                 console.log(`✅ OPTIMIZED PNG: ${viewName} uploaded successfully!`);
+                console.log(`🔗 OPTIMIZED PNG: ${viewName} URL:`, result.data?.png_url || result.data?.file_url || 'URL not found');
                 return {
                     success: true,
                     viewId: viewId,
                     viewName: viewName,
-                    url: result.data.png_url
+                    url: result.data?.png_url || result.data?.file_url || null
                 };
             } else {
                 console.error(`❌ OPTIMIZED PNG: ${viewName} upload failed:`, result.data);

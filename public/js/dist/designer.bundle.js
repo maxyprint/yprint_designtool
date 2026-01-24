@@ -2101,36 +2101,7 @@ class DesignerWidget {
                                 };
                             }
 
-                            // Also maintain backward compatibility with single PNG
-                            if (pngResult.mainPNG) {
-                                console.log('📁 Main PNG available for backward compatibility');
-
-                                // Send main PNG to backend for legacy support
-                                const pngFormData = new FormData();
-                                pngFormData.append('action', 'save_design_png');
-                                pngFormData.append('nonce', octoPrintDesigner.nonce);
-                                pngFormData.append('design_id', this.currentDesignId);
-
-                                // Convert data URL to blob
-                                const response = await fetch(pngResult.mainPNG);
-                                const blob = await response.blob();
-                                pngFormData.append('png_file', blob, `design_${this.currentDesignId}.png`);
-
-                                const pngResponse = await fetch(octoPrintDesigner.ajaxUrl, {
-                                    method: 'POST',
-                                    body: pngFormData
-                                });
-
-                                const pngData = await pngResponse.json();
-
-                                if (pngData.success) {
-                                    console.log('✅ Legacy PNG saved successfully!');
-                                    console.log('📁 PNG file location:', pngData.data.file_url);
-                                    console.log('💾 PNG file path:', pngData.data.file_path);
-                                } else {
-                                    console.warn('⚠️ Legacy PNG save failed:', pngData.data.message);
-                                }
-                            }
+                            // No legacy "main" PNG - all views are equal
 
                             // Handle partial failures
                             if (pngResult.failedUploads > 0) {
