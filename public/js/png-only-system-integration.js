@@ -102,33 +102,33 @@ class PNGOnlySystemIntegration {
             try {
                 console.log('🖨️ PNG-ONLY INTEGRATION: Auto-generating print PNG...');
 
-                // Generate print zone snapshot using proper print zone generator
-                const printZoneGenerator = new PrintZonePNGGenerator();
-                const canvas = window.designerInstance?.fabricCanvas ||
-                             window.designerWidgetInstance?.fabricCanvas;
-
-                if (!canvas) {
-                    console.warn('❌ PNG-ONLY INTEGRATION: No fabric canvas available for auto-generation');
+                // Use existing working PNG generator
+                if (!window.saveOnlyPNGGenerator) {
+                    console.warn('❌ PNG-ONLY INTEGRATION: PNG generator not available for auto-generation');
                     return;
                 }
 
-                const pngInfo = printZoneGenerator.generatePrintZonePNG(canvas);
-                if (!pngInfo) {
-                    console.warn('❌ PNG-ONLY INTEGRATION: Failed to generate print zone PNG for auto-generation');
+                const pngResult = await window.saveOnlyPNGGenerator.generatePNG({
+                    viewId: 'auto',
+                    viewName: 'Auto Generated'
+                });
+
+                if (!pngResult.success) {
+                    console.warn('❌ PNG-ONLY INTEGRATION: Auto PNG generation failed');
                     return;
                 }
 
                 // Prepare design PNG data
                 const designPNGData = {
                     design_id: this.generateDesignId({}),
-                    print_png: pngInfo.dataURL,
+                    print_png: pngResult.dataUrl,
                     print_area_px: JSON.stringify({
-                        width: pngInfo.width,
-                        height: pngInfo.height
+                        width: 230,
+                        height: 351
                     }),
                     print_area_mm: JSON.stringify({
-                        width: pngInfo.sizeInches.width * 25.4,
-                        height: pngInfo.sizeInches.height * 25.4
+                        width: 58.4,
+                        height: 89.2
                     }),
                     template_id: 'unknown'
                 };
@@ -229,8 +229,7 @@ class PNGOnlySystemIntegration {
     setupUIIntegration() {
         console.log('🔗 PNG-ONLY INTEGRATION: Setting up UI integration...');
 
-        // Add print PNG preview button only (NO CART REPLACEMENT)
-        this.addPrintPreviewButton();
+        // No preview buttons - system works automatically
 
         console.log('✅ PNG-ONLY INTEGRATION: UI integration ready');
     }
@@ -269,57 +268,6 @@ class PNGOnlySystemIntegration {
         });
     }
 
-    addPrintPreviewButton() {
-        // Add print preview button to designer interface
-        const designerContainer = document.querySelector('.octo-print-designer') ||
-                                  document.querySelector('.designer-container');
-
-        if (designerContainer) {
-            const previewButton = document.createElement('button');
-            previewButton.className = 'btn btn-secondary yprint-print-preview';
-            previewButton.innerHTML = '🖨️ Generate Print PNG';
-            previewButton.style.margin = '10px 0';
-
-            previewButton.addEventListener('click', async () => {
-                try {
-                    previewButton.textContent = 'Generating Print PNG...';
-                    previewButton.disabled = true;
-
-                    // Generate print zone snapshot using proper print zone generator
-                    const printZoneGenerator = new PrintZonePNGGenerator();
-                    const canvas = window.designerInstance?.fabricCanvas ||
-                                 window.designerWidgetInstance?.fabricCanvas;
-
-                    if (!canvas) {
-                        throw new Error('No fabric canvas available');
-                    }
-
-                    const pngInfo = printZoneGenerator.generatePrintZonePNG(canvas);
-                    if (!pngInfo) {
-                        throw new Error('Failed to generate print zone PNG');
-                    }
-
-                    // Save PNG for later 'Designdaten laden' access
-                    await this.savePrintPNGToCurrentDesign(pngInfo.dataURL);
-
-                    console.log('✅ PNG-ONLY INTEGRATION: Print zone PNG generated successfully', {
-                        dimensions: `${pngInfo.width}x${pngInfo.height}px`,
-                        dpi: pngInfo.dpi,
-                        sizeInches: pngInfo.sizeInches
-                    });
-
-                } catch (error) {
-                    console.error('❌ PNG-ONLY INTEGRATION: PNG generation failed:', error);
-                } finally {
-                    previewButton.innerHTML = '🖨️ Generate Print PNG';
-                    previewButton.disabled = false;
-                }
-            });
-
-            designerContainer.appendChild(previewButton);
-            console.log('✅ PNG-ONLY INTEGRATION: Print PNG generator button added');
-        }
-    }
 
 
     setupEventHandlers() {
