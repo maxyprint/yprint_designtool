@@ -3,7 +3,7 @@
  * Provides only the essential generatePNGForDownload function for designer.bundle.js
  */
 
-console.log('✅ MINIMAL PNG: Providing clean generatePNGForDownload function');
+console.log('🎯 MINIMAL PNG v2: Providing clean generatePNGForDownload function - Cache Breaker');
 
 // Provide minimal PNG generation function for designer.bundle.js
 window.generatePNGForDownload = async function() {
