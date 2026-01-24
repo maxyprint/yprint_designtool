@@ -36,8 +36,9 @@ window.generatePNGForDownload = async function() {
                 results[viewId] = pngData;
                 console.log(`✅ CLEAN PNG: Generated ${viewData.name} - ${pngData.length} chars`);
 
-                // Upload this view's PNG separately
-                uploadPromises.push(uploadViewPNG(pngData, viewId, viewData.name, designer.currentDesignId));
+                // Upload this view's PNG separately - use templateId as fallback for new designs
+                const designId = designer.currentDesignId || designer.activeTemplateId || 'temp';
+                uploadPromises.push(uploadViewPNG(pngData, viewId, viewData.name, designId));
             }
         }
 
