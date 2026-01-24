@@ -3,13 +3,7 @@
  * Provides only the essential generatePNGForDownload function for designer.bundle.js
  */
 
-console.log('🚫 SAVE-ONLY PNG: System disabled - using designer.bundle.js');
-
-// System disabled - prevent all initialization
-if (true) {
-    console.log('🚫 SAVE-ONLY PNG: System disabled');
-    return;
-}
+console.log('🎯 MINIMAL PNG v2: Providing clean generatePNGForDownload function - Cache Breaker');
 
 // Multi-View PNG generation function for designer.bundle.js
 window.generatePNGForDownload = async function() {
