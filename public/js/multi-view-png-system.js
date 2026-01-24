@@ -5,7 +5,8 @@
 
 // Early exit to prevent initialization
 console.log('🚫 MULTI-VIEW: System disabled - using designer.bundle.js for PNG generation');
-return;
+
+/* REST OF FILE DISABLED
 
 class MultiViewPNGSystem {
     constructor() {
@@ -511,8 +512,4 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 
     window.multiViewPNGDebug = {
         checkDependencies: () => window.multiViewPNGSystem.checkDependencies(),
-        getInfo: () => window.multiViewPNGSystem.getDebugInfo(),
-        forceInit: () => window.multiViewPNGSystem.init(),
-        updateContent: () => window.multiViewPNGSystem.updateViewContentStatus()
-    };
-}
+        DISABLED - END OF COMMENT */

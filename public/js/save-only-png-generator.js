@@ -11,7 +11,9 @@
 
 // 🚫 SYSTEM DISABLED: This PNG system is redundant - designer.bundle.js handles PNG generation
 console.log('🚫 SAVE-ONLY PNG: System disabled - using designer.bundle.js for PNG generation');
-return; // Exit early to prevent initialization
+
+// System disabled - prevent all initialization
+/* REST OF FILE DISABLED
 setTimeout(() => {
     const config = window.octo_print_designer_config;
     if (config) {
@@ -2600,7 +2602,4 @@ window.testDesignSave = async function(designName = 'test_design') {
     }
 };
 
-// Export for testing
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SaveOnlyPNGGenerator;
-}
+DISABLED - END OF COMMENT */
