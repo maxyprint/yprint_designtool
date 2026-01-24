@@ -5,115 +5,119 @@
 
 console.log('🎯 MINIMAL PNG v2: Providing clean generatePNGForDownload function - Cache Breaker');
 
-// Multi-View PNG generation function for designer.bundle.js
+// Multi-View PNG generation function for designer.bundle.js - OPTIMIZED
 window.generatePNGForDownload = async function() {
     try {
-        console.log('🎯 CLEAN PNG: Multi-view generation started');
+        console.log('🎯 OPTIMIZED PNG: Parallel multi-view generation started');
 
         const designer = window.designerInstance;
         if (!designer?.fabricCanvas) {
-            console.error('❌ CLEAN PNG: No designer or canvas');
+            console.error('❌ OPTIMIZED PNG: No designer or canvas');
             return null;
         }
 
-        // Get all available views
-        const views = await getAvailableViews(designer);
-        console.log('🔍 CLEAN PNG: Found views:', Object.keys(views));
+        // Store original view to restore later
+        const originalView = designer.currentView;
+        console.log(`🔄 OPTIMIZED PNG: Original view: ${originalView}`);
 
-        // Generate PNGs for both views and upload separately
-        const results = {};
-        const uploadPromises = [];
+        // Get all available views with their complete data
+        const views = await getAvailableViewsWithData(designer);
+        console.log('🔍 OPTIMIZED PNG: Found views:', Object.keys(views));
 
-        for (const [viewId, viewData] of Object.entries(views)) {
-            console.log(`🎯 CLEAN PNG: Processing view ${viewData.name} (${viewId})`);
+        // Generate design ID once for all uploads
+        const designId = designer.currentDesignId || designer.activeTemplateId || 'temp';
 
-            // Switch to view
-            await switchToView(designer, viewId);
+        // Process all views in parallel - NO VIEW SWITCHING
+        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
+            console.log(`🎯 OPTIMIZED PNG: Processing view ${viewData.name} (${viewId}) in parallel`);
 
-            // Generate PNG for this view (print zone cropped)
-            const pngData = await generateViewPNG(designer, viewId, viewData.name);
+            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
+
             if (pngData) {
-                results[viewId] = pngData;
-                console.log(`✅ CLEAN PNG: Generated ${viewData.name} - ${pngData.length} chars`);
-
-                // Upload this view's PNG separately - use templateId as fallback for new designs
-                const designId = designer.currentDesignId || designer.activeTemplateId || 'temp';
-                uploadPromises.push(uploadViewPNG(pngData, viewId, viewData.name, designId));
+                console.log(`✅ OPTIMIZED PNG: Generated ${viewData.name} - ${pngData.length} chars`);
+                return {
+                    viewId,
+                    viewData,
+                    pngData,
+                    uploadPromise: uploadViewPNG(pngData, viewId, viewData.name, designId)
+                };
             }
-        }
+            return null;
+        });
+
+        // Wait for all PNG generations to complete
+        const pngResults = await Promise.all(pngPromises);
+        const validResults = pngResults.filter(result => result !== null);
 
         // Wait for all uploads to complete
-        const uploadResults = await Promise.all(uploadPromises);
+        const uploadResults = await Promise.all(validResults.map(result => result.uploadPromise));
 
         // Log all PNG URLs
         uploadResults.forEach(result => {
             if (result.success) {
-                console.log(`🔗 CLEAN PNG: ${result.viewName} URL:`, result.url);
+                console.log(`🔗 OPTIMIZED PNG: ${result.viewName} URL:`, result.url);
             }
         });
 
+        // Restore original view (should be unchanged anyway)
+        if (designer.currentView !== originalView) {
+            console.log(`🔄 OPTIMIZED PNG: Restoring original view: ${originalView}`);
+            designer.currentView = originalView;
+        }
+
         // Return first successful PNG for compatibility with existing save system
-        const firstPng = Object.values(results)[0];
-        console.log('🎯 CLEAN PNG: Multi-view generation complete, returning:', firstPng ? 'SUCCESS' : 'FAILED');
+        const firstPng = validResults[0]?.pngData;
+        console.log('🎯 OPTIMIZED PNG: Parallel multi-view generation complete, returning:', firstPng ? 'SUCCESS' : 'FAILED');
         return firstPng || null;
 
     } catch (error) {
-        console.error('❌ CLEAN PNG: Multi-view generation failed:', error);
+        console.error('❌ OPTIMIZED PNG: Multi-view generation failed:', error);
         return null;
     }
 };
 
-// Helper: Get available views from template system
-async function getAvailableViews(designer) {
+// Helper: Get available views with complete data for parallel processing
+async function getAvailableViewsWithData(designer) {
     try {
         const template = designer.templates?.get(designer.activeTemplateId);
         const variation = template?.variations?.get(designer.currentVariation?.toString());
 
         if (variation?.views) {
-            // Convert Map to Object
+            // Convert Map to Object with enhanced view data
             const viewsObj = {};
             variation.views.forEach((viewData, viewId) => {
-                viewsObj[viewId] = viewData;
+                viewsObj[viewId] = {
+                    ...viewData,
+                    // Pre-calculate print area for this view
+                    printArea: getPrintAreaForView(designer, viewId, viewData)
+                };
             });
             return viewsObj;
         }
 
         // Fallback: Use current view only
-        return { [designer.currentView]: { name: 'Current View' } };
+        return {
+            [designer.currentView]: {
+                name: 'Current View',
+                printArea: getPrintAreaForView(designer, designer.currentView, null)
+            }
+        };
     } catch (error) {
-        console.error('❌ CLEAN PNG: Failed to get views:', error);
-        return { [designer.currentView]: { name: 'Current View' } };
+        console.error('❌ OPTIMIZED PNG: Failed to get views:', error);
+        return {
+            [designer.currentView]: {
+                name: 'Current View',
+                printArea: getPrintAreaForView(designer, designer.currentView, null)
+            }
+        };
     }
 }
 
-// Helper: Switch to specific view
-async function switchToView(designer, viewId) {
-    try {
-        if (designer.currentView === viewId) {
-            console.log(`🔄 CLEAN PNG: Already on view ${viewId}`);
-            return;
-        }
-
-        console.log(`🔄 CLEAN PNG: Switching to view ${viewId}`);
-
-        if (typeof designer.switchView === 'function') {
-            await designer.switchView(viewId);
-        } else {
-            designer.currentView = viewId;
-        }
-
-        // Wait for view switch to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-    } catch (error) {
-        console.error('❌ CLEAN PNG: View switch failed:', error);
-    }
-}
-
-// Helper: Generate PNG for specific view (print zone cropped)
-async function generateViewPNG(designer, viewId, viewName) {
+// Helper: Generate PNG for specific view WITHOUT switching views
+async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
     try {
         const canvas = designer.fabricCanvas;
+        console.log(`🎨 OPTIMIZED PNG: Processing view ${viewData.name} (${viewId}) without switching`);
 
         // Get design elements only (exclude background shirt)
         const designObjects = canvas.getObjects().filter(obj => {
@@ -125,16 +129,16 @@ async function generateViewPNG(designer, viewId, viewName) {
             return isUserContent && !isBackground && !isSystemObject;
         });
 
-        console.log(`🎨 CLEAN PNG: Found ${designObjects.length} design objects for ${viewName}`);
+        console.log(`🎨 OPTIMIZED PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
 
         if (designObjects.length === 0) {
-            console.log(`⚠️ CLEAN PNG: No design content in ${viewName}, skipping`);
+            console.log(`⚠️ OPTIMIZED PNG: No design content in ${viewData.name}, skipping`);
             return null;
         }
 
-        // Get print area coordinates from view data
-        const printArea = getPrintArea(designer);
-        console.log(`📐 CLEAN PNG: Print area for ${viewName}:`, printArea);
+        // Use pre-calculated print area from viewData
+        const printArea = viewData.printArea;
+        console.log(`📐 OPTIMIZED PNG: Print area for ${viewData.name}:`, printArea);
 
         // Hide background objects temporarily
         const hiddenObjects = [];
@@ -167,29 +171,34 @@ async function generateViewPNG(designer, viewId, viewName) {
         });
         canvas.renderAll();
 
-        console.log(`✂️ CLEAN PNG: Cropped ${viewName} to print zone (${printArea.width}x${printArea.height})`);
+        console.log(`✂️ OPTIMIZED PNG: Generated ${viewData.name} print zone (${printArea.width}x${printArea.height})`);
 
         return dataUrl;
 
     } catch (error) {
-        console.error(`❌ CLEAN PNG: Failed to generate PNG for ${viewName}:`, error);
+        console.error(`❌ OPTIMIZED PNG: Failed to generate PNG for ${viewData.name}:`, error);
         return null;
     }
 }
 
-// Helper: Get print area coordinates
-function getPrintArea(designer) {
-    // Try to get print zone from view data
+// Helper: Get print area coordinates for specific view
+function getPrintAreaForView(designer, viewId, viewData) {
+    // Try to get print zone from specific view data
     try {
         const template = designer.templates?.get(designer.activeTemplateId);
         const variation = template?.variations?.get(designer.currentVariation?.toString());
-        const view = variation?.views?.get(designer.currentView?.toString());
+        const view = variation?.views?.get(viewId?.toString());
 
         if (view?.printArea) {
             return view.printArea;
         }
+
+        // Try from passed viewData
+        if (viewData?.printArea) {
+            return viewData.printArea;
+        }
     } catch (error) {
-        console.warn('⚠️ CLEAN PNG: Could not get print area from view data');
+        console.warn(`⚠️ OPTIMIZED PNG: Could not get print area for view ${viewId}`);
     }
 
     // Fallback: Use safe zone or default area
@@ -204,14 +213,15 @@ function getPrintArea(designer) {
     };
 }
 
+
 // Helper: Upload individual view PNG to server
 async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
     try {
-        console.log(`📤 CLEAN PNG: Uploading ${viewName} PNG...`);
+        console.log(`📤 OPTIMIZED PNG: Uploading ${viewName} PNG...`);
 
         const formData = new FormData();
         formData.append('action', 'save_design_png');
-        formData.append('nonce', window.octoPrintDesigner?.nonce || '');
+        formData.append('nonce', window.octoPrintDesigner?.nonce || window.octo_print_designer_config?.nonce || '');
         formData.append('design_id', designId);
         formData.append('view_id', viewId);
         formData.append('view_name', viewName);
@@ -230,7 +240,7 @@ async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
         if (uploadResponse.ok) {
             const result = await uploadResponse.json();
             if (result.success) {
-                console.log(`✅ CLEAN PNG: ${viewName} uploaded successfully!`);
+                console.log(`✅ OPTIMIZED PNG: ${viewName} uploaded successfully!`);
                 return {
                     success: true,
                     viewId: viewId,
@@ -238,18 +248,33 @@ async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
                     url: result.data.png_url
                 };
             } else {
-                console.error(`❌ CLEAN PNG: ${viewName} upload failed:`, result.data);
+                console.error(`❌ OPTIMIZED PNG: ${viewName} upload failed:`, result.data);
+                return {
+                    success: false,
+                    viewId: viewId,
+                    viewName: viewName,
+                    error: result.data
+                };
             }
         } else {
-            console.error(`❌ CLEAN PNG: ${viewName} upload HTTP error:`, uploadResponse.status);
+            console.error(`❌ OPTIMIZED PNG: ${viewName} upload HTTP error:`, uploadResponse.status);
+            return {
+                success: false,
+                viewId: viewId,
+                viewName: viewName,
+                error: `HTTP ${uploadResponse.status}`
+            };
         }
 
-        return { success: false, viewId: viewId, viewName: viewName };
-
     } catch (error) {
-        console.error(`❌ CLEAN PNG: ${viewName} upload error:`, error);
-        return { success: false, viewId: viewId, viewName: viewName };
+        console.error(`❌ OPTIMIZED PNG: ${viewName} upload error:`, error);
+        return {
+            success: false,
+            viewId: viewId,
+            viewName: viewName,
+            error: error.message
+        };
     }
 }
 
-console.log('✅ MINIMAL PNG: Clean PNG system ready');
+console.log('✅ OPTIMIZED PNG: Parallel multi-view PNG system ready - NO VIEW SWITCHING!');
