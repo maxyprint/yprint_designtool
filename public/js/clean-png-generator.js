@@ -1,11 +1,12 @@
 /**
- * 🎯 CLEAN PNG GENERATOR - No Cache Issues
- * FINAL SOLUTION: Provides generatePNGForDownload function for designer.bundle.js
+ * 🚫 CLEAN PNG GENERATOR - DISABLED
+ * This system is superseded by save-only-png-generator.js canvas snapshot system
  */
 
-console.log('🚀 CLEAN PNG GENERATOR: Loaded successfully - No cache issues!');
+console.log('🚫 CLEAN PNG GENERATOR: Disabled - using save-only-png-generator.js canvas snapshot system');
 
-// Essential PNG generation function
+// System disabled - save-only-png-generator.js provides generatePNGForDownload
+/* DISABLED:
 window.generatePNGForDownload = async function() {
     try {
         console.log('🎯 CLEAN PNG: generatePNGForDownload function called successfully!');
@@ -68,5 +69,6 @@ window.generatePNGForDownload = async function() {
         return null;
     }
 };
+*/
 
-console.log('✅ CLEAN PNG GENERATOR: Ready and function exposed globally!');
+console.log('🚫 CLEAN PNG GENERATOR: System disabled - no functions exposed');

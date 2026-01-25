@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PNG Size Analysis Debug</title>
+</head>
+<body>
+    <h1>PNG Size Analysis Debug</h1>
+    <script>
+        console.log('🔍 PNG SIZE ANALYSIS: Starting comprehensive debug...');
+
+        // Function to analyze PNG generation differences
+        function debugPNGSizes() {
+            const designer = window.designerInstance;
+
+            if (!designer?.fabricCanvas) {
+                console.error('❌ No designer canvas found');
+                return;
+            }
+
+            console.log('📐 CANVAS DIMENSIONS:');
+            console.log('- Canvas width:', designer.fabricCanvas.width);
+            console.log('- Canvas height:', designer.fabricCanvas.height);
+            console.log('- Canvas zoom:', designer.fabricCanvas.getZoom());
+
+            // Check current view print areas
+            console.log('\n🎯 CURRENT VIEW DATA:');
+            console.log('- Current View ID:', designer.currentView);
+
+            // Get template and variation data
+            const template = designer.templates?.get(designer.activeTemplateId);
+            const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+            if (variation?.views) {
+                console.log('\n📋 ALL VIEWS DATA:');
+                variation.views.forEach((viewData, viewId) => {
+                    console.log(`\n--- View ${viewData.name} (${viewId}) ---`);
+                    console.log('View Data:', viewData);
+                    if (viewData.printArea) {
+                        console.log('Print Area:', viewData.printArea);
+                        console.log(`Print Size: ${viewData.printArea.width}x${viewData.printArea.height}`);
+                    } else {
+                        console.log('❌ No print area defined!');
+                    }
+                });
+            }
+
+            // Test different PNG generation methods
+            console.log('\n🧪 TESTING PNG GENERATION METHODS:');
+
+            // Method 1: Full canvas (current legacy method)
+            console.log('\n1. FULL CANVAS METHOD:');
+            const fullCanvasPNG = designer.fabricCanvas.toDataURL({
+                format: 'png',
+                quality: 1,
+                multiplier: 1 // Lower for testing
+            });
+            console.log('Full Canvas PNG size:', fullCanvasPNG.length, 'chars');
+
+            // Method 2: With print area cropping (multi-view method)
+            console.log('\n2. PRINT AREA CROPPING METHOD:');
+            const currentView = variation?.views?.get(designer.currentView?.toString());
+            if (currentView?.printArea) {
+                const printArea = currentView.printArea;
+                console.log('Using print area:', printArea);
+
+                const croppedPNG = designer.fabricCanvas.toDataURL({
+                    format: 'png',
+                    quality: 1,
+                    multiplier: 1, // Lower for testing
+                    left: printArea.left,
+                    top: printArea.top,
+                    width: printArea.width,
+                    height: printArea.height
+                });
+                console.log('Cropped PNG size:', croppedPNG.length, 'chars');
+                console.log('Size difference:', croppedPNG.length - fullCanvasPNG.length, 'chars');
+
+                // Calculate actual dimensions
+                const actualWidth = printArea.width * 1; // multiplier
+                const actualHeight = printArea.height * 1; // multiplier
+                console.log(`Actual cropped dimensions: ${actualWidth}x${actualHeight}px`);
+                console.log(`Full canvas dimensions: ${designer.fabricCanvas.width}x${designer.fabricCanvas.height}px`);
+            }
+
+            // Method 3: Check what objects are visible
+            console.log('\n3. CANVAS OBJECTS ANALYSIS:');
+            const allObjects = designer.fabricCanvas.getObjects();
+            console.log('Total objects on canvas:', allObjects.length);
+
+            allObjects.forEach((obj, index) => {
+                const isBackground = obj.isBackground === true ||
+                                  (obj.type === 'image' && obj.selectable === false);
+                const isSystemObject = obj.excludeFromExport === true;
+                const isUserContent = obj.selectable === true && obj.visible === true;
+
+                console.log(`Object ${index}: ${obj.type} - Background:${isBackground}, System:${isSystemObject}, UserContent:${isUserContent}, Visible:${obj.visible}`);
+                if (obj.type === 'image') {
+                    console.log(`  Image size: ${obj.width}x${obj.height}, Scale: ${obj.scaleX}x${obj.scaleY}`);
+                }
+            });
+
+            // Check if we're using the right print area calculation
+            console.log('\n4. PRINT AREA CALCULATION CHECK:');
+
+            // Test the getPrintAreaForView function logic
+            function testGetPrintAreaForView(viewId) {
+                console.log(`Testing print area calculation for view ${viewId}:`);
+
+                // Same logic as in save-only-png-generator.js
+                const template = designer.templates?.get(designer.activeTemplateId);
+                const variation = template?.variations?.get(designer.currentVariation?.toString());
+                const view = variation?.views?.get(viewId?.toString());
+
+                if (view?.printArea) {
+                    console.log('✅ Found view.printArea:', view.printArea);
+                    return view.printArea;
+                }
+
+                // Fallback calculation
+                const canvasWidth = designer.fabricCanvas.width;
+                const canvasHeight = designer.fabricCanvas.height;
+                const fallback = {
+                    left: canvasWidth * 0.1,
+                    top: canvasHeight * 0.1,
+                    width: canvasWidth * 0.8,
+                    height: canvasHeight * 0.8
+                };
+                console.log('⚠️ Using fallback calculation:', fallback);
+                return fallback;
+            }
+
+            // Test for current view and other views
+            if (variation?.views) {
+                variation.views.forEach((viewData, viewId) => {
+                    const printArea = testGetPrintAreaForView(viewId);
+                    console.log(`View ${viewData.name}: Print area`, printArea);
+                });
+            }
+        }
+
+        // Wait for designer to be ready
+        if (window.designerInstance) {
+            debugPNGSizes();
+        } else {
+            console.log('⏳ Waiting for designer instance...');
+            setTimeout(() => {
+                if (window.designerInstance) {
+                    debugPNGSizes();
+                } else {
+                    console.error('❌ Designer instance not found after timeout');
+                }
+            }, 2000);
+        }
+
+        // Also expose function globally for manual testing
+        window.debugPNGSizes = debugPNGSizes;
+
+        console.log('🎯 PNG Size Analysis ready. Run debugPNGSizes() manually if needed.');
+    </script>
+</body>
+</html>
