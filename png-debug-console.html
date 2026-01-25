@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PNG Debug Console</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .debug-button { background: #007cba; color: white; padding: 10px 20px; border: none; margin: 5px; cursor: pointer; }
+        .debug-output { background: #f0f0f0; padding: 15px; margin: 10px 0; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>🔍 PNG Debug Console</h1>
+    <p>Copy and paste console commands from here into your browser console on the design page.</p>
+
+    <button class="debug-button" onclick="copyToClipboard('debugBasic')">Copy Basic Debug</button>
+    <button class="debug-button" onclick="copyToClipboard('debugFull')">Copy Full Analysis</button>
+    <button class="debug-button" onclick="copyToClipboard('debugFixed')">Copy Fixed PNG Function</button>
+
+    <div id="output" class="debug-output">Click buttons to copy debug commands to clipboard...</div>
+
+    <script>
+        const debugCommands = {
+            debugBasic: `
+// BASIC PNG DEBUG - Copy this into browser console
+console.log('🔍 BASIC PNG DEBUG START');
+
+const designer = window.designerInstance;
+if (!designer?.fabricCanvas) {
+    console.error('❌ No designer found');
+} else {
+    const canvas = designer.fabricCanvas;
+    const objects = canvas.getObjects();
+
+    console.log('📊 Canvas Info:', {
+        width: canvas.width,
+        height: canvas.height,
+        totalObjects: objects.length
+    });
+
+    // Analyze objects
+    const designObjects = objects.filter(obj => {
+        const isBackground = obj.isBackground === true || (obj.type === 'image' && obj.selectable === false);
+        const isSystemObject = obj.excludeFromExport === true;
+        const isUserContent = obj.selectable === true && obj.visible === true;
+        return isUserContent && !isBackground && !isSystemObject;
+    });
+
+    console.log('🎨 Design Objects:', designObjects.length);
+    designObjects.forEach((obj, i) => {
+        const bounds = obj.getBoundingRect();
+        console.log(\`Design Object \${i}:\`, {
+            type: obj.type,
+            bounds: bounds,
+            visible: obj.visible,
+            selectable: obj.selectable
+        });
+    });
+
+    // Check print areas
+    const template = designer.templates?.get(designer.activeTemplateId);
+    const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+    if (variation?.views) {
+        console.log('📋 Available Views:');
+        variation.views.forEach((viewData, viewId) => {
+            console.log(\`View \${viewData.name} (\${viewId}):\`, viewData);
+        });
+    }
+
+    // Test PNG generation
+    if (typeof window.generatePNGForDownload === 'function') {
+        console.log('✅ PNG function exists - testing...');
+        window.generatePNGForDownload();
+    } else {
+        console.error('❌ PNG function missing');
+    }
+}
+            `,
+
+            debugFull: `
+// FULL PNG DEBUG ANALYSIS - Copy this into browser console
+console.log('🔍 FULL PNG DEBUG START');
+
+function analyzeDesignObjects() {
+    const designer = window.designerInstance;
+    if (!designer?.fabricCanvas) return;
+
+    const canvas = designer.fabricCanvas;
+    const objects = canvas.getObjects();
+
+    console.log('📊 Canvas Analysis:');
+    console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+    console.log('Total objects:', objects.length);
+
+    // Get template info
+    const template = designer.templates?.get(designer.activeTemplateId);
+    const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+    // Analyze each view's print area vs design objects
+    if (variation?.views) {
+        variation.views.forEach((viewData, viewId) => {
+            console.log(\`\\n📋 VIEW \${viewData.name} (\${viewId}) ANALYSIS:\`);
+
+            let printArea = null;
+            if (viewData.safeZone) {
+                printArea = viewData.safeZone;
+                console.log('✅ Using safeZone:', printArea);
+            } else {
+                printArea = {
+                    left: canvas.width * 0.1,
+                    top: canvas.height * 0.1,
+                    width: canvas.width * 0.8,
+                    height: canvas.height * 0.8
+                };
+                console.log('⚠️ Using fallback printArea:', printArea);
+            }
+
+            // Filter design objects
+            const designObjects = objects.filter(obj => {
+                const isBackground = obj.isBackground === true || (obj.type === 'image' && obj.selectable === false);
+                const isSystemObject = obj.excludeFromExport === true;
+                const isUserContent = obj.selectable === true && obj.visible === true;
+                return isUserContent && !isBackground && !isSystemObject;
+            });
+
+            console.log(\`Found \${designObjects.length} design objects\`);
+
+            // Check if design objects overlap with print area
+            designObjects.forEach((obj, i) => {
+                const bounds = obj.getBoundingRect();
+
+                // Check overlap
+                const overlaps = !(
+                    bounds.left > printArea.left + printArea.width ||
+                    bounds.left + bounds.width < printArea.left ||
+                    bounds.top > printArea.top + printArea.height ||
+                    bounds.top + bounds.height < printArea.top
+                );
+
+                console.log(\`Object \${i} (\${obj.type}):\`, {
+                    bounds: bounds,
+                    printArea: printArea,
+                    overlapsWithPrintArea: overlaps,
+                    fullyInside: bounds.left >= printArea.left &&
+                                bounds.top >= printArea.top &&
+                                (bounds.left + bounds.width) <= (printArea.left + printArea.width) &&
+                                (bounds.top + bounds.height) <= (printArea.top + printArea.height)
+                });
+            });
+        });
+    }
+}
+
+analyzeDesignObjects();
+            `,
+
+            debugFixed: `
+// FIXED PNG GENERATION FUNCTION - Copy this into browser console
+console.log('🔧 INSTALLING FIXED PNG FUNCTION');
+
+// Fixed version that finds design objects and crops around them instead of using fixed print areas
+window.generatePNGForDownloadFixed = async function() {
+    try {
+        console.log('🎯 FIXED PNG: Starting generation...');
+
+        const designer = window.designerInstance;
+        if (!designer?.fabricCanvas) {
+            console.error('❌ FIXED PNG: No designer or canvas');
+            return null;
+        }
+
+        const canvas = designer.fabricCanvas;
+
+        // Get design objects
+        const designObjects = canvas.getObjects().filter(obj => {
+            const isBackground = obj.isBackground === true || (obj.type === 'image' && obj.selectable === false);
+            const isSystemObject = obj.excludeFromExport === true;
+            const isUserContent = obj.selectable === true && obj.visible === true;
+            return isUserContent && !isBackground && !isSystemObject;
+        });
+
+        console.log(\`🎨 FIXED PNG: Found \${designObjects.length} design objects\`);
+
+        if (designObjects.length === 0) {
+            console.error('❌ FIXED PNG: No design objects found');
+            return null;
+        }
+
+        // Calculate bounding box of all design objects
+        let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
+
+        designObjects.forEach(obj => {
+            const bounds = obj.getBoundingRect();
+            minLeft = Math.min(minLeft, bounds.left);
+            minTop = Math.min(minTop, bounds.top);
+            maxRight = Math.max(maxRight, bounds.left + bounds.width);
+            maxBottom = Math.max(maxBottom, bounds.top + bounds.height);
+        });
+
+        // Add padding around design objects
+        const padding = 20;
+        const designBounds = {
+            left: Math.max(0, minLeft - padding),
+            top: Math.max(0, minTop - padding),
+            width: Math.min(canvas.width, maxRight + padding) - Math.max(0, minLeft - padding),
+            height: Math.min(canvas.height, maxBottom + padding) - Math.max(0, minTop - padding)
+        };
+
+        console.log('📐 FIXED PNG: Design bounds with padding:', designBounds);
+
+        // Hide background objects
+        const hiddenObjects = [];
+        canvas.getObjects().forEach(obj => {
+            const isBackground = obj.isBackground === true ||
+                               (obj.type === 'image' && obj.selectable === false) ||
+                               obj.excludeFromExport === true;
+            if (isBackground && obj.visible) {
+                obj.visible = false;
+                hiddenObjects.push(obj);
+            }
+        });
+
+        canvas.renderAll();
+
+        // Export full canvas first
+        const fullCanvasDataURL = canvas.toDataURL({
+            format: 'png',
+            quality: 1,
+            multiplier: 4.17
+        });
+
+        console.log(\`📸 FIXED PNG: Full canvas exported - \${fullCanvasDataURL.length} chars\`);
+
+        // Crop to design bounds
+        const cropArea = {
+            left: designBounds.left * 4.17,
+            top: designBounds.top * 4.17,
+            width: designBounds.width * 4.17,
+            height: designBounds.height * 4.17
+        };
+
+        console.log('✂️ FIXED PNG: Cropping to design bounds...');
+
+        // Crop function
+        const croppedDataURL = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const cropCanvas = document.createElement('canvas');
+                const ctx = cropCanvas.getContext('2d');
+
+                cropCanvas.width = cropArea.width;
+                cropCanvas.height = cropArea.height;
+
+                ctx.drawImage(
+                    img,
+                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
+                    0, 0, cropArea.width, cropArea.height
+                );
+
+                resolve(cropCanvas.toDataURL('image/png', 1.0));
+            };
+            img.src = fullCanvasDataURL;
+        });
+
+        // Restore hidden objects
+        hiddenObjects.forEach(obj => obj.visible = true);
+        canvas.renderAll();
+
+        if (croppedDataURL && croppedDataURL.length > 100) {
+            console.log(\`✅ FIXED PNG: Generated - \${croppedDataURL.length} chars\`);
+
+            // Test upload to server
+            if (window.octo_print_designer_config?.ajax_url) {
+                const formData = new FormData();
+                formData.append('action', 'save_design_png');
+                formData.append('nonce', window.octo_print_designer_config.nonce || '');
+                formData.append('png_data', croppedDataURL);
+                formData.append('design_id', designer.currentDesignId || 'temp_fixed');
+
+                try {
+                    const response = await fetch(window.octo_print_designer_config.ajax_url, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('🔗 FIXED PNG: Uploaded successfully:', result.data?.png_url);
+                        return result.data?.png_url;
+                    }
+                } catch (uploadError) {
+                    console.warn('⚠️ FIXED PNG: Upload failed, returning data URL');
+                }
+            }
+
+            return croppedDataURL;
+        } else {
+            console.error('❌ FIXED PNG: Failed to crop - empty result');
+            return null;
+        }
+
+    } catch (error) {
+        console.error('❌ FIXED PNG: Generation failed:', error);
+        return null;
+    }
+};
+
+console.log('✅ FIXED PNG function installed as generatePNGForDownloadFixed()');
+console.log('🧪 Test it by running: generatePNGForDownloadFixed()');
+            `
+        };
+
+        function copyToClipboard(commandName) {
+            const command = debugCommands[commandName];
+            navigator.clipboard.writeText(command).then(() => {
+                document.getElementById('output').innerHTML = \`<div class="success">✅ Copied \${commandName} to clipboard! Paste into browser console on design page.</div>\` + command;
+            }).catch(err => {
+                document.getElementById('output').innerHTML = \`<div class="error">❌ Failed to copy. Manual copy:</div>\` + command;
+            });
+        }
+    </script>
+</body>
+</html>
