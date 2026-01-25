@@ -318,7 +318,7 @@ window.generatePNGForSave = async function(designId) {
         const views = await getAvailableViewsWithData(designer);
         console.log('🔍 SAVE-INTEGRATED PNG: Found views:', Object.keys(views));
 
-        // Process all views in parallel - NO VIEW SWITCHING
+        // Generate all PNGs first (parallel)
         const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
             console.log(`🎯 SAVE-INTEGRATED PNG: Processing view ${viewData.name} (${viewId}) in parallel`);
 
@@ -329,8 +329,7 @@ window.generatePNGForSave = async function(designId) {
                 return {
                     viewId,
                     viewData,
-                    pngData,
-                    uploadPromise: uploadViewPNG(pngData, viewId, viewData.name, designId)
+                    pngData
                 };
             }
             return null;
@@ -344,8 +343,17 @@ window.generatePNGForSave = async function(designId) {
             throw new Error('No PNGs could be generated');
         }
 
-        // Wait for all uploads to complete
-        const uploadResults = await Promise.all(validResults.map(result => result.uploadPromise));
+        // Upload sequentially with 2 second delay to ensure unique timestamps
+        const uploadResults = [];
+        for (let i = 0; i < validResults.length; i++) {
+            const result = validResults[i];
+            if (i > 0) {
+                console.log(`⏱️ SAVE-INTEGRATED PNG: Waiting 2s before uploading ${result.viewData.name}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            const uploadResult = await uploadViewPNG(result.pngData, result.viewId, result.viewData.name, designId);
+            uploadResults.push(uploadResult);
+        }
 
         // Log all PNG URLs and collect results
         const successfulUploads = [];
