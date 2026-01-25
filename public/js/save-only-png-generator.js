@@ -124,13 +124,13 @@ async function getAvailableViewsWithData(designer) {
     }
 }
 
-// Helper: Generate PNG for specific view WITHOUT switching views
+// Helper: Generate PNG for specific view WITHOUT switching views - CANVAS SNAPSHOT METHOD
 async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
     try {
         const canvas = designer.fabricCanvas;
-        console.log(`🎨 OPTIMIZED PNG: Processing view ${viewData.name} (${viewId}) without switching`);
+        console.log(`🎨 SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with canvas snapshot method`);
 
-        // Get design elements only (exclude background shirt)
+        // Get design elements only (exclude background shirt) - SAME FILTER AS BEFORE
         const designObjects = canvas.getObjects().filter(obj => {
             const isBackground = obj.isBackground === true ||
                                (obj.type === 'image' && obj.selectable === false);
@@ -140,18 +140,18 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
             return isUserContent && !isBackground && !isSystemObject;
         });
 
-        console.log(`🎨 OPTIMIZED PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
+        console.log(`🎨 SNAPSHOT PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
 
         if (designObjects.length === 0) {
-            console.log(`⚠️ OPTIMIZED PNG: No design content in ${viewData.name}, skipping`);
+            console.log(`⚠️ SNAPSHOT PNG: No design content in ${viewData.name}, skipping`);
             return null;
         }
 
-        // Use pre-calculated print area from viewData
+        // Get print area from viewData - SAME AS BEFORE
         const printArea = viewData.printArea;
-        console.log(`📐 OPTIMIZED PNG: Print area for ${viewData.name}:`, printArea);
+        console.log(`📐 SNAPSHOT PNG: Print area for ${viewData.name}:`, printArea);
 
-        // Hide background objects temporarily
+        // Hide background objects temporarily - SAME AS BEFORE
         const hiddenObjects = [];
         canvas.getObjects().forEach(obj => {
             const isBackground = obj.isBackground === true ||
@@ -165,29 +165,43 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
 
         canvas.renderAll();
 
-        // Use fabric.js toDataURL with crop parameters - NO coordinate math!
-        const dataUrl = canvas.toDataURL({
+        // STEP 1: Export FULL canvas (no coordinate cropping) - CANVAS SNAPSHOT
+        console.log('📸 SNAPSHOT PNG: Exporting full canvas snapshot...');
+        const fullCanvasDataURL = canvas.toDataURL({
             format: 'png',
             quality: 1,
-            multiplier: 4.17, // 300 DPI
-            left: printArea.left,
-            top: printArea.top,
-            width: printArea.width,
-            height: printArea.height
+            multiplier: 4.17 // 300 DPI - SAME AS BEFORE
         });
+        console.log(`📸 SNAPSHOT PNG: Full canvas exported - ${fullCanvasDataURL.length} chars`);
 
-        // Restore hidden objects
+        // STEP 2: Crop to print area using post-processing - NO COORDINATE MATH IN FABRIC
+        console.log(`✂️ SNAPSHOT PNG: Cropping to print area (${printArea.width}x${printArea.height})...`);
+        const multiplier = 4.17; // Same multiplier as canvas export
+        const cropArea = {
+            left: printArea.left * multiplier,
+            top: printArea.top * multiplier,
+            width: printArea.width * multiplier,
+            height: printArea.height * multiplier
+        };
+
+        const croppedDataURL = await cropImageToArea(fullCanvasDataURL, cropArea);
+
+        // Restore hidden objects - SAME AS BEFORE
         hiddenObjects.forEach(obj => {
             obj.visible = true;
         });
         canvas.renderAll();
 
-        console.log(`✂️ OPTIMIZED PNG: Generated ${viewData.name} print zone (${printArea.width}x${printArea.height})`);
-
-        return dataUrl;
+        if (croppedDataURL && croppedDataURL.length > 100) {
+            console.log(`✅ SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (print area only)`);
+            return croppedDataURL;
+        } else {
+            console.error(`❌ SNAPSHOT PNG: Failed to crop ${viewData.name} - empty result`);
+            return null;
+        }
 
     } catch (error) {
-        console.error(`❌ OPTIMIZED PNG: Failed to generate PNG for ${viewData.name}:`, error);
+        console.error(`❌ SNAPSHOT PNG: Failed to generate PNG for ${viewData.name}:`, error);
         return null;
     }
 }
@@ -395,5 +409,101 @@ window.generatePNGForSave = async function(designId) {
         throw error; // Re-throw for saveDesign() error handling
     }
 };
+
+// Helper: Crop full canvas export to specific area (from working commit b0f8939)
+async function cropImageToArea(dataURL, cropArea) {
+    return new Promise((resolve, reject) => {
+        console.log('✂️ CROP: Starting image crop operation', {
+            dataURL_exists: !!dataURL,
+            dataURL_length: dataURL?.length || 0,
+            cropArea: cropArea,
+            cropArea_valid: !!(cropArea?.left !== undefined && cropArea?.top !== undefined && cropArea?.width > 0 && cropArea?.height > 0)
+        });
+
+        if (!dataURL) {
+            console.error('❌ CROP: No dataURL provided');
+            resolve(null);
+            return;
+        }
+
+        if (!cropArea || cropArea.width <= 0 || cropArea.height <= 0) {
+            console.error('❌ CROP: Invalid crop area:', cropArea);
+            resolve(null);
+            return;
+        }
+
+        const img = new Image();
+
+        img.onerror = (error) => {
+            console.error('❌ CROP: Image failed to load:', error);
+            resolve(null);
+        };
+
+        img.onload = () => {
+            console.log('✅ CROP: Image loaded successfully', {
+                image_width: img.width,
+                image_height: img.height,
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight
+            });
+
+            // Validate crop area against image bounds
+            const cropValid = cropArea.left >= 0 && cropArea.top >= 0 &&
+                             (cropArea.left + cropArea.width) <= img.width &&
+                             (cropArea.top + cropArea.height) <= img.height;
+
+            console.log('🔍 CROP: Crop bounds validation:', {
+                crop_left: cropArea.left,
+                crop_top: cropArea.top,
+                crop_right: cropArea.left + cropArea.width,
+                crop_bottom: cropArea.top + cropArea.height,
+                image_width: img.width,
+                image_height: img.height,
+                crop_valid: cropValid
+            });
+
+            if (!cropValid) {
+                console.warn('⚠️ CROP: WARNING - Crop area exceeds image bounds, proceeding anyway');
+            }
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas to crop area size
+            canvas.width = cropArea.width;
+            canvas.height = cropArea.height;
+            console.log('✂️ CROP: Created crop canvas:', { width: canvas.width, height: canvas.height });
+
+            try {
+                // Draw cropped section
+                ctx.drawImage(
+                    img,
+                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
+                    0, 0, cropArea.width, cropArea.height
+                );
+
+                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
+
+                console.log('✅ CROP: Image cropped successfully', {
+                    output_dataURL_length: croppedDataURL?.length || 0,
+                    output_starts_with_data: croppedDataURL?.startsWith('data:image') || false
+                });
+
+                if (!croppedDataURL || croppedDataURL.length < 100) {
+                    console.error('❌ CROP: Cropped PNG is empty or invalid!');
+                    resolve(null);
+                } else {
+                    resolve(croppedDataURL);
+                }
+            } catch (drawError) {
+                console.error('❌ CROP: Error during drawImage:', drawError);
+                resolve(null);
+            }
+        };
+
+        console.log('✂️ CROP: Setting image source...');
+        img.src = dataURL;
+    });
+}
 
 console.log('✅ OPTIMIZED PNG: Parallel multi-view PNG system ready - NO VIEW SWITCHING!');
