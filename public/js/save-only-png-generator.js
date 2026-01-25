@@ -239,10 +239,12 @@ async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
         formData.append('view_id', viewId);
         formData.append('view_name', viewName);
 
-        // Convert data URL to blob
+        // Convert data URL to blob with unique filename
         const response = await fetch(pngDataUrl);
         const blob = await response.blob();
-        formData.append('png_file', blob, `design_${designId}_${viewName.toLowerCase()}_${viewId}.png`);
+        const uniqueFilename = `design_${designId}_${viewName.toLowerCase()}_${viewId}_${Date.now()}.png`;
+        formData.append('png_file', blob, uniqueFilename);
+        formData.append('custom_filename', uniqueFilename);
 
         // Upload to server
         const uploadResponse = await fetch(window.octoPrintDesigner?.ajaxUrl || window.octo_print_designer_config?.ajax_url, {
