@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Load PNG Comparison System</title>
+</head>
+<body>
+    <h1>🔍 PNG Comparison System Loader</h1>
+    <p>Copy and paste this script tag into your design page HTML to load the PNG comparison system:</p>
+
+    <textarea style="width: 100%; height: 100px; font-family: monospace;" readonly>
+<script src="public/js/png-comparison-popup.js"></script>
+    </textarea>
+
+    <p><strong>Or copy this JavaScript code into your browser console:</strong></p>
+
+    <textarea style="width: 100%; height: 150px; font-family: monospace;" readonly>
+// Load PNG Comparison System
+var script = document.createElement('script');
+script.src = 'public/js/png-comparison-popup.js';
+script.onload = function() {
+    console.log('✅ PNG Comparison System loaded successfully!');
+};
+script.onerror = function() {
+    console.error('❌ Failed to load PNG Comparison System');
+};
+document.head.appendChild(script);
+    </textarea>
+
+    <button onclick="copyToClipboard()">📋 Copy Console Code</button>
+
+    <script>
+        function copyToClipboard() {
+            const code = `// Load PNG Comparison System
+var script = document.createElement('script');
+script.src = 'public/js/png-comparison-popup.js';
+script.onload = function() {
+    console.log('✅ PNG Comparison System loaded successfully!');
+};
+script.onerror = function() {
+    console.error('❌ Failed to load PNG Comparison System');
+};
+document.head.appendChild(script);`;
+
+            navigator.clipboard.writeText(code).then(() => {
+                alert('📋 Code copied to clipboard!');
+            }).catch(() => {
+                alert('❌ Failed to copy. Please select and copy manually.');
+            });
+        }
+    </script>
+</body>
+</html>

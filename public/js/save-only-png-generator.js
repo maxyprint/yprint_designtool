@@ -142,7 +142,7 @@ async function getAvailableViewsWithData(designer) {
 async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
     try {
         const canvas = designer.fabricCanvas;
-        console.log(`🎨 SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with dynamic bounds detection`);
+        console.log(`🎨 SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with print zone sizing`);
 
         // Get design elements only (exclude background shirt)
         const designObjects = canvas.getObjects().filter(obj => {
@@ -161,7 +161,11 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
             return null;
         }
 
-        // DYNAMIC BOUNDS DETECTION: Calculate actual bounding box of design objects
+        // GET PRINT ZONE from safeZone data (correct print area)
+        const printArea = getPrintAreaForView(designer, viewId, viewData);
+        console.log(`📐 SNAPSHOT PNG: Print zone for ${viewData.name}:`, printArea);
+
+        // Calculate design object bounds for comparison/debugging
         let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
 
         designObjects.forEach(obj => {
@@ -172,21 +176,26 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
             maxBottom = Math.max(maxBottom, bounds.top + bounds.height);
         });
 
-        // Add smart padding around design content
-        const padding = 50; // Generous padding for design elements
         const designBounds = {
-            left: Math.max(0, minLeft - padding),
-            top: Math.max(0, minTop - padding),
-            width: Math.min(canvas.width, maxRight + padding) - Math.max(0, minLeft - padding),
-            height: Math.min(canvas.height, maxBottom + padding) - Math.max(0, minTop - padding)
+            left: minLeft,
+            top: minTop,
+            width: maxRight - minLeft,
+            height: maxBottom - minTop
         };
 
-        console.log(`📐 SNAPSHOT PNG: Dynamic design bounds for ${viewData.name}:`, designBounds);
-        console.log(`📊 SNAPSHOT PNG: Original objects bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
+        console.log(`📊 SNAPSHOT PNG: Design object bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
+        console.log(`🔍 SNAPSHOT PNG: Design bounds vs print area:`, {
+            designBounds: designBounds,
+            printArea: printArea,
+            designInsidePrintArea: minLeft >= printArea.left &&
+                                  minTop >= printArea.top &&
+                                  maxRight <= (printArea.left + printArea.width) &&
+                                  maxBottom <= (printArea.top + printArea.height)
+        });
 
-        // Validate bounds are reasonable
-        if (designBounds.width <= 0 || designBounds.height <= 0) {
-            console.error(`❌ SNAPSHOT PNG: Invalid design bounds for ${viewData.name}:`, designBounds);
+        // Validate print area is reasonable
+        if (printArea.width <= 0 || printArea.height <= 0) {
+            console.error(`❌ SNAPSHOT PNG: Invalid print area for ${viewData.name}:`, printArea);
             return null;
         }
 
@@ -213,14 +222,14 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
         });
         console.log(`📸 SNAPSHOT PNG: Full canvas exported - ${fullCanvasDataURL.length} chars`);
 
-        // STEP 2: Crop to DYNAMIC design bounds using post-processing
-        console.log(`✂️ SNAPSHOT PNG: Cropping to design bounds (${designBounds.width}x${designBounds.height})...`);
+        // STEP 2: Crop to PRINT ZONE (not design bounds) using post-processing
+        console.log(`✂️ SNAPSHOT PNG: Cropping to print zone (${printArea.width}x${printArea.height})...`);
         const multiplier = 4.17; // Same multiplier as canvas export
         const cropArea = {
-            left: designBounds.left * multiplier,
-            top: designBounds.top * multiplier,
-            width: designBounds.width * multiplier,
-            height: designBounds.height * multiplier
+            left: printArea.left * multiplier,
+            top: printArea.top * multiplier,
+            width: printArea.width * multiplier,
+            height: printArea.height * multiplier
         };
 
         console.log(`🔍 SNAPSHOT PNG: Crop area scaled by ${multiplier}:`, cropArea);
@@ -234,12 +243,13 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
         canvas.renderAll();
 
         if (croppedDataURL && croppedDataURL.length > 100) {
-            console.log(`✅ SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (design bounds only)`);
+            console.log(`✅ SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (print zone size)`);
+            console.log(`📏 SNAPSHOT PNG: Final PNG dimensions should be: ${Math.round(printArea.width * 4.17)}x${Math.round(printArea.height * 4.17)}px`);
             return croppedDataURL;
         } else {
             console.error(`❌ SNAPSHOT PNG: Failed to crop ${viewData.name} - empty result`);
             console.error(`❌ SNAPSHOT PNG: Crop area was:`, cropArea);
-            console.error(`❌ SNAPSHOT PNG: Design bounds were:`, designBounds);
+            console.error(`❌ SNAPSHOT PNG: Print area was:`, printArea);
             return null;
         }
 

@@ -1878,8 +1878,8 @@ class DesignerWidget {
         const saveButton = this.container.querySelector('.designer-editor footer .designer-action-button');
         saveButton.addEventListener('click', () => this.showSaveModal());
 
-        // Modal events
-        this.modalSaveButton.addEventListener('click', () => this.saveDesign());
+        // Modal events - Modified to show PNGs instead of redirect
+        this.modalSaveButton.addEventListener('click', () => this.saveDesignWithPNGDisplay());
         this.modalCancelButton.addEventListener('click', () => this.hideModal());
         this.modalCloseButton.addEventListener('click', () => this.hideModal());
         
@@ -2003,7 +2003,17 @@ class DesignerWidget {
         setTimeout(() => pngModal.classList.add('show'), 10);
     }
 
-    async saveDesign() {
+    async saveDesignWithPNGDisplay() {
+        // Call original save function but handle redirect differently
+        const originalSaveResult = await this.saveDesignInternal();
+
+        // Show PNG display instead of redirect
+        if (originalSaveResult && this._savedPNGs) {
+            this.showPNGDisplay(this._savedPNGs);
+        }
+    }
+
+    async saveDesignInternal() {
         // Skip save for non-logged users
         if (!this.isLoggedIn) {
             this.showLoginModal();
@@ -2155,9 +2165,12 @@ class DesignerWidget {
                     // Don't block the redirect if PNG fails
                 }
 
-                setTimeout(() => {
-                    window.location.href = data.data.redirect_url;
-                }, 1000);
+                // Store redirect URL for later use but don't redirect
+                this._redirectUrl = data.data.redirect_url;
+                console.log('💾 Design saved successfully, redirect URL stored:', this._redirectUrl);
+
+                // Return success for PNG display handling
+                return true;
     
             } else {
                 throw new Error(data.data.message || 'Error saving design');
@@ -2169,6 +2182,63 @@ class DesignerWidget {
         } finally {
             this.saveDesignModal.classList.remove('loading');
         }
+
+        return false; // Return false if save failed
+    }
+
+    showPNGDisplay(pngData) {
+        // Hide save modal
+        this.hideModal();
+
+        console.log('🖼️ Displaying generated PNGs:', pngData);
+
+        // Create simple PNG display modal
+        const pngModal = document.createElement('div');
+        pngModal.innerHTML = `
+            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 90%; max-height: 90%; overflow: auto;">
+                    <h2>🎉 Design saved! Generated PNGs:</h2>
+                    <div id="png-display-container"></div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button id="png-continue-btn" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px;">Continue to Dashboard</button>
+                        <button id="png-close-btn" style="background: #666; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px;">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(pngModal);
+
+        // Add PNG images
+        const container = pngModal.querySelector('#png-display-container');
+        if (pngData.urls && pngData.urls.length > 0) {
+            pngData.uploads.forEach(upload => {
+                if (upload.success && upload.url) {
+                    const pngDiv = document.createElement('div');
+                    pngDiv.style.marginBottom = '20px';
+                    pngDiv.innerHTML = `
+                        <h3>${upload.viewName}</h3>
+                        <img src="${upload.url}" style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; margin: 10px 0;">
+                        <div><a href="${upload.url}" target="_blank">${upload.url}</a></div>
+                    `;
+                    container.appendChild(pngDiv);
+                }
+            });
+        } else {
+            container.innerHTML = '<p>No PNGs were generated.</p>';
+        }
+
+        // Event listeners
+        pngModal.querySelector('#png-continue-btn').addEventListener('click', () => {
+            document.body.removeChild(pngModal);
+            if (this._redirectUrl) {
+                window.location.href = this._redirectUrl;
+            }
+        });
+
+        pngModal.querySelector('#png-close-btn').addEventListener('click', () => {
+            document.body.removeChild(pngModal);
+        });
     }
 
     async loadDesign(designId) {
