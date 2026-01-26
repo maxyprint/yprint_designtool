@@ -602,11 +602,12 @@ function getCurrentPrintZoneFromCanvas(canvas, designer) {
     const canvasObjects = canvas.getObjects();
 
     for (let obj of canvasObjects) {
-        // Look for print zone indicators by type or class name
+        // Enhanced print zone detection including excludeFromExport rectangles
         const isPrintZone = obj.isPrintZone === true ||
                            obj.className === 'PrintZone' ||
                            obj.type === 'printZone' ||
-                           (obj.selectable === false && obj.stroke && obj.fill === '');
+                           (obj.type === 'rect' && obj.excludeFromExport === true) ||
+                           (obj.selectable === false && obj.stroke && (obj.fill === '' || obj.fill === 'transparent' || !obj.fill));
 
         if (isPrintZone && obj.visible) {
             const bounds = obj.getBoundingRect();
@@ -618,7 +619,11 @@ function getCurrentPrintZoneFromCanvas(canvas, designer) {
                 height: bounds.height,
                 type: obj.type,
                 className: obj.className,
-                isPrintZone: obj.isPrintZone
+                isPrintZone: obj.isPrintZone,
+                excludeFromExport: obj.excludeFromExport,
+                selectable: obj.selectable,
+                stroke: obj.stroke,
+                fill: obj.fill
             });
 
             return {
@@ -652,22 +657,18 @@ function getCurrentPrintZoneFromCanvas(canvas, designer) {
         };
     }
 
-    // Search for any rectangular objects with print zone characteristics
+    // Search for any rectangular objects with print zone characteristics (broader search)
     console.log('🔍 LIVE PRINT ZONE: Searching for rect-like print zone objects...');
     for (let obj of canvasObjects) {
-        if (obj.type === 'rect' &&
-            obj.selectable === false &&
-            obj.visible === true &&
-            obj.stroke &&
-            (!obj.fill || obj.fill === '' || obj.fill === 'transparent')) {
-
+        if (obj.type === 'rect' && obj.selectable === false && obj.visible === true) {
             const bounds = obj.getBoundingRect();
 
             // Check if it covers a significant portion of canvas (likely print zone)
             const coverageX = bounds.width / canvas.width;
             const coverageY = bounds.height / canvas.height;
 
-            if (coverageX > 0.5 && coverageY > 0.5 && coverageX < 0.95 && coverageY < 0.95) {
+            // More lenient coverage check
+            if (coverageX > 0.3 && coverageY > 0.3 && coverageX < 0.98 && coverageY < 0.98) {
                 console.log('✅ LIVE PRINT ZONE: Found likely print zone rectangle:', {
                     left: bounds.left,
                     top: bounds.top,
@@ -675,7 +676,8 @@ function getCurrentPrintZoneFromCanvas(canvas, designer) {
                     height: bounds.height,
                     coverage: { x: coverageX, y: coverageY },
                     stroke: obj.stroke,
-                    fill: obj.fill
+                    fill: obj.fill,
+                    excludeFromExport: obj.excludeFromExport
                 });
 
                 return {
