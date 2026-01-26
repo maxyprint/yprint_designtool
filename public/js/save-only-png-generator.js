@@ -17,69 +17,73 @@ window.generatePNGForDownload = async function() {
             return null;
         }
 
-        const canvas = designer.fabricCanvas;
+        // Get all available views with their complete data
+        const views = await getAvailableViewsWithData(designer);
+        console.log('🔍 CANVAS SNAPSHOT PNG: Found views:', Object.keys(views));
 
-        // Check if current canvas has design content
-        const designObjects = canvas.getObjects().filter(obj => {
-            const isBackground = obj.isBackground === true || (obj.type === 'image' && obj.selectable === false);
-            const isSystemObject = obj.excludeFromExport === true;
-            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
-            const isUserContent = obj.selectable === true && obj.visible === true;
-            return isUserContent && !isBackground && !isSystemObject && !isPrintZoneOverlay;
-        });
-
-        console.log(`🔍 CANVAS SNAPSHOT PNG: Current canvas has ${designObjects.length} design objects`);
-
-        if (designObjects.length === 0) {
-            console.log('⚠️ CANVAS SNAPSHOT PNG: No design content found on current canvas, skipping PNG generation');
-            return null;
-        }
-
-        // Get current view data for PNG generation
-        const currentViewId = designer.currentView;
-        const template = designer.templates?.get(designer.activeTemplateId);
-        const variation = template?.variations?.get(designer.currentVariation?.toString());
-        const currentViewData = variation?.views?.get(currentViewId.toString());
-
-        if (!currentViewData) {
-            console.error('❌ CANVAS SNAPSHOT PNG: No view data found for current view:', currentViewId);
-            return null;
-        }
-
-        console.log(`🎯 CANVAS SNAPSHOT PNG: Generating PNG for active view ${currentViewData.name} (${currentViewId}) with content`);
-
-        // Generate PNG for current view only
+        // Generate design ID once for all uploads
         const designId = designer.currentDesignId || designer.activeTemplateId || 'temp';
-        const pngData = await generateViewPNGWithoutSwitching(designer, currentViewId, currentViewData);
 
-        if (!pngData) {
-            console.error('❌ CANVAS SNAPSHOT PNG: Failed to generate PNG for current view');
-            return null;
-        }
+        // Generate all PNGs (each view crops its own print zone area)
+        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
+            console.log(`🎯 CANVAS SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with template print zone`);
 
-        console.log(`✅ CANVAS SNAPSHOT PNG: Generated ${currentViewData.name} - ${pngData.length} chars`);
+            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
 
-        // Upload the single PNG
-        const uploadResult = await uploadViewPNG(pngData, currentViewId, currentViewData.name, designId);
-
-        if (uploadResult.success) {
-            console.log(`🔗 CANVAS SNAPSHOT PNG: ${uploadResult.viewName} URL:`, uploadResult.url);
-
-            // Store upload results for designer.bundle.js integration
-            if (window.designerInstance) {
-                window.designerInstance._lastMultiViewPNGs = {
-                    uploads: [uploadResult],
-                    successful: [uploadResult],
-                    timestamp: Date.now()
+            if (pngData) {
+                console.log(`✅ CANVAS SNAPSHOT PNG: Generated ${viewData.name} - ${pngData.length} chars`);
+                return {
+                    viewId,
+                    viewData,
+                    pngData
                 };
             }
+            return null;
+        });
 
-            console.log('🎯 CANVAS SNAPSHOT PNG: Content-based generation complete - SUCCESS');
-            return pngData;
-        } else {
-            console.error('❌ CANVAS SNAPSHOT PNG: Upload failed:', uploadResult.error);
+        // Wait for all PNG generations to complete
+        const pngResults = await Promise.all(pngPromises);
+        const validResults = pngResults.filter(result => result !== null);
+
+        if (validResults.length === 0) {
+            console.error('❌ CANVAS SNAPSHOT PNG: No PNGs could be generated');
             return null;
         }
+
+        // Upload sequentially with 2 second delay to ensure unique timestamps
+        const uploadResults = [];
+        for (let i = 0; i < validResults.length; i++) {
+            const result = validResults[i];
+            if (i > 0) {
+                console.log(`⏱️ CANVAS SNAPSHOT PNG: Waiting 2s before uploading ${result.viewData.name}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            const uploadResult = await uploadViewPNG(result.pngData, result.viewId, result.viewData.name, designId);
+            uploadResults.push(uploadResult);
+        }
+
+        // Log all PNG URLs and collect successful ones
+        const successfulUploads = [];
+        uploadResults.forEach(result => {
+            if (result.success) {
+                console.log(`🔗 CANVAS SNAPSHOT PNG: ${result.viewName} URL:`, result.url);
+                successfulUploads.push(result);
+            }
+        });
+
+        // Store upload results for designer.bundle.js integration
+        if (window.designerInstance) {
+            window.designerInstance._lastMultiViewPNGs = {
+                uploads: uploadResults,
+                successful: successfulUploads,
+                timestamp: Date.now()
+            };
+        }
+
+        // Return first successful PNG for compatibility with existing save system
+        const firstPng = validResults[0]?.pngData;
+        console.log('🎯 CANVAS SNAPSHOT PNG: Multi-view generation complete, returning:', firstPng ? 'SUCCESS' : 'FAILED');
+        return firstPng || null;
 
     } catch (error) {
         console.error('❌ CANVAS SNAPSHOT PNG: Content-based generation failed:', error);
@@ -143,14 +147,9 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
 
         console.log(`🎨 VISUAL SNAPSHOT PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
 
-        if (designObjects.length === 0) {
-            console.log(`⚠️ VISUAL SNAPSHOT PNG: No design content in ${viewData.name}, skipping`);
-            return null;
-        }
-
-        // GET LIVE PRINT ZONE from canvas instead of static data
-        const livePrintZone = getCurrentPrintZoneFromCanvas(canvas, designer);
-        console.log(`📐 VISUAL SNAPSHOT PNG: Live print zone for ${viewData.name}:`, livePrintZone);
+        // USE TEMPLATE PRINT ZONE for view-specific cropping
+        const templatePrintZone = viewData.safeZone;
+        console.log(`📐 VISUAL SNAPSHOT PNG: Template print zone for ${viewData.name}:`, templatePrintZone);
 
         // Calculate design object bounds for comparison/debugging
         let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
@@ -171,19 +170,26 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
         };
 
         console.log(`📊 VISUAL SNAPSHOT PNG: Design object bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
-        console.log(`🔍 VISUAL SNAPSHOT PNG: Design bounds vs LIVE print zone:`, {
+
+        // Check if design content overlaps with this view's print zone
+        const designInViewPrintZone = templatePrintZone ? (
+            !(minLeft > templatePrintZone.left + templatePrintZone.width ||
+              maxRight < templatePrintZone.left ||
+              minTop > templatePrintZone.top + templatePrintZone.height ||
+              maxBottom < templatePrintZone.top)
+        ) : false;
+
+        console.log(`🔍 VISUAL SNAPSHOT PNG: Design bounds vs ${viewData.name} print zone:`, {
             designBounds: designBounds,
-            livePrintZone: livePrintZone,
-            designInsideLivePrintZone: livePrintZone ? (minLeft >= livePrintZone.left &&
-                                                       minTop >= livePrintZone.top &&
-                                                       maxRight <= (livePrintZone.left + livePrintZone.width) &&
-                                                       maxBottom <= (livePrintZone.top + livePrintZone.height)) : false
+            templatePrintZone: templatePrintZone,
+            designOverlapsWithViewPrintZone: designInViewPrintZone,
+            viewHasContent: designInViewPrintZone ? 'YES' : 'NO - will generate empty PNG'
         });
 
-        // Fallback to static print area if no live print zone found
-        let printArea = livePrintZone;
+        // Use template print zone (always crop to this view's defined area)
+        let printArea = templatePrintZone;
         if (!printArea || printArea.width <= 0 || printArea.height <= 0) {
-            console.warn(`⚠️ VISUAL SNAPSHOT PNG: No valid live print zone found, falling back to static data`);
+            console.warn(`⚠️ VISUAL SNAPSHOT PNG: No valid template print zone found, falling back to getPrintAreaForView`);
             printArea = getPrintAreaForView(designer, viewId, viewData);
             console.log(`📐 VISUAL SNAPSHOT PNG: Using fallback print area:`, printArea);
         }
@@ -375,89 +381,75 @@ window.generatePNGForSave = async function(designId) {
             throw new Error('Valid design ID required for PNG generation');
         }
 
-        const canvas = designer.fabricCanvas;
+        // Get all available views with their complete data
+        const views = await getAvailableViewsWithData(designer);
+        console.log('🔍 SAVE-INTEGRATED PNG: Found views:', Object.keys(views));
 
-        // Check if current canvas has design content
-        const designObjects = canvas.getObjects().filter(obj => {
-            const isBackground = obj.isBackground === true || (obj.type === 'image' && obj.selectable === false);
-            const isSystemObject = obj.excludeFromExport === true;
-            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
-            const isUserContent = obj.selectable === true && obj.visible === true;
-            return isUserContent && !isBackground && !isSystemObject && !isPrintZoneOverlay;
+        // Generate all PNGs (each view crops its own print zone area)
+        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
+            console.log(`🎯 SAVE-INTEGRATED PNG: Processing view ${viewData.name} (${viewId}) with template print zone`);
+
+            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
+
+            if (pngData) {
+                console.log(`✅ SAVE-INTEGRATED PNG: Generated ${viewData.name} - ${pngData.length} chars`);
+                return {
+                    viewId,
+                    viewData,
+                    pngData
+                };
+            }
+            return null;
         });
 
-        console.log(`🔍 SAVE-INTEGRATED PNG: Current canvas has ${designObjects.length} design objects`);
+        // Wait for all PNG generations to complete
+        const pngResults = await Promise.all(pngPromises);
+        const validResults = pngResults.filter(result => result !== null);
 
-        if (designObjects.length === 0) {
-            console.log('⚠️ SAVE-INTEGRATED PNG: No design content found on current canvas, skipping PNG generation');
-            return {
-                success: false,
-                totalGenerated: 0,
-                successfulUploads: 0,
-                failedUploads: 0,
-                uploads: [],
-                mainPNG: null,
-                urls: []
-            };
+        if (validResults.length === 0) {
+            throw new Error('No PNGs could be generated');
         }
 
-        // Get current view data for PNG generation
-        const currentViewId = designer.currentView;
-        const template = designer.templates?.get(designer.activeTemplateId);
-        const variation = template?.variations?.get(designer.currentVariation?.toString());
-        const currentViewData = variation?.views?.get(currentViewId.toString());
-
-        if (!currentViewData) {
-            console.error('❌ SAVE-INTEGRATED PNG: No view data found for current view:', currentViewId);
-            throw new Error('Current view data not available');
+        // Upload sequentially with 2 second delay to ensure unique timestamps
+        const uploadResults = [];
+        for (let i = 0; i < validResults.length; i++) {
+            const result = validResults[i];
+            if (i > 0) {
+                console.log(`⏱️ SAVE-INTEGRATED PNG: Waiting 2s before uploading ${result.viewData.name}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            const uploadResult = await uploadViewPNG(result.pngData, result.viewId, result.viewData.name, designId);
+            uploadResults.push(uploadResult);
         }
 
-        console.log(`🎯 SAVE-INTEGRATED PNG: Generating PNG for active view ${currentViewData.name} (${currentViewId}) with content`);
+        // Log all PNG URLs and collect results
+        const successfulUploads = [];
+        const failedUploads = [];
 
-        // Generate PNG for current view only
-        const pngData = await generateViewPNGWithoutSwitching(designer, currentViewId, currentViewData);
+        uploadResults.forEach(result => {
+            if (result.success) {
+                console.log(`🔗 SAVE-INTEGRATED PNG: ${result.viewName} URL:`, result.url);
+                successfulUploads.push(result);
+            } else {
+                console.error(`❌ SAVE-INTEGRATED PNG: ${result.viewName} upload failed:`, result.error);
+                failedUploads.push(result);
+            }
+        });
 
-        if (!pngData) {
-            throw new Error('Failed to generate PNG for current view');
-        }
+        // Return comprehensive results
+        const result = {
+            success: successfulUploads.length > 0,
+            totalGenerated: validResults.length,
+            successfulUploads: successfulUploads.length,
+            failedUploads: failedUploads.length,
+            uploads: uploadResults,
+            mainPNG: validResults[0]?.pngData, // For backward compatibility
+            urls: successfulUploads.map(upload => upload.url)
+        };
 
-        console.log(`✅ SAVE-INTEGRATED PNG: Generated ${currentViewData.name} - ${pngData.length} chars`);
+        console.log(`🎯 SAVE-INTEGRATED PNG: Complete - ${result.successfulUploads}/${result.totalGenerated} uploads successful`);
 
-        // Upload the single PNG
-        const uploadResult = await uploadViewPNG(pngData, currentViewId, currentViewData.name, designId);
-
-        if (uploadResult.success) {
-            console.log(`🔗 SAVE-INTEGRATED PNG: ${uploadResult.viewName} URL:`, uploadResult.url);
-
-            // Return comprehensive results (single PNG)
-            const result = {
-                success: true,
-                totalGenerated: 1,
-                successfulUploads: 1,
-                failedUploads: 0,
-                uploads: [uploadResult],
-                mainPNG: pngData,
-                urls: [uploadResult.url]
-            };
-
-            console.log('🎯 SAVE-INTEGRATED PNG: Content-based generation complete - SUCCESS');
-            return result;
-
-        } else {
-            console.error(`❌ SAVE-INTEGRATED PNG: Upload failed:`, uploadResult.error);
-
-            const result = {
-                success: false,
-                totalGenerated: 1,
-                successfulUploads: 0,
-                failedUploads: 1,
-                uploads: [uploadResult],
-                mainPNG: pngData,
-                urls: []
-            };
-
-            return result;
-        }
+        return result;
 
     } catch (error) {
         console.error('❌ SAVE-INTEGRATED PNG: Content-based generation failed:', error);
