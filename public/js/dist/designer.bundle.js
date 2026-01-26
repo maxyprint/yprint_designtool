@@ -2192,12 +2192,12 @@ class DesignerWidget {
 
         console.log('🖼️ Displaying generated PNGs:', pngData);
 
-        // Create simple PNG display modal
+        // Create enhanced PNG display modal with debug info
         const pngModal = document.createElement('div');
         pngModal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 90%; max-height: 90%; overflow: auto;">
-                    <h2>🎉 Design saved! Generated PNGs:</h2>
+                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 95%; max-height: 95%; overflow: auto; font-family: monospace;">
+                    <h2>🎉 Design saved! Generated PNGs with Debug Info:</h2>
                     <div id="png-display-container"></div>
                     <div style="text-align: center; margin-top: 20px;">
                         <button id="png-continue-btn" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px;">Continue to Dashboard</button>
@@ -2209,23 +2209,127 @@ class DesignerWidget {
 
         document.body.appendChild(pngModal);
 
-        // Add PNG images
+        // Add PNG images with enhanced debug information
         const container = pngModal.querySelector('#png-display-container');
         if (pngData.urls && pngData.urls.length > 0) {
-            pngData.uploads.forEach(upload => {
+            // Get template and print zone information for comparison
+            const designer = this;
+            const template = designer.templates?.get(designer.activeTemplateId);
+            const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+            pngData.uploads.forEach((upload, index) => {
                 if (upload.success && upload.url) {
+                    // Get view data for debug info
+                    const viewData = variation?.views?.get(upload.viewId.toString());
+
                     const pngDiv = document.createElement('div');
-                    pngDiv.style.marginBottom = '20px';
+                    pngDiv.style.marginBottom = '30px';
+                    pngDiv.style.border = '2px solid #ddd';
+                    pngDiv.style.padding = '15px';
+                    pngDiv.style.borderRadius = '5px';
+
+                    // Create placeholder for image dimensions (will be updated when image loads)
+                    const imageDebugId = `image-debug-${index}`;
+
                     pngDiv.innerHTML = `
-                        <h3>${upload.viewName}</h3>
-                        <img src="${upload.url}" style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; margin: 10px 0;">
-                        <div><a href="${upload.url}" target="_blank">${upload.url}</a></div>
+                        <h3 style="color: #007cba; margin: 0 0 15px 0;">📋 ${upload.viewName} View (${upload.viewId})</h3>
+
+                        <div style="display: flex; gap: 20px; align-items: flex-start;">
+                            <div style="flex-shrink: 0;">
+                                <h4>🖼️ Generated PNG:</h4>
+                                <img id="png-img-${index}" src="${upload.url}" style="max-width: 250px; max-height: 250px; border: 1px solid #ccc; display: block; margin: 5px 0;">
+                                <div style="font-size: 12px; color: #666;">
+                                    <div>📏 <span id="${imageDebugId}">Loading dimensions...</span></div>
+                                    <div>🔗 <a href="${upload.url}" target="_blank" style="color: #007cba;">Open in new tab</a></div>
+                                </div>
+                            </div>
+
+                            <div style="flex: 1;">
+                                <h4>🔍 Debug Information:</h4>
+                                <div style="background: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 12px; line-height: 1.4;">
+                                    ${viewData ? `
+                                        <div><strong>📐 Template Print Zone:</strong></div>
+                                        <div style="margin-left: 15px;">
+                                            ${viewData.safeZone ? `
+                                                <div>• Size: ${viewData.safeZone.width}×${viewData.safeZone.height}px</div>
+                                                <div>• Position: (${viewData.safeZone.left}, ${viewData.safeZone.top})</div>
+                                            ` : '<div>• No safeZone data</div>'}
+                                        </div>
+                                        <br>
+                                    ` : ''}
+
+                                    <div><strong>📸 Generated PNG Details:</strong></div>
+                                    <div style="margin-left: 15px;" id="png-details-${index}">
+                                        <div>• Loading PNG analysis...</div>
+                                    </div>
+                                    <br>
+
+                                    <div><strong>✅ Validation Status:</strong></div>
+                                    <div style="margin-left: 15px;" id="validation-${index}">
+                                        <div>• Checking size match...</div>
+                                    </div>
+
+                                    ${upload.error ? `
+                                        <br>
+                                        <div><strong>❌ Upload Errors:</strong></div>
+                                        <div style="margin-left: 15px; color: #d32f2f;">
+                                            <div>${upload.error}</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
                     `;
                     container.appendChild(pngDiv);
+
+                    // Load image and analyze its dimensions
+                    const img = pngDiv.querySelector(`#png-img-${index}`);
+                    img.onload = function() {
+                        const imageDimensions = `${this.naturalWidth}×${this.naturalHeight}px`;
+                        document.getElementById(imageDebugId).textContent = imageDimensions;
+
+                        // Update PNG details
+                        const pngDetails = document.getElementById(`png-details-${index}`);
+                        const fileSize = upload.url.includes('data:') ?
+                            Math.round(upload.url.length * 0.75 / 1024) : 'Unknown';
+
+                        pngDetails.innerHTML = `
+                            <div>• Dimensions: ${this.naturalWidth}×${this.naturalHeight}px</div>
+                            <div>• Multiplier: 4.17× (300 DPI)</div>
+                            <div>• Method: Visual Canvas Snapshot</div>
+                            ${fileSize !== 'Unknown' ? `<div>• Estimated Size: ${fileSize}KB</div>` : ''}
+                        `;
+
+                        // Update validation
+                        const validation = document.getElementById(`validation-${index}`);
+                        if (viewData?.safeZone) {
+                            const expectedWidth = Math.round(viewData.safeZone.width * 4.17);
+                            const expectedHeight = Math.round(viewData.safeZone.height * 4.17);
+                            const widthMatch = Math.abs(this.naturalWidth - expectedWidth) <= 2;
+                            const heightMatch = Math.abs(this.naturalHeight - expectedHeight) <= 2;
+
+                            validation.innerHTML = `
+                                <div style="color: ${widthMatch ? '#4caf50' : '#d32f2f'};">
+                                    • Width: ${this.naturalWidth}px ${widthMatch ? '✅' : '❌'} (expected ~${expectedWidth}px)
+                                </div>
+                                <div style="color: ${heightMatch ? '#4caf50' : '#d32f2f'};">
+                                    • Height: ${this.naturalHeight}px ${heightMatch ? '✅' : '❌'} (expected ~${expectedHeight}px)
+                                </div>
+                                <div style="color: ${widthMatch && heightMatch ? '#4caf50' : '#d32f2f'};">
+                                    • Overall: ${widthMatch && heightMatch ? 'MATCH ✅' : 'MISMATCH ❌'}
+                                </div>
+                            `;
+                        } else {
+                            validation.innerHTML = `
+                                <div>• No template data available for comparison</div>
+                                <div>• PNG generated successfully ✅</div>
+                            `;
+                        }
+                    };
                 }
             });
         } else {
-            container.innerHTML = '<p>No PNGs were generated.</p>';
+            container.innerHTML = '<p style="color: #d32f2f; text-align: center; padding: 20px;">❌ No PNGs were generated. Check console for errors.</p>';
         }
 
         // Event listeners

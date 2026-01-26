@@ -138,32 +138,33 @@ async function getAvailableViewsWithData(designer) {
     }
 }
 
-// Helper: Generate PNG for specific view WITHOUT switching views - CANVAS SNAPSHOT METHOD
+// Helper: Generate PNG for specific view WITHOUT switching views - VISUAL CANVAS SNAPSHOT METHOD
 async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
     try {
         const canvas = designer.fabricCanvas;
-        console.log(`🎨 SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with print zone sizing`);
+        console.log(`🎨 VISUAL SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with live canvas print zone`);
 
-        // Get design elements only (exclude background shirt)
+        // Get design elements only (exclude background shirt and print zone overlays)
         const designObjects = canvas.getObjects().filter(obj => {
             const isBackground = obj.isBackground === true ||
                                (obj.type === 'image' && obj.selectable === false);
             const isSystemObject = obj.excludeFromExport === true;
+            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
             const isUserContent = obj.selectable === true && obj.visible === true;
 
-            return isUserContent && !isBackground && !isSystemObject;
+            return isUserContent && !isBackground && !isSystemObject && !isPrintZoneOverlay;
         });
 
-        console.log(`🎨 SNAPSHOT PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
+        console.log(`🎨 VISUAL SNAPSHOT PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
 
         if (designObjects.length === 0) {
-            console.log(`⚠️ SNAPSHOT PNG: No design content in ${viewData.name}, skipping`);
+            console.log(`⚠️ VISUAL SNAPSHOT PNG: No design content in ${viewData.name}, skipping`);
             return null;
         }
 
-        // GET PRINT ZONE from safeZone data (correct print area)
-        const printArea = getPrintAreaForView(designer, viewId, viewData);
-        console.log(`📐 SNAPSHOT PNG: Print zone for ${viewData.name}:`, printArea);
+        // GET LIVE PRINT ZONE from canvas instead of static data
+        const livePrintZone = getCurrentPrintZoneFromCanvas(canvas, designer);
+        console.log(`📐 VISUAL SNAPSHOT PNG: Live print zone for ${viewData.name}:`, livePrintZone);
 
         // Calculate design object bounds for comparison/debugging
         let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
@@ -183,29 +184,39 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
             height: maxBottom - minTop
         };
 
-        console.log(`📊 SNAPSHOT PNG: Design object bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
-        console.log(`🔍 SNAPSHOT PNG: Design bounds vs print area:`, {
+        console.log(`📊 VISUAL SNAPSHOT PNG: Design object bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
+        console.log(`🔍 VISUAL SNAPSHOT PNG: Design bounds vs LIVE print zone:`, {
             designBounds: designBounds,
-            printArea: printArea,
-            designInsidePrintArea: minLeft >= printArea.left &&
-                                  minTop >= printArea.top &&
-                                  maxRight <= (printArea.left + printArea.width) &&
-                                  maxBottom <= (printArea.top + printArea.height)
+            livePrintZone: livePrintZone,
+            designInsideLivePrintZone: livePrintZone ? (minLeft >= livePrintZone.left &&
+                                                       minTop >= livePrintZone.top &&
+                                                       maxRight <= (livePrintZone.left + livePrintZone.width) &&
+                                                       maxBottom <= (livePrintZone.top + livePrintZone.height)) : false
         });
 
+        // Fallback to static print area if no live print zone found
+        let printArea = livePrintZone;
+        if (!printArea || printArea.width <= 0 || printArea.height <= 0) {
+            console.warn(`⚠️ VISUAL SNAPSHOT PNG: No valid live print zone found, falling back to static data`);
+            printArea = getPrintAreaForView(designer, viewId, viewData);
+            console.log(`📐 VISUAL SNAPSHOT PNG: Using fallback print area:`, printArea);
+        }
+
         // Validate print area is reasonable
-        if (printArea.width <= 0 || printArea.height <= 0) {
-            console.error(`❌ SNAPSHOT PNG: Invalid print area for ${viewData.name}:`, printArea);
+        if (!printArea || printArea.width <= 0 || printArea.height <= 0) {
+            console.error(`❌ VISUAL SNAPSHOT PNG: Invalid print area for ${viewData.name}:`, printArea);
             return null;
         }
 
-        // Hide background objects temporarily
+        // Hide background objects and overlays temporarily
         const hiddenObjects = [];
         canvas.getObjects().forEach(obj => {
             const isBackground = obj.isBackground === true ||
                                (obj.type === 'image' && obj.selectable === false) ||
                                obj.excludeFromExport === true;
-            if (isBackground && obj.visible) {
+            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
+
+            if ((isBackground || isPrintZoneOverlay) && obj.visible) {
                 obj.visible = false;
                 hiddenObjects.push(obj);
             }
@@ -213,17 +224,17 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
 
         canvas.renderAll();
 
-        // STEP 1: Export FULL canvas (no coordinate cropping) - CANVAS SNAPSHOT
-        console.log('📸 SNAPSHOT PNG: Exporting full canvas snapshot...');
+        // STEP 1: Export FULL canvas (no coordinate cropping) - VISUAL CANVAS SNAPSHOT
+        console.log('📸 VISUAL SNAPSHOT PNG: Exporting full canvas snapshot (without overlays)...');
         const fullCanvasDataURL = canvas.toDataURL({
             format: 'png',
             quality: 1,
             multiplier: 4.17 // 300 DPI
         });
-        console.log(`📸 SNAPSHOT PNG: Full canvas exported - ${fullCanvasDataURL.length} chars`);
+        console.log(`📸 VISUAL SNAPSHOT PNG: Full canvas exported - ${fullCanvasDataURL.length} chars`);
 
-        // STEP 2: Crop to PRINT ZONE (not design bounds) using post-processing
-        console.log(`✂️ SNAPSHOT PNG: Cropping to print zone (${printArea.width}x${printArea.height})...`);
+        // STEP 2: Crop to LIVE PRINT ZONE using post-processing
+        console.log(`✂️ VISUAL SNAPSHOT PNG: Cropping to live print zone (${printArea.width}x${printArea.height})...`);
         const multiplier = 4.17; // Same multiplier as canvas export
         const cropArea = {
             left: printArea.left * multiplier,
@@ -232,29 +243,31 @@ async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
             height: printArea.height * multiplier
         };
 
-        console.log(`🔍 SNAPSHOT PNG: Crop area scaled by ${multiplier}:`, cropArea);
+        console.log(`🔍 VISUAL SNAPSHOT PNG: Crop area scaled by ${multiplier}:`, cropArea);
 
         const croppedDataURL = await cropImageToArea(fullCanvasDataURL, cropArea);
 
-        // Restore hidden objects
+        // Restore hidden objects and overlays
         hiddenObjects.forEach(obj => {
             obj.visible = true;
         });
         canvas.renderAll();
 
         if (croppedDataURL && croppedDataURL.length > 100) {
-            console.log(`✅ SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (print zone size)`);
-            console.log(`📏 SNAPSHOT PNG: Final PNG dimensions should be: ${Math.round(printArea.width * 4.17)}x${Math.round(printArea.height * 4.17)}px`);
+            console.log(`✅ VISUAL SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (live print zone size)`);
+            console.log(`📏 VISUAL SNAPSHOT PNG: Final PNG dimensions should be: ${Math.round(printArea.width * 4.17)}x${Math.round(printArea.height * 4.17)}px`);
+            console.log(`🎯 VISUAL SNAPSHOT PNG: Used ${livePrintZone ? 'LIVE' : 'FALLBACK'} print zone data`);
             return croppedDataURL;
         } else {
-            console.error(`❌ SNAPSHOT PNG: Failed to crop ${viewData.name} - empty result`);
-            console.error(`❌ SNAPSHOT PNG: Crop area was:`, cropArea);
-            console.error(`❌ SNAPSHOT PNG: Print area was:`, printArea);
+            console.error(`❌ VISUAL SNAPSHOT PNG: Failed to crop ${viewData.name} - empty result`);
+            console.error(`❌ VISUAL SNAPSHOT PNG: Crop area was:`, cropArea);
+            console.error(`❌ VISUAL SNAPSHOT PNG: Print area was:`, printArea);
+            console.error(`❌ VISUAL SNAPSHOT PNG: Live print zone was:`, livePrintZone);
             return null;
         }
 
     } catch (error) {
-        console.error(`❌ SNAPSHOT PNG: Failed to generate PNG for ${viewData.name}:`, error);
+        console.error(`❌ VISUAL SNAPSHOT PNG: Failed to generate PNG for ${viewData.name}:`, error);
         return null;
     }
 }
@@ -556,6 +569,127 @@ async function cropImageToArea(dataURL, cropArea) {
         console.log('✂️ CROP: Setting image source...');
         img.src = dataURL;
     });
+}
+
+// Helper: Get live print zone from canvas (visual borders displayed to customer)
+function getCurrentPrintZoneFromCanvas(canvas, designer) {
+    console.log('🔍 LIVE PRINT ZONE: Searching for live print zone rect...');
+
+    // Check designer for printZoneRect object (primary method)
+    if (designer.printZoneRect && designer.printZoneRect.visible) {
+        const rect = designer.printZoneRect;
+        const bounds = rect.getBoundingRect();
+
+        console.log('✅ LIVE PRINT ZONE: Found designer.printZoneRect:', {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            visible: rect.visible,
+            type: rect.type
+        });
+
+        return {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height
+        };
+    }
+
+    // Search canvas objects for print zone overlay objects
+    console.log('🔍 LIVE PRINT ZONE: Searching canvas objects for print zone...');
+    const canvasObjects = canvas.getObjects();
+
+    for (let obj of canvasObjects) {
+        // Look for print zone indicators by type or class name
+        const isPrintZone = obj.isPrintZone === true ||
+                           obj.className === 'PrintZone' ||
+                           obj.type === 'printZone' ||
+                           (obj.selectable === false && obj.stroke && obj.fill === '');
+
+        if (isPrintZone && obj.visible) {
+            const bounds = obj.getBoundingRect();
+
+            console.log('✅ LIVE PRINT ZONE: Found canvas print zone object:', {
+                left: bounds.left,
+                top: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
+                type: obj.type,
+                className: obj.className,
+                isPrintZone: obj.isPrintZone
+            });
+
+            return {
+                left: bounds.left,
+                top: bounds.top,
+                width: bounds.width,
+                height: bounds.height
+            };
+        }
+    }
+
+    // Check for safeZoneRect as backup
+    if (designer.safeZoneRect && designer.safeZoneRect.visible) {
+        const rect = designer.safeZoneRect;
+        const bounds = rect.getBoundingRect();
+
+        console.log('⚠️ LIVE PRINT ZONE: Using safeZoneRect as fallback:', {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            visible: rect.visible,
+            type: rect.type
+        });
+
+        return {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height
+        };
+    }
+
+    // Search for any rectangular objects with print zone characteristics
+    console.log('🔍 LIVE PRINT ZONE: Searching for rect-like print zone objects...');
+    for (let obj of canvasObjects) {
+        if (obj.type === 'rect' &&
+            obj.selectable === false &&
+            obj.visible === true &&
+            obj.stroke &&
+            (!obj.fill || obj.fill === '' || obj.fill === 'transparent')) {
+
+            const bounds = obj.getBoundingRect();
+
+            // Check if it covers a significant portion of canvas (likely print zone)
+            const coverageX = bounds.width / canvas.width;
+            const coverageY = bounds.height / canvas.height;
+
+            if (coverageX > 0.5 && coverageY > 0.5 && coverageX < 0.95 && coverageY < 0.95) {
+                console.log('✅ LIVE PRINT ZONE: Found likely print zone rectangle:', {
+                    left: bounds.left,
+                    top: bounds.top,
+                    width: bounds.width,
+                    height: bounds.height,
+                    coverage: { x: coverageX, y: coverageY },
+                    stroke: obj.stroke,
+                    fill: obj.fill
+                });
+
+                return {
+                    left: bounds.left,
+                    top: bounds.top,
+                    width: bounds.width,
+                    height: bounds.height
+                };
+            }
+        }
+    }
+
+    console.log('❌ LIVE PRINT ZONE: No live print zone found on canvas');
+    return null;
 }
 
 console.log('✅ CANVAS SNAPSHOT PNG: System ready - Full canvas export + post-processing crop method!');
