@@ -283,19 +283,24 @@ window.generatePNGForSave = async function(designId) {
         const savePromises = visualResults.map(async (result) => {
             console.log(`💾 PNG SAVE: Uploading ${result.viewName} to server`);
 
-            const formData = new FormData();
-            formData.append('action', 'save_design_png_with_metadata');
-            formData.append('design_id', designId);
-            formData.append('view_id', result.viewId);
-            formData.append('view_name', result.viewName);
-            formData.append('png_data', result.pngData);
-            formData.append('print_area_px', JSON.stringify(result.printZone));
-            formData.append('save_type', 'visual_canvas_snapshot');
-            formData.append('generation_method', 'coordinate_free_clipping');
-            formData.append('nonce', window.wp_ajax_object?.nonce || '');
-
             try {
-                const response = await fetch(
+                // Convert DataURL to Blob for proper file upload
+                const response = await fetch(result.pngData);
+                const blob = await response.blob();
+
+                const formData = new FormData();
+                formData.append('action', 'save_design_png');
+                formData.append('design_id', designId);
+                formData.append('png_file', blob, `design_${designId}_${result.viewId}.png`);
+                formData.append('nonce', window.octoPrintDesigner?.nonce || window.wp_ajax_object?.nonce || '');
+
+                console.log(`📦 PNG SAVE: Prepared file upload for ${result.viewName}`, {
+                    blobSize: blob.size,
+                    fileName: `design_${designId}_${result.viewId}.png`,
+                    hasNonce: !!(window.octoPrintDesigner?.nonce || window.wp_ajax_object?.nonce)
+                });
+
+                const uploadResponse = await fetch(
                     window.wp_ajax_object?.ajax_url || '/wp-admin/admin-ajax.php',
                     {
                         method: 'POST',
@@ -303,17 +308,23 @@ window.generatePNGForSave = async function(designId) {
                     }
                 );
 
-                const responseData = await response.json();
+                const responseData = await uploadResponse.json();
 
                 if (responseData.success) {
-                    console.log(`✅ PNG SAVE: ${result.viewName} saved successfully`);
-                    return { success: true, viewName: result.viewName, data: responseData };
+                    console.log(`✅ PNG SAVE: ${result.viewName} saved successfully`, responseData.data);
+                    return {
+                        success: true,
+                        viewName: result.viewName,
+                        data: responseData,
+                        url: responseData.data?.file_url,
+                        filepath: responseData.data?.file_path
+                    };
                 } else {
                     console.error(`❌ PNG SAVE: ${result.viewName} save failed:`, responseData);
                     return { success: false, viewName: result.viewName, error: responseData };
                 }
             } catch (saveError) {
-                console.error(`❌ PNG SAVE: ${result.viewName} network error:`, saveError);
+                console.error(`❌ PNG SAVE: ${result.viewName} error:`, saveError);
                 return { success: false, viewName: result.viewName, error: saveError };
             }
         });
