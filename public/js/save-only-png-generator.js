@@ -1,681 +1,485 @@
 /**
- * ✅ CANVAS SNAPSHOT PNG GENERATOR - Clean Implementation
- * Provides canvas snapshot based PNG generation for designer.bundle.js
- * Uses full canvas export + post-processing crop for accurate results
+ * ✅ VISUAL CANVAS SNAPSHOT PNG GENERATOR - Complete Clean Implementation
+ * Replaces all legacy coordinate-based systems with visual canvas snapshot approach
+ * Uses Fabric.js ClipPath for coordinate-free, accurate PNG generation
+ *
+ * VOLLSTÄNDIGE IMPLEMENTIERUNG - No legacy code, no dead code, clean initialization
  */
 
-console.log('🎯 CANVAS SNAPSHOT PNG: System loading - providing clean generatePNGForDownload function');
+console.log('🎯 VISUAL PNG SYSTEM: Loading complete visual canvas snapshot implementation');
 
-// Canvas Snapshot PNG generation function for designer.bundle.js
-window.generatePNGForDownload = async function() {
-    try {
-        console.log('📸 CANVAS SNAPSHOT PNG: Content-based generation started');
+/**
+ * ===== CORE VISUAL PNG SYSTEM =====
+ * Clean implementation of coordinate-free PNG generation
+ */
 
-        const designer = window.designerInstance;
-        if (!designer?.fabricCanvas) {
-            console.error('❌ CANVAS SNAPSHOT PNG: No designer or canvas');
-            return null;
-        }
+/**
+ * Detects all print zones on canvas using live visual detection
+ * No static coordinates - only live canvas state
+ */
+function detectCanvasPrintZones(canvas, designer) {
+    console.log('🔍 PRINT ZONE DETECTION: Scanning canvas for live print zones');
 
-        // Get all available views with their complete data
-        const views = await getAvailableViewsWithData(designer);
-        console.log('🔍 CANVAS SNAPSHOT PNG: Found views:', Object.keys(views));
-
-        // Generate design ID once for all uploads
-        const designId = designer.currentDesignId || designer.activeTemplateId || 'temp';
-
-        // Generate all PNGs (each view crops its own print zone area)
-        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
-            console.log(`🎯 CANVAS SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with template print zone`);
-
-            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
-
-            if (pngData) {
-                console.log(`✅ CANVAS SNAPSHOT PNG: Generated ${viewData.name} - ${pngData.length} chars`);
-                return {
-                    viewId,
-                    viewData,
-                    pngData
-                };
-            }
-            return null;
-        });
-
-        // Wait for all PNG generations to complete
-        const pngResults = await Promise.all(pngPromises);
-        const validResults = pngResults.filter(result => result !== null);
-
-        if (validResults.length === 0) {
-            console.error('❌ CANVAS SNAPSHOT PNG: No PNGs could be generated');
-            return null;
-        }
-
-        // Upload sequentially with 2 second delay to ensure unique timestamps
-        const uploadResults = [];
-        for (let i = 0; i < validResults.length; i++) {
-            const result = validResults[i];
-            if (i > 0) {
-                console.log(`⏱️ CANVAS SNAPSHOT PNG: Waiting 2s before uploading ${result.viewData.name}...`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            const uploadResult = await uploadViewPNG(result.pngData, result.viewId, result.viewData.name, designId);
-            uploadResults.push(uploadResult);
-        }
-
-        // Log all PNG URLs and collect successful ones
-        const successfulUploads = [];
-        uploadResults.forEach(result => {
-            if (result.success) {
-                console.log(`🔗 CANVAS SNAPSHOT PNG: ${result.viewName} URL:`, result.url);
-                successfulUploads.push(result);
-            }
-        });
-
-        // Store upload results for designer.bundle.js integration
-        if (window.designerInstance) {
-            window.designerInstance._savedPNGs = {
-                designId: designId,
-                uploads: uploadResults,
-                successful: successfulUploads,
-                urls: successfulUploads.map(upload => upload.url),
-                timestamp: Date.now()
-            };
-        }
-
-        // Return first successful PNG for compatibility with existing save system
-        const firstPng = validResults[0]?.pngData;
-        console.log('🎯 CANVAS SNAPSHOT PNG: Multi-view generation complete, returning:', firstPng ? 'SUCCESS' : 'FAILED');
-        return firstPng || null;
-
-    } catch (error) {
-        console.error('❌ CANVAS SNAPSHOT PNG: Content-based generation failed:', error);
-        return null;
+    if (!canvas || !designer) {
+        console.error('❌ PRINT ZONE DETECTION: Missing canvas or designer');
+        return [];
     }
-};
 
-// Helper: Get available views with complete data for parallel processing
-async function getAvailableViewsWithData(designer) {
-    try {
-        const template = designer.templates?.get(designer.activeTemplateId);
-        const variation = template?.variations?.get(designer.currentVariation?.toString());
+    const printZones = [];
+    const allObjects = canvas.getObjects();
 
-        if (variation?.views) {
-            // Convert Map to Object with enhanced view data
-            const viewsObj = {};
-            variation.views.forEach((viewData, viewId) => {
-                viewsObj[viewId] = {
-                    ...viewData,
-                    // Pre-calculate print area for this view
-                    printArea: getPrintAreaForView(designer, viewId, viewData)
-                };
+    // Method 1: Direct designer print zone references
+    if (designer.printZoneRect && designer.printZoneRect.visible) {
+        const bounds = designer.printZoneRect.getBoundingRect();
+        printZones.push({
+            source: 'designer.printZoneRect',
+            rect: designer.printZoneRect,
+            bounds: bounds,
+            viewId: 'current',
+            viewName: 'Current View'
+        });
+        console.log('✅ PRINT ZONE: Found printZoneRect', bounds);
+    }
+
+    if (designer.safeZoneRect && designer.safeZoneRect.visible) {
+        const bounds = designer.safeZoneRect.getBoundingRect();
+        printZones.push({
+            source: 'designer.safeZoneRect',
+            rect: designer.safeZoneRect,
+            bounds: bounds,
+            viewId: 'safe',
+            viewName: 'Safe Zone'
+        });
+        console.log('✅ PRINT ZONE: Found safeZoneRect', bounds);
+    }
+
+    // Method 2: Canvas object analysis for excludeFromExport rectangles
+    const excludeRects = allObjects.filter(obj =>
+        obj.type === 'rect' &&
+        obj.excludeFromExport === true &&
+        obj.visible === true
+    );
+
+    excludeRects.forEach((rect, index) => {
+        const bounds = rect.getBoundingRect();
+        const coverage = {
+            x: bounds.width / canvas.width,
+            y: bounds.height / canvas.height
+        };
+
+        // Only consider rectangles that cover significant area (likely print zones)
+        if (coverage.x > 0.15 && coverage.y > 0.15) {
+            printZones.push({
+                source: 'canvas_excludeFromExport',
+                rect: rect,
+                bounds: bounds,
+                viewId: `detected_${index}`,
+                viewName: `Print Zone ${index + 1}`,
+                coverage: coverage
             });
-            return viewsObj;
+            console.log(`✅ PRINT ZONE: Found canvas zone ${index + 1}`, bounds);
         }
+    });
 
-        // Fallback: Use current view only
-        return {
-            [designer.currentView]: {
-                name: 'Current View',
-                printArea: getPrintAreaForView(designer, designer.currentView, null)
-            }
-        };
-    } catch (error) {
-        console.error('❌ CANVAS SNAPSHOT PNG: Failed to get views:', error);
-        return {
-            [designer.currentView]: {
-                name: 'Current View',
-                printArea: getPrintAreaForView(designer, designer.currentView, null)
-            }
-        };
-    }
+    console.log(`🎯 PRINT ZONE DETECTION: Found ${printZones.length} zones total`);
+    return printZones;
 }
 
-// Helper: Generate PNG for specific view WITHOUT switching views - VISUAL CANVAS SNAPSHOT METHOD
-async function generateViewPNGWithoutSwitching(designer, viewId, viewData) {
+/**
+ * Generates PNG using visual canvas snapshot with Fabric.js ClipPath
+ * Completely coordinate-free approach
+ */
+async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId) {
+    console.log('📸 VISUAL SNAPSHOT: Starting coordinate-free generation', {
+        viewId: viewId,
+        printZone: printZone.bounds
+    });
+
+    let originalClipPath = null;
+    let originalBackgroundColor = null;
+
     try {
-        const canvas = designer.fabricCanvas;
-        console.log(`🎨 VISUAL SNAPSHOT PNG: Processing view ${viewData.name} (${viewId}) with live canvas print zone`);
+        // Save original canvas state
+        originalClipPath = canvas.clipPath;
+        originalBackgroundColor = canvas.backgroundColor;
 
-        // Get design elements only (exclude background shirt and print zone overlays)
-        const designObjects = canvas.getObjects().filter(obj => {
-            const isBackground = obj.isBackground === true ||
-                               (obj.type === 'image' && obj.selectable === false);
-            const isSystemObject = obj.excludeFromExport === true;
-            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
-            const isUserContent = obj.selectable === true && obj.visible === true;
-
-            return isUserContent && !isBackground && !isSystemObject && !isPrintZoneOverlay;
+        // Create clipping path from detected print zone
+        const clipPath = new fabric.Rect({
+            left: printZone.bounds.left,
+            top: printZone.bounds.top,
+            width: printZone.bounds.width,
+            height: printZone.bounds.height,
+            fill: 'transparent',
+            stroke: null,
+            excludeFromExport: true
         });
 
-        console.log(`🎨 VISUAL SNAPSHOT PNG: Found ${designObjects.length} design objects for ${viewData.name}`);
+        console.log('✂️ VISUAL SNAPSHOT: Created clip path', clipPath.getBoundingRect());
 
-        // USE TEMPLATE PRINT ZONE for view-specific cropping
-        const templatePrintZone = viewData.safeZone;
-        console.log(`📐 VISUAL SNAPSHOT PNG: Template print zone for ${viewData.name}:`, templatePrintZone);
-
-        // Calculate design object bounds for comparison/debugging
-        let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
-
-        designObjects.forEach(obj => {
-            const bounds = obj.getBoundingRect();
-            minLeft = Math.min(minLeft, bounds.left);
-            minTop = Math.min(minTop, bounds.top);
-            maxRight = Math.max(maxRight, bounds.left + bounds.width);
-            maxBottom = Math.max(maxBottom, bounds.top + bounds.height);
-        });
-
-        const designBounds = {
-            left: minLeft,
-            top: minTop,
-            width: maxRight - minLeft,
-            height: maxBottom - minTop
-        };
-
-        console.log(`📊 VISUAL SNAPSHOT PNG: Design object bounds: left=${minLeft}, top=${minTop}, right=${maxRight}, bottom=${maxBottom}`);
-
-        // Check if design content overlaps with this view's print zone
-        const designInViewPrintZone = templatePrintZone ? (
-            !(minLeft > templatePrintZone.left + templatePrintZone.width ||
-              maxRight < templatePrintZone.left ||
-              minTop > templatePrintZone.top + templatePrintZone.height ||
-              maxBottom < templatePrintZone.top)
-        ) : false;
-
-        console.log(`🔍 VISUAL SNAPSHOT PNG: Design bounds vs ${viewData.name} print zone:`, {
-            designBounds: designBounds,
-            templatePrintZone: templatePrintZone,
-            designOverlapsWithViewPrintZone: designInViewPrintZone,
-            viewHasContent: designInViewPrintZone ? 'YES' : 'NO - will generate empty PNG'
-        });
-
-        // Use template print zone (always crop to this view's defined area)
-        let printArea = templatePrintZone;
-        if (!printArea || printArea.width <= 0 || printArea.height <= 0) {
-            console.warn(`⚠️ VISUAL SNAPSHOT PNG: No valid template print zone found, falling back to getPrintAreaForView`);
-            printArea = getPrintAreaForView(designer, viewId, viewData);
-            console.log(`📐 VISUAL SNAPSHOT PNG: Using fallback print area:`, printArea);
-        }
-
-        // Validate print area is reasonable
-        if (!printArea || printArea.width <= 0 || printArea.height <= 0) {
-            console.error(`❌ VISUAL SNAPSHOT PNG: Invalid print area for ${viewData.name}:`, printArea);
-            return null;
-        }
-
-        // Hide background objects and overlays temporarily
-        const hiddenObjects = [];
-        canvas.getObjects().forEach(obj => {
-            const isBackground = obj.isBackground === true ||
-                               (obj.type === 'image' && obj.selectable === false) ||
-                               obj.excludeFromExport === true;
-            const isPrintZoneOverlay = obj === designer.printZoneRect || obj === designer.safeZoneRect;
-
-            if ((isBackground || isPrintZoneOverlay) && obj.visible) {
-                obj.visible = false;
-                hiddenObjects.push(obj);
-            }
-        });
-
+        // Apply visual clipping to canvas
+        canvas.clipPath = clipPath;
+        canvas.backgroundColor = 'transparent';
         canvas.renderAll();
 
-        // STEP 1: Export FULL canvas (no coordinate cropping) - VISUAL CANVAS SNAPSHOT
-        console.log('📸 VISUAL SNAPSHOT PNG: Exporting full canvas snapshot (without overlays)...');
-        const fullCanvasDataURL = canvas.toDataURL({
+        console.log('🎨 VISUAL SNAPSHOT: Applied clipping, generating PNG...');
+
+        // Generate high-quality snapshot
+        const dataURL = canvas.toDataURL({
             format: 'png',
             quality: 1,
-            multiplier: 4.17 // 300 DPI
+            multiplier: 2, // High resolution for print quality
+            enableRetinaScaling: false
         });
-        console.log(`📸 VISUAL SNAPSHOT PNG: Full canvas exported - ${fullCanvasDataURL.length} chars`);
 
-        // STEP 2: Crop to LIVE PRINT ZONE using post-processing
-        console.log(`✂️ VISUAL SNAPSHOT PNG: Cropping to live print zone (${printArea.width}x${printArea.height})...`);
-        const multiplier = 4.17; // Same multiplier as canvas export
-        const cropArea = {
-            left: printArea.left * multiplier,
-            top: printArea.top * multiplier,
-            width: printArea.width * multiplier,
-            height: printArea.height * multiplier
-        };
-
-        console.log(`🔍 VISUAL SNAPSHOT PNG: Crop area scaled by ${multiplier}:`, cropArea);
-
-        const croppedDataURL = await cropImageToArea(fullCanvasDataURL, cropArea);
-
-        // Restore hidden objects and overlays
-        hiddenObjects.forEach(obj => {
-            obj.visible = true;
+        console.log('📸 VISUAL SNAPSHOT: Generated snapshot', {
+            length: dataURL?.length || 0,
+            validPNG: dataURL?.startsWith('data:image/png') || false
         });
-        canvas.renderAll();
 
-        if (croppedDataURL && croppedDataURL.length > 100) {
-            console.log(`✅ VISUAL SNAPSHOT PNG: Generated ${viewData.name} - ${croppedDataURL.length} chars (live print zone size)`);
-            console.log(`📏 VISUAL SNAPSHOT PNG: Final PNG dimensions should be: ${Math.round(printArea.width * 4.17)}x${Math.round(printArea.height * 4.17)}px`);
-            console.log(`🎯 VISUAL SNAPSHOT PNG: Used ${livePrintZone ? 'LIVE' : 'FALLBACK'} print zone data`);
-            return croppedDataURL;
-        } else {
-            console.error(`❌ VISUAL SNAPSHOT PNG: Failed to crop ${viewData.name} - empty result`);
-            console.error(`❌ VISUAL SNAPSHOT PNG: Crop area was:`, cropArea);
-            console.error(`❌ VISUAL SNAPSHOT PNG: Print area was:`, printArea);
-            console.error(`❌ VISUAL SNAPSHOT PNG: Live print zone was:`, livePrintZone);
+        // Validate PNG content
+        if (!dataURL || dataURL.length < 1000) {
+            console.error('❌ VISUAL SNAPSHOT: Generated PNG is empty or too small');
             return null;
         }
 
+        console.log('✅ VISUAL SNAPSHOT: Successfully generated visual PNG');
+        return dataURL;
+
     } catch (error) {
-        console.error(`❌ VISUAL SNAPSHOT PNG: Failed to generate PNG for ${viewData.name}:`, error);
+        console.error('❌ VISUAL SNAPSHOT: Generation failed:', error);
+        return null;
+    } finally {
+        // Always restore canvas state
+        try {
+            canvas.clipPath = originalClipPath;
+            canvas.backgroundColor = originalBackgroundColor;
+            canvas.renderAll();
+            console.log('🔄 VISUAL SNAPSHOT: Canvas state restored');
+        } catch (restoreError) {
+            console.error('❌ VISUAL SNAPSHOT: Failed to restore canvas state:', restoreError);
+        }
+    }
+}
+
+/**
+ * Multi-view PNG generation without view switching
+ * Processes all detected print zones automatically
+ */
+async function generateMultiViewVisualPNGs(designId) {
+    console.log('🌟 MULTI-VIEW: Starting multi-view visual generation', { designId });
+
+    const designer = window.designerInstance;
+    if (!designer?.fabricCanvas) {
+        console.error('❌ MULTI-VIEW: No designer or canvas available');
         return null;
     }
-}
 
-// Helper: Get print area coordinates for specific view
-function getPrintAreaForView(designer, viewId, viewData) {
-    // Use safeZone from template data - this is the real print area
-    try {
-        const template = designer.templates?.get(designer.activeTemplateId);
-        const variation = template?.variations?.get(designer.currentVariation?.toString());
-        const view = variation?.views?.get(viewId?.toString());
+    const canvas = designer.fabricCanvas;
+    const printZones = detectCanvasPrintZones(canvas, designer);
 
-        if (view?.safeZone) {
-            console.log(`✅ Using safeZone for ${viewId}:`, view.safeZone);
-            return {
-                left: view.safeZone.left,
-                top: view.safeZone.top,
-                width: view.safeZone.width,
-                height: view.safeZone.height
-            };
-        }
-    } catch (error) {
-        console.warn(`⚠️ SNAPSHOT PNG: Could not get safeZone for view ${viewId}`);
+    if (printZones.length === 0) {
+        console.error('❌ MULTI-VIEW: No print zones detected on canvas');
+        return null;
     }
 
-    // Fallback: Use safe zone or default area
-    const canvasWidth = designer.fabricCanvas.width;
-    const canvasHeight = designer.fabricCanvas.height;
+    console.log(`🎯 MULTI-VIEW: Processing ${printZones.length} print zones`);
 
-    console.warn(`⚠️ Using fallback print area for ${viewId}`);
-    return {
-        left: canvasWidth * 0.1,
-        top: canvasHeight * 0.1,
-        width: canvasWidth * 0.8,
-        height: canvasHeight * 0.8
-    };
-}
+    const results = [];
 
-// Helper: Upload individual view PNG to server
-async function uploadViewPNG(pngDataUrl, viewId, viewName, designId) {
-    try {
-        console.log(`📤 SNAPSHOT PNG: Uploading ${viewName} PNG...`);
+    for (const printZone of printZones) {
+        console.log(`📸 MULTI-VIEW: Generating PNG for ${printZone.viewName}`);
 
-        const formData = new FormData();
-        formData.append('action', 'save_design_png');
-        formData.append('nonce', window.octoPrintDesigner?.nonce || window.octo_print_designer_config?.nonce || '');
-        formData.append('design_id', designId);
-        formData.append('view_id', viewId);
-        formData.append('view_name', viewName);
+        const pngData = await generateVisualCanvasSnapshot(
+            canvas,
+            printZone,
+            designId,
+            printZone.viewId
+        );
 
-        // Convert data URL to blob with unique filename
-        const response = await fetch(pngDataUrl);
-        const blob = await response.blob();
-        const uniqueFilename = `design_${designId}_${viewName.toLowerCase()}_${viewId}_${Date.now()}.png`;
-        formData.append('png_file', blob, uniqueFilename);
-        formData.append('custom_filename', uniqueFilename);
-
-        // Upload to server
-        const uploadResponse = await fetch(window.octoPrintDesigner?.ajaxUrl || window.octo_print_designer_config?.ajax_url, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (uploadResponse.ok) {
-            const result = await uploadResponse.json();
-            console.log(`🔍 SNAPSHOT PNG: Server response for ${viewName}:`, result);
-            if (result.success) {
-                console.log(`✅ SNAPSHOT PNG: ${viewName} uploaded successfully!`);
-                console.log(`🔗 SNAPSHOT PNG: ${viewName} URL:`, result.data?.png_url || result.data?.file_url || 'URL not found');
-                return {
-                    success: true,
-                    viewId: viewId,
-                    viewName: viewName,
-                    url: result.data?.png_url || result.data?.file_url || null
-                };
-            } else {
-                console.error(`❌ SNAPSHOT PNG: ${viewName} upload failed:`, result.data);
-                return {
-                    success: false,
-                    viewId: viewId,
-                    viewName: viewName,
-                    error: result.data
-                };
-            }
+        if (pngData) {
+            results.push({
+                viewId: printZone.viewId,
+                viewName: printZone.viewName,
+                pngData: pngData,
+                printZone: printZone.bounds,
+                source: printZone.source
+            });
+            console.log(`✅ MULTI-VIEW: Generated ${printZone.viewName} PNG successfully`);
         } else {
-            console.error(`❌ SNAPSHOT PNG: ${viewName} upload HTTP error:`, uploadResponse.status);
-            return {
-                success: false,
-                viewId: viewId,
-                viewName: viewName,
-                error: `HTTP ${uploadResponse.status}`
-            };
+            console.warn(`⚠️ MULTI-VIEW: Failed to generate ${printZone.viewName} PNG`);
         }
-
-    } catch (error) {
-        console.error(`❌ SNAPSHOT PNG: ${viewName} upload error:`, error);
-        return {
-            success: false,
-            viewId: viewId,
-            viewName: viewName,
-            error: error.message
-        };
     }
+
+    console.log(`🎉 MULTI-VIEW: Generated ${results.length}/${printZones.length} PNGs`);
+    return results;
 }
 
-// Enhanced function for designer.bundle.js integration - ensures proper design ID validation
-window.generatePNGForSave = async function(designId) {
-    try {
-        console.log('🎯 SAVE-INTEGRATED PNG: Starting content-based generation with design ID:', designId);
+/**
+ * ===== PUBLIC API FUNCTIONS =====
+ * Clean, consistent API for PNG generation
+ */
 
+/**
+ * Generate PNG for download - Primary function for user downloads
+ */
+window.generatePNGForDownload = async function() {
+    console.log('📥 PNG DOWNLOAD: Starting visual canvas snapshot download');
+
+    try {
         const designer = window.designerInstance;
         if (!designer?.fabricCanvas) {
-            console.error('❌ SAVE-INTEGRATED PNG: No designer or canvas');
-            throw new Error('Designer or canvas not available');
-        }
-
-        if (!designId || designId === 'temp') {
-            console.error('❌ SAVE-INTEGRATED PNG: Invalid design ID:', designId);
-            throw new Error('Valid design ID required for PNG generation');
-        }
-
-        // Get all available views with their complete data
-        const views = await getAvailableViewsWithData(designer);
-        console.log('🔍 SAVE-INTEGRATED PNG: Found views:', Object.keys(views));
-
-        // Generate all PNGs (each view crops its own print zone area)
-        const pngPromises = Object.entries(views).map(async ([viewId, viewData]) => {
-            console.log(`🎯 SAVE-INTEGRATED PNG: Processing view ${viewData.name} (${viewId}) with template print zone`);
-
-            const pngData = await generateViewPNGWithoutSwitching(designer, viewId, viewData);
-
-            if (pngData) {
-                console.log(`✅ SAVE-INTEGRATED PNG: Generated ${viewData.name} - ${pngData.length} chars`);
-                return {
-                    viewId,
-                    viewData,
-                    pngData
-                };
-            }
+            console.error('❌ PNG DOWNLOAD: No designer instance or canvas');
             return null;
-        });
-
-        // Wait for all PNG generations to complete
-        const pngResults = await Promise.all(pngPromises);
-        const validResults = pngResults.filter(result => result !== null);
-
-        if (validResults.length === 0) {
-            throw new Error('No PNGs could be generated');
         }
 
-        // Upload sequentially with 2 second delay to ensure unique timestamps
-        const uploadResults = [];
-        for (let i = 0; i < validResults.length; i++) {
-            const result = validResults[i];
-            if (i > 0) {
-                console.log(`⏱️ SAVE-INTEGRATED PNG: Waiting 2s before uploading ${result.viewData.name}...`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            const uploadResult = await uploadViewPNG(result.pngData, result.viewId, result.viewData.name, designId);
-            uploadResults.push(uploadResult);
+        const designId = designer.currentDesignId || designer.activeTemplateId || 'download';
+        const visualResults = await generateMultiViewVisualPNGs(designId);
+
+        if (!visualResults || visualResults.length === 0) {
+            console.error('❌ PNG DOWNLOAD: No visual PNGs could be generated');
+            return null;
         }
 
-        // Log all PNG URLs and collect results
-        const successfulUploads = [];
-        const failedUploads = [];
+        // For download, return the primary/first result
+        const primaryResult = visualResults[0];
+        console.log(`✅ PNG DOWNLOAD: Using ${primaryResult.viewName} for download`);
 
-        uploadResults.forEach(result => {
-            if (result.success) {
-                console.log(`🔗 SAVE-INTEGRATED PNG: ${result.viewName} URL:`, result.url);
-                successfulUploads.push(result);
-            } else {
-                console.error(`❌ SAVE-INTEGRATED PNG: ${result.viewName} upload failed:`, result.error);
-                failedUploads.push(result);
-            }
-        });
-
-        // Return comprehensive results
-        const result = {
-            success: successfulUploads.length > 0,
-            totalGenerated: validResults.length,
-            successfulUploads: successfulUploads.length,
-            failedUploads: failedUploads.length,
-            uploads: uploadResults,
-            mainPNG: validResults[0]?.pngData, // For backward compatibility
-            urls: successfulUploads.map(upload => upload.url)
+        return {
+            success: true,
+            pngData: primaryResult.pngData,
+            viewName: primaryResult.viewName,
+            allViews: visualResults,
+            method: 'visual_canvas_snapshot'
         };
 
-        console.log(`🎯 SAVE-INTEGRATED PNG: Complete - ${result.successfulUploads}/${result.totalGenerated} uploads successful`);
-
-        return result;
-
     } catch (error) {
-        console.error('❌ SAVE-INTEGRATED PNG: Content-based generation failed:', error);
-        throw error; // Re-throw for saveDesign() error handling
+        console.error('❌ PNG DOWNLOAD: Error during generation:', error);
+        return null;
     }
 };
 
-// Helper: Crop full canvas export to specific area (from working commit b0f8939)
-async function cropImageToArea(dataURL, cropArea) {
-    return new Promise((resolve, reject) => {
-        console.log('✂️ CROP: Starting image crop operation', {
-            dataURL_exists: !!dataURL,
-            dataURL_length: dataURL?.length || 0,
-            cropArea: cropArea,
-            cropArea_valid: !!(cropArea?.left !== undefined && cropArea?.top !== undefined && cropArea?.width > 0 && cropArea?.height > 0)
-        });
+/**
+ * Generate and save PNG to server - Multi-view with server upload
+ */
+window.generatePNGForSave = async function(designId) {
+    console.log('💾 PNG SAVE: Starting multi-view save to server', { designId });
 
-        if (!dataURL) {
-            console.error('❌ CROP: No dataURL provided');
-            resolve(null);
-            return;
+    if (!designId) {
+        console.error('❌ PNG SAVE: No design ID provided');
+        return { success: false, error: 'Missing design ID' };
+    }
+
+    try {
+        const visualResults = await generateMultiViewVisualPNGs(designId);
+
+        if (!visualResults || visualResults.length === 0) {
+            console.error('❌ PNG SAVE: No visual PNGs generated for saving');
+            return { success: false, error: 'No PNGs generated' };
         }
 
-        if (!cropArea || cropArea.width <= 0 || cropArea.height <= 0) {
-            console.error('❌ CROP: Invalid crop area:', cropArea);
-            resolve(null);
-            return;
-        }
+        console.log(`💾 PNG SAVE: Saving ${visualResults.length} views to server`);
 
-        const img = new Image();
+        // Save all views to server
+        const savePromises = visualResults.map(async (result) => {
+            console.log(`💾 PNG SAVE: Uploading ${result.viewName} to server`);
 
-        img.onerror = (error) => {
-            console.error('❌ CROP: Image failed to load:', error);
-            resolve(null);
-        };
-
-        img.onload = () => {
-            console.log('✅ CROP: Image loaded successfully', {
-                image_width: img.width,
-                image_height: img.height,
-                naturalWidth: img.naturalWidth,
-                naturalHeight: img.naturalHeight
-            });
-
-            // Validate crop area against image bounds
-            const cropValid = cropArea.left >= 0 && cropArea.top >= 0 &&
-                             (cropArea.left + cropArea.width) <= img.width &&
-                             (cropArea.top + cropArea.height) <= img.height;
-
-            console.log('🔍 CROP: Crop bounds validation:', {
-                crop_left: cropArea.left,
-                crop_top: cropArea.top,
-                crop_right: cropArea.left + cropArea.width,
-                crop_bottom: cropArea.top + cropArea.height,
-                image_width: img.width,
-                image_height: img.height,
-                crop_valid: cropValid
-            });
-
-            if (!cropValid) {
-                console.warn('⚠️ CROP: WARNING - Crop area exceeds image bounds, proceeding anyway');
-            }
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            // Set canvas to crop area size
-            canvas.width = cropArea.width;
-            canvas.height = cropArea.height;
-            console.log('✂️ CROP: Created crop canvas:', { width: canvas.width, height: canvas.height });
+            const formData = new FormData();
+            formData.append('action', 'save_design_png_with_metadata');
+            formData.append('design_id', designId);
+            formData.append('view_id', result.viewId);
+            formData.append('view_name', result.viewName);
+            formData.append('png_data', result.pngData);
+            formData.append('print_area_px', JSON.stringify(result.printZone));
+            formData.append('save_type', 'visual_canvas_snapshot');
+            formData.append('generation_method', 'coordinate_free_clipping');
+            formData.append('nonce', window.wp_ajax_object?.nonce || '');
 
             try {
-                // Draw cropped section
-                ctx.drawImage(
-                    img,
-                    cropArea.left, cropArea.top, cropArea.width, cropArea.height,
-                    0, 0, cropArea.width, cropArea.height
+                const response = await fetch(
+                    window.wp_ajax_object?.ajax_url || '/wp-admin/admin-ajax.php',
+                    {
+                        method: 'POST',
+                        body: formData
+                    }
                 );
 
-                const croppedDataURL = canvas.toDataURL('image/png', 1.0);
+                const responseData = await response.json();
 
-                console.log('✅ CROP: Image cropped successfully', {
-                    output_dataURL_length: croppedDataURL?.length || 0,
-                    output_starts_with_data: croppedDataURL?.startsWith('data:image') || false
-                });
-
-                if (!croppedDataURL || croppedDataURL.length < 100) {
-                    console.error('❌ CROP: Cropped PNG is empty or invalid!');
-                    resolve(null);
+                if (responseData.success) {
+                    console.log(`✅ PNG SAVE: ${result.viewName} saved successfully`);
+                    return { success: true, viewName: result.viewName, data: responseData };
                 } else {
-                    resolve(croppedDataURL);
+                    console.error(`❌ PNG SAVE: ${result.viewName} save failed:`, responseData);
+                    return { success: false, viewName: result.viewName, error: responseData };
                 }
-            } catch (drawError) {
-                console.error('❌ CROP: Error during drawImage:', drawError);
-                resolve(null);
+            } catch (saveError) {
+                console.error(`❌ PNG SAVE: ${result.viewName} network error:`, saveError);
+                return { success: false, viewName: result.viewName, error: saveError };
             }
-        };
-
-        console.log('✂️ CROP: Setting image source...');
-        img.src = dataURL;
-    });
-}
-
-// Helper: Get live print zone from canvas (visual borders displayed to customer)
-function getCurrentPrintZoneFromCanvas(canvas, designer) {
-    console.log('🔍 LIVE PRINT ZONE: Searching for live print zone rect...');
-
-    // Check designer for printZoneRect object (primary method)
-    if (designer.printZoneRect && designer.printZoneRect.visible) {
-        const rect = designer.printZoneRect;
-        const bounds = rect.getBoundingRect();
-
-        console.log('✅ LIVE PRINT ZONE: Found designer.printZoneRect:', {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            visible: rect.visible,
-            type: rect.type
         });
 
-        return {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height
-        };
-    }
+        const saveResults = await Promise.all(savePromises);
+        const successCount = saveResults.filter(r => r.success).length;
 
-    // Search canvas objects for print zone overlay objects
-    console.log('🔍 LIVE PRINT ZONE: Searching canvas objects for print zone...');
-    const canvasObjects = canvas.getObjects();
-
-    for (let obj of canvasObjects) {
-        // Enhanced print zone detection including excludeFromExport rectangles
-        const isPrintZone = obj.isPrintZone === true ||
-                           obj.className === 'PrintZone' ||
-                           obj.type === 'printZone' ||
-                           (obj.type === 'rect' && obj.excludeFromExport === true) ||
-                           (obj.selectable === false && obj.stroke && (obj.fill === '' || obj.fill === 'transparent' || !obj.fill));
-
-        if (isPrintZone && obj.visible) {
-            const bounds = obj.getBoundingRect();
-
-            console.log('✅ LIVE PRINT ZONE: Found canvas print zone object:', {
-                left: bounds.left,
-                top: bounds.top,
-                width: bounds.width,
-                height: bounds.height,
-                type: obj.type,
-                className: obj.className,
-                isPrintZone: obj.isPrintZone,
-                excludeFromExport: obj.excludeFromExport,
-                selectable: obj.selectable,
-                stroke: obj.stroke,
-                fill: obj.fill
-            });
-
-            return {
-                left: bounds.left,
-                top: bounds.top,
-                width: bounds.width,
-                height: bounds.height
-            };
-        }
-    }
-
-    // Check for safeZoneRect as backup
-    if (designer.safeZoneRect && designer.safeZoneRect.visible) {
-        const rect = designer.safeZoneRect;
-        const bounds = rect.getBoundingRect();
-
-        console.log('⚠️ LIVE PRINT ZONE: Using safeZoneRect as fallback:', {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            visible: rect.visible,
-            type: rect.type
-        });
+        console.log(`🎉 PNG SAVE: Saved ${successCount}/${visualResults.length} PNGs successfully`);
 
         return {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height
+            success: successCount > 0,
+            designId: designId,
+            totalViews: visualResults.length,
+            savedViews: successCount,
+            results: saveResults,
+            method: 'visual_canvas_snapshot',
+            message: `Successfully saved ${successCount} of ${visualResults.length} views`
         };
+
+    } catch (error) {
+        console.error('❌ PNG SAVE: Error during save process:', error);
+        return { success: false, designId: designId, error: error.message };
+    }
+};
+
+/**
+ * Generate PNG for specific view without switching - Used by multi-view system
+ */
+window.generateViewPNGWithoutSwitching = async function(designer, viewId, viewData) {
+    console.log('🎯 VIEW PNG: Generating PNG for specific view', { viewId });
+
+    if (!designer?.fabricCanvas) {
+        console.error('❌ VIEW PNG: No designer or canvas available');
+        return null;
     }
 
-    // Search for any rectangular objects with print zone characteristics (broader search)
-    console.log('🔍 LIVE PRINT ZONE: Searching for rect-like print zone objects...');
-    for (let obj of canvasObjects) {
-        if (obj.type === 'rect' && obj.selectable === false && obj.visible === true) {
-            const bounds = obj.getBoundingRect();
+    try {
+        const canvas = designer.fabricCanvas;
+        const printZones = detectCanvasPrintZones(canvas, designer);
 
-            // Check if it covers a significant portion of canvas (likely print zone)
-            const coverageX = bounds.width / canvas.width;
-            const coverageY = bounds.height / canvas.height;
+        // Find matching print zone for the requested view
+        let matchingPrintZone = printZones.find(zone =>
+            zone.viewId === viewId ||
+            zone.viewName === viewData?.name ||
+            zone.viewId === 'current'
+        );
 
-            // More lenient coverage check
-            if (coverageX > 0.3 && coverageY > 0.3 && coverageX < 0.98 && coverageY < 0.98) {
-                console.log('✅ LIVE PRINT ZONE: Found likely print zone rectangle:', {
-                    left: bounds.left,
-                    top: bounds.top,
-                    width: bounds.width,
-                    height: bounds.height,
-                    coverage: { x: coverageX, y: coverageY },
-                    stroke: obj.stroke,
-                    fill: obj.fill,
-                    excludeFromExport: obj.excludeFromExport
-                });
-
-                return {
-                    left: bounds.left,
-                    top: bounds.top,
-                    width: bounds.width,
-                    height: bounds.height
-                };
-            }
+        // Use first available if no specific match
+        if (!matchingPrintZone && printZones.length > 0) {
+            matchingPrintZone = printZones[0];
+            console.log('🔄 VIEW PNG: Using first available print zone as fallback');
         }
-    }
 
-    console.log('❌ LIVE PRINT ZONE: No live print zone found on canvas');
-    return null;
+        if (!matchingPrintZone) {
+            console.error('❌ VIEW PNG: No print zone found for view');
+            return null;
+        }
+
+        console.log('📸 VIEW PNG: Generating visual snapshot for view');
+
+        const pngData = await generateVisualCanvasSnapshot(
+            canvas,
+            matchingPrintZone,
+            designer.currentDesignId || designer.activeTemplateId,
+            viewId
+        );
+
+        if (pngData) {
+            console.log('✅ VIEW PNG: Generated successfully for view');
+            return pngData;
+        } else {
+            console.error('❌ VIEW PNG: Failed to generate PNG');
+            return null;
+        }
+
+    } catch (error) {
+        console.error('❌ VIEW PNG: Error during generation:', error);
+        return null;
+    }
+};
+
+/**
+ * ===== SYSTEM INITIALIZATION =====
+ * Clean system setup and validation
+ */
+
+// Validate system requirements
+function validateSystemRequirements() {
+    console.log('🔧 SYSTEM VALIDATION: Checking requirements for visual PNG system');
+
+    const requirements = {
+        fabricJS: typeof fabric !== 'undefined',
+        designerInstance: !!window.designerInstance,
+        fabricCanvas: !!window.designerInstance?.fabricCanvas,
+        clipPathSupport: typeof window.designerInstance?.fabricCanvas?.clipPath !== 'undefined'
+    };
+
+    console.log('📋 System Requirements Check:', requirements);
+
+    const allRequirementsMet = Object.values(requirements).every(req => req);
+
+    if (allRequirementsMet) {
+        console.log('✅ SYSTEM VALIDATION: All requirements met - system ready');
+        return true;
+    } else {
+        console.warn('⚠️ SYSTEM VALIDATION: Some requirements not met - functionality may be limited');
+        return false;
+    }
 }
 
-console.log('✅ CANVAS SNAPSHOT PNG: System ready - Full canvas export + post-processing crop method!');
+// Initialize the visual PNG system
+function initializeVisualPNGSystem() {
+    console.log('🚀 SYSTEM INITIALIZATION: Starting visual PNG system');
+
+    const systemReady = validateSystemRequirements();
+
+    if (systemReady) {
+        console.log('✅ VISUAL PNG SYSTEM: Fully initialized and ready');
+
+        // Test print zone detection on initialization
+        if (window.designerInstance?.fabricCanvas) {
+            const printZones = detectCanvasPrintZones(
+                window.designerInstance.fabricCanvas,
+                window.designerInstance
+            );
+            console.log(`🎯 INITIALIZATION: Detected ${printZones.length} print zones on startup`);
+        }
+    } else {
+        console.warn('⚠️ VISUAL PNG SYSTEM: Initialized with limited functionality');
+    }
+
+    return systemReady;
+}
+
+// Provide debug access for development
+window.visualPNGSystem = {
+    // Core functions
+    detectCanvasPrintZones: detectCanvasPrintZones,
+    generateVisualCanvasSnapshot: generateVisualCanvasSnapshot,
+    generateMultiViewVisualPNGs: generateMultiViewVisualPNGs,
+
+    // System management
+    validateRequirements: validateSystemRequirements,
+    reinitialize: initializeVisualPNGSystem,
+
+    // Quick testing
+    testPrintZoneDetection: () => {
+        if (window.designerInstance?.fabricCanvas) {
+            return detectCanvasPrintZones(window.designerInstance.fabricCanvas, window.designerInstance);
+        }
+        return [];
+    },
+
+    testPNGGeneration: async () => {
+        try {
+            return await window.generatePNGForDownload();
+        } catch (error) {
+            console.error('Test PNG generation failed:', error);
+            return null;
+        }
+    }
+};
+
+// Initialize system on load
+const systemInitialized = initializeVisualPNGSystem();
+
+console.log('🎉 VISUAL PNG SYSTEM: Complete clean implementation loaded');
+console.log('ℹ️ STATUS: ' + (systemInitialized ? 'READY FOR PRODUCTION' : 'LIMITED FUNCTIONALITY'));
+console.log('🛠️ DEBUG ACCESS: window.visualPNGSystem for development tools');
