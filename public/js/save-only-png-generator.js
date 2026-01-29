@@ -73,9 +73,11 @@ window.generatePNGForDownload = async function() {
 
         // Store upload results for designer.bundle.js integration
         if (window.designerInstance) {
-            window.designerInstance._lastMultiViewPNGs = {
+            window.designerInstance._savedPNGs = {
+                designId: designId,
                 uploads: uploadResults,
                 successful: successfulUploads,
+                urls: successfulUploads.map(upload => upload.url),
                 timestamp: Date.now()
             };
         }
