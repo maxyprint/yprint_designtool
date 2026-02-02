@@ -14,11 +14,54 @@ console.log('🎯 VISUAL PNG SYSTEM: Loading complete visual canvas snapshot imp
  */
 
 /**
+ * Discovers all available views from template data
+ * Returns view information without loading view data
+ */
+function discoverAvailableViews(designer) {
+    console.log('🔍 VIEW DISCOVERY: Scanning template for available views');
+
+    if (!designer?.activeTemplateId || !designer?.currentVariation) {
+        console.warn('⚠️ VIEW DISCOVERY: No active template or variation');
+        return [];
+    }
+
+    try {
+        const template = designer.templates?.get(designer.activeTemplateId);
+        const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+        if (!variation?.views) {
+            console.warn('⚠️ VIEW DISCOVERY: No views found in template variation');
+            return [];
+        }
+
+        const discoveredViews = [];
+        variation.views.forEach((viewData, viewId) => {
+            discoveredViews.push({
+                viewId: viewId,
+                viewName: viewData.name,
+                printZone: viewData.printZone,
+                safeZone: viewData.safeZone,
+                isCurrentView: viewId === designer.currentView,
+                templateData: viewData
+            });
+            console.log(`✅ VIEW DISCOVERY: Found ${viewData.name} (${viewId})`);
+        });
+
+        console.log(`🎯 VIEW DISCOVERY: Found ${discoveredViews.length} total views`);
+        return discoveredViews;
+
+    } catch (error) {
+        console.error('❌ VIEW DISCOVERY: Error discovering views:', error);
+        return [];
+    }
+}
+
+/**
  * Detects all print zones on canvas using live visual detection
- * No static coordinates - only live canvas state
+ * Enhanced with multi-view support while preserving working single-view logic
  */
 function detectCanvasPrintZones(canvas, designer) {
-    console.log('🔍 PRINT ZONE DETECTION: Scanning for template views');
+    console.log('🔍 PRINT ZONE DETECTION: Scanning for print zones (multi-view enabled)');
 
     if (!canvas || !designer) {
         console.error('❌ PRINT ZONE DETECTION: Missing canvas or designer');
@@ -27,74 +70,208 @@ function detectCanvasPrintZones(canvas, designer) {
 
     const printZones = [];
 
-    // Get template view data
-    const template = designer.templates?.get(designer.activeTemplateId);
-    const variation = template?.variations?.get(designer.currentVariation?.toString());
+    // NEW: Try multi-view discovery first, keep working single-view as fallback
+    const discoveredViews = discoverAvailableViews(designer);
 
-    if (variation?.views) {
-        console.log('📋 TEMPLATE VIEWS: Processing template-based print zones');
+    if (discoveredViews.length > 0) {
+        console.log('📋 PRINT ZONE DETECTION: Using template-based multi-view approach');
 
-        variation.views.forEach((viewData, viewId) => {
-            // Use canvas print zone for current view, template data for others
-            if (viewId === designer.currentView && designer.printZoneRect?.visible) {
-                // Current view: use live canvas print zone
+        discoveredViews.forEach(view => {
+            if (view.isCurrentView && designer.printZoneRect?.visible) {
+                // Current view: use PROVEN working live canvas approach
                 const bounds = designer.printZoneRect.getBoundingRect();
                 printZones.push({
                     source: 'live_canvas_current_view',
                     rect: designer.printZoneRect,
                     bounds: bounds,
-                    viewId: viewId,
-                    viewName: viewData.name
+                    viewId: view.viewId,
+                    viewName: view.viewName
                 });
-                console.log(`✅ TEMPLATE VIEW: ${viewData.name} (${viewId}) - live canvas`, bounds);
-            } else if (viewData.printArea) {
-                // Other views: use template print area data
+                console.log(`✅ PRINT ZONE: Current view ${view.viewName} (live canvas)`, bounds);
+            } else if (view.printZone) {
+                // Other views: use template print zone data
                 printZones.push({
-                    source: 'template_print_area',
+                    source: 'template_print_zone',
                     rect: null, // No live rect for non-current views
-                    bounds: viewData.printArea,
-                    viewId: viewId,
-                    viewName: viewData.name
+                    bounds: view.printZone,
+                    viewId: view.viewId,
+                    viewName: view.viewName
                 });
-                console.log(`✅ TEMPLATE VIEW: ${viewData.name} (${viewId}) - template data`, viewData.printArea);
+                console.log(`✅ PRINT ZONE: Template view ${view.viewName}`, view.printZone);
+            } else if (view.safeZone) {
+                // Fallback to safeZone if no printZone
+                printZones.push({
+                    source: 'template_safe_zone',
+                    rect: null,
+                    bounds: view.safeZone,
+                    viewId: view.viewId,
+                    viewName: view.viewName
+                });
+                console.log(`✅ PRINT ZONE: Template safe zone ${view.viewName}`, view.safeZone);
             }
         });
-    } else {
-        console.warn('⚠️ TEMPLATE VIEWS: No template views found, falling back to canvas detection');
 
-        // Fallback: canvas-based detection for systems without template views
-        if (designer.printZoneRect?.visible) {
-            const bounds = designer.printZoneRect.getBoundingRect();
-            printZones.push({
-                source: 'canvas_fallback',
-                rect: designer.printZoneRect,
-                bounds: bounds,
-                viewId: 'current',
-                viewName: 'Current View'
-            });
-            console.log('✅ FALLBACK: Found canvas print zone', bounds);
+        if (printZones.length > 0) {
+            console.log(`🎯 PRINT ZONE DETECTION: Multi-view success - found ${printZones.length} zones`);
+            return printZones;
         }
     }
 
-    console.log(`🎯 PRINT ZONE DETECTION: Found ${printZones.length} template views`);
+    // PRESERVED: Original working single-view logic as fallback
+    console.log('📋 PRINT ZONE DETECTION: Using proven single-view canvas approach');
+    const allObjects = canvas.getObjects();
+
+    // Method 1: Direct designer print zone references
+    if (designer.printZoneRect && designer.printZoneRect.visible) {
+        const bounds = designer.printZoneRect.getBoundingRect();
+        printZones.push({
+            source: 'designer.printZoneRect',
+            rect: designer.printZoneRect,
+            bounds: bounds,
+            viewId: 'current',
+            viewName: 'Current View'
+        });
+        console.log('✅ PRINT ZONE: Found printZoneRect', bounds);
+    }
+
+    if (designer.safeZoneRect && designer.safeZoneRect.visible) {
+        const bounds = designer.safeZoneRect.getBoundingRect();
+        printZones.push({
+            source: 'designer.safeZoneRect',
+            rect: designer.safeZoneRect,
+            bounds: bounds,
+            viewId: 'safe',
+            viewName: 'Safe Zone'
+        });
+        console.log('✅ PRINT ZONE: Found safeZoneRect', bounds);
+    }
+
+    // Method 2: Canvas object analysis for excludeFromExport rectangles
+    const excludeRects = allObjects.filter(obj =>
+        obj.type === 'rect' &&
+        obj.excludeFromExport === true &&
+        obj.visible === true
+    );
+
+    excludeRects.forEach((rect, index) => {
+        const bounds = rect.getBoundingRect();
+        const coverage = {
+            x: bounds.width / canvas.width,
+            y: bounds.height / canvas.height
+        };
+
+        // Only consider rectangles that cover significant area (likely print zones)
+        if (coverage.x > 0.15 && coverage.y > 0.15) {
+            printZones.push({
+                source: 'canvas_excludeFromExport',
+                rect: rect,
+                bounds: bounds,
+                viewId: `detected_${index}`,
+                viewName: `Print Zone ${index + 1}`,
+                coverage: coverage
+            });
+            console.log(`✅ PRINT ZONE: Found canvas zone ${index + 1}`, bounds);
+        }
+    });
+
+    console.log(`🎯 PRINT ZONE DETECTION: Found ${printZones.length} zones total`);
     return printZones;
 }
 
 /**
+ * Temporarily loads graphics for a specific view onto canvas
+ * Preserves original canvas state for restoration
+ */
+async function temporaryLoadViewGraphics(canvas, designer, targetViewId) {
+    console.log(`🔄 VIEW GRAPHICS: Loading graphics for view ${targetViewId}`);
+
+    const currentViewId = designer.currentView;
+    if (targetViewId === currentViewId) {
+        console.log('✅ VIEW GRAPHICS: Target view is current view - no loading needed');
+        return { graphics: [], originalObjects: [] };
+    }
+
+    const variationId = designer.currentVariation?.toString();
+    const viewKey = `${variationId}_${targetViewId}`;
+    const viewGraphics = designer.variationImages?.get(viewKey) || [];
+
+    console.log(`🎯 VIEW GRAPHICS: Found ${viewGraphics.length} graphics for view ${targetViewId}`);
+
+    if (viewGraphics.length === 0) {
+        console.log('ℹ️ VIEW GRAPHICS: No graphics to load for this view');
+        return { graphics: [], originalObjects: [] };
+    }
+
+    // Save current canvas objects for restoration
+    const originalObjects = canvas.getObjects().slice();
+
+    // Add view graphics to canvas temporarily
+    const addedGraphics = [];
+    for (const graphic of viewGraphics) {
+        if (graphic.fabricImage && graphic.visible) {
+            const clonedGraphic = await new Promise((resolve) => {
+                graphic.fabricImage.clone(resolve);
+            });
+
+            canvas.add(clonedGraphic);
+            addedGraphics.push(clonedGraphic);
+            console.log(`✅ VIEW GRAPHICS: Added graphic to canvas`, graphic.transform);
+        }
+    }
+
+    canvas.renderAll();
+    console.log(`🎨 VIEW GRAPHICS: Loaded ${addedGraphics.length} graphics onto canvas`);
+
+    return {
+        graphics: addedGraphics,
+        originalObjects: originalObjects,
+        viewKey: viewKey
+    };
+}
+
+/**
+ * Restores canvas to original state after temporary view loading
+ */
+function restoreOriginalCanvas(canvas, originalObjects, addedGraphics) {
+    console.log('🔄 VIEW GRAPHICS: Restoring original canvas state');
+
+    try {
+        // Remove temporarily added graphics
+        addedGraphics.forEach(graphic => {
+            canvas.remove(graphic);
+        });
+
+        // Verify canvas has original objects only
+        const currentObjects = canvas.getObjects();
+        console.log(`✅ VIEW GRAPHICS: Canvas restored (${currentObjects.length} objects)`);
+
+        canvas.renderAll();
+    } catch (error) {
+        console.error('❌ VIEW GRAPHICS: Error restoring canvas:', error);
+    }
+}
+
+/**
  * Generates PNG using visual canvas snapshot with Fabric.js ClipPath
- * Completely coordinate-free approach
+ * Enhanced with multi-view graphics loading while preserving working approach
  */
 async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId) {
-    console.log('📸 VISUAL SNAPSHOT: Starting coordinate-free generation', {
+    console.log('📸 VISUAL SNAPSHOT: Starting multi-view coordinate-free generation', {
         viewId: viewId,
-        printZone: printZone.bounds
+        printZone: printZone.bounds,
+        source: printZone.source
     });
 
     let originalClipPath = null;
     let originalBackgroundColor = null;
+    let viewGraphicsState = null;
+    const designer = window.designerInstance;
 
     try {
-        // Save original canvas state
+        // STEP 1: Load view-specific graphics (NEW)
+        viewGraphicsState = await temporaryLoadViewGraphics(canvas, designer, viewId);
+
+        // STEP 2: Save original canvas state (PRESERVED)
         originalClipPath = canvas.clipPath;
         originalBackgroundColor = canvas.backgroundColor;
 
@@ -146,10 +323,16 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
     } finally {
         // Always restore canvas state
         try {
+            // STEP 1: Restore view graphics (NEW)
+            if (viewGraphicsState && viewGraphicsState.graphics.length > 0) {
+                restoreOriginalCanvas(canvas, viewGraphicsState.originalObjects, viewGraphicsState.graphics);
+            }
+
+            // STEP 2: Restore canvas properties (PRESERVED)
             canvas.clipPath = originalClipPath;
             canvas.backgroundColor = originalBackgroundColor;
             canvas.renderAll();
-            console.log('🔄 VISUAL SNAPSHOT: Canvas state restored');
+            console.log('🔄 VISUAL SNAPSHOT: Complete canvas state restored');
         } catch (restoreError) {
             console.error('❌ VISUAL SNAPSHOT: Failed to restore canvas state:', restoreError);
         }
@@ -472,6 +655,11 @@ window.visualPNGSystem = {
     generateVisualCanvasSnapshot: generateVisualCanvasSnapshot,
     generateMultiViewVisualPNGs: generateMultiViewVisualPNGs,
 
+    // Multi-view system (NEW)
+    discoverAvailableViews: discoverAvailableViews,
+    temporaryLoadViewGraphics: temporaryLoadViewGraphics,
+    restoreOriginalCanvas: restoreOriginalCanvas,
+
     // System management
     validateRequirements: validateSystemRequirements,
     reinitialize: initializeVisualPNGSystem,
@@ -482,6 +670,35 @@ window.visualPNGSystem = {
             return detectCanvasPrintZones(window.designerInstance.fabricCanvas, window.designerInstance);
         }
         return [];
+    },
+
+    testViewDiscovery: () => {
+        if (window.designerInstance) {
+            return discoverAvailableViews(window.designerInstance);
+        }
+        return [];
+    },
+
+    testMultiViewAccess: () => {
+        const designer = window.designerInstance;
+        if (!designer) return { error: 'No designer' };
+
+        const views = discoverAvailableViews(designer);
+        const variationId = designer.currentVariation?.toString();
+
+        const result = {
+            currentView: designer.currentView,
+            discoveredViews: views,
+            graphicsPerView: {}
+        };
+
+        views.forEach(view => {
+            const viewKey = `${variationId}_${view.viewId}`;
+            const graphics = designer.variationImages?.get(viewKey) || [];
+            result.graphicsPerView[view.viewName] = graphics.length;
+        });
+
+        return result;
     },
 
     testPNGGeneration: async () => {
