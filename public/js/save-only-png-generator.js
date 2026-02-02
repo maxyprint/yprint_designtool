@@ -18,7 +18,7 @@ console.log('🎯 VISUAL PNG SYSTEM: Loading complete visual canvas snapshot imp
  * No static coordinates - only live canvas state
  */
 function detectCanvasPrintZones(canvas, designer) {
-    console.log('🔍 PRINT ZONE DETECTION: Scanning canvas for live print zones');
+    console.log('🔍 PRINT ZONE DETECTION: Scanning for template views');
 
     if (!canvas || !designer) {
         console.error('❌ PRINT ZONE DETECTION: Missing canvas or designer');
@@ -26,62 +26,57 @@ function detectCanvasPrintZones(canvas, designer) {
     }
 
     const printZones = [];
-    const allObjects = canvas.getObjects();
 
-    // Method 1: Direct designer print zone references
-    if (designer.printZoneRect && designer.printZoneRect.visible) {
-        const bounds = designer.printZoneRect.getBoundingRect();
-        printZones.push({
-            source: 'designer.printZoneRect',
-            rect: designer.printZoneRect,
-            bounds: bounds,
-            viewId: 'current',
-            viewName: 'Current View'
+    // Get template view data
+    const template = designer.templates?.get(designer.activeTemplateId);
+    const variation = template?.variations?.get(designer.currentVariation?.toString());
+
+    if (variation?.views) {
+        console.log('📋 TEMPLATE VIEWS: Processing template-based print zones');
+
+        variation.views.forEach((viewData, viewId) => {
+            // Use canvas print zone for current view, template data for others
+            if (viewId === designer.currentView && designer.printZoneRect?.visible) {
+                // Current view: use live canvas print zone
+                const bounds = designer.printZoneRect.getBoundingRect();
+                printZones.push({
+                    source: 'live_canvas_current_view',
+                    rect: designer.printZoneRect,
+                    bounds: bounds,
+                    viewId: viewId,
+                    viewName: viewData.name
+                });
+                console.log(`✅ TEMPLATE VIEW: ${viewData.name} (${viewId}) - live canvas`, bounds);
+            } else if (viewData.printArea) {
+                // Other views: use template print area data
+                printZones.push({
+                    source: 'template_print_area',
+                    rect: null, // No live rect for non-current views
+                    bounds: viewData.printArea,
+                    viewId: viewId,
+                    viewName: viewData.name
+                });
+                console.log(`✅ TEMPLATE VIEW: ${viewData.name} (${viewId}) - template data`, viewData.printArea);
+            }
         });
-        console.log('✅ PRINT ZONE: Found printZoneRect', bounds);
-    }
+    } else {
+        console.warn('⚠️ TEMPLATE VIEWS: No template views found, falling back to canvas detection');
 
-    if (designer.safeZoneRect && designer.safeZoneRect.visible) {
-        const bounds = designer.safeZoneRect.getBoundingRect();
-        printZones.push({
-            source: 'designer.safeZoneRect',
-            rect: designer.safeZoneRect,
-            bounds: bounds,
-            viewId: 'safe',
-            viewName: 'Safe Zone'
-        });
-        console.log('✅ PRINT ZONE: Found safeZoneRect', bounds);
-    }
-
-    // Method 2: Canvas object analysis for excludeFromExport rectangles
-    const excludeRects = allObjects.filter(obj =>
-        obj.type === 'rect' &&
-        obj.excludeFromExport === true &&
-        obj.visible === true
-    );
-
-    excludeRects.forEach((rect, index) => {
-        const bounds = rect.getBoundingRect();
-        const coverage = {
-            x: bounds.width / canvas.width,
-            y: bounds.height / canvas.height
-        };
-
-        // Only consider rectangles that cover significant area (likely print zones)
-        if (coverage.x > 0.15 && coverage.y > 0.15) {
+        // Fallback: canvas-based detection for systems without template views
+        if (designer.printZoneRect?.visible) {
+            const bounds = designer.printZoneRect.getBoundingRect();
             printZones.push({
-                source: 'canvas_excludeFromExport',
-                rect: rect,
+                source: 'canvas_fallback',
+                rect: designer.printZoneRect,
                 bounds: bounds,
-                viewId: `detected_${index}`,
-                viewName: `Print Zone ${index + 1}`,
-                coverage: coverage
+                viewId: 'current',
+                viewName: 'Current View'
             });
-            console.log(`✅ PRINT ZONE: Found canvas zone ${index + 1}`, bounds);
+            console.log('✅ FALLBACK: Found canvas print zone', bounds);
         }
-    });
+    }
 
-    console.log(`🎯 PRINT ZONE DETECTION: Found ${printZones.length} zones total`);
+    console.log(`🎯 PRINT ZONE DETECTION: Found ${printZones.length} template views`);
     return printZones;
 }
 
@@ -334,12 +329,23 @@ window.generatePNGForSave = async function(designId) {
 
         console.log(`🎉 PNG SAVE: Saved ${successCount}/${visualResults.length} PNGs successfully`);
 
+        // Extract Front View URL for direct access
+        const frontResult = saveResults.find(result =>
+            result.success && (result.viewName === 'Front' || result.viewName?.includes('Front'))
+        );
+        const frontPngUrl = frontResult?.url || null;
+
+        if (frontPngUrl) {
+            console.log(`🎯 FRONT VIEW: Front PNG available at ${frontPngUrl}`);
+        }
+
         return {
             success: successCount > 0,
             designId: designId,
             totalViews: visualResults.length,
             savedViews: successCount,
             results: saveResults,
+            frontPngUrl: frontPngUrl, // Direct Front View URL access
             method: 'visual_canvas_snapshot',
             message: `Successfully saved ${successCount} of ${visualResults.length} views`
         };
