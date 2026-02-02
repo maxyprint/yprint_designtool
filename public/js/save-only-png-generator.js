@@ -36,15 +36,18 @@ function discoverAvailableViews(designer) {
 
         const discoveredViews = [];
         variation.views.forEach((viewData, viewId) => {
+            // Use safeZone as primary since printZone is empty array []
+            const zoneBounds = viewData.safeZone || viewData.printZone || null;
+
             discoveredViews.push({
                 viewId: viewId,
                 viewName: viewData.name,
-                printZone: viewData.printZone,
+                printZone: zoneBounds, // Use safeZone data for print zone
                 safeZone: viewData.safeZone,
                 isCurrentView: viewId === designer.currentView,
                 templateData: viewData
             });
-            console.log(`✅ VIEW DISCOVERY: Found ${viewData.name} (${viewId})`);
+            console.log(`✅ VIEW DISCOVERY: Found ${viewData.name} (${viewId}) - bounds:`, zoneBounds);
         });
 
         console.log(`🎯 VIEW DISCOVERY: Found ${discoveredViews.length} total views`);
