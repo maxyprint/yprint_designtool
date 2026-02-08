@@ -36,8 +36,13 @@ function discoverAvailableViews(designer) {
 
         const discoveredViews = [];
         variation.views.forEach((viewData, viewId) => {
-            // Use safeZone as primary since printZone is empty array []
-            const zoneBounds = viewData.safeZone || viewData.printZone || null;
+            // Find live canvas print zone rectangle using stable identifier
+            const canvas = designer?.fabricCanvas;
+            const objects = canvas?.getObjects() || [];
+            const printZoneRect = objects.find(obj => obj.data?.role === 'printZone');
+
+            // Use live canvas coordinates - correct coordinate space
+            const zoneBounds = printZoneRect?.getBoundingRect(true, true) || null;
 
             discoveredViews.push({
                 viewId: viewId,

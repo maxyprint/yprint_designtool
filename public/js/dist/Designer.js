@@ -554,6 +554,8 @@ export class DesignerWidget {
             evented: false,
             originX: 'center',
             originY: 'center',
+            // Stable identifier for PNG generation
+            data: { role: 'printZone' }
         });
 
         console.log('✅ PRINT ZONE ELEMENT CREATED:', {
