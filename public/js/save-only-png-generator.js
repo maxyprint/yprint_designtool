@@ -303,13 +303,32 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
 
         console.log('🎨 VISUAL SNAPSHOT: Applied clipping, generating PNG...');
 
-        // Generate high-quality snapshot
-        const dataURL = canvas.toDataURL({
-            format: 'png',
-            quality: 1,
-            multiplier: 2, // High resolution for print quality
-            enableRetinaScaling: false
-        });
+        // Hide print zone frame during export (it has excludeFromExport but toDataURL ignores it)
+        const printZoneRect = canvas.getObjects().find(obj => obj.data?.role === 'printZone');
+        const originalVisible = printZoneRect?.visible;
+
+        let dataURL;
+        try {
+            if (printZoneRect) {
+                printZoneRect.visible = false;
+                canvas.requestRenderAll?.() || canvas.renderAll();
+            }
+
+            // Generate high-quality snapshot
+            dataURL = canvas.toDataURL({
+                format: 'png',
+                quality: 1,
+                multiplier: 2, // High resolution for print quality
+                enableRetinaScaling: false
+            });
+
+        } finally {
+            // Always restore print zone visibility
+            if (printZoneRect) {
+                printZoneRect.visible = originalVisible;
+                canvas.requestRenderAll?.() || canvas.renderAll();
+            }
+        }
 
         console.log('📸 VISUAL SNAPSHOT: Generated snapshot', {
             length: dataURL?.length || 0,
