@@ -1028,6 +1028,9 @@ class DesignerWidget {
             excludeFromExport: true
         });
 
+        // Add stable identifier for PNG generation
+        this.printingZoneElement.data = { role: 'printZone' };
+
         // Debug the created element
         console.log('✅ Print zone element created:');
         console.log('  - Final position:', this.printingZoneElement.left, ',', this.printingZoneElement.top);
