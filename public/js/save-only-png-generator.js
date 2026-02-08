@@ -207,7 +207,45 @@ async function temporaryLoadViewGraphics(canvas, designer, targetViewId) {
 
     if (viewGraphics.length === 0) {
         console.log('ℹ️ VIEW GRAPHICS: No graphics to load for this view');
-        return { graphics: [], originalObjects: [] };
+        return { graphics: [], originalObjects: [], hiddenCurrentViewGraphics: [] };
+    }
+
+    // CANVAS STATE ISOLATION: Hide current view graphics when loading different target view
+    let hiddenCurrentViewGraphics = [];
+
+    // Hard guard: skip isolation if target is current view
+    if (targetViewId.toString() !== currentViewId.toString()) {
+        const currentViewKey = `${variationId}_${currentViewId}`;
+        const currentViewGraphics = designer.variationImages?.get(currentViewKey) || [];
+        const currentViewGraphicIds = new Set(currentViewGraphics.map(g => g.id).filter(id => id));
+
+        // Identify and temporarily hide current view graphics on canvas
+        canvas.getObjects().forEach(obj => {
+            if (obj.type === 'image' && obj.selectable === true && obj.evented === true) {
+                const matchesCurrentView = currentViewGraphicIds.has(obj.id) ||
+                                         currentViewGraphics.some(g =>
+                                             g.fabricImage && obj.getSrc && g.fabricImage.getSrc &&
+                                             g.fabricImage.getSrc() === obj.getSrc()
+                                         );
+
+                if (matchesCurrentView) {
+                    hiddenCurrentViewGraphics.push({
+                        obj: obj,
+                        originalVisible: obj.visible
+                    });
+                    obj.visible = false;
+                }
+            }
+        });
+
+        if (hiddenCurrentViewGraphics.length > 0) {
+            canvas.renderAll();
+            console.log('VIEW_ISOLATION_APPLIED', {
+                targetViewId,
+                currentViewId,
+                hiddenCount: hiddenCurrentViewGraphics.length
+            });
+        }
     }
 
     // Save current canvas objects for restoration
@@ -233,14 +271,15 @@ async function temporaryLoadViewGraphics(canvas, designer, targetViewId) {
     return {
         graphics: addedGraphics,
         originalObjects: originalObjects,
-        viewKey: viewKey
+        viewKey: viewKey,
+        hiddenCurrentViewGraphics: hiddenCurrentViewGraphics
     };
 }
 
 /**
  * Restores canvas to original state after temporary view loading
  */
-function restoreOriginalCanvas(canvas, originalObjects, addedGraphics) {
+function restoreOriginalCanvas(canvas, originalObjects, addedGraphics, hiddenCurrentViewGraphics) {
     console.log('🔄 VIEW GRAPHICS: Restoring original canvas state');
 
     try {
@@ -248,6 +287,13 @@ function restoreOriginalCanvas(canvas, originalObjects, addedGraphics) {
         addedGraphics.forEach(graphic => {
             canvas.remove(graphic);
         });
+
+        // Restore visibility of previously hidden current view graphics
+        if (hiddenCurrentViewGraphics?.length) {
+            hiddenCurrentViewGraphics.forEach(entry => {
+                entry.obj.visible = entry.originalVisible;
+            });
+        }
 
         // Verify canvas has original objects only
         const currentObjects = canvas.getObjects();
@@ -458,7 +504,7 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
         try {
             // STEP 1: Restore view graphics (NEW)
             if (viewGraphicsState && viewGraphicsState.graphics.length > 0) {
-                restoreOriginalCanvas(canvas, viewGraphicsState.originalObjects, viewGraphicsState.graphics);
+                restoreOriginalCanvas(canvas, viewGraphicsState.originalObjects, viewGraphicsState.graphics, viewGraphicsState.hiddenCurrentViewGraphics);
             }
 
             // STEP 2: Restore canvas properties (PRESERVED)
