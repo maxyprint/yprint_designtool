@@ -348,29 +348,42 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
             obj.evented === false
         );
 
-        // Store original visibility states
-        const originalPrintZoneVisible = printZoneRect?.visible;
-        const originalMockupStates = mockupImages.map(img => ({
-            obj: img,
-            visible: img.visible
-        }));
+        // EXPERIMENTAL FIX: Store removal info with original positions (before any removals)
+        const currentObjects = canvas.getObjects();
+        const removalInfo = [];
+
+        if (printZoneRect) {
+            const index = currentObjects.indexOf(printZoneRect);
+            removalInfo.push({ obj: printZoneRect, index, type: 'printZone' });
+        }
+
+        mockupImages.forEach(img => {
+            const index = currentObjects.indexOf(img);
+            removalInfo.push({ obj: img, index, type: 'mockup' });
+        });
 
         let dataURL;
         try {
-            // Hide print zone frame
-            if (printZoneRect) {
-                printZoneRect.visible = false;
-            }
-
-            // Hide mockup/background images (keep user graphics visible)
-            mockupImages.forEach(img => {
-                img.visible = false;
+            // Remove objects temporarily instead of hiding
+            removalInfo.forEach(info => {
+                canvas.remove(info.obj);
             });
 
             canvas.renderAll();
 
-            // POINT 2: After hide-block and renderAll
-            logObjectStates('AFTER_HIDE');
+            // POINT 2: After removal and renderAll
+            logObjectStates('AFTER_REMOVE');
+
+            // Proof: Log canvas state to verify removal
+            const remaining = canvas.getObjects();
+            const userGraphics = remaining.filter(o => o.type === 'image' && o.selectable === true && o.evented === true);
+            console.log('🔬 REMOVAL PROOF:', {
+                hasPrintZone: remaining.some(o => o.data?.role === 'printZone'),
+                mockupCount: remaining.filter(o => o.type === 'image' && o.selectable === false && o.evented === false).length,
+                userCount: userGraphics.length,
+                totalObjects: remaining.length,
+                removedCount: removalInfo.length
+            });
 
             // POINT 3: Immediately before toDataURL
             logObjectStates('PRE_TODATAURL');
@@ -384,13 +397,18 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
             });
 
         } finally {
-            // Always restore original visibility states
-            if (printZoneRect) {
-                printZoneRect.visible = originalPrintZoneVisible;
-            }
+            // Always restore removed objects at their original positions
+            // Sort by index to restore in correct order
+            removalInfo.sort((a, b) => a.index - b.index);
 
-            originalMockupStates.forEach(state => {
-                state.obj.visible = state.visible;
+            removalInfo.forEach(info => {
+                try {
+                    canvas.insertAt(info.obj, info.index);
+                } catch (e) {
+                    // Fallback: add + moveTo if insertAt fails
+                    canvas.add(info.obj);
+                    canvas.moveTo(info.obj, info.index);
+                }
             });
 
             canvas.renderAll();

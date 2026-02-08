@@ -161,7 +161,7 @@ class Octo_Print_Designer_Public {
             'yprint-save-only-png',
             OCTO_PRINT_DESIGNER_URL . 'public/js/save-only-png-generator.js',
             ['yprint-high-dpi-export'],
-            $this->version . '.clean-png-generator-v1',
+            $this->version . '.clean-png-generator-v' . filemtime(__DIR__ . '/js/save-only-png-generator.js'),
             true
         );
 
