@@ -388,6 +388,25 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
             // POINT 3: Immediately before toDataURL
             logObjectStates('PRE_TODATAURL');
 
+            // RENDER BARRIER: Ensure Fabric export captures current clean state
+            try {
+                // Discard any active selections
+                if (canvas.discardActiveObject) {
+                    canvas.discardActiveObject();
+                }
+
+                // Request render and wait for completion
+                canvas.requestRenderAll();
+                await new Promise(resolve => requestAnimationFrame(resolve));
+
+                // Force synchronous render
+                canvas.renderAll();
+
+                console.log('BARRIER_APPLIED', { ts: Date.now() });
+            } catch (e) {
+                console.warn('Render barrier failed, using fallback export:', e);
+            }
+
             // Generate high-quality snapshot
             dataURL = canvas.toDataURL({
                 format: 'png',
