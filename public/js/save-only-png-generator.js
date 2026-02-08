@@ -303,6 +303,43 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
 
         console.log('🎨 VISUAL SNAPSHOT: Applied clipping, generating PNG...');
 
+        // Causality logging function
+        const logObjectStates = (stage) => {
+            const objs = canvas.getObjects();
+            objs.forEach(obj => {
+                if (!obj.__uid) {
+                    window.__dbgUid = (window.__dbgUid||0)+1;
+                    obj.__uid = 'u'+window.__dbgUid;
+                }
+            });
+
+            const relevant = objs.filter(obj =>
+                obj.data?.role === 'printZone' ||
+                (obj.type === 'image' && obj.selectable === false && obj.evented === false) ||
+                (obj.type === 'image' && obj.selectable === true && obj.evented === true)
+            );
+
+            const rows = relevant.map(obj => ({
+                uid: obj.__uid,
+                type: obj.type,
+                role: obj.data?.role || 'none',
+                name: obj.name || 'unnamed',
+                visible: obj.visible,
+                opacity: obj.opacity,
+                selectable: obj.selectable,
+                evented: obj.evented,
+                srcShort: obj.type === 'image' ?
+                    (obj.getSrc?.() || obj._element?.src || 'no-src').slice(-40) : 'n/a'
+            }));
+
+            console.groupCollapsed('CAUSALITY ' + stage);
+            console.table(rows);
+            console.groupEnd();
+        };
+
+        // POINT 1: Before hide-block
+        logObjectStates('BEFORE_HIDE');
+
         // Hide print zone frame and mockup images during export
         const printZoneRect = canvas.getObjects().find(obj => obj.data?.role === 'printZone');
         const mockupImages = canvas.getObjects().filter(obj =>
@@ -332,6 +369,12 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
 
             canvas.renderAll();
 
+            // POINT 2: After hide-block and renderAll
+            logObjectStates('AFTER_HIDE');
+
+            // POINT 3: Immediately before toDataURL
+            logObjectStates('PRE_TODATAURL');
+
             // Generate high-quality snapshot
             dataURL = canvas.toDataURL({
                 format: 'png',
@@ -351,6 +394,9 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
             });
 
             canvas.renderAll();
+
+            // POINT 4: After restore and renderAll
+            logObjectStates('AFTER_RESTORE');
         }
 
         console.log('📸 VISUAL SNAPSHOT: Generated snapshot', {
