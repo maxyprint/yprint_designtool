@@ -303,16 +303,34 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
 
         console.log('🎨 VISUAL SNAPSHOT: Applied clipping, generating PNG...');
 
-        // Hide print zone frame during export (it has excludeFromExport but toDataURL ignores it)
+        // Hide print zone frame and mockup images during export
         const printZoneRect = canvas.getObjects().find(obj => obj.data?.role === 'printZone');
-        const originalVisible = printZoneRect?.visible;
+        const mockupImages = canvas.getObjects().filter(obj =>
+            obj.type === 'image' &&
+            obj.selectable === false &&
+            obj.evented === false
+        );
+
+        // Store original visibility states
+        const originalPrintZoneVisible = printZoneRect?.visible;
+        const originalMockupStates = mockupImages.map(img => ({
+            obj: img,
+            visible: img.visible
+        }));
 
         let dataURL;
         try {
+            // Hide print zone frame
             if (printZoneRect) {
                 printZoneRect.visible = false;
-                canvas.requestRenderAll?.() || canvas.renderAll();
             }
+
+            // Hide mockup/background images (keep user graphics visible)
+            mockupImages.forEach(img => {
+                img.visible = false;
+            });
+
+            canvas.renderAll();
 
             // Generate high-quality snapshot
             dataURL = canvas.toDataURL({
@@ -323,11 +341,16 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
             });
 
         } finally {
-            // Always restore print zone visibility
+            // Always restore original visibility states
             if (printZoneRect) {
-                printZoneRect.visible = originalVisible;
-                canvas.requestRenderAll?.() || canvas.renderAll();
+                printZoneRect.visible = originalPrintZoneVisible;
             }
+
+            originalMockupStates.forEach(state => {
+                state.obj.visible = state.visible;
+            });
+
+            canvas.renderAll();
         }
 
         console.log('📸 VISUAL SNAPSHOT: Generated snapshot', {
