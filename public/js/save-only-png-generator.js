@@ -453,13 +453,39 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
                 console.warn('Render barrier failed, using fallback export:', e);
             }
 
-            // Generate high-quality snapshot
-            dataURL = canvas.toDataURL({
-                format: 'png',
-                quality: 1,
-                multiplier: 2, // High resolution for print quality
-                enableRetinaScaling: false
-            });
+            // Generate high-quality snapshot with correct crop parameters
+            const clipPath = canvas.clipPath;
+            if (clipPath) {
+                // Apply crop parameters with deterministic rounding
+                const cropParams = {
+                    left: Math.floor(clipPath.left),
+                    top: Math.floor(clipPath.top),
+                    width: Math.ceil(clipPath.width),
+                    height: Math.ceil(clipPath.height),
+                    multiplier: 2
+                };
+
+                console.log('CROP_APPLIED', cropParams);
+
+                dataURL = canvas.toDataURL({
+                    format: 'png',
+                    quality: 1,
+                    multiplier: cropParams.multiplier,
+                    enableRetinaScaling: false,
+                    left: cropParams.left,
+                    top: cropParams.top,
+                    width: cropParams.width,
+                    height: cropParams.height
+                });
+            } else {
+                // Fallback: use existing behavior if no clipPath
+                dataURL = canvas.toDataURL({
+                    format: 'png',
+                    quality: 1,
+                    multiplier: 2, // High resolution for print quality
+                    enableRetinaScaling: false
+                });
+            }
 
         } finally {
             // Always restore removed objects at their original positions
