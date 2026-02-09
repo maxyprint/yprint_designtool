@@ -1,47 +1,6 @@
 import { Canvas, Image, Rect, ActiveSelection, filters, Group } from 'fabric';
 import { ToastManager } from './ToastManager';
 
-// ---- PrintZone Adapter (backward compatible, non-invasive)
-const PrintZoneAdapter = {
-    read(view) {
-        const pz = view?.printZone || view?.safeZone || null;
-        if (!pz) return null;
-
-        return {
-            left: pz.left ?? pz.x ?? 0,
-            top: pz.top ?? pz.y ?? 0,
-            width: pz.width ?? pz.w ?? 0,
-            height: pz.height ?? pz.h ?? 0
-        };
-    },
-
-    write(view, bounds, { mirrorToSafeZone = false } = {}) {
-        if (!view) return;
-
-        const updates = {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            // legacy aliases
-            x: bounds.left,
-            y: bounds.top,
-            w: bounds.width,
-            h: bounds.height
-        };
-
-        // primary
-        if (!view.printZone) view.printZone = {};
-        Object.assign(view.printZone, updates);
-
-        // optional mirror
-        if (mirrorToSafeZone) {
-            if (!view.safeZone) view.safeZone = {};
-            Object.assign(view.safeZone, updates);
-        }
-    }
-};
-
 export class DesignerWidget {
 
     constructor() {
@@ -324,9 +283,6 @@ export class DesignerWidget {
             backgroundColor: '#fff',
             preserveObjectStacking: true
         });
-
-        this.__ensurePrintZoneOverlay();
-        this.__syncPrintZoneOverlayFromView();
     }
 
     async loadTemplates() {
@@ -634,8 +590,6 @@ export class DesignerWidget {
 
         // Load saved image for this view if it exists
         this.loadViewImage();
-
-        this.__syncPrintZoneOverlayFromView();
     }
 
     addImageToGrid(imageUrl, imageId, isTemporary = false) {
@@ -2195,159 +2149,6 @@ export class DesignerWidget {
         if (!variation) return null;
 
         return variation.views.get(this.currentView.toString());
-    }
-
-    // ---- Enhanced PrintZone Overlay System (non-invasive)
-
-    // get current active view (wrapper: tries existing fields first)
-    __getActiveView() {
-        // 1) If you already have a method for this, prefer it
-        if (typeof this.getCurrentViewData === 'function') {
-            try { return this.getCurrentViewData(); } catch (_) {}
-        }
-
-        // 2) Conservative fallback using described structure
-        const template = (this.templates?.get && this.activeTemplateId != null)
-            ? this.templates.get(this.activeTemplateId)
-            : this.activeTemplate || this.template || null;
-
-        if (!template) return null;
-
-        const variationId = (this.currentVariation ?? this.activeVariation ?? this.selectedVariation)?.toString?.()
-            ?? (this.currentVariationId ?? this.activeVariationId ?? this.variationId)?.toString?.();
-
-        const variation = (template.variations?.get && variationId != null)
-            ? template.variations.get(variationId)
-            : null;
-
-        if (!variation) return null;
-
-        const viewId = (this.currentView ?? this.activeView ?? this.selectedView)?.toString?.()
-            ?? (this.currentViewId ?? this.activeViewId ?? this.viewId)?.toString?.();
-
-        const view = (variation.views?.get && viewId != null)
-            ? variation.views.get(viewId)
-            : null;
-
-        return view || null;
-    }
-
-    // ensure overlay exists
-    __ensurePrintZoneOverlay() {
-        const canvas = this.fabricCanvas;
-        if (!canvas || canvas.__printZoneRect) return;
-
-        // Use whatever fabric namespace you have available
-        const RectCtor = (typeof Rect !== 'undefined' ? Rect : (window.fabric && window.fabric.Rect));
-        if (!RectCtor) return;
-
-        const rect = new RectCtor({
-            left: 0,
-            top: 0,
-            width: 10,
-            height: 10,
-            fill: 'rgba(0,122,204,0.06)',
-            stroke: '#007acc',
-            strokeWidth: 2,
-            strokeDashArray: [6, 4],
-            objectCaching: false,
-            excludeFromExport: true,
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            lockRotation: true,
-            name: '__printZone__',
-            // helpful for export pipeline / debug filters
-            data: { role: 'printZone' }
-        });
-
-        canvas.add(rect);
-        rect.bringToFront();
-        canvas.__printZoneRect = rect;
-
-        // keep on top
-        const bringTop = () => rect.bringToFront();
-        canvas.on('object:added', bringTop);
-        canvas.on('object:modified', bringTop);
-        canvas.on('object:removed', bringTop);
-
-        rect.on('moving', bringTop);
-        rect.on('scaling', bringTop);
-
-        // commit handler
-        rect.on('modified', () => {
-            const w = rect.width * rect.scaleX;
-            const h = rect.height * rect.scaleY;
-
-            // normalize
-            rect.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
-            rect.setCoords();
-            rect.bringToFront();
-
-            const view = this.__getActiveView();
-            if (!view) return;
-
-            PrintZoneAdapter.write(
-                view,
-                { left: rect.left, top: rect.top, width: w, height: h },
-                { mirrorToSafeZone: false }
-            );
-
-            // mark dirty if you have it
-            if (typeof this.markDirty === 'function') this.markDirty();
-            if (typeof this.__markDirty === 'function') this.__markDirty();
-
-            canvas.requestRenderAll();
-        });
-    }
-
-    // sync overlay from current view state
-    __syncPrintZoneOverlayFromView() {
-        const canvas = this.fabricCanvas;
-        if (!canvas) return;
-
-        this.__ensurePrintZoneOverlay();
-        const rect = canvas.__printZoneRect;
-        if (!rect) return;
-
-        const view = this.__getActiveView();
-        const pz = PrintZoneAdapter.read(view);
-        if (!pz) return;
-
-        rect.set({
-            left: pz.left,
-            top: pz.top,
-            width: pz.width,
-            height: pz.height,
-            scaleX: 1,
-            scaleY: 1,
-            angle: 0
-        });
-
-        rect.setCoords();
-        rect.bringToFront();
-        canvas.requestRenderAll();
-    }
-
-    // optional: enable/disable interactive editing
-    setPrintZoneEditMode(enabled) {
-        const rect = this.fabricCanvas?.__printZoneRect;
-        if (!rect) return;
-
-        rect.set({
-            selectable: !!enabled,
-            evented: !!enabled,
-            hasControls: !!enabled,
-            cornerStyle: 'circle',
-            cornerSize: enabled ? 10 : 0
-        });
-
-        // remove rotation handle
-        if (typeof rect.setControlsVisibility === 'function') {
-            rect.setControlsVisibility({ mtr: false });
-        }
-
-        this.fabricCanvas.requestRenderAll();
     }
 
 }
