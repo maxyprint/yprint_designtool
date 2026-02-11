@@ -1041,8 +1041,19 @@ wp_add_inline_script('octo-print-designer-designer', '
             wp_mkdir_p($design_dir);
         }
 
-        // Generate unique filename
-        $filename = 'design_' . $design_id . '_' . time() . '.png';
+        // Generate unique filename with view identifier to prevent Front/Back collision
+        $view_suffix = '';
+        if (isset($_POST['view_id']) && is_numeric($_POST['view_id'])) {
+            $view_suffix = '_' . absint($_POST['view_id']);
+        } else {
+            // Fallback: extract from original filename
+            $original_filename = basename($file['name']);
+            if (preg_match('/design_\d+_(\d+)\.png$/', $original_filename, $matches)) {
+                $view_suffix = '_' . $matches[1];
+            }
+        }
+
+        $filename = 'design_' . $design_id . '_' . time() . $view_suffix . '.png';
         $file_path = $design_dir . '/' . $filename;
         $file_url = $upload_dir['baseurl'] . '/design-pngs/' . $filename;
 

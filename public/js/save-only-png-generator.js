@@ -676,6 +676,8 @@ window.generatePNGForSave = async function(designId) {
                 formData.append('design_id', designId);
                 formData.append('png_file', blob, `design_${designId}_${result.viewId}.png`);
                 formData.append('nonce', window.octoPrintDesigner?.nonce || window.wp_ajax_object?.nonce || '');
+                formData.append('view_id', result.viewId);
+                formData.append('view_name', result.viewName);
 
                 console.log(`📦 PNG SAVE: Prepared file upload for ${result.viewName}`, {
                     blobSize: blob.size,
