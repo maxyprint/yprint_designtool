@@ -125,6 +125,25 @@ function detectCanvasPrintZones(canvas, designer) {
         const template = designer.templates?.get(designer.activeTemplateId);
         const variation = template?.variations?.get(designer.currentVariation?.toString());
 
+        // Robust canvas dimension detection
+        let cw, ch, canvasType;
+        if (canvas && typeof canvas.getWidth === 'function') {
+            cw = canvas.getWidth();
+            ch = canvas.getHeight();
+            canvasType = 'fabric';
+        } else if (canvas instanceof HTMLCanvasElement) {
+            cw = canvas.width;
+            ch = canvas.height;
+            canvasType = 'html';
+        } else if (designer.fabricCanvas && typeof designer.fabricCanvas.getWidth === 'function') {
+            cw = designer.fabricCanvas.getWidth();
+            ch = designer.fabricCanvas.getHeight();
+            canvasType = 'fallback_fabric';
+            console.log('CANVAS_FALLBACK_USED', { reason: 'canvas param invalid, using designer.fabricCanvas' });
+        } else {
+            throw new Error('No valid canvas dimensions available');
+        }
+
         if (variation?.views) {
             console.log('📋 PRINT ZONE DETECTION: Using template-based multi-view approach');
 
@@ -149,7 +168,7 @@ function detectCanvasPrintZones(canvas, designer) {
                     const zoneData = viewData.printZone || viewData.safeZone;
 
                     if (zoneData) {
-                        const pixelBounds = convertTemplateBoundsToPixels(zoneData, canvas.width, canvas.height);
+                        const pixelBounds = convertTemplateBoundsToPixels(zoneData, cw, ch);
 
                         if (pixelBounds) {
                             printZones.push({
@@ -175,10 +194,40 @@ function detectCanvasPrintZones(canvas, designer) {
             if (printZones.length > 0) {
                 console.log(`🎯 PRINT ZONE DETECTION: Template success - found ${printZones.length} zones`);
                 return printZones;
+            } else {
+                // Log why template path returned empty
+                const emptyDiagnostic = [];
+                variation.views.forEach((viewData, viewId) => {
+                    const zoneData = viewData.printZone || viewData.safeZone;
+                    const hasZoneData = !!zoneData;
+                    let pixelBoundsNull = false;
+                    if (hasZoneData) {
+                        const testBounds = convertTemplateBoundsToPixels(zoneData, cw, ch);
+                        pixelBoundsNull = !testBounds;
+                    }
+                    emptyDiagnostic.push({
+                        viewId: viewId,
+                        hasZoneData: hasZoneData,
+                        pixelBoundsNull: pixelBoundsNull
+                    });
+                });
+                console.log('TEMPLATE_PATH_EMPTY', {
+                    printZonesCount: printZones.length,
+                    perViewDiagnostic: emptyDiagnostic
+                });
             }
         }
     } catch (error) {
-        console.warn('⚠️ PRINT ZONE DETECTION: Template approach failed, using fallback:', error);
+        console.error('TEMPLATE_PATH_ERROR', {
+            message: error.message,
+            stack: error.stack,
+            activeTemplateId: designer.activeTemplateId,
+            currentVariation: designer.currentVariation,
+            viewsType: typeof variation?.views,
+            cw: cw,
+            ch: ch,
+            canvasType: canvasType
+        });
     }
 
     // PRESERVED: Original working single-view logic as fallback
