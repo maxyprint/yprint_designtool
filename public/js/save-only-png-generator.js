@@ -165,7 +165,19 @@ function detectCanvasPrintZones(canvas, designer) {
                     });
                 } else {
                     // Other views: resolve template bounds using real template variation store
-                    const zoneData = viewData.printZone || viewData.safeZone;
+                    // Fix: Handle empty array [] which is truthy but should fall back to safeZone
+                    let zoneData;
+                    if (Array.isArray(viewData.printZone)) {
+                        if (viewData.printZone.length > 0) {
+                            zoneData = viewData.printZone[0];  // Use first zone object
+                        } else {
+                            zoneData = viewData.safeZone;      // Fallback to safeZone
+                        }
+                    } else if (viewData.printZone && typeof viewData.printZone.left === 'number') {
+                        zoneData = viewData.printZone;        // Use object with numeric left/top
+                    } else {
+                        zoneData = viewData.safeZone;         // Fallback to safeZone
+                    }
 
                     if (zoneData) {
                         const pixelBounds = convertTemplateBoundsToPixels(zoneData, cw, ch);
@@ -182,7 +194,8 @@ function detectCanvasPrintZones(canvas, designer) {
                                 viewId: viewId,
                                 source: 'template',
                                 raw: zoneData,
-                                pixels: pixelBounds
+                                pixels: pixelBounds,
+                                printZone_len: Array.isArray(viewData.printZone) ? viewData.printZone.length : 'not_array'
                             });
                         }
                     } else {
