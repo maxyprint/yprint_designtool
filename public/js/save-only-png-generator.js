@@ -65,6 +65,48 @@ function discoverAvailableViews(designer) {
 }
 
 /**
+ * Converts template bounds from percent/center-origin to pixel/top-left coordinates
+ * Template format: left/top as percent (0-100) center-origin, width/height as pixels
+ * Export needs: top-left pixel coordinates for canvas.toDataURL()
+ */
+function convertTemplateBoundsToPixels(zoneData, canvasWidth, canvasHeight) {
+    if (!zoneData || typeof zoneData.left !== 'number' || typeof zoneData.top !== 'number') {
+        return null;
+    }
+
+    // Convert percent center-origin to center coordinates
+    const centerX = zoneData.left * canvasWidth / 100;
+    const centerY = zoneData.top * canvasHeight / 100;
+
+    // Convert center to top-left
+    let left = centerX - (zoneData.width / 2);
+    let top = centerY - (zoneData.height / 2);
+
+    // Clamp left/top to >= 0
+    left = Math.max(0, left);
+    top = Math.max(0, top);
+
+    // Guarantee crop rect stays within canvas
+    const width = Math.min(zoneData.width, canvasWidth - left);
+    const height = Math.min(zoneData.height, canvasHeight - top);
+
+    const clampedBounds = {
+        left: Math.floor(left),
+        top: Math.floor(top),
+        width: Math.ceil(width),
+        height: Math.ceil(height)
+    };
+
+    console.log('TEMPLATE_BOUNDS_CONVERTED', {
+        input: zoneData,
+        canvas: { width: canvasWidth, height: canvasHeight },
+        converted: clampedBounds
+    });
+
+    return clampedBounds;
+}
+
+/**
  * Detects all print zones on canvas using live visual detection
  * Enhanced with multi-view support while preserving working single-view logic
  */
@@ -78,51 +120,65 @@ function detectCanvasPrintZones(canvas, designer) {
 
     const printZones = [];
 
-    // NEW: Try multi-view discovery first, keep working single-view as fallback
-    const discoveredViews = discoverAvailableViews(designer);
+    // NEW: Try template-based multi-view approach first using real template store
+    try {
+        const template = designer.templates?.get(designer.activeTemplateId);
+        const variation = template?.variations?.get(designer.currentVariation?.toString());
 
-    if (discoveredViews.length > 0) {
-        console.log('📋 PRINT ZONE DETECTION: Using template-based multi-view approach');
+        if (variation?.views) {
+            console.log('📋 PRINT ZONE DETECTION: Using template-based multi-view approach');
 
-        discoveredViews.forEach(view => {
-            if (view.isCurrentView && designer.printZoneRect?.visible) {
-                // Current view: use PROVEN working live canvas approach
-                const bounds = designer.printZoneRect.getBoundingRect();
-                printZones.push({
-                    source: 'live_canvas_current_view',
-                    rect: designer.printZoneRect,
-                    bounds: bounds,
-                    viewId: view.viewId,
-                    viewName: view.viewName
-                });
-                console.log(`✅ PRINT ZONE: Current view ${view.viewName} (live canvas)`, bounds);
-            } else if (view.printZone) {
-                // Other views: use template print zone data
-                printZones.push({
-                    source: 'template_print_zone',
-                    rect: null, // No live rect for non-current views
-                    bounds: view.printZone,
-                    viewId: view.viewId,
-                    viewName: view.viewName
-                });
-                console.log(`✅ PRINT ZONE: Template view ${view.viewName}`, view.printZone);
-            } else if (view.safeZone) {
-                // Fallback to safeZone if no printZone
-                printZones.push({
-                    source: 'template_safe_zone',
-                    rect: null,
-                    bounds: view.safeZone,
-                    viewId: view.viewId,
-                    viewName: view.viewName
-                });
-                console.log(`✅ PRINT ZONE: Template safe zone ${view.viewName}`, view.safeZone);
+            variation.views.forEach((viewData, viewId) => {
+                if (viewId === designer.currentView && designer.printZoneRect?.visible) {
+                    // Current view: use PROVEN working live canvas approach
+                    const bounds = designer.printZoneRect.getBoundingRect();
+                    printZones.push({
+                        source: 'live_canvas_current_view',
+                        rect: designer.printZoneRect,
+                        bounds: bounds,
+                        viewId: viewId,
+                        viewName: viewData.name
+                    });
+                    console.log('VIEW_BOUNDS_RESOLVED', {
+                        viewId: viewId,
+                        source: 'live_canvas',
+                        bounds: bounds
+                    });
+                } else {
+                    // Other views: resolve template bounds using real template variation store
+                    const zoneData = viewData.printZone || viewData.safeZone;
+
+                    if (zoneData) {
+                        const pixelBounds = convertTemplateBoundsToPixels(zoneData, canvas.width, canvas.height);
+
+                        if (pixelBounds) {
+                            printZones.push({
+                                source: 'template_bounds_resolved',
+                                rect: null, // No live rect for non-current views
+                                bounds: pixelBounds,
+                                viewId: viewId,
+                                viewName: viewData.name
+                            });
+                            console.log('VIEW_BOUNDS_RESOLVED', {
+                                viewId: viewId,
+                                source: 'template',
+                                raw: zoneData,
+                                pixels: pixelBounds
+                            });
+                        }
+                    } else {
+                        console.warn(`⚠️ PRINT ZONE: No zone data for ${viewData.name}`);
+                    }
+                }
+            });
+
+            if (printZones.length > 0) {
+                console.log(`🎯 PRINT ZONE DETECTION: Template success - found ${printZones.length} zones`);
+                return printZones;
             }
-        });
-
-        if (printZones.length > 0) {
-            console.log(`🎯 PRINT ZONE DETECTION: Multi-view success - found ${printZones.length} zones`);
-            return printZones;
         }
+    } catch (error) {
+        console.warn('⚠️ PRINT ZONE DETECTION: Template approach failed, using fallback:', error);
     }
 
     // PRESERVED: Original working single-view logic as fallback
@@ -464,6 +520,19 @@ async function generateVisualCanvasSnapshot(canvas, printZone, designId, viewId)
                     height: Math.ceil(clipPath.height),
                     multiplier: 2
                 };
+
+                // Proof gate: Assert exact same numbers from VIEW_BOUNDS_RESOLVED are used
+                console.log('CROP_BOUNDS_ASSERTION', {
+                    viewId: viewId,
+                    clipPathBounds: {
+                        left: clipPath.left,
+                        top: clipPath.top,
+                        width: clipPath.width,
+                        height: clipPath.height
+                    },
+                    cropParams: cropParams,
+                    printZoneBounds: printZone.bounds
+                });
 
                 console.log('CROP_APPLIED', cropParams);
 
