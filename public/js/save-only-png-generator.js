@@ -97,11 +97,14 @@ function convertTemplateBoundsToPixels(zoneData, canvasWidth, canvasHeight) {
         height: Math.ceil(height)
     };
 
-    console.log('TEMPLATE_BOUNDS_CONVERTED', {
-        input: zoneData,
-        canvas: { width: canvasWidth, height: canvasHeight },
-        converted: clampedBounds
-    });
+    // Reduced verbosity: only log if conversion fails
+    if (!clampedBounds || clampedBounds.width <= 0 || clampedBounds.height <= 0) {
+        console.warn('TEMPLATE_BOUNDS_CONVERSION_FAILED', {
+            input: zoneData,
+            canvas: { width: canvasWidth, height: canvasHeight },
+            result: clampedBounds
+        });
+    }
 
     return clampedBounds;
 }
@@ -206,6 +209,14 @@ function detectCanvasPrintZones(canvas, designer) {
 
             if (printZones.length > 0) {
                 console.log(`🎯 PRINT ZONE DETECTION: Template success - found ${printZones.length} zones`);
+
+                // Concise per-export summary
+                const summary = printZones.map(zone => ({
+                    viewId: zone.viewId,
+                    cropDims: `${zone.bounds.width}×${zone.bounds.height}`
+                }));
+                console.log('MULTI_VIEW_EXPORT_SUMMARY', summary);
+
                 return printZones;
             } else {
                 // Log why template path returned empty
@@ -233,12 +244,11 @@ function detectCanvasPrintZones(canvas, designer) {
     } catch (error) {
         console.error('TEMPLATE_PATH_ERROR', {
             message: error.message,
-            stack: error.stack,
+            stackSummary: error.stack?.split('\n')[0] || 'no stack',
             activeTemplateId: designer.activeTemplateId,
             currentVariation: designer.currentVariation,
             viewsType: typeof variation?.views,
-            cw: cw,
-            ch: ch,
+            canvasDims: `${cw}×${ch}`,
             canvasType: canvasType
         });
     }
