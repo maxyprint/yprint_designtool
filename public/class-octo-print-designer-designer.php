@@ -1101,13 +1101,21 @@ wp_add_inline_script('octo-print-designer-designer', '
 
             $view_name = isset($_POST['view_name']) ? sanitize_text_field($_POST['view_name']) : null;
 
-            // Duplicate prevention: check existing record
+            // Duplicate prevention: check existing record (with proper NULL handling)
             global $wpdb;
             $table_name = $wpdb->prefix . 'yprint_design_pngs';
-            $existing = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM {$table_name} WHERE design_id = %s AND view_id = %s",
-                $design_id, $view_id
-            ));
+
+            if ($view_id === null) {
+                $existing = $wpdb->get_var($wpdb->prepare(
+                    "SELECT id FROM {$table_name} WHERE design_id = %s AND view_id IS NULL",
+                    $design_id
+                ));
+            } else {
+                $existing = $wpdb->get_var($wpdb->prepare(
+                    "SELECT id FROM {$table_name} WHERE design_id = %s AND view_id = %s",
+                    $design_id, $view_id
+                ));
+            }
 
             if (!$existing) {
                 // Convert filesystem PNG to data URL format required by save_to_database_table()
