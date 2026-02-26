@@ -1103,7 +1103,7 @@ class PNG_Storage_Handler {
                     'similar_tables' => array_column($similar_tables, 'Tables_in_' . $wpdb->dbname),
                     'all_tables_count' => count($wpdb->get_results("SHOW TABLES", ARRAY_A))
                 );
-                wp_send_json_error('TABLE NOT FOUND - DEBUG: ' . json_encode($debug_info));
+                error_log('❌ DATABASE SAVE: TABLE NOT FOUND - DEBUG: ' . json_encode($debug_info));
                 return false;
             }
 
