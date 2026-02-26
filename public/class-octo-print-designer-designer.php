@@ -1088,6 +1088,61 @@ wp_add_inline_script('octo-print-designer-designer', '
             ));
         }
 
+        // Optional: Save to database for WooCommerce discovery (fallback-safe)
+        try {
+            // Extract view data for multi-view support
+            $view_id = null;
+            if (isset($_POST['view_id']) && is_numeric($_POST['view_id'])) {
+                $view_id = absint($_POST['view_id']);
+            } elseif ($view_suffix) {
+                // Parse from view_suffix (format: "_189542")
+                $view_id = (int)ltrim($view_suffix, '_');
+            }
+
+            $view_name = isset($_POST['view_name']) ? sanitize_text_field($_POST['view_name']) : null;
+
+            // Duplicate prevention: check existing record
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'yprint_design_pngs';
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$table_name} WHERE design_id = %s AND view_id = %s",
+                $design_id, $view_id
+            ));
+
+            if (!$existing) {
+                // Convert filesystem PNG to data URL format required by save_to_database_table()
+                $png_binary = file_get_contents($file_path);
+                $png_data_url = 'data:image/png;base64,' . base64_encode($png_binary);
+
+                // Create PNG storage handler and save to database
+                $png_handler = new PNG_Storage_Handler('yprint-designtool', '1.0');
+                $design_meta = array(
+                    'view_id' => $view_id,
+                    'view_name' => $view_name
+                );
+
+                $db_result = $png_handler->save_to_database_table(
+                    $design_id,
+                    $png_data_url,
+                    'filesystem',
+                    null, // order_id
+                    null, // template_id
+                    $design_meta
+                );
+
+                if ($db_result) {
+                    error_log('✅ Database PNG record created for design_id: ' . $design_id . ', view_id: ' . $view_id);
+                } else {
+                    error_log('⚠️ Database PNG save failed (non-critical) for design_id: ' . $design_id);
+                }
+            } else {
+                error_log('ℹ️ Database PNG record already exists for design_id: ' . $design_id . ', view_id: ' . $view_id);
+            }
+
+        } catch (Exception $e) {
+            error_log('⚠️ Database PNG save failed (non-critical): ' . $e->getMessage());
+        }
+
         wp_send_json_success(array(
             'message' => __('PNG file saved successfully', 'octo-print-designer'),
             'file_path' => $file_path,

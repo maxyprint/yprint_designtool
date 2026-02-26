@@ -1039,7 +1039,7 @@ class PNG_Storage_Handler {
      * 🗄️ CRITICAL: Save PNG to database table
      * Fixes the missing database storage issue
      */
-    private function save_to_database_table($design_id, $print_png, $save_type, $order_id, $template_id, $design_meta) {
+    public function save_to_database_table($design_id, $print_png, $save_type, $order_id, $template_id, $design_meta) {
         global $wpdb;
 
         try {
