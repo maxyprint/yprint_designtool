@@ -1415,6 +1415,9 @@ class PNG_Storage_Handler {
                 return $b['modified'] - $a['modified'];
             });
 
+            // 🔬 PRE-DEDUP LOGGING: Show what was discovered before deduplication
+            error_log('🔬 PRE-DEDUP: ' . count($discovered_files) . ' files: ' . implode(', ', array_column($discovered_files, 'filename')));
+
             // 🔧 FIX: Only return the most recent PNG per design_id to avoid duplicates
             $unique_files = [];
             $seen_identifiers = [];
@@ -1436,6 +1439,9 @@ class PNG_Storage_Handler {
 
             // Use the filtered unique files list
             $discovered_files = $unique_files;
+
+            // 🔬 POST-DEDUP LOGGING: Show what remains after deduplication
+            error_log('🔬 POST-DEDUP: ' . count($discovered_files) . ' files: ' . implode(', ', array_column($discovered_files, 'filename')));
 
             if (!empty($discovered_files)) {
                 wp_send_json_success([
