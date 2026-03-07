@@ -1342,18 +1342,13 @@ class PNG_Storage_Handler {
 
             // Define search directories and their patterns
             $search_patterns = [
-                // design-pngs directory (current storage location)
+                // design-pngs directory (current storage location for order discovery)
                 [
                     'dir' => $upload_base_path . '/design-pngs/',
                     'url_base' => $upload_base_url . '/design-pngs/',
                     'patterns' => $all_patterns
-                ],
-                // yprint-print-pngs directory
-                [
-                    'dir' => $upload_base_path . '/yprint-print-pngs/',
-                    'url_base' => $upload_base_url . '/yprint-print-pngs/',
-                    'patterns' => $all_patterns
                 ]
+                // Note: yprint-print-pngs excluded for order discovery to prevent cross-system file inclusion
             ];
 
             // Add octo-print-designer preview directories for each identifier
