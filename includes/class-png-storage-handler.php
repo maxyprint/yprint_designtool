@@ -1338,8 +1338,8 @@ class PNG_Storage_Handler {
                 $all_patterns = array_merge($all_patterns, [
                     "design_{$search_id}_*.png",
                     "{$search_id}.png",
-                    "design_*_{$search_id}.png",
-                    "*{$search_id}*.png"
+                    "design_*_{$search_id}.png"
+                    // Removed "*{$search_id}*.png" - too broad, matches timestamps
                 ]);
             }
 
