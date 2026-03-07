@@ -1224,6 +1224,12 @@ class PNG_Storage_Handler {
      * 🔍 AJAX handler to discover PNG files in filesystem
      */
     public function handle_discover_png_files() {
+        // 🔬 CODEPATH VERIFICATION: Prove this function is reached
+        $timestamp = date('Y-m-d H:i:s');
+        $identifier = sanitize_text_field($_POST['identifier'] ?? 'MISSING');
+        $order_id = intval($_POST['order_id'] ?? 0);
+        error_log("🔬 DISCOVERY-ENTRY: {$timestamp} | identifier={$identifier} | order_id={$order_id} | Function reached successfully");
+
         // More flexible nonce verification for different contexts
         $nonce_valid = false;
 
