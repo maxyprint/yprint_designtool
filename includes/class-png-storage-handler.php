@@ -1431,10 +1431,18 @@ class PNG_Storage_Handler {
             foreach ($discovered_files as $file) {
                 $identifier = $file['matched_identifier'] ?? 'unknown';
 
-                // Only keep the first (newest) file per identifier
-                if (!in_array($identifier, $seen_identifiers)) {
+                // 🎯 MULTI-VIEW DEDUP: Enhanced key for view-aware deduplication
+                $dedup_key = $identifier;
+                if (preg_match('/design_\d+_\d+_(\d+)\.png$/', $file['filename'], $matches)) {
+                    // Multi-view pattern detected: separate dedup per view_id
+                    $dedup_key = $identifier . '_view_' . $matches[1];
+                }
+                // Fallback: Single-view/unknown patterns use identifier-only (preserves existing behavior)
+
+                // Only keep the first (newest) file per dedup key
+                if (!in_array($dedup_key, $seen_identifiers)) {
                     $unique_files[] = $file;
-                    $seen_identifiers[] = $identifier;
+                    $seen_identifiers[] = $dedup_key;
                     error_log('🔍 PNG DISCOVERY: Keeping newest PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
                 } else {
                     error_log('🔍 PNG DISCOVERY: Skipping older PNG for identifier: ' . $identifier . ' - ' . $file['filename']);
