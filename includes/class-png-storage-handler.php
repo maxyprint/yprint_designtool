@@ -1317,6 +1317,9 @@ class PNG_Storage_Handler {
                 }
             }
 
+            // 🔬 DIAGNOSTIC: Log exact search_identifiers to prove contamination vs matching issue
+            error_log('🔬 DEBUG: search_identifiers = ' . json_encode($search_identifiers));
+
             // Remove duplicates and empty values
             $search_identifiers = array_unique(array_filter($search_identifiers));
             error_log('🔍 PNG DISCOVERY: Final search identifiers: ' . implode(', ', $search_identifiers));
