@@ -1505,48 +1505,31 @@ export class DesignerWidget {
                 this.toastManager.show('Design saved!', 'success');
                 this.currentDesignId = data.data.design_id;
 
-                // Generate print-ready PNG file after successful save
+                // Generate high-res print PNGs after successful save
                 try {
-                    console.log('🖨️ Generating print-ready PNG file...');
-
-                    if (typeof window.generatePNGForDownload === 'function') {
-                        const pngDataUrl = await window.generatePNGForDownload();
-
-                        if (pngDataUrl) {
-                            // Send PNG to backend for storage
-                            const pngFormData = new FormData();
-                            pngFormData.append('action', 'save_design_png');
-                            pngFormData.append('nonce', octoPrintDesigner.nonce);
-                            pngFormData.append('design_id', this.currentDesignId);
-
-                            // Convert data URL to blob
-                            const response = await fetch(pngDataUrl);
-                            const blob = await response.blob();
-                            pngFormData.append('png_file', blob, `design_${this.currentDesignId}.png`);
-
-                            const pngResponse = await fetch(octoPrintDesigner.ajaxUrl, {
-                                method: 'POST',
-                                body: pngFormData
-                            });
-
-                            const pngData = await pngResponse.json();
-
-                            if (pngData.success) {
-                                console.log('✅ Print-ready PNG saved successfully!');
-                                console.log('📁 PNG file location:', pngData.data.file_url);
-                                console.log('💾 PNG file path:', pngData.data.file_path);
-                            } else {
-                                console.warn('⚠️ PNG save failed:', pngData.data.message);
-                            }
+                    if (typeof window.generatePNGForSave === 'function') {
+                        const pngResult = await window.generatePNGForSave(this.currentDesignId);
+                        if (!pngResult.success) {
+                            console.error('❌ Print PNG: all views failed', pngResult.error || pngResult.results);
+                        } else if (pngResult.savedViews < pngResult.totalViews) {
+                            const failed = pngResult.results?.filter(r => !r.success).map(r => r.viewName);
+                            console.warn('⚠️ Print PNG: partial failure — missing views:', failed);
                         } else {
-                            console.warn('⚠️ PNG generation returned empty result');
+                            console.log(`✅ Print PNG: all ${pngResult.savedViews} views saved`);
                         }
+                        this._lastPrintPngResult = {
+                            designId: this.currentDesignId,
+                            savedViews: pngResult.savedViews ?? 0,
+                            totalViews: pngResult.totalViews ?? 0,
+                            success: pngResult.success,
+                            failedViews: pngResult.results?.filter(r => !r.success).map(r => r.viewName) ?? []
+                        };
                     } else {
-                        console.warn('⚠️ generatePNGForDownload function not available');
+                        console.warn('⚠️ generatePNGForSave not available');
                     }
                 } catch (pngError) {
-                    console.error('❌ PNG generation/save error:', pngError);
-                    // Don't block the redirect if PNG fails
+                    console.error('❌ High-res PNG generation error:', pngError);
+                    // Non-blocking — redirect proceeds regardless
                 }
 
                 setTimeout(() => {
