@@ -44,7 +44,7 @@ class Octo_Print_Designer_Settings {
             'octo-api-settings',
             array($this, 'render_api_settings_page')
         );
-        
+
         // Add API Information page
         add_submenu_page(
             'octo-print-designer', // Parent menu (Print Designer)
@@ -53,6 +53,18 @@ class Octo_Print_Designer_Settings {
             'manage_options',
             'octo-api-guide',
             array($this, 'render_api_guide_page')
+        );
+
+        // PNG Manager — Phase 1 read-only admin screen
+        require_once plugin_dir_path( __FILE__ ) . 'class-octo-print-png-admin.php';
+        $png_admin = new Octo_Print_PNG_Admin();
+        add_submenu_page(
+            'octo-print-designer',
+            __( 'PNG Manager', 'octo-print-designer' ),
+            __( 'PNG Manager', 'octo-print-designer' ),
+            'manage_options',
+            'octo-png-manager',
+            array( $png_admin, 'render_page' )
         );
     }
 
