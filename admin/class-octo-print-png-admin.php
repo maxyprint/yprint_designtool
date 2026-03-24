@@ -24,6 +24,7 @@ class PNG_List_Table extends WP_List_Table {
             'save_type'        => __( 'Save Type', 'octo-print-designer' ),
             'png_size_kb'      => __( 'Size in DB', 'octo-print-designer' ),
             'db_status'        => __( 'DB Status', 'octo-print-designer' ),
+            'png_preview'      => __( 'Preview', 'octo-print-designer' ),
         );
     }
 
@@ -74,6 +75,18 @@ class PNG_List_Table extends WP_List_Table {
             return '<span style="color:#46b450;" title="Binary PNG present in database">&#10003; Has data</span>';
         }
         return '<span style="color:#dc3232;" title="Record exists but binary data is empty">&#9888; Empty record</span>';
+    }
+
+    protected function column_png_preview( $item ) {
+        if ( $item->png_record_id === null || $item->png_size_bytes === 0 ) {
+            return '<span style="color:#999;">—</span>';
+        }
+        $url = add_query_arg( array(
+            'action' => 'yprint_admin_preview_png',
+            'png_id' => absint( $item->png_record_id ),
+            'nonce'  => wp_create_nonce( 'yprint_preview_png' ),
+        ), admin_url( 'admin-ajax.php' ) );
+        return '<a href="' . esc_url( $url ) . '" target="_blank">View PNG</a>';
     }
 
     public function prepare_items() {

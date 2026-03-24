@@ -277,6 +277,14 @@ class Octo_Print_Designer_Products {
                 throw new Exception(__('Failed to delete designs', 'octo-print-designer'));
             }
 
+            // Cascade: delete associated PNG records
+            $png_table        = $wpdb->prefix . 'yprint_design_pngs';
+            $png_placeholders = implode( ',', array_fill( 0, count( $design_ids ), '%d' ) );
+            $wpdb->query( $wpdb->prepare(
+                "DELETE FROM {$png_table} WHERE CAST(design_id AS UNSIGNED) IN ({$png_placeholders})",
+                $design_ids
+            ) );
+
             // Delete associated images
             if (!empty($image_ids)) {
                 foreach ($image_ids as $image_id) {
@@ -285,7 +293,12 @@ class Octo_Print_Designer_Products {
             }
 
             $wpdb->query('COMMIT');
-            
+
+            // Clean up wp_options PNG metadata (only _print_png keys, not _order_data)
+            foreach ( $design_ids as $did ) {
+                delete_option( 'yprint_design_' . intval( $did ) . '_print_png' );
+            }
+
             wp_send_json_success(array(
                 'message' => sprintf(
                     _n(

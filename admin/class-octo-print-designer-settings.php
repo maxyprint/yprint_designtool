@@ -18,6 +18,7 @@ class Octo_Print_Designer_Settings {
         add_action('admin_menu', array($this, 'add_api_admin_menu'));
         add_action('admin_init', array($this, 'page_init'));
         add_action('wp_ajax_octo_test_api_connection', array($this, 'test_api_connection'));
+        add_action( 'wp_ajax_yprint_admin_preview_png', array( $this, 'handle_png_preview' ) );
     }
 
     public function add_plugin_page() {
@@ -114,6 +115,41 @@ class Octo_Print_Designer_Settings {
                 'debug_info' => array('Exception: ' . $e->getMessage())
             ));
         }
+    }
+
+    /**
+     * AJAX handler: serve raw PNG binary from wp_yprint_design_pngs for admin preview
+     */
+    public function handle_png_preview() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Forbidden', 403 );
+        }
+        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( sanitize_key( $_GET['nonce'] ), 'yprint_preview_png' ) ) {
+            wp_die( 'Invalid nonce', 403 );
+        }
+        $png_id = absint( $_GET['png_id'] ?? 0 );
+        if ( ! $png_id ) {
+            wp_die( 'Invalid ID', 400 );
+        }
+
+        global $wpdb;
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT print_png FROM {$wpdb->prefix}yprint_design_pngs WHERE id = %d",
+            $png_id
+        ) );
+
+        if ( ! $row || empty( $row->print_png ) ) {
+            wp_die( 'PNG not found', 404 );
+        }
+
+        if ( ob_get_length() ) {
+            ob_clean();
+        }
+        header( 'Content-Type: image/png' );
+        header( 'Cache-Control: private, max-age=300' );
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo $row->print_png;
+        exit;
     }
 
     /**
