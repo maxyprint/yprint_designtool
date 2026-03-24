@@ -39,7 +39,8 @@ class PNG_List_Table extends WP_List_Table {
     protected function column_default( $item, $column_name ) {
         switch ( $column_name ) {
             case 'design_id':
-                return esc_html( $item->design_id );
+                return esc_html( $item->design_id )
+                    . ' <a href="#raw-png-records" style="font-size:11px;">[PNG Records ↓]</a>';
             case 'design_name':
                 return esc_html( $item->design_name ?: '—' );
             case 'user':
@@ -252,6 +253,109 @@ class PNG_List_Table extends WP_List_Table {
 }
 
 /**
+ * PNG_Raw_Records_Table — direct view of wp_yprint_design_pngs, no JOIN.
+ * Columns: id, design_id (raw string), view_name, save_type, generated_at, size_kb, preview.
+ */
+class PNG_Raw_Records_Table extends WP_List_Table {
+
+    public function get_columns() {
+        return array(
+            'png_id'        => __( 'PNG ID', 'octo-print-designer' ),
+            'raw_design_id' => __( 'design_id (raw)', 'octo-print-designer' ),
+            'view_name'     => __( 'View', 'octo-print-designer' ),
+            'save_type'     => __( 'Save Type', 'octo-print-designer' ),
+            'generated_at'  => __( 'Generated', 'octo-print-designer' ),
+            'size_kb'       => __( 'Size', 'octo-print-designer' ),
+            'preview'       => __( 'Preview', 'octo-print-designer' ),
+        );
+    }
+
+    public function get_sortable_columns() {
+        return array(
+            'png_id'       => array( 'id', true ),
+            'generated_at' => array( 'generated_at', false ),
+            'size_kb'      => array( 'size_bytes', false ),
+        );
+    }
+
+    protected function column_default( $item, $column_name ) {
+        switch ( $column_name ) {
+            case 'png_id':
+                return esc_html( $item->id );
+            case 'raw_design_id':
+                return '<span style="font-family:monospace;font-size:11px;word-break:break-all;">'
+                    . esc_html( $item->design_id ) . '</span>';
+            case 'view_name':
+                return $item->view_name !== null ? esc_html( $item->view_name ) : '—';
+            case 'save_type':
+                return $item->save_type ? esc_html( $item->save_type ) : '—';
+            case 'generated_at':
+                return $item->generated_at ? esc_html( $item->generated_at ) : '—';
+            case 'size_kb':
+                return $item->size_bytes > 0
+                    ? esc_html( round( $item->size_bytes / 1024, 1 ) ) . ' KB'
+                    : '0 KB';
+            default:
+                return '';
+        }
+    }
+
+    protected function column_preview( $item ) {
+        if ( empty( $item->size_bytes ) ) {
+            return '<span style="color:#999;">—</span>';
+        }
+        $url = add_query_arg( array(
+            'action' => 'yprint_admin_preview_png',
+            'png_id' => absint( $item->id ),
+            'nonce'  => wp_create_nonce( 'yprint_preview_png' ),
+        ), admin_url( 'admin-ajax.php' ) );
+        return '<a href="' . esc_url( $url ) . '" target="_blank">View PNG</a>';
+    }
+
+    public function prepare_items() {
+        $search = sanitize_text_field( $_GET['raw_search'] ?? '' );
+        $this->_column_headers = array( $this->get_columns(), array(), $this->get_sortable_columns() );
+        $this->items = $this->get_raw_records( $search );
+    }
+
+    private function get_raw_records( $search ) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'yprint_design_pngs';
+
+        if ( $search !== '' ) {
+            return $wpdb->get_results( $wpdb->prepare(
+                "SELECT id, design_id, view_name, save_type, generated_at,
+                        LENGTH(print_png) AS size_bytes
+                 FROM {$table}
+                 WHERE design_id LIKE %s
+                 ORDER BY generated_at DESC
+                 LIMIT 100",
+                '%' . $wpdb->esc_like( $search ) . '%'
+            ) );
+        }
+
+        return $wpdb->get_results(
+            "SELECT id, design_id, view_name, save_type, generated_at,
+                    LENGTH(print_png) AS size_bytes
+             FROM {$table}
+             ORDER BY generated_at DESC
+             LIMIT 100"
+        );
+    }
+
+    protected function extra_tablenav( $which ) {
+        if ( $which !== 'top' ) return;
+        $search = esc_attr( sanitize_text_field( $_GET['raw_search'] ?? '' ) );
+        echo '<div class="alignleft actions">';
+        echo '<input type="text" name="raw_search" value="' . $search . '" '
+            . 'placeholder="' . esc_attr__( 'Search design_id…', 'octo-print-designer' ) . '" '
+            . 'style="width:300px;" />';
+        submit_button( __( 'Search', 'octo-print-designer' ), 'button', 'raw_search_submit', false );
+        echo '</div>';
+    }
+}
+
+/**
  * Octo_Print_PNG_Admin — render callback only.
  * Submenu registration lives in class-octo-print-designer-settings.php::add_api_admin_menu()
  */
@@ -264,6 +368,9 @@ class Octo_Print_PNG_Admin {
 
         $table = new PNG_List_Table();
         $table->prepare_items();
+
+        $raw_table = new PNG_Raw_Records_Table();
+        $raw_table->prepare_items();
         ?>
         <div class="wrap">
             <h1><?php esc_html_e( 'PNG Manager', 'octo-print-designer' ); ?></h1>
@@ -273,6 +380,17 @@ class Octo_Print_PNG_Admin {
             <form method="get">
                 <input type="hidden" name="page" value="octo-png-manager" />
                 <?php $table->display(); ?>
+            </form>
+
+            <hr style="margin:30px 0;" />
+
+            <h2 id="raw-png-records"><?php esc_html_e( 'PNG Records (Direct)', 'octo-print-designer' ); ?></h2>
+            <p style="color:#666;">
+                <?php esc_html_e( 'Direct view of wp_yprint_design_pngs — no join. Shows up to 100 records. Use search to filter by design_id string.', 'octo-print-designer' ); ?>
+            </p>
+            <form method="get">
+                <input type="hidden" name="page" value="octo-png-manager" />
+                <?php $raw_table->display(); ?>
             </form>
         </div>
         <?php
