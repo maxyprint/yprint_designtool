@@ -392,6 +392,115 @@ class Octo_Print_PNG_Admin {
                 <input type="hidden" name="page" value="octo-png-manager" />
                 <?php $raw_table->display(); ?>
             </form>
+
+            <hr style="margin:30px 0;" />
+
+            <h2 id="discover-pngs-by-order"><?php esc_html_e( 'Discover PNGs by Order', 'octo-print-designer' ); ?></h2>
+            <p style="color:#666;">
+                <?php esc_html_e( 'Enter a WooCommerce Order ID to find all PNG files associated with that order.', 'octo-print-designer' ); ?>
+            </p>
+            <div style="margin-bottom:16px;">
+                <input type="number" id="png-discover-order-id" min="1" step="1"
+                       placeholder="<?php esc_attr_e( 'Order ID…', 'octo-print-designer' ); ?>"
+                       style="width:180px; margin-right:8px;" />
+                <button type="button" id="png-discover-btn" class="button button-primary">
+                    <?php esc_html_e( 'Discover PNGs', 'octo-print-designer' ); ?>
+                </button>
+            </div>
+            <div id="png-discover-result" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:4px; min-height:40px; color:#666;">
+                <?php esc_html_e( 'Enter an order ID above and click Discover PNGs.', 'octo-print-designer' ); ?>
+            </div>
+
+            <script>
+            (function () {
+                function escapeHtml(str) {
+                    return String(str)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                }
+
+                async function yprintDiscoverPNGsForOrder() {
+                    var container = document.getElementById('png-discover-result');
+                    var input     = document.getElementById('png-discover-order-id');
+                    var orderId   = input ? input.value.trim() : '';
+
+                    if (!orderId || isNaN(parseInt(orderId, 10)) || parseInt(orderId, 10) < 1) {
+                        container.innerHTML = '<span style="color:#dc3232;"><?php echo esc_js( __( 'Please enter a valid Order ID.', 'octo-print-designer' ) ); ?></span>';
+                        return;
+                    }
+
+                    if (!window.ajaxurl) {
+                        container.innerHTML = '<span style="color:#dc3232;"><?php echo esc_js( __( 'WordPress ajaxurl is not defined. This page may not have loaded correctly.', 'octo-print-designer' ) ); ?></span>';
+                        return;
+                    }
+
+                    container.innerHTML = '<span style="color:#666;"><?php echo esc_js( __( 'Searching…', 'octo-print-designer' ) ); ?></span>';
+
+                    var formData = new FormData();
+                    formData.append('action', 'yprint_discover_png_files');
+                    formData.append('identifier', orderId);
+                    formData.append('order_id', orderId);
+                    formData.append('nonce', '<?php echo esc_js( wp_create_nonce( 'admin' ) ); ?>');
+
+                    try {
+                        var response = await fetch(window.ajaxurl, { method: 'POST', body: formData });
+                        var data = await response.json();
+
+                        if (data.success && data.data && data.data.png_files && data.data.png_files.length > 0) {
+                            var html = '<strong>' + escapeHtml('<?php echo esc_js( __( 'Found', 'octo-print-designer' ) ); ?> ' + data.data.png_files.length + ' <?php echo esc_js( __( 'PNG file(s):', 'octo-print-designer' ) ); ?>') + '</strong>';
+                            data.data.png_files.forEach(function (png) {
+                                var title = png.view_name
+                                    ? escapeHtml(png.view_name) + ': ' + escapeHtml(png.design_name || 'Design #' + png.design_id)
+                                    : escapeHtml(png.design_name || 'Design #' + png.design_id);
+                                var meta = [];
+                                meta.push('Design ID: ' + escapeHtml(String(png.design_id)));
+                                if (png.view_id) { meta.push('View ID: ' + escapeHtml(String(png.view_id))); }
+                                meta.push('Source: ' + escapeHtml(String(png.source)));
+                                if (png.generated_at && png.generated_at !== 'unknown') {
+                                    try { meta.push('Generated: ' + escapeHtml(new Date(png.generated_at).toLocaleDateString())); } catch (e) {}
+                                }
+                                html += '<div style="margin:8px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:3px;">';
+                                html += '<strong>' + title + '</strong><br>';
+                                html += '<small>' + meta.join(' | ') + '</small><br>';
+                                html += '<a href="' + escapeHtml(png.print_file_url) + '" target="_blank" rel="noopener noreferrer">View PNG</a>';
+                                html += '</div>';
+                            });
+                            container.innerHTML = html;
+
+                        } else if (data.success && data.data && data.data.files && data.data.files.length > 0) {
+                            var html = '<strong>' + escapeHtml('<?php echo esc_js( __( 'Found', 'octo-print-designer' ) ); ?> ' + data.data.files.length + ' <?php echo esc_js( __( 'PNG file(s) (filesystem):', 'octo-print-designer' ) ); ?>') + '</strong>';
+                            data.data.files.forEach(function (file) {
+                                html += '<div style="margin:8px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:3px;">';
+                                html += '<strong>' + escapeHtml(file.filename) + '</strong><br>';
+                                html += '<small>Design ID: ' + escapeHtml(String(file.matched_identifier)) + ' | Size: ' + escapeHtml((file.size / 1024).toFixed(1)) + ' KB</small><br>';
+                                html += '<a href="' + escapeHtml(file.url) + '" target="_blank" rel="noopener noreferrer">View PNG</a>';
+                                html += '</div>';
+                            });
+                            container.innerHTML = html;
+
+                        } else {
+                            container.innerHTML = '<span style="color:#dc3232;"><?php echo esc_js( __( 'No PNG files found for Order ID', 'octo-print-designer' ) ); ?> ' + escapeHtml(orderId) + '.</span>';
+                        }
+                    } catch (e) {
+                        container.innerHTML = '<span style="color:#dc3232;"><?php echo esc_js( __( 'Request failed:', 'octo-print-designer' ) ); ?> ' + escapeHtml(e.message) + '</span>';
+                    }
+                }
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    var btn   = document.getElementById('png-discover-btn');
+                    var input = document.getElementById('png-discover-order-id');
+                    if (btn)   { btn.addEventListener('click', yprintDiscoverPNGsForOrder); }
+                    if (input) {
+                        input.addEventListener('keydown', function (e) {
+                            if (e.key === 'Enter') { e.preventDefault(); yprintDiscoverPNGsForOrder(); }
+                        });
+                    }
+                });
+            }());
+            </script>
         </div>
         <?php
     }
