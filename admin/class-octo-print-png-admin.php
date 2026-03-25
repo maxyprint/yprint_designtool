@@ -15,6 +15,7 @@ class PNG_List_Table extends WP_List_Table {
     public function get_columns() {
         return array(
             'design_id'        => __( 'Design ID', 'octo-print-designer' ),
+            'linked_png_count' => __( 'Linked PNGs', 'octo-print-designer' ),
             'design_name'      => __( 'Design Name', 'octo-print-designer' ),
             'user'             => __( 'Owner', 'octo-print-designer' ),
             'template'         => __( 'Template', 'octo-print-designer' ),
@@ -58,6 +59,10 @@ class PNG_List_Table extends WP_List_Table {
                 return $item->png_generated_at ? esc_html( $item->png_generated_at ) : '—';
             case 'save_type':
                 return $item->save_type ? esc_html( $item->save_type ) : '—';
+            case 'linked_png_count':
+                return $item->linked_png_count > 0
+                    ? esc_html( $item->linked_png_count )
+                    : '<span style="color:#999;">0</span>';
             case 'png_size_kb':
                 if ( $item->png_record_id === null ) return '—';
                 return $item->png_size_bytes > 0
@@ -160,7 +165,10 @@ class PNG_List_Table extends WP_List_Table {
                 p.view_name,
                 p.generated_at  AS png_generated_at,
                 p.save_type,
-                LENGTH(p.print_png) AS png_size_bytes
+                LENGTH(p.print_png) AS png_size_bytes,
+                (SELECT COUNT(*)
+                 FROM {$pngs_table} pcount
+                 WHERE pcount.design_id = CAST(d.id AS CHAR)) AS linked_png_count
             FROM {$designs_table} d
             LEFT JOIN {$pngs_table} p ON CAST(p.design_id AS UNSIGNED) = d.id
             WHERE " . implode( ' AND ', $where ) . "
@@ -375,7 +383,7 @@ class Octo_Print_PNG_Admin {
         <div class="wrap">
             <h1><?php esc_html_e( 'PNG Manager', 'octo-print-designer' ); ?></h1>
             <p style="color:#666;">
-                <?php esc_html_e( 'Read-only view. Design-level columns: ID, Name, Owner, Template. View-level columns: View, View ID, Generated, Save Type, Size in DB, DB Status.', 'octo-print-designer' ); ?>
+                <?php esc_html_e( 'Read-only view. Design-level columns: ID, Name, Owner, Template. View-level columns: View, View ID, Generated, Save Type, Size in DB, DB Status. Linked PNGs counts only numerically-linked PNG records (direct design ID match).', 'octo-print-designer' ); ?>
             </p>
             <form method="get">
                 <input type="hidden" name="page" value="octo-png-manager" />
